@@ -31,10 +31,10 @@
       empty.
 - [ ] 3.8 Refuse to continue when the database is empty and no bootstrap input
       exists.
-- [ ] 3.9 Generate local root and app credentials on first install.
-- [ ] 3.10 Protect `mysql/credentials.env` with restrictive Windows ACLs.
+- [x] 3.9 Generate local root and app credentials on first install.
+- [x] 3.10 Protect `mysql/credentials.env` with restrictive Windows ACLs.
 - [ ] 3.11 Write `mysql/state.json` after successful install.
-- [ ] 3.12 Refuse to manage `MistMySQL` when service ownership checks fail.
+- [x] 3.12 Refuse to manage `MistMySQL` when service ownership checks fail.
 - [ ] 3.13 Refuse existing data directories from unsupported MySQL major lines.
 
 ## 4. Integrate with appliance installer
