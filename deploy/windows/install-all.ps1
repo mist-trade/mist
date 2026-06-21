@@ -2,7 +2,11 @@
 
 param(
     [switch]$SkipDatabaseCheck,
-    [switch]$SkipDatasourceTest
+    [switch]$SkipDatasourceTest,
+    [switch]$InstallPortableMySQL,
+    [int]$MysqlPort = 3307,
+    [string]$MysqlDumpFile = "",
+    [string]$MysqlSchemaFile = ""
 )
 
 $ErrorActionPreference = "Stop"
@@ -33,6 +37,25 @@ function Get-EnvValue($content, $name) {
     return $match.Groups[1].Value.Trim().Trim('"').Trim("'")
 }
 
+function Set-EnvValue($path, $name, $value) {
+    $line = "$name=$value"
+    if (-not (Test-Path $path -PathType Leaf)) {
+        Set-Content -Path $path -Value $line -Encoding UTF8
+        return
+    }
+
+    $content = Get-Content $path -Raw
+    $pattern = "(?m)^\s*$([regex]::Escape($name))\s*=.*$"
+    if ([regex]::IsMatch($content, $pattern)) {
+        $content = [regex]::Replace($content, $pattern, $line)
+    } else {
+        if (-not $content.EndsWith("`n")) { $content += "`n" }
+        $content += "$line`n"
+    }
+
+    Set-Content -Path $path -Value $content -Encoding UTF8
+}
+
 function Ensure-EnvFile($dir, $label) {
     $envFile = Join-Path $dir ".env"
     $example = Join-Path $dir ".env.example"
@@ -57,13 +80,6 @@ function Test-DatabaseInitialized {
         return
     }
 
-    $mysql = Get-Command mysql -ErrorAction SilentlyContinue
-    if (-not $mysql) {
-        Write-Fail "mysql CLI not found. Install MySQL client or rerun with -SkipDatabaseCheck after manual verification."
-        Write-Host "  See $(Join-Path $DatabaseDir "README.md")" -ForegroundColor Yellow
-        exit 1
-    }
-
     $content = Get-Content $BackendEnvFile -Raw
     $hostName = Get-EnvValue $content "mysql_server_host"
     $port = Get-EnvValue $content "mysql_server_port"
@@ -79,11 +95,26 @@ function Test-DatabaseInitialized {
         exit 1
     }
 
+    $mysqlExe = ""
+    $portableMysqlExe = Join-Path $RootDir "mysql\runtime\mysql-8.4.10\bin\mysql.exe"
+    if ($hostName -eq "127.0.0.1" -and $port -eq "$MysqlPort" -and (Test-Path $portableMysqlExe -PathType Leaf)) {
+        $mysqlExe = $portableMysqlExe
+    } else {
+        $mysql = Get-Command mysql -ErrorAction SilentlyContinue
+        if ($mysql) { $mysqlExe = $mysql.Source }
+    }
+
+    if (-not $mysqlExe) {
+        Write-Fail "mysql CLI not found. Install MySQL client or rerun with -SkipDatabaseCheck after manual verification."
+        Write-Host "  See $(Join-Path $DatabaseDir "README.md")" -ForegroundColor Yellow
+        exit 1
+    }
+
     $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$database';"
     $args = @("-h", $hostName, "-P", $port, "-u", $user, "-N", "-B", "-e", $query)
     if ($password) { $args = @("-h", $hostName, "-P", $port, "-u", $user, "-p$password", "-N", "-B", "-e", $query) }
 
-    $tableCount = & $mysql.Source @args 2>$null
+    $tableCount = & $mysqlExe @args 2>$null
     if ($LASTEXITCODE -ne 0) {
         Write-Fail "Unable to query MySQL. Check backend .env credentials or initialize database manually."
         exit 1
@@ -116,6 +147,23 @@ if (-not ($backendReady -and $datasourceReady)) {
 }
 
 $backendEnv = Join-Path $BackendDir ".env"
+
+if ($InstallPortableMySQL) {
+    Write-Step "Install portable MySQL"
+    $mysqlInstaller = Join-Path $RootDir "mysql\scripts\install-portable-mysql.ps1"
+    if (-not (Test-Path $mysqlInstaller -PathType Leaf)) {
+        Write-Fail "Portable MySQL installer not found: $mysqlInstaller"
+        exit 1
+    }
+
+    $portable = & $mysqlInstaller -RootDir $RootDir -Port $MysqlPort -DumpFile $MysqlDumpFile -SchemaFile $MysqlSchemaFile
+    Set-EnvValue $backendEnv "mysql_server_host" $portable.Host
+    Set-EnvValue $backendEnv "mysql_server_port" "$($portable.Port)"
+    Set-EnvValue $backendEnv "mysql_server_username" $portable.AppUser
+    Set-EnvValue $backendEnv "mysql_server_password" $portable.AppPassword
+    Set-EnvValue $backendEnv "mysql_server_database" $portable.Database
+}
+
 Test-DatabaseInitialized -BackendEnvFile $backendEnv
 
 Write-Step "Datasource preflight"

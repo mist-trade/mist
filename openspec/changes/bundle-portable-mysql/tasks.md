@@ -4,9 +4,9 @@
 
 - [x] 1.1 Choose the pinned MySQL Windows ZIP version.
 - [x] 1.2 Confirm redistribution/licensing requirements for the release shape.
-- [ ] 1.3 Choose the default portable service name `MistMySQL`.
-- [ ] 1.4 Choose the default portable port `3307`.
-- [ ] 1.5 Confirm Python and uv remain out of scope for this change.
+- [x] 1.3 Choose the default portable service name `MistMySQL`.
+- [x] 1.4 Choose the default portable port `3307`.
+- [x] 1.5 Confirm Python and uv remain out of scope for this change.
 - [x] 1.6 Confirm the first supported portable runtime line is MySQL 8.4 LTS.
 
 ## 2. Update appliance packaging
@@ -21,30 +21,30 @@
 
 ## 3. Add portable MySQL scripts
 
-- [ ] 3.1 Add `deploy/windows/mysql/install-portable-mysql.ps1`.
-- [ ] 3.2 Generate `mysql/my.ini` with package-local paths.
-- [ ] 3.3 Initialize `mysql/data` only when it is not already initialized.
-- [ ] 3.4 Register or update the `MistMySQL` Windows service.
-- [ ] 3.5 Create or update the `mist` database.
-- [ ] 3.6 Create or update the `mist_app` database user.
-- [ ] 3.7 Import `-MysqlDumpFile` or `-MysqlSchemaFile` when the database is
+- [x] 3.1 Add `deploy/windows/mysql/install-portable-mysql.ps1`.
+- [x] 3.2 Generate `mysql/my.ini` with package-local paths.
+- [x] 3.3 Initialize `mysql/data` only when it is not already initialized.
+- [x] 3.4 Register or update the `MistMySQL` Windows service.
+- [x] 3.5 Create or update the `mist` database.
+- [x] 3.6 Create or update the `mist_app` database user.
+- [x] 3.7 Import `-MysqlDumpFile` or `-MysqlSchemaFile` when the database is
       empty.
-- [ ] 3.8 Refuse to continue when the database is empty and no bootstrap input
+- [x] 3.8 Refuse to continue when the database is empty and no bootstrap input
       exists.
 - [x] 3.9 Generate local root and app credentials on first install.
 - [x] 3.10 Protect `mysql/credentials.env` with restrictive Windows ACLs.
-- [ ] 3.11 Write `mysql/state.json` after successful install.
+- [x] 3.11 Write `mysql/state.json` after successful install.
 - [x] 3.12 Refuse to manage `MistMySQL` when service ownership checks fail.
-- [ ] 3.13 Refuse existing data directories from unsupported MySQL major lines.
+- [x] 3.13 Refuse existing data directories from unsupported MySQL major lines.
 
 ## 4. Integrate with appliance installer
 
-- [ ] 4.1 Add `-InstallPortableMySQL` to `install-all.ps1`.
-- [ ] 4.2 Add `-MysqlPort`, defaulting to `3307`.
-- [ ] 4.3 Add `-MysqlDumpFile` and `-MysqlSchemaFile`.
-- [ ] 4.4 Call portable MySQL install before backend service installation.
-- [ ] 4.5 Update `backend/.env` only when portable MySQL is requested.
-- [ ] 4.6 Preserve existing external MySQL configuration when portable MySQL is
+- [x] 4.1 Add `-InstallPortableMySQL` to `install-all.ps1`.
+- [x] 4.2 Add `-MysqlPort`, defaulting to `3307`.
+- [x] 4.3 Add `-MysqlDumpFile` and `-MysqlSchemaFile`.
+- [x] 4.4 Call portable MySQL install before backend service installation.
+- [x] 4.5 Update `backend/.env` only when portable MySQL is requested.
+- [x] 4.6 Preserve existing external MySQL configuration when portable MySQL is
       not requested.
 
 ## 5. Add backup and uninstall behavior
