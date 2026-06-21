@@ -49,14 +49,14 @@
 
 ## 5. Add backup and uninstall behavior
 
-- [ ] 5.1 Add `deploy/windows/mysql/backup-mysql.ps1`.
-- [ ] 5.2 Add `deploy/windows/mysql/uninstall-portable-mysql.ps1`.
-- [ ] 5.3 Update `uninstall-all.ps1` to remove `MistMySQL` service when present.
-- [ ] 5.4 Preserve `mysql/data` by default.
-- [ ] 5.5 Add explicit `-RemovePortableMySQLData` for destructive cleanup.
-- [ ] 5.6 Add `deploy/windows/mysql/restore-mysql.ps1` for explicit dump
+- [x] 5.1 Add `deploy/windows/mysql/backup-mysql.ps1`.
+- [x] 5.2 Add `deploy/windows/mysql/uninstall-portable-mysql.ps1`.
+- [x] 5.3 Update `uninstall-all.ps1` to remove `MistMySQL` service when present.
+- [x] 5.4 Preserve `mysql/data` by default.
+- [x] 5.5 Add explicit `-RemovePortableMySQLData` for destructive cleanup.
+- [x] 5.6 Add `deploy/windows/mysql/restore-mysql.ps1` for explicit dump
       restores.
-- [ ] 5.7 Require a separate force flag before restoring over a non-empty
+- [x] 5.7 Require a separate force flag before restoring over a non-empty
       database.
 
 ## 6. Update health checks and docs

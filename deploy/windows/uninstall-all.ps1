@@ -1,5 +1,9 @@
 ﻿# Uninstall Mist Windows API appliance services.
 
+param(
+    [switch]$RemovePortableMySQLData
+)
+
 $ErrorActionPreference = "Stop"
 
 $RootDir = $PSScriptRoot
@@ -19,6 +23,11 @@ function Resolve-NssmExe {
 $backendUninstall = Join-Path $BackendDir "scripts\uninstall-service.ps1"
 if (Test-Path $backendUninstall -PathType Leaf) {
     & $backendUninstall
+}
+
+$portableMysqlUninstall = Join-Path $RootDir "mysql\scripts\uninstall-portable-mysql.ps1"
+if (Test-Path $portableMysqlUninstall -PathType Leaf) {
+    & $portableMysqlUninstall -RootDir $RootDir -RemoveData:$RemovePortableMySQLData
 }
 
 $nssmExe = Resolve-NssmExe
