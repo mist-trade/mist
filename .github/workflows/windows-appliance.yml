@@ -1,0 +1,151 @@
+name: Build Windows API Appliance
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build mist-api-appliance-win-x64.zip
+    runs-on: windows-latest
+
+    env:
+      NODE_VERSION: 24.x
+      DATASOURCE_REPOSITORY: mist-trade/mist-datasource
+      ARTIFACT_NAME: mist-api-appliance-win-x64
+
+    steps:
+      - name: Checkout mist
+        uses: actions/checkout@v4
+        with:
+          path: mist
+          fetch-depth: 0
+
+      - name: Checkout mist-datasource
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ env.DATASOURCE_REPOSITORY }}
+          path: mist-datasource
+          token: ${{ secrets.DATASOURCE_CHECKOUT_TOKEN || github.token }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install pnpm
+        run: npm install -g pnpm
+
+      - name: Build Mist backend
+        shell: pwsh
+        run: |
+          cd mist
+          pnpm install --frozen-lockfile
+          pnpm run build
+          pnpm prune --prod
+
+      - name: Setup Python for datasource lock
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Generate datasource lockfile
+        shell: pwsh
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install uv
+          cd mist-datasource
+          uv lock
+
+      - name: Install NSSM for appliance package
+        shell: pwsh
+        run: |
+          choco install nssm -y --no-progress
+          $nssm = (Get-Command nssm).Source
+          Write-Host "NSSM=$nssm"
+
+      - name: Assemble appliance
+        id: assemble
+        shell: pwsh
+        run: |
+          $root = (Get-Location).Path
+          $pkg = Join-Path $env:RUNNER_TEMP "mist-api-appliance"
+          $zip = Join-Path $root "${{ env.ARTIFACT_NAME }}.zip"
+
+          if (Test-Path $pkg) { Remove-Item $pkg -Recurse -Force }
+          if (Test-Path $zip) { Remove-Item $zip -Force }
+
+          New-Item -ItemType Directory -Path $pkg | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "backend") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "backend\runtime") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "backend\scripts") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "datasource") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "database") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "nssm") | Out-Null
+
+          Copy-Item "mist\deploy\windows\install-all.ps1" $pkg
+          Copy-Item "mist\deploy\windows\uninstall-all.ps1" $pkg
+          Copy-Item "mist\deploy\windows\health-check.ps1" $pkg
+          Copy-Item "mist\deploy\windows\README-Windows.md" $pkg
+          Copy-Item "mist\deploy\windows\database\*" (Join-Path $pkg "database") -Recurse
+
+          Copy-Item "mist\dist" (Join-Path $pkg "backend\dist") -Recurse
+          Copy-Item "mist\node_modules" (Join-Path $pkg "backend\node_modules") -Recurse
+          Copy-Item "mist\package.json" (Join-Path $pkg "backend")
+          Copy-Item "mist\pnpm-lock.yaml" (Join-Path $pkg "backend")
+          Copy-Item "mist\deploy\windows\backend.env.example" (Join-Path $pkg "backend\.env.example")
+          Copy-Item "mist\deploy\windows\backend\*.ps1" (Join-Path $pkg "backend\scripts")
+          Copy-Item (Get-Command node).Source (Join-Path $pkg "backend\runtime\node.exe")
+
+          foreach ($item in @("src", "tdx", "qmt", "scripts")) {
+            Copy-Item "mist-datasource\$item" (Join-Path $pkg "datasource\$item") -Recurse
+          }
+          foreach ($file in @("pyproject.toml", "uv.lock", "README.md", "TDX.md", "QMT.md")) {
+            if (Test-Path "mist-datasource\$file") {
+              Copy-Item "mist-datasource\$file" (Join-Path $pkg "datasource")
+            }
+          }
+          Copy-Item "mist-datasource\.env.windows.example" (Join-Path $pkg "datasource\.env.example")
+
+          $nssm = (Get-Command nssm).Source
+          Copy-Item $nssm (Join-Path $pkg "nssm\nssm.exe")
+
+          $datasourceSha = git -C mist-datasource rev-parse HEAD
+          $version = if ($env:GITHUB_REF -like "refs/tags/*") { $env:GITHUB_REF.Replace("refs/tags/", "") } else { "manual-$env:GITHUB_RUN_NUMBER" }
+          $manifest = [ordered]@{
+            name = "mist-api-appliance-win-x64"
+            version = $version
+            createdAt = (Get-Date).ToUniversalTime().ToString("o")
+            mistRepository = "${{ github.repository }}"
+            mistSha = "${{ github.sha }}"
+            datasourceRepository = "${{ env.DATASOURCE_REPOSITORY }}"
+            datasourceSha = $datasourceSha
+            nodeVersion = (node --version)
+            pythonRequirement = ">=3.12"
+            redisRequired = $false
+            sdkBundled = $false
+          }
+          $manifest | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $pkg "manifest.json") -Encoding UTF8
+
+          Compress-Archive -Path (Join-Path $pkg "*") -DestinationPath $zip -CompressionLevel Optimal
+          "zip_path=$zip" >> $env:GITHUB_OUTPUT
+
+      - name: Upload appliance artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ env.ARTIFACT_NAME }}
+          path: ${{ steps.assemble.outputs.zip_path }}
+          retention-days: 14
+
+      - name: Attach appliance to release
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ steps.assemble.outputs.zip_path }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
