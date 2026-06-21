@@ -166,10 +166,6 @@ if ($InstallPortableMySQL) {
 
 Test-DatabaseInitialized -BackendEnvFile $backendEnv
 
-Write-Step "Datasource preflight"
-$preflight = Join-Path $DatasourceDir "scripts\preflight-sdk.ps1"
-& $preflight -EnvFile (Join-Path $DatasourceDir ".env")
-
 Write-Step "Install datasource services"
 $datasourceDeploy = Join-Path $DatasourceDir "scripts\deploy_windows.ps1"
 if ($SkipDatasourceTest) {
