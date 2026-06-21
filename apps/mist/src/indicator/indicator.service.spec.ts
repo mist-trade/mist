@@ -44,4 +44,34 @@ describe('IndicatorService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  it('uses a fallback indicator engine when native talib is unavailable', async () => {
+    jest.resetModules();
+    jest.doMock(
+      'talib',
+      () => {
+        throw new Error('native talib unavailable');
+      },
+      { virtual: true },
+    );
+
+    const { IndicatorService: IndicatorServiceWithFallback } = await import(
+      './indicator.service'
+    );
+    const fallbackService = new IndicatorServiceWithFallback(
+      mockSecurityRepository as any,
+      mockKRepository as any,
+      mockDataSourceService as any,
+    );
+
+    expect(() => fallbackService.onModuleInit()).not.toThrow();
+
+    const result = await fallbackService.runRSI(
+      Array.from({ length: 20 }, (_, index) => index + 1),
+      14,
+    );
+
+    expect(result.nbElement).toBeGreaterThan(0);
+    expect(result.rsi.every((value) => Number.isFinite(value))).toBe(true);
+  });
 });
