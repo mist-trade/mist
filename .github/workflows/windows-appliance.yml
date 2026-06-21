@@ -16,6 +16,7 @@ jobs:
 
     env:
       NODE_VERSION: 24.x
+      PNPM_VERSION: 9.15.3
       DATASOURCE_REPOSITORY: mist-trade/mist-datasource
       ARTIFACT_NAME: mist-api-appliance-win-x64
 
@@ -39,7 +40,7 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@${{ env.PNPM_VERSION }}
 
       - name: Build Mist backend
         shell: pwsh
@@ -47,7 +48,7 @@ jobs:
           cd mist
           pnpm install --frozen-lockfile
           pnpm run build
-          pnpm prune --prod
+          pnpm prune --prod --ignore-scripts
 
       - name: Setup Python for datasource lock
         uses: actions/setup-python@v5
