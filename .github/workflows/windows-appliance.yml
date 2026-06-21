@@ -67,7 +67,7 @@ jobs:
           Write-Host "Python: $(python --version)"
           Write-Host "node-gyp msvs_version: $env:npm_config_msvs_version"
 
-          Invoke-Native "pnpm install" { pnpm install --frozen-lockfile }
+          Invoke-Native "pnpm install" { pnpm install --frozen-lockfile --ignore-scripts }
           Invoke-Native "pnpm build" { pnpm run build }
 
           $dist = Join-Path (Get-Location).Path "dist"
