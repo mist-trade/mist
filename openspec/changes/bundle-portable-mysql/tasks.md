@@ -2,22 +2,22 @@
 
 ## 1. Confirm portable MySQL contract
 
-- [ ] 1.1 Choose the pinned MySQL Windows ZIP version.
-- [ ] 1.2 Confirm redistribution/licensing requirements for the release shape.
+- [x] 1.1 Choose the pinned MySQL Windows ZIP version.
+- [x] 1.2 Confirm redistribution/licensing requirements for the release shape.
 - [ ] 1.3 Choose the default portable service name `MistMySQL`.
 - [ ] 1.4 Choose the default portable port `3307`.
 - [ ] 1.5 Confirm Python and uv remain out of scope for this change.
-- [ ] 1.6 Confirm the first supported portable runtime line is MySQL 8.4 LTS.
+- [x] 1.6 Confirm the first supported portable runtime line is MySQL 8.4 LTS.
 
 ## 2. Update appliance packaging
 
-- [ ] 2.1 Add workflow variables for MySQL version, ZIP URL, and SHA256.
-- [ ] 2.2 Download the MySQL Windows ZIP during `windows-appliance.yml`.
-- [ ] 2.3 Verify the downloaded ZIP SHA256 before extraction.
-- [ ] 2.4 Extract MySQL under `mysql/runtime/mysql-<version>`.
-- [ ] 2.5 Include MySQL runtime metadata in `manifest.json`.
-- [ ] 2.6 Ensure the repo does not commit MySQL binaries.
-- [ ] 2.7 Include MySQL license and third-party notices in the artifact.
+- [x] 2.1 Add workflow variables for MySQL version, ZIP URL, and SHA256.
+- [x] 2.2 Download the MySQL Windows ZIP during `windows-appliance.yml`.
+- [x] 2.3 Verify the downloaded ZIP SHA256 before extraction.
+- [x] 2.4 Extract MySQL under `mysql/runtime/mysql-<version>`.
+- [x] 2.5 Include MySQL runtime metadata in `manifest.json`.
+- [x] 2.6 Ensure the repo does not commit MySQL binaries.
+- [x] 2.7 Include MySQL license and third-party notices in the artifact.
 
 ## 3. Add portable MySQL scripts
 
