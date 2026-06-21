@@ -61,11 +61,11 @@
 
 ## 6. Update health checks and docs
 
-- [ ] 6.1 Add portable MySQL service and TCP checks to `health-check.ps1`.
-- [ ] 6.2 Add a database table-count check using bundled `mysql.exe`.
-- [ ] 6.3 Update `README-Windows.md` with external and portable MySQL paths.
-- [ ] 6.4 Update `database/README.md` with dump/schema import examples.
-- [ ] 6.5 Document that portable MySQL binds only to `127.0.0.1`.
+- [x] 6.1 Add portable MySQL service and TCP checks to `health-check.ps1`.
+- [x] 6.2 Add a database table-count check using bundled `mysql.exe`.
+- [x] 6.3 Update `README-Windows.md` with external and portable MySQL paths.
+- [x] 6.4 Update `database/README.md` with dump/schema import examples.
+- [x] 6.5 Document that portable MySQL binds only to `127.0.0.1`.
 
 ## 7. Verification
 

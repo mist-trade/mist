@@ -15,6 +15,22 @@ Example dump import:
 .\import-backup.ps1 -DumpFile D:\backups\mist.sql -Database mist -User root
 ```
 
+Portable MySQL can import the dump during appliance install:
+
+```powershell
+..\install-all.ps1 -InstallPortableMySQL -MysqlDumpFile D:\backups\mist.sql
+```
+
+Portable backup and restore:
+
+```powershell
+..\mysql\scripts\backup-mysql.ps1
+..\mysql\scripts\restore-mysql.ps1 -DumpFile D:\backups\mist.sql -Force
+```
+
+Restore refuses to overwrite a non-empty `mist` database unless `-Force` is
+passed.
+
 After import, rerun:
 
 ```powershell

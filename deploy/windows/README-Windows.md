@@ -7,7 +7,7 @@ machine.
 
 ```text
 Windows API machine
-  - MySQL
+  - MySQL, external or package-local portable
   - TDX / miniQMT clients
   - MistTDX on 127.0.0.1:9001
   - MistQMT on 127.0.0.1:9002, optional
@@ -44,7 +44,8 @@ Leave `QMT_SDK_PATH` empty to skip QMT service installation.
 
 ## Install
 
-1. Install MySQL and import a known-good Mist schema or dump.
+1. Choose either an existing external MySQL instance or the package-local
+   portable MySQL path.
 2. Confirm TDX / miniQMT clients are installed, authorized, running, and logged in.
 3. Extract the package to a stable path, for example `D:/MistAPI`.
 4. Copy or edit `backend/.env` and `datasource/.env`.
@@ -54,6 +55,15 @@ Leave `QMT_SDK_PATH` empty to skip QMT service installation.
 Set-ExecutionPolicy -Scope Process Bypass
 .\install-all.ps1
 ```
+
+Portable MySQL path, importing an existing dump:
+
+```powershell
+.\install-all.ps1 -InstallPortableMySQL -MysqlDumpFile D:\backups\mist.sql
+```
+
+Portable MySQL binds only to `127.0.0.1:3307`. `MistBackend` still listens on
+`0.0.0.0:8001`, so the Mac can call `http://192.168.31.x:8001`.
 
 If MySQL was verified manually and the `mysql` CLI is not available:
 
@@ -65,6 +75,7 @@ If MySQL was verified manually and the `mysql` CLI is not available:
 
 ```powershell
 .\health-check.ps1
+.\health-check.ps1 -IncludeMySQL
 ```
 
 From the Mac:
