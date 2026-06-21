@@ -89,3 +89,48 @@ Then configure:
 ```text
 MIST_API_BASE_URL=http://<windows-lan-ip>:8001
 ```
+
+## Datasource services
+
+The appliance installs datasource services through the datasource deployment
+entrypoint:
+
+```text
+datasource/scripts/deploy_windows.ps1
+```
+
+`MistTDX` and `MistQMT` are reconciled on every install. If a service already
+belongs to a Mist datasource package, the installer updates its working
+directory, command, logs, and restart policy. If another unrelated service uses
+the same name, installation fails instead of overwriting it.
+
+Useful NSSM commands:
+
+```powershell
+nssm status MistTDX
+nssm status MistQMT
+nssm restart MistTDX
+nssm restart MistQMT
+nssm stop MistTDX
+```
+
+The datasource runner delays normal restarts and stops retrying after repeated
+early crashes. This usually means the SDK path, terminal login, `.env`, or port
+binding needs attention. After fixing the issue, remove the crash-loop state
+file and restart the service:
+
+```powershell
+Remove-Item datasource\logs\service-runner-tdx-state.json -ErrorAction SilentlyContinue
+Remove-Item datasource\logs\service-runner-qmt-state.json -ErrorAction SilentlyContinue
+nssm restart MistTDX
+nssm restart MistQMT
+```
+
+The most useful logs are:
+
+```text
+datasource/logs/tdx-stdout.log
+datasource/logs/tdx-stderr.log
+datasource/logs/qmt-stdout.log
+datasource/logs/qmt-stderr.log
+```
