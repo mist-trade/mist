@@ -12,11 +12,12 @@ permissions:
 jobs:
   build:
     name: Build mist-api-appliance-win-x64.zip
-    runs-on: windows-latest
+    runs-on: windows-2022
 
     env:
-      NODE_VERSION: 24.x
+      NODE_VERSION: 22.x
       PNPM_VERSION: 9.15.3
+      npm_config_msvs_version: 2022
       DATASOURCE_REPOSITORY: mist-trade/mist-datasource
       ARTIFACT_NAME: mist-api-appliance-win-x64
 
@@ -39,15 +40,35 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
       - name: Install pnpm
         run: npm install -g pnpm@${{ env.PNPM_VERSION }}
 
       - name: Build Mist backend
         shell: pwsh
         run: |
-          cd mist
-          pnpm install --frozen-lockfile
-          pnpm run build
+          $ErrorActionPreference = "Stop"
+          Set-Location mist
+
+          function Invoke-Native($Label, [scriptblock]$Command) {
+            & $Command
+            if ($LASTEXITCODE -ne 0) {
+              throw "$Label failed with exit code $LASTEXITCODE"
+            }
+          }
+
+          $env:npm_config_python = (Get-Command python).Source
+          Write-Host "Node: $(node --version)"
+          Write-Host "pnpm: $(pnpm --version)"
+          Write-Host "Python: $(python --version)"
+          Write-Host "node-gyp msvs_version: $env:npm_config_msvs_version"
+
+          Invoke-Native "pnpm install" { pnpm install --frozen-lockfile }
+          Invoke-Native "pnpm build" { pnpm run build }
 
           $dist = Join-Path (Get-Location).Path "dist"
           $entrypoint = Join-Path $dist "apps\mist\main.js"
@@ -62,12 +83,7 @@ jobs:
           $stagedDist = Join-Path $env:RUNNER_TEMP "mist-backend-dist"
           if (Test-Path $stagedDist) { Remove-Item $stagedDist -Recurse -Force }
           Copy-Item $dist $stagedDist -Recurse
-          pnpm prune --prod --ignore-scripts
-
-      - name: Setup Python for datasource lock
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
+          Invoke-Native "pnpm prune" { pnpm prune --prod --ignore-scripts }
 
       - name: Generate datasource lockfile
         shell: pwsh
