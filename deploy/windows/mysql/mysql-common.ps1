@@ -27,7 +27,7 @@ function Get-PortableMysqlPaths {
     $mysqlDir = Join-Path $root "mysql"
     $runtimeDir = Join-Path $mysqlDir "runtime\mysql-$Version"
 
-    [ordered]@{
+    @{
         RootDir = $root
         MysqlDir = $mysqlDir
         RuntimeDir = $runtimeDir
