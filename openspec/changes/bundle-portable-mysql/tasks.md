@@ -69,8 +69,8 @@
 
 ## 7. Verification
 
-- [ ] 7.1 Validate OpenSpec with `openspec validate bundle-portable-mysql --strict`.
-- [ ] 7.2 Run PowerShell syntax checks on changed scripts.
+- [x] 7.1 Validate OpenSpec with `openspec validate bundle-portable-mysql --strict`.
+- [x] 7.2 Run PowerShell syntax checks on changed scripts.
 - [ ] 7.3 Build the Windows appliance artifact.
 - [ ] 7.4 Install with external MySQL to confirm current behavior still works.
 - [ ] 7.5 Install with `-InstallPortableMySQL` on a clean Windows machine.
