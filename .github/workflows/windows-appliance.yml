@@ -74,7 +74,6 @@ jobs:
           $stagedDist = Join-Path $env:RUNNER_TEMP "mist-backend-dist"
           if (Test-Path $stagedDist) { Remove-Item $stagedDist -Recurse -Force }
           Copy-Item $dist $stagedDist -Recurse
-          Invoke-Native "pnpm prune" { pnpm prune --prod --ignore-scripts }
 
       - name: Setup Python for datasource
         uses: actions/setup-python@v5
@@ -107,6 +106,13 @@ jobs:
           $pkg = Join-Path $env:RUNNER_TEMP "mist-api-appliance"
           $zip = Join-Path $root "${{ env.ARTIFACT_NAME }}.zip"
 
+          function Invoke-Native($Label, [scriptblock]$Command) {
+            & $Command
+            if ($LASTEXITCODE -ne 0) {
+              throw "$Label failed with exit code $LASTEXITCODE"
+            }
+          }
+
           if (Test-Path $pkg) { Remove-Item $pkg -Recurse -Force }
           if (Test-Path $zip) { Remove-Item $zip -Force }
 
@@ -133,13 +139,22 @@ jobs:
           Copy-Item (Join-Path $mistDir "deploy\windows\README-Windows.md") $pkg
           Copy-Item (Join-Path $mistDir "deploy\windows\database\*") (Join-Path $pkg "database") -Recurse
 
-          Copy-Item $stagedDist (Join-Path $pkg "backend\dist") -Recurse
-          Copy-Item (Join-Path $mistDir "node_modules") (Join-Path $pkg "backend\node_modules") -Recurse
-          Copy-Item (Join-Path $mistDir "package.json") (Join-Path $pkg "backend")
-          Copy-Item (Join-Path $mistDir "pnpm-lock.yaml") (Join-Path $pkg "backend")
-          Copy-Item (Join-Path $mistDir "deploy\windows\backend.env.example") (Join-Path $pkg "backend\.env.example")
-          Copy-Item (Join-Path $mistDir "deploy\windows\backend\*.ps1") (Join-Path $pkg "backend\scripts")
-          Copy-Item (Get-Command node).Source (Join-Path $pkg "backend\runtime\node.exe")
+          $backendDir = Join-Path $pkg "backend"
+          Copy-Item $stagedDist (Join-Path $backendDir "dist") -Recurse
+          Copy-Item (Join-Path $mistDir "package.json") $backendDir
+          Copy-Item (Join-Path $mistDir "pnpm-lock.yaml") $backendDir
+          Copy-Item (Join-Path $mistDir "deploy\windows\backend.env.example") (Join-Path $backendDir ".env.example")
+          Copy-Item (Join-Path $mistDir "deploy\windows\backend\*.ps1") (Join-Path $backendDir "scripts")
+          Copy-Item (Get-Command node).Source (Join-Path $backendDir "runtime\node.exe")
+
+          Push-Location $backendDir
+          try {
+            Invoke-Native "pnpm install backend production dependencies" {
+              pnpm install --prod --frozen-lockfile --ignore-scripts --config.node-linker=hoisted
+            }
+          } finally {
+            Pop-Location
+          }
 
           foreach ($item in @("src", "tdx", "qmt", "scripts")) {
             Copy-Item (Join-Path $datasourceDir $item) (Join-Path $pkg "datasource\$item") -Recurse

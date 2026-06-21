@@ -165,7 +165,11 @@ the existing `formatIndicator(...)` flow.
 
 The backend package should include the compiled `dist`, production
 `node_modules`, `package.json`, environment template, and either a bundled Node
-runtime or a strict preflight check for the required Node version.
+runtime or a strict preflight check for the required Node version. The Windows
+workflow should generate production `node_modules` inside the backend staging
+directory from `package.json` and `pnpm-lock.yaml`; it should not copy a pruned
+checkout-level pnpm `node_modules` tree because stale pnpm links can fail during
+PowerShell copy or archive operations.
 
 Do not build the final Windows runtime on macOS.
 
