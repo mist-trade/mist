@@ -17,7 +17,6 @@ jobs:
     env:
       NODE_VERSION: 22.x
       PNPM_VERSION: 9.15.3
-      npm_config_msvs_version: 2022
       DATASOURCE_REPOSITORY: mist-trade/mist-datasource
       ARTIFACT_NAME: mist-api-appliance-win-x64
 
@@ -40,11 +39,6 @@ jobs:
         with:
           node-version: ${{ env.NODE_VERSION }}
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.12'
-
       - name: Install pnpm
         run: npm install -g pnpm@${{ env.PNPM_VERSION }}
 
@@ -61,11 +55,8 @@ jobs:
             }
           }
 
-          $env:npm_config_python = (Get-Command python).Source
           Write-Host "Node: $(node --version)"
           Write-Host "pnpm: $(pnpm --version)"
-          Write-Host "Python: $(python --version)"
-          Write-Host "node-gyp msvs_version: $env:npm_config_msvs_version"
 
           Invoke-Native "pnpm install" { pnpm install --frozen-lockfile --ignore-scripts }
           Invoke-Native "pnpm build" { pnpm run build }
@@ -84,6 +75,11 @@ jobs:
           if (Test-Path $stagedDist) { Remove-Item $stagedDist -Recurse -Force }
           Copy-Item $dist $stagedDist -Recurse
           Invoke-Native "pnpm prune" { pnpm prune --prod --ignore-scripts }
+
+      - name: Setup Python for datasource
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Generate datasource lockfile
         shell: pwsh
