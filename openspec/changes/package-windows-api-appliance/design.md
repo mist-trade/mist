@@ -154,12 +154,14 @@ QMT_SDK_PATH/xtquant exists, when QMT is enabled
 ### Backend
 
 Build the backend package on a Windows runner so Windows-specific package layout
-is resolved correctly. The first appliance package should not depend on
-`talib@1.1.6` successfully running its native Windows postinstall: that package
-still assumes old MSBuild 14.0 behavior and can fail before producing
-`ta_libc_csr.lib`. Install backend dependencies with lifecycle scripts disabled
-for the appliance build, and let the backend use its built-in indicator fallback
-when the native `talib` addon is unavailable.
+is resolved correctly. The backend must not depend on native TA-Lib addon
+compilation for the appliance build. Technical indicator calculations should use
+the pure JavaScript `technicalindicators` dependency so the Windows package does
+not require MSBuild, Visual Studio Build Tools, Python, or `node-gyp` for the
+Mist backend install path. The service-level indicator contracts must keep their
+existing method names, return field names, and `begIndex` alignment behavior so
+indicator controllers and Chan Theory consumers continue to map values through
+the existing `formatIndicator(...)` flow.
 
 The backend package should include the compiled `dist`, production
 `node_modules`, `package.json`, environment template, and either a bundled Node
