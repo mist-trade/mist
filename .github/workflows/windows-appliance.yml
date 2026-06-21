@@ -19,6 +19,10 @@ jobs:
       PNPM_VERSION: 9.15.3
       DATASOURCE_REPOSITORY: mist-trade/mist-datasource
       ARTIFACT_NAME: mist-api-appliance-win-x64
+      MYSQL_VERSION: 8.4.10
+      MYSQL_ZIP_URL: https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.10-winx64.zip
+      MYSQL_ZIP_SHA256: 3b950db31c33fb59252568c012bd9ee5fac50811e778ca7c8f1a0dc91686cd6f
+      MYSQL_ZIP_MD5: 150f12262df6ac88d43862a0e683eb81
 
     steps:
       - name: Checkout mist
@@ -95,6 +99,44 @@ jobs:
           $nssm = (Get-Command nssm).Source
           Write-Host "NSSM=$nssm"
 
+      - name: Download MySQL portable runtime
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Stop"
+          $downloadDir = Join-Path $env:RUNNER_TEMP "mysql-download"
+          $runtimeRoot = Join-Path $env:RUNNER_TEMP "mysql-runtime"
+          $zip = Join-Path $downloadDir "mysql-$env:MYSQL_VERSION-winx64.zip"
+
+          if (Test-Path $downloadDir) { Remove-Item $downloadDir -Recurse -Force }
+          if (Test-Path $runtimeRoot) { Remove-Item $runtimeRoot -Recurse -Force }
+          New-Item -ItemType Directory -Path $downloadDir | Out-Null
+          New-Item -ItemType Directory -Path $runtimeRoot | Out-Null
+
+          Invoke-WebRequest -Uri $env:MYSQL_ZIP_URL -OutFile $zip
+
+          $sha256 = (Get-FileHash -Path $zip -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha256 -ne $env:MYSQL_ZIP_SHA256) {
+            throw "MySQL ZIP SHA256 mismatch. Expected $env:MYSQL_ZIP_SHA256, got $sha256"
+          }
+
+          $md5 = (Get-FileHash -Path $zip -Algorithm MD5).Hash.ToLowerInvariant()
+          if ($md5 -ne $env:MYSQL_ZIP_MD5) {
+            throw "MySQL ZIP MD5 mismatch. Expected $env:MYSQL_ZIP_MD5, got $md5"
+          }
+
+          Expand-Archive -Path $zip -DestinationPath $runtimeRoot
+          $expanded = Get-ChildItem $runtimeRoot -Directory | Select-Object -First 1
+          if (-not $expanded) { throw "MySQL archive did not expand to a runtime directory" }
+
+          foreach ($required in @("bin\mysqld.exe", "bin\mysql.exe", "bin\mysqldump.exe")) {
+            $path = Join-Path $expanded.FullName $required
+            if (-not (Test-Path $path -PathType Leaf)) {
+              throw "MySQL runtime missing required file: $required"
+            }
+          }
+
+          "MYSQL_RUNTIME_DIR=$($expanded.FullName)" >> $env:GITHUB_ENV
+
       - name: Assemble appliance
         id: assemble
         shell: pwsh
@@ -131,13 +173,24 @@ jobs:
           New-Item -ItemType Directory -Path (Join-Path $pkg "backend\scripts") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "datasource") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "database") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "mysql") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "mysql\runtime") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "mysql\data") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "mysql\logs") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "mysql\scripts") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "nssm") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "third-party-notices\mysql") | Out-Null
 
           Copy-Item (Join-Path $mistDir "deploy\windows\install-all.ps1") $pkg
           Copy-Item (Join-Path $mistDir "deploy\windows\uninstall-all.ps1") $pkg
           Copy-Item (Join-Path $mistDir "deploy\windows\health-check.ps1") $pkg
           Copy-Item (Join-Path $mistDir "deploy\windows\README-Windows.md") $pkg
           Copy-Item (Join-Path $mistDir "deploy\windows\database\*") (Join-Path $pkg "database") -Recurse
+          Copy-Item (Join-Path $mistDir "deploy\windows\mysql\*.ps1") (Join-Path $pkg "mysql\scripts")
+          Copy-Item (Join-Path $mistDir "deploy\windows\mysql\THIRD-PARTY-NOTICES.md") (Join-Path $pkg "third-party-notices\mysql")
+
+          $mysqlRuntimeTarget = Join-Path $pkg "mysql\runtime\mysql-${{ env.MYSQL_VERSION }}"
+          Copy-Item $env:MYSQL_RUNTIME_DIR $mysqlRuntimeTarget -Recurse
 
           $backendDir = Join-Path $pkg "backend"
           Copy-Item $stagedDist (Join-Path $backendDir "dist") -Recurse
@@ -184,6 +237,14 @@ jobs:
             pythonRequirement = ">=3.12"
             redisRequired = $false
             sdkBundled = $false
+            mysqlBundled = $true
+            mysqlVersion = "${{ env.MYSQL_VERSION }}"
+            mysqlSha256 = "${{ env.MYSQL_ZIP_SHA256 }}"
+            mysqlMd5 = "${{ env.MYSQL_ZIP_MD5 }}"
+            mysqlDefaultPort = 3307
+            mysqlServiceName = "MistMySQL"
+            portableMysqlDataPreservedOnUninstall = $true
+            mysqlLicenseNoticePath = "third-party-notices/mysql/THIRD-PARTY-NOTICES.md"
           }
           $manifest | ConvertTo-Json -Depth 4 | Set-Content -Path (Join-Path $pkg "manifest.json") -Encoding UTF8
 
