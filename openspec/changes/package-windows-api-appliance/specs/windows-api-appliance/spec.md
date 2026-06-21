@@ -83,6 +83,49 @@ The datasource services SHALL bind to localhost by default because only
 - THEN it SHALL listen on `127.0.0.1:9001` by default
 - AND it SHALL NOT need to be reachable from the Mac
 
+### Requirement: Datasource service registration shall be idempotent
+
+The datasource installer SHALL reconcile `MistTDX` and `MistQMT` NSSM services
+to the desired appliance configuration each time the service step runs.
+
+#### Scenario: Existing datasource service is updated
+
+- GIVEN `MistTDX` already exists as a Mist datasource service
+- AND the operator extracted a newer appliance package
+- WHEN the datasource service installation step runs
+- THEN the installer SHALL update the service working directory, command,
+  service parameters, log paths, start mode, and restart policy
+- AND it SHALL NOT require the operator to remove and recreate the service by
+  hand
+
+#### Scenario: Existing unrelated service is not overwritten
+
+- GIVEN a Windows service named `MistTDX` exists
+- AND its configuration does not point at a Mist datasource installation
+- WHEN the datasource service installation step runs
+- THEN installation SHALL fail with a clear service ownership message
+- AND it SHALL NOT overwrite the unrelated service configuration
+
+### Requirement: Datasource services shall prevent unbounded crash loops
+
+Datasource services SHALL avoid rapid or unbounded restart loops when SDK
+initialization, environment configuration, or port binding repeatedly fails.
+
+#### Scenario: Transient datasource crash is retried with delay
+
+- GIVEN `MistTDX` exits unexpectedly once
+- WHEN NSSM handles the exit
+- THEN the service SHALL restart only after a configured delay
+- AND the restart SHALL NOT happen in a tight immediate loop
+
+#### Scenario: Repeated datasource crashes stop the service
+
+- GIVEN `MistTDX` crashes repeatedly within the configured crash window
+- WHEN the datasource service runner reaches the maximum crash count
+- THEN it SHALL exit with a sentinel code
+- AND NSSM SHALL stop retrying that service
+- AND the logs SHALL explain that crash-loop protection stopped the service
+
 ### Requirement: MistBackend shall be LAN reachable
 
 `MistBackend` SHALL be reachable from the Mac or LLM machine over the LAN.
