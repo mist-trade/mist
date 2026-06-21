@@ -80,3 +80,31 @@
 - [ ] 9.4 Verify `MistBackend` health on `127.0.0.1:8001/app/hello`.
 - [ ] 9.5 Verify Mac can reach `http://192.168.31.x:8001/app/hello`.
 - [ ] 9.6 Run `mist-skills` data, indicator, and Chan Theory smoke tests.
+
+## 10. Harden datasource service supervision
+
+- [ ] 10.1 Keep `mist-datasource/scripts/deploy_windows.ps1` as the public
+      deployment entrypoint, but refactor repeated logic into datasource-owned
+      helper scripts.
+- [ ] 10.2 Add `windows-common.ps1` for datasource PowerShell logging, `.env`
+      parsing, NSSM resolution, and HTTP health polling.
+- [ ] 10.3 Add `service-common.ps1` with an idempotent
+      `Ensure-DatasourceNssmService` helper for `MistTDX` and `MistQMT`.
+- [ ] 10.4 Update datasource NSSM registration to install missing services,
+      update existing Mist datasource services, and refuse to overwrite
+      unrelated services.
+- [ ] 10.5 Add `service-runner.ps1` as the NSSM application entrypoint for TDX
+      and QMT uvicorn processes.
+- [ ] 10.6 Configure NSSM restart throttling, restart delay, and sentinel exit
+      behavior for datasource services; verify the settings against the
+      packaged `nssm.exe` on Windows.
+- [ ] 10.7 Implement crash-loop state tracking so repeated early exits stop the
+      service instead of retrying forever.
+- [ ] 10.8 Remove duplicate datasource preflight orchestration from
+      `install-all.ps1`; the appliance should call the datasource entrypoint
+      and let it own SDK validation.
+- [ ] 10.9 Update Windows README troubleshooting for service ownership,
+      delayed restart, crash-loop stop, and how to reset crash-loop state after
+      fixing SDK or environment issues.
+- [ ] 10.10 Add PowerShell parser checks and Windows smoke verification for the
+      refactored datasource scripts.

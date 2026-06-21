@@ -77,6 +77,9 @@ mist-api-appliance/
         scripts/
             deploy_windows.ps1
             preflight-sdk.ps1
+            windows-common.ps1
+            service-common.ps1
+            service-runner.ps1
         pyproject.toml
         uv.lock
         .env.example
@@ -182,6 +185,50 @@ The first appliance installer may require Python 3.12 and uv on the target
 machine, matching the existing `deploy_windows.ps1` flow. A later offline
 variant can include a wheelhouse or portable Python runtime.
 
+## Datasource script boundary
+
+Do not merge `mist-datasource` into the Mist backend repository or backend
+process. The release package should still include `mist-datasource` under the
+same zip artifact, and the appliance-level installer should treat it as a
+packaged subsystem.
+
+`install-all.ps1` remains the appliance orchestrator:
+
+```text
+install-all.ps1
+    |
+    +-- install or verify MySQL
+    +-- call datasource/scripts/deploy_windows.ps1
+    +-- install MistBackend service
+    +-- run appliance health check
+```
+
+`mist-datasource/scripts/deploy_windows.ps1` remains the datasource public
+entrypoint. It should keep the existing `-Only install|test|service` shape, but
+delegate repeated details to datasource-owned helper scripts:
+
+```text
+deploy_windows.ps1
+    Public CLI and step orchestration only.
+
+windows-common.ps1
+    Console output helpers, .env parsing, command resolution, and HTTP health
+    polling shared by datasource scripts.
+
+service-common.ps1
+    NSSM service reconciliation for MistTDX and MistQMT.
+
+service-runner.ps1
+    Long-running NSSM application entrypoint. It launches uvicorn, records
+    crash-loop state, and exits with a sentinel code when the service should
+    stop instead of retrying forever.
+```
+
+The appliance installer should not run datasource SDK preflight separately and
+then call `deploy_windows.ps1` in a way that repeats the same check. Datasource
+preflight belongs to `mist-datasource`; the appliance should call the
+datasource entrypoint and let it own SDK validation.
+
 ## Database strategy
 
 MySQL runs on the Windows API machine.
@@ -209,11 +256,13 @@ it keeps all services consistent.
 ```text
 MistTDX
     AppDirectory = appliance/datasource
-    Command      = .venv/Scripts/python.exe -m uvicorn tdx.main:app --host 127.0.0.1 --port 9001
+    Command      = powershell.exe -NoProfile -ExecutionPolicy Bypass
+                   -File scripts/service-runner.ps1 -Instance tdx
 
 MistQMT
     AppDirectory = appliance/datasource
-    Command      = .venv/Scripts/python.exe -m uvicorn qmt.main:app --host 127.0.0.1 --port 9002
+    Command      = powershell.exe -NoProfile -ExecutionPolicy Bypass
+                   -File scripts/service-runner.ps1 -Instance qmt
 
 MistBackend
     AppDirectory = appliance/backend
@@ -223,6 +272,73 @@ MistBackend
 
 `MistTDX` and `MistQMT` should bind to localhost by default. `MistBackend`
 should bind to `0.0.0.0` so the Mac or LLM machine can call it over the LAN.
+
+### Datasource NSSM reconciliation
+
+Datasource service registration should be idempotent. The service step should
+build a desired service definition for each enabled datasource instance and
+reconcile NSSM to that definition.
+
+For each of `MistTDX` and `MistQMT`:
+
+```text
+if service is missing:
+    install service with the desired runner command
+else if service appears to be a Mist datasource service:
+    update AppDirectory, Application, AppParameters, log paths, start mode,
+    and restart policy
+else:
+    fail with a clear message instead of overwriting an unrelated service
+```
+
+Existing services can be treated as Mist datasource services when their NSSM
+configuration points at a datasource directory containing expected markers such
+as `pyproject.toml`, `tdx/`, and `qmt/`, or when their command already points at
+`tdx.main:app`, `qmt.main:app`, or `service-runner.ps1`. This allows upgrades
+from the first manual NSSM layout while avoiding silent takeover of unrelated
+Windows services.
+
+### Datasource crash-loop protection
+
+NSSM should provide a delay between restarts, while `service-runner.ps1` should
+decide when repeated failures are no longer useful.
+
+Expected behavior:
+
+```text
+service-runner.ps1 -Instance tdx
+    |
+    +-- read crash state from logs/service-runner-tdx-state.json
+    +-- if too many recent crashes exist, exit with sentinel code 88
+    +-- launch .venv/Scripts/python.exe -m uvicorn tdx.main:app
+    +-- wait for process exit
+    +-- reset crash state after a stable run
+    +-- record crash state after an early failed run
+```
+
+Initial thresholds:
+
+```text
+Stable run threshold: 60 seconds
+Crash window:         10 minutes
+Max crashes/window:   5
+Sentinel exit code:   88
+```
+
+NSSM should be configured so normal non-zero exits restart with delay, while
+the sentinel exit code stops the service:
+
+```text
+AppThrottle      60000
+AppRestartDelay  30000
+AppExit Default  Restart
+AppExit 88       Exit
+```
+
+The exact NSSM field names and behavior should be verified against the packaged
+`nssm.exe` during implementation on Windows. If a given NSSM version does not
+support one of these fields, the implementation should fail installation with a
+clear message rather than silently running without crash-loop protection.
 
 ## GitHub Actions changes
 
