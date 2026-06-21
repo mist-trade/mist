@@ -48,6 +48,20 @@ jobs:
           cd mist
           pnpm install --frozen-lockfile
           pnpm run build
+
+          $dist = Join-Path (Get-Location).Path "dist"
+          $entrypoint = Join-Path $dist "apps\mist\main.js"
+          if (-not (Test-Path $entrypoint -PathType Leaf)) {
+            Write-Host "Expected backend entrypoint missing: $entrypoint" -ForegroundColor Red
+            Write-Host "main.js files under the mist checkout:" -ForegroundColor Yellow
+            Get-ChildItem -Path (Get-Location).Path -Filter main.js -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -ExpandProperty FullName
+            exit 1
+          }
+
+          $stagedDist = Join-Path $env:RUNNER_TEMP "mist-backend-dist"
+          if (Test-Path $stagedDist) { Remove-Item $stagedDist -Recurse -Force }
+          Copy-Item $dist $stagedDist -Recurse
           pnpm prune --prod --ignore-scripts
 
       - name: Setup Python for datasource lock
@@ -75,11 +89,23 @@ jobs:
         shell: pwsh
         run: |
           $root = (Get-Location).Path
+          $mistDir = Join-Path $root "mist"
+          $datasourceDir = Join-Path $root "mist-datasource"
+          $stagedDist = Join-Path $env:RUNNER_TEMP "mist-backend-dist"
           $pkg = Join-Path $env:RUNNER_TEMP "mist-api-appliance"
           $zip = Join-Path $root "${{ env.ARTIFACT_NAME }}.zip"
 
           if (Test-Path $pkg) { Remove-Item $pkg -Recurse -Force }
           if (Test-Path $zip) { Remove-Item $zip -Force }
+
+          $backendEntry = Join-Path $stagedDist "apps\mist\main.js"
+          if (-not (Test-Path $backendEntry -PathType Leaf)) {
+            Write-Host "Staged backend dist is missing: $backendEntry" -ForegroundColor Red
+            Write-Host "RUNNER_TEMP contents:" -ForegroundColor Yellow
+            Get-ChildItem $env:RUNNER_TEMP -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 80 -ExpandProperty FullName
+            exit 1
+          }
 
           New-Item -ItemType Directory -Path $pkg | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "backend") | Out-Null
@@ -89,34 +115,35 @@ jobs:
           New-Item -ItemType Directory -Path (Join-Path $pkg "database") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "nssm") | Out-Null
 
-          Copy-Item "mist\deploy\windows\install-all.ps1" $pkg
-          Copy-Item "mist\deploy\windows\uninstall-all.ps1" $pkg
-          Copy-Item "mist\deploy\windows\health-check.ps1" $pkg
-          Copy-Item "mist\deploy\windows\README-Windows.md" $pkg
-          Copy-Item "mist\deploy\windows\database\*" (Join-Path $pkg "database") -Recurse
+          Copy-Item (Join-Path $mistDir "deploy\windows\install-all.ps1") $pkg
+          Copy-Item (Join-Path $mistDir "deploy\windows\uninstall-all.ps1") $pkg
+          Copy-Item (Join-Path $mistDir "deploy\windows\health-check.ps1") $pkg
+          Copy-Item (Join-Path $mistDir "deploy\windows\README-Windows.md") $pkg
+          Copy-Item (Join-Path $mistDir "deploy\windows\database\*") (Join-Path $pkg "database") -Recurse
 
-          Copy-Item "mist\dist" (Join-Path $pkg "backend\dist") -Recurse
-          Copy-Item "mist\node_modules" (Join-Path $pkg "backend\node_modules") -Recurse
-          Copy-Item "mist\package.json" (Join-Path $pkg "backend")
-          Copy-Item "mist\pnpm-lock.yaml" (Join-Path $pkg "backend")
-          Copy-Item "mist\deploy\windows\backend.env.example" (Join-Path $pkg "backend\.env.example")
-          Copy-Item "mist\deploy\windows\backend\*.ps1" (Join-Path $pkg "backend\scripts")
+          Copy-Item $stagedDist (Join-Path $pkg "backend\dist") -Recurse
+          Copy-Item (Join-Path $mistDir "node_modules") (Join-Path $pkg "backend\node_modules") -Recurse
+          Copy-Item (Join-Path $mistDir "package.json") (Join-Path $pkg "backend")
+          Copy-Item (Join-Path $mistDir "pnpm-lock.yaml") (Join-Path $pkg "backend")
+          Copy-Item (Join-Path $mistDir "deploy\windows\backend.env.example") (Join-Path $pkg "backend\.env.example")
+          Copy-Item (Join-Path $mistDir "deploy\windows\backend\*.ps1") (Join-Path $pkg "backend\scripts")
           Copy-Item (Get-Command node).Source (Join-Path $pkg "backend\runtime\node.exe")
 
           foreach ($item in @("src", "tdx", "qmt", "scripts")) {
-            Copy-Item "mist-datasource\$item" (Join-Path $pkg "datasource\$item") -Recurse
+            Copy-Item (Join-Path $datasourceDir $item) (Join-Path $pkg "datasource\$item") -Recurse
           }
           foreach ($file in @("pyproject.toml", "uv.lock", "README.md", "TDX.md", "QMT.md")) {
-            if (Test-Path "mist-datasource\$file") {
-              Copy-Item "mist-datasource\$file" (Join-Path $pkg "datasource")
+            $sourceFile = Join-Path $datasourceDir $file
+            if (Test-Path $sourceFile) {
+              Copy-Item $sourceFile (Join-Path $pkg "datasource")
             }
           }
-          Copy-Item "mist-datasource\.env.windows.example" (Join-Path $pkg "datasource\.env.example")
+          Copy-Item (Join-Path $datasourceDir ".env.windows.example") (Join-Path $pkg "datasource\.env.example")
 
           $nssm = (Get-Command nssm).Source
           Copy-Item $nssm (Join-Path $pkg "nssm\nssm.exe")
 
-          $datasourceSha = git -C mist-datasource rev-parse HEAD
+          $datasourceSha = git -C $datasourceDir rev-parse HEAD
           $version = if ($env:GITHUB_REF -like "refs/tags/*") { $env:GITHUB_REF.Replace("refs/tags/", "") } else { "manual-$env:GITHUB_RUN_NUMBER" }
           $manifest = [ordered]@{
             name = "mist-api-appliance-win-x64"
