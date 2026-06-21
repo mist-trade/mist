@@ -40,7 +40,7 @@ mist GitHub Actions
     |
     +-- checkout moyui/mist
     +-- checkout mist-trade/mist-datasource
-    +-- build Mist backend on windows-latest
+    +-- build Mist backend on windows-2022
     +-- assemble Windows appliance zip
     +-- upload artifact or attach to GitHub Release
 ```
@@ -154,7 +154,10 @@ QMT_SDK_PATH/xtquant exists, when QMT is enabled
 ### Backend
 
 Build the backend package on a Windows runner so native Node modules are
-resolved for Windows.
+resolved for Windows. Use `windows-2022` with Node 22 for the first appliance
+package because the backend depends on native `talib`; this keeps node-gyp on a
+known Visual Studio 2022 toolchain instead of the moving `windows-latest`
+image.
 
 The backend package should include the compiled `dist`, production
 `node_modules`, `package.json`, environment template, and either a bundled Node

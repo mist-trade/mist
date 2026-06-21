@@ -61,7 +61,7 @@
 - [x] 7.2 Run the workflow on `workflow_dispatch`.
 - [x] 7.3 Attach the zip on semantic version tags.
 - [x] 7.4 Checkout `mist-datasource` during packaging.
-- [x] 7.5 Build backend on `windows-latest`.
+- [x] 7.5 Build backend on a Windows runner with a pinned Node/MSVC toolchain.
 - [x] 7.6 Assemble `mist-api-appliance-win-x64.zip`.
 - [x] 7.7 Include a `manifest.json` with source SHAs and runtime versions.
 
