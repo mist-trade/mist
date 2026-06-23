@@ -79,8 +79,14 @@ function Invoke-PortableMysqlSqlFile {
 
 Assert-MySqlIdentifier -Value $Database -Label "Database"
 Assert-MySqlIdentifier -Value $AppUser -Label "Application user"
+$DumpFile = $DumpFile.Trim()
+$SchemaFile = $SchemaFile.Trim()
+if ($DumpFile -and $SchemaFile) {
+    throw "Use either -DumpFile or -SchemaFile, not both."
+}
 
 $paths = Get-PortableMysqlPaths -RootDir $RootDir -Version $Version
+$bundledSchemaFile = Join-Path $paths.RootDir "database\schema.sql"
 
 foreach ($required in @($paths.MysqldExe, $paths.MysqlExe, $paths.MysqlDumpExe)) {
     if (-not (Test-Path $required -PathType Leaf)) {
@@ -214,10 +220,17 @@ $tableCount = [int](Invoke-MySqlScalar `
 if ($tableCount -le 0) {
     if ($DumpFile) {
         Invoke-PortableMysqlSqlFile -Paths $paths -Port $Port -RootPassword $rootPassword -Database $Database -SqlFile $DumpFile
-    } elseif ($SchemaFile) {
-        Invoke-PortableMysqlSqlFile -Paths $paths -Port $Port -RootPassword $rootPassword -Database $Database -SqlFile $SchemaFile
     } else {
-        throw "Portable MySQL database '$Database' has no tables. Provide -MysqlDumpFile D:\backups\mist.sql or -MysqlSchemaFile .\database\schema.sql."
+        $schemaToImport = $SchemaFile
+        if (-not $schemaToImport) {
+            if (-not (Test-Path $bundledSchemaFile -PathType Leaf)) {
+                throw "Portable MySQL database '$Database' has no tables. Package database\schema.sql is missing; provide -MysqlDumpFile D:\backups\mist.sql or -MysqlSchemaFile D:\backups\schema.sql."
+            }
+            Write-Host "No MysqlSchemaFile provided; using bundled database\schema.sql" -ForegroundColor Yellow
+            $schemaToImport = $bundledSchemaFile
+        }
+
+        Invoke-PortableMysqlSqlFile -Paths $paths -Port $Port -RootPassword $rootPassword -Database $Database -SqlFile $schemaToImport
     }
 }
 
