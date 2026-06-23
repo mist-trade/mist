@@ -28,16 +28,20 @@ installation paths and set the datasource `.env` accordingly.
 TDX expected layout:
 
 ```text
-D:/tdx/PYPlugins/TPythClient.dll
-D:/tdx/PYPlugins/user/tqcenter.py
-TDX_SDK_PATH=D:/tdx/PYPlugins/user
+F:/quant/tdx/PYPlugins/TPythClient.dll
+F:/quant/tdx/PYPlugins/tpythclient.py        # if provided by your TDX install
+F:/quant/tdx/PYPlugins/user/tqcenter.py
+TDX_SDK_PATH=F:/quant/tdx/PYPlugins/user
 ```
+
+`TDX_SDK_PATH` points to the `user` directory that contains `tqcenter.py`.
+`TPythClient.dll` stays one level above it.
 
 QMT expected layout:
 
 ```text
-QMT_PATH=D:/miniQMT
-QMT_SDK_PATH=D:/miniQMT/Lib
+QMT_PATH=F:/quant/qmt
+QMT_SDK_PATH=
 ```
 
 Leave `QMT_SDK_PATH` empty to skip QMT service installation.
