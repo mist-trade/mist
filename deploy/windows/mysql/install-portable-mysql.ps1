@@ -110,12 +110,16 @@ if (-not $service -and -not (Test-TcpPortAvailable -Port $Port)) {
 
 if (-not $isFirstInstall) {
     if (-not (Test-Path $paths.StateFile -PathType Leaf)) {
-        throw "Existing portable MySQL data is missing mysql/state.json. Take a dump backup and run an explicit migration before reusing this data directory."
-    }
-
-    $state = Get-Content $paths.StateFile -Raw | ConvertFrom-Json
-    if ("$($state.runtimeVersion)" -notlike "8.4.*") {
-        throw "Portable MySQL data was initialized by runtime $($state.runtimeVersion). Take a dump backup and run an explicit MySQL upgrade before using runtime $Version."
+        $serviceForRecovery = Get-ServiceIfPresent -Name $ServiceName
+        if (-not $serviceForRecovery) {
+            throw "Existing portable MySQL data is missing mysql/state.json. Take a dump backup and run an explicit migration before reusing this data directory."
+        }
+        Write-Host "Portable MySQL state file is missing; continuing to recover an interrupted bootstrap." -ForegroundColor Yellow
+    } else {
+        $state = Get-Content $paths.StateFile -Raw | ConvertFrom-Json
+        if ("$($state.runtimeVersion)" -notlike "8.4.*") {
+            throw "Portable MySQL data was initialized by runtime $($state.runtimeVersion). Take a dump backup and run an explicit MySQL upgrade before using runtime $Version."
+        }
     }
 }
 

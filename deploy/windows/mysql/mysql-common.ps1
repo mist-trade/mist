@@ -168,7 +168,11 @@ function Test-PortableMysqlServiceOwnedByAppliance {
 
     if (-not $normalizedPathName.Contains($normalizedMysqld)) { return $false }
     if (-not $normalizedPathName.Contains($normalizedMyIni)) { return $false }
-    if (-not (Test-Path $StateFile -PathType Leaf)) { return $false }
+    if (-not (Test-Path $StateFile -PathType Leaf)) {
+        # state.json is written after bootstrap completes; an interrupted first
+        # install can leave the service registered before state is persisted.
+        return $true
+    }
 
     $state = Get-Content $StateFile -Raw | ConvertFrom-Json
     return ($state.serviceName -eq $ServiceName)

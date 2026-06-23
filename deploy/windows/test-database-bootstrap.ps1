@@ -35,12 +35,15 @@ function Assert-FileExists {
 
 $schemaPath = Join-Path $RootDir "database\schema.sql"
 $installerPath = Join-Path $RootDir "mysql\install-portable-mysql.ps1"
+$commonPath = Join-Path $RootDir "mysql\mysql-common.ps1"
 
 Assert-FileExists "bundled database schema exists" $schemaPath
 Assert-FileExists "portable mysql installer exists" $installerPath
+Assert-FileExists "portable mysql common helpers exist" $commonPath
 
 $schema = Get-Content $schemaPath -Raw
 $installer = Get-Content $installerPath -Raw
+$common = Get-Content $commonPath -Raw
 
 foreach ($table in @(
     "securities",
@@ -63,5 +66,7 @@ Assert-Contains "installer knows bundled schema path" "database\schema.sql" $ins
 Assert-Contains "installer announces bundled schema fallback" "No MysqlSchemaFile provided; using bundled database\schema.sql" $installer
 Assert-Contains "installer error mentions bundled schema" "Package database\schema.sql is missing" $installer
 Assert-Contains "installer rejects both mysql bootstrap files" "Use either -DumpFile or -SchemaFile, not both." $installer
+Assert-Contains "installer recovers interrupted bootstrap" "recover an interrupted bootstrap" $installer
+Assert-Contains "service ownership accepts matching interrupted bootstrap" "state.json is written after bootstrap completes" $common
 
 Write-Host "`nDatabase bootstrap tests passed." -ForegroundColor Green
