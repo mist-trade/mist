@@ -102,6 +102,7 @@ Assert-Contains "install-all table check ignores migration metadata" "table_name
 Assert-Contains "health check table check ignores migration metadata" "table_name <> 'schema_migrations'" $healthCheck
 Assert-Contains "installer supports empty database for external migration runner" '[switch]$AllowEmptyDatabase' $installer
 Assert-Contains "installer honors empty database migration handoff" "AllowEmptyDatabase" $installer
+Assert-Contains "installer grants references for migration foreign keys" "CREATE, ALTER, INDEX, DROP, REFERENCES" $installer
 Assert-Contains "installer table check ignores migration metadata" "table_name <> 'schema_migrations'" $installer
 Assert-NotContains "installer does not auto import bundled schema" "using bundled database\schema.sql" $installer
 Assert-Contains "installer error reserves migration step" "Run database migrations or provide -MysqlDumpFile" $installer

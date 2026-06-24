@@ -226,7 +226,7 @@ $bootstrapSql = @"
 $alterRootSql
 CREATE DATABASE IF NOT EXISTS ``$Database`` CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 CREATE USER IF NOT EXISTS '$AppUser'@'localhost' IDENTIFIED BY '$appPasswordSql';
-GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP ON ``$Database``.* TO '$AppUser'@'localhost';
+GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, DROP, REFERENCES ON ``$Database``.* TO '$AppUser'@'localhost';
 FLUSH PRIVILEGES;
 "@
 
