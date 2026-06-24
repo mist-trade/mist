@@ -59,14 +59,30 @@ function New-MysqlBaseArgs {
         [string]$HostName,
         [int]$Port,
         [string]$User,
-        [string]$Password,
         [string]$Database
     )
 
     $args = @("-h", $HostName, "-P", "$Port", "-u", $User, "--default-character-set=utf8mb4")
-    if ($Password) { $args += "-p$Password" }
     if ($Database) { $args += @("-D", $Database) }
     return $args
+}
+
+function Set-MigrationMysqlPassword {
+    param([string]$Password)
+
+    $previousPassword = [Environment]::GetEnvironmentVariable("MYSQL_PWD", "Process")
+    if ($Password) {
+        [Environment]::SetEnvironmentVariable("MYSQL_PWD", $Password, "Process")
+    } else {
+        [Environment]::SetEnvironmentVariable("MYSQL_PWD", $null, "Process")
+    }
+    return $previousPassword
+}
+
+function Restore-MigrationMysqlPassword {
+    param([AllowNull()][string]$PreviousPassword)
+
+    [Environment]::SetEnvironmentVariable("MYSQL_PWD", $PreviousPassword, "Process")
 }
 
 function Invoke-MigrationMysqlCli {
@@ -120,15 +136,17 @@ $baseArgs = New-MysqlBaseArgs `
     -HostName $HostName `
     -Port $Port `
     -User $User `
-    -Password $Password `
     -Database $Database
 
-Write-Step "Run database migrations"
-Write-Host "  Host:      $HostName`:$Port"
-Write-Host "  Database:  $Database"
-Write-Host "  Directory: $MigrationDir"
+try {
+    $previousMysqlPassword = Set-MigrationMysqlPassword -Password $Password
 
-$versionTableSql = @'
+    Write-Step "Run database migrations"
+    Write-Host "  Host:      $HostName`:$Port"
+    Write-Host "  Database:  $Database"
+    Write-Host "  Directory: $MigrationDir"
+
+    $versionTableSql = @'
 CREATE TABLE IF NOT EXISTS `schema_migrations` (
   `version` varchar(190) NOT NULL,
   `applied_at` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
@@ -136,28 +154,31 @@ CREATE TABLE IF NOT EXISTS `schema_migrations` (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 '@
 
-Invoke-MigrationMysqlCli -MysqlExe $mysql -Arguments (@($baseArgs) + @("-e", $versionTableSql))
+    Invoke-MigrationMysqlCli -MysqlExe $mysql -Arguments (@($baseArgs) + @("-e", $versionTableSql))
 
-$migrations = @(Get-ChildItem -Path $MigrationDir -Filter "*.sql" -File | Sort-Object Name)
-if ($migrations.Count -eq 0) {
-    Write-Warn "No migration files found"
-    return
-}
-
-foreach ($migration in $migrations) {
-    $version = $migration.Name
-    $escapedVersion = Escape-MySqlString $version
-    $appliedQuery = 'SELECT COUNT(*) FROM `schema_migrations` WHERE `version`=' + "'$escapedVersion';"
-    $applied = [int](Invoke-MigrationMysqlScalar -MysqlExe $mysql -BaseArgs $baseArgs -Query $appliedQuery)
-
-    if ($applied -gt 0) {
-        Write-Ok "Already applied $version"
-        continue
+    $migrations = @(Get-ChildItem -Path $MigrationDir -Filter "*.sql" -File | Sort-Object Name)
+    if ($migrations.Count -eq 0) {
+        Write-Warn "No migration files found"
+        return
     }
 
-    Invoke-MigrationSqlFile -MysqlExe $mysql -BaseArgs $baseArgs -SqlFile $migration.FullName
+    foreach ($migration in $migrations) {
+        $version = $migration.Name
+        $escapedVersion = Escape-MySqlString $version
+        $appliedQuery = 'SELECT COUNT(*) FROM `schema_migrations` WHERE `version`=' + "'$escapedVersion';"
+        $applied = [int](Invoke-MigrationMysqlScalar -MysqlExe $mysql -BaseArgs $baseArgs -Query $appliedQuery)
 
-    $insertQuery = 'INSERT INTO `schema_migrations` (`version`) VALUES (' + "'$escapedVersion');"
-    Invoke-MigrationMysqlCli -MysqlExe $mysql -Arguments (@($baseArgs) + @("-e", $insertQuery))
-    Write-Ok "Applied $version"
+        if ($applied -gt 0) {
+            Write-Ok "Already applied $version"
+            continue
+        }
+
+        Invoke-MigrationSqlFile -MysqlExe $mysql -BaseArgs $baseArgs -SqlFile $migration.FullName
+
+        $insertQuery = 'INSERT INTO `schema_migrations` (`version`) VALUES (' + "'$escapedVersion');"
+        Invoke-MigrationMysqlCli -MysqlExe $mysql -Arguments (@($baseArgs) + @("-e", $insertQuery))
+        Write-Ok "Applied $version"
+    }
+} finally {
+    Restore-MigrationMysqlPassword -PreviousPassword $previousMysqlPassword
 }
