@@ -77,6 +77,31 @@ function Invoke-PortableMysqlSqlFile {
     }
 }
 
+function Write-PortableMysqlState {
+    param(
+        [hashtable]$Paths,
+        [string]$ServiceName,
+        [int]$Port,
+        [string]$Version
+    )
+
+    $runtimeSha256 = ""
+    $manifest = Read-PortableMysqlManifest -ManifestFile $Paths.ManifestFile
+    if ($manifest) { $runtimeSha256 = "$($manifest.mysqlSha256)" }
+
+    $state = [ordered]@{
+        serviceName = $ServiceName
+        port = $Port
+        bindAddress = "127.0.0.1"
+        runtimeVersion = $Version
+        runtimeSha256 = $runtimeSha256
+        runtimePath = $Paths.RuntimeDir
+        dataDir = $Paths.DataDir
+        initializedAt = (Get-Date).ToUniversalTime().ToString("o")
+    }
+    $state | ConvertTo-Json -Depth 4 | Set-Content -Path $Paths.StateFile -Encoding UTF8
+}
+
 Assert-MySqlIdentifier -Value $Database -Label "Database"
 Assert-MySqlIdentifier -Value $AppUser -Label "Application user"
 $DumpFile = $DumpFile.Trim()
@@ -86,7 +111,6 @@ if ($DumpFile -and $SchemaFile) {
 }
 
 $paths = Get-PortableMysqlPaths -RootDir $RootDir -Version $Version
-$bundledSchemaFile = Join-Path $paths.RootDir "database\schema.sql"
 
 foreach ($required in @($paths.MysqldExe, $paths.MysqlExe, $paths.MysqlDumpExe)) {
     if (-not (Test-Path $required -PathType Leaf)) {
@@ -212,6 +236,10 @@ Invoke-MySqlCli `
     -Password $rootPasswordForSql `
     -Arguments @("-e", $bootstrapSql) | Out-Null
 
+# Record runtime state before the business-table gate. Table creation belongs to
+# an explicit migration/import step, not package-local MySQL installation.
+Write-PortableMysqlState -Paths $paths -ServiceName $ServiceName -Port $Port -Version $Version
+
 $tableQuery = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$Database';"
 $tableCount = [int](Invoke-MySqlScalar `
     -MysqlExe $paths.MysqlExe `
@@ -224,17 +252,10 @@ $tableCount = [int](Invoke-MySqlScalar `
 if ($tableCount -le 0) {
     if ($DumpFile) {
         Invoke-PortableMysqlSqlFile -Paths $paths -Port $Port -RootPassword $rootPassword -Database $Database -SqlFile $DumpFile
+    } elseif ($SchemaFile) {
+        Invoke-PortableMysqlSqlFile -Paths $paths -Port $Port -RootPassword $rootPassword -Database $Database -SqlFile $SchemaFile
     } else {
-        $schemaToImport = $SchemaFile
-        if (-not $schemaToImport) {
-            if (-not (Test-Path $bundledSchemaFile -PathType Leaf)) {
-                throw "Portable MySQL database '$Database' has no tables. Package database\schema.sql is missing; provide -MysqlDumpFile D:\backups\mist.sql or -MysqlSchemaFile D:\backups\schema.sql."
-            }
-            Write-Host "No MysqlSchemaFile provided; using bundled database\schema.sql" -ForegroundColor Yellow
-            $schemaToImport = $bundledSchemaFile
-        }
-
-        Invoke-PortableMysqlSqlFile -Paths $paths -Port $Port -RootPassword $rootPassword -Database $Database -SqlFile $schemaToImport
+        throw "Portable MySQL database '$Database' has no tables. Run database migrations or provide -MysqlDumpFile D:\backups\mist.sql or -MysqlSchemaFile D:\backups\schema.sql."
     }
 }
 
@@ -248,22 +269,6 @@ $tableCount = [int](Invoke-MySqlScalar `
 if ($tableCount -le 0) {
     throw "Portable MySQL database '$Database' still has no tables after bootstrap"
 }
-
-$runtimeSha256 = ""
-$manifest = Read-PortableMysqlManifest -ManifestFile $paths.ManifestFile
-if ($manifest) { $runtimeSha256 = "$($manifest.mysqlSha256)" }
-
-$state = [ordered]@{
-    serviceName = $ServiceName
-    port = $Port
-    bindAddress = "127.0.0.1"
-    runtimeVersion = $Version
-    runtimeSha256 = $runtimeSha256
-    runtimePath = $paths.RuntimeDir
-    dataDir = $paths.DataDir
-    initializedAt = (Get-Date).ToUniversalTime().ToString("o")
-}
-$state | ConvertTo-Json -Depth 4 | Set-Content -Path $paths.StateFile -Encoding UTF8
 
 [pscustomobject]@{
     Host = "127.0.0.1"

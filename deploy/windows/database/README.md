@@ -1,21 +1,24 @@
 # Database bootstrap
 
 The Windows appliance does not use TypeORM synchronize in production. Portable
-MySQL bootstraps a fresh database from this directory's `schema.sql` when no
-dump or external schema is provided.
+MySQL installation is limited to the runtime, service, credentials, and local
+data directory; it does not create business tables by default.
 
 Use one of these paths:
 
 1. Import a known-good dump from the existing Mist database.
 2. Import a schema file generated from a known-good database.
-3. For a brand-new deployment, let portable MySQL import the bundled
-   `database/schema.sql`.
+3. In a later change, run database migrations from `database/migrations`.
 
-Fresh portable MySQL install with empty tables:
+Fresh portable MySQL install without creating business tables:
 
 ```powershell
 ..\install-all.ps1 -InstallPortableMySQL
 ```
+
+If the `mist` database has no tables, install stops after MySQL is installed and
+prints a migration/import prompt. This keeps package upgrades from silently
+changing production schema.
 
 Example dump import:
 
@@ -29,7 +32,7 @@ Portable MySQL can also import a dump during appliance install:
 ..\install-all.ps1 -InstallPortableMySQL -MysqlDumpFile D:\backups\mist.sql
 ```
 
-Or import an explicit schema instead of the bundled one:
+Or import an explicit schema:
 
 ```powershell
 ..\install-all.ps1 -InstallPortableMySQL -MysqlSchemaFile D:\backups\schema.sql
