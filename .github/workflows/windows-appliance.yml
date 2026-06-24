@@ -172,6 +172,7 @@ jobs:
           New-Item -ItemType Directory -Path (Join-Path $pkg "backend\runtime") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "backend\scripts") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "datasource") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "datasource\runtime") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "database") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "mysql") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "mysql\runtime") | Out-Null
@@ -220,6 +221,9 @@ jobs:
           }
           Copy-Item (Join-Path $datasourceDir ".env.windows.example") (Join-Path $pkg "datasource\.env.example")
 
+          $uv = (Get-Command uv).Source
+          Copy-Item $uv (Join-Path $pkg "datasource\runtime\uv.exe")
+
           $nssm = (Get-Command nssm).Source
           Copy-Item $nssm (Join-Path $pkg "nssm\nssm.exe")
 
@@ -235,6 +239,8 @@ jobs:
             datasourceSha = $datasourceSha
             nodeVersion = (node --version)
             pythonRequirement = ">=3.12"
+            uvVersion = (uv --version)
+            uvBundled = $true
             redisRequired = $false
             sdkBundled = $false
             mysqlBundled = $true
