@@ -50,6 +50,35 @@ function Resolve-HealthMysqlExe {
     return ""
 }
 
+function Invoke-HealthMysqlScalar {
+    param(
+        [string]$MysqlExe,
+        [string]$HostName,
+        [string]$Port,
+        [string]$User,
+        [string]$Password,
+        [string]$Query
+    )
+
+    $previousPassword = [Environment]::GetEnvironmentVariable("MYSQL_PWD", "Process")
+    try {
+        if ($Password) {
+            [Environment]::SetEnvironmentVariable("MYSQL_PWD", $Password, "Process")
+        } else {
+            [Environment]::SetEnvironmentVariable("MYSQL_PWD", $null, "Process")
+        }
+
+        $args = @("-h", $HostName, "-P", $Port, "-u", $User, "-N", "-B", "-e", $Query)
+        $output = & $MysqlExe @args 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw "mysql.exe failed with exit code $LASTEXITCODE"
+        }
+        return "$output".Trim()
+    } finally {
+        [Environment]::SetEnvironmentVariable("MYSQL_PWD", $previousPassword, "Process")
+    }
+}
+
 function Test-PortableMySql {
     $mysqlHost = Get-EnvValue $BackendEnv "mysql_server_host"
     $mysqlPort = Get-EnvValue $BackendEnv "mysql_server_port"
@@ -95,14 +124,16 @@ function Test-PortableMySql {
         return $false
     }
 
-    $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$mysqlDatabase' AND table_name <> 'schema_migrations';"
-    $args = @("-h", $mysqlHost, "-P", $mysqlPort, "-u", $mysqlUser, "-N", "-B", "-e", $query)
-    if ($mysqlPassword) {
-        $args = @("-h", $mysqlHost, "-P", $mysqlPort, "-u", $mysqlUser, "-p$mysqlPassword", "-N", "-B", "-e", $query)
-    }
-
-    $tableCount = & $mysqlExe @args 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    try {
+        $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$mysqlDatabase' AND table_name <> 'schema_migrations';"
+        $tableCount = Invoke-HealthMysqlScalar `
+            -MysqlExe $mysqlExe `
+            -HostName $mysqlHost `
+            -Port $mysqlPort `
+            -User $mysqlUser `
+            -Password $mysqlPassword `
+            -Query $query
+    } catch {
         Write-Host "  [FAIL] MySQL database '$mysqlDatabase' query failed" -ForegroundColor Red
         return $false
     }
