@@ -73,6 +73,35 @@ function Ensure-EnvFile($dir, $label) {
     exit 1
 }
 
+function Invoke-InstallMysqlScalar {
+    param(
+        [string]$MysqlExe,
+        [string]$HostName,
+        [string]$Port,
+        [string]$User,
+        [string]$Password,
+        [string]$Query
+    )
+
+    $previousPassword = [Environment]::GetEnvironmentVariable("MYSQL_PWD", "Process")
+    try {
+        if ($Password) {
+            [Environment]::SetEnvironmentVariable("MYSQL_PWD", $Password, "Process")
+        } else {
+            [Environment]::SetEnvironmentVariable("MYSQL_PWD", $null, "Process")
+        }
+
+        $args = @("-h", $HostName, "-P", $Port, "-u", $User, "-N", "-B", "-e", $Query)
+        $output = & $MysqlExe @args 2>$null
+        if ($LASTEXITCODE -ne 0) {
+            throw "mysql.exe failed with exit code $LASTEXITCODE"
+        }
+        return "$output".Trim()
+    } finally {
+        [Environment]::SetEnvironmentVariable("MYSQL_PWD", $previousPassword, "Process")
+    }
+}
+
 function Invoke-DatabaseMigrations {
     param([string]$BackendEnvFile)
 
@@ -152,12 +181,16 @@ function Test-DatabaseInitialized {
         exit 1
     }
 
-    $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$database' AND table_name <> 'schema_migrations';"
-    $args = @("-h", $hostName, "-P", $port, "-u", $user, "-N", "-B", "-e", $query)
-    if ($password) { $args = @("-h", $hostName, "-P", $port, "-u", $user, "-p$password", "-N", "-B", "-e", $query) }
-
-    $tableCount = & $mysqlExe @args 2>$null
-    if ($LASTEXITCODE -ne 0) {
+    try {
+        $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$database' AND table_name <> 'schema_migrations';"
+        $tableCount = Invoke-InstallMysqlScalar `
+            -MysqlExe $mysqlExe `
+            -HostName $hostName `
+            -Port $port `
+            -User $user `
+            -Password $password `
+            -Query $query
+    } catch {
         Write-Fail "Unable to query MySQL. Check backend .env credentials or initialize database manually."
         exit 1
     }

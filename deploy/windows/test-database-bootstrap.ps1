@@ -98,7 +98,11 @@ Assert-NotContains "initial migration never drops tables" "DROP TABLE" $initialM
 Assert-Contains "install-all exposes migration switch" '[switch]$RunDatabaseMigrations' $installAll
 Assert-Contains "install-all invokes migration runner" "database\run-migrations.ps1" $installAll
 Assert-Contains "install-all lets portable mysql return empty db for migrations" "-AllowEmptyDatabase:`$RunDatabaseMigrations" $installAll
+Assert-Contains "install-all uses scoped mysql password for database check" "Invoke-InstallMysqlScalar" $installAll
+Assert-NotContains "install-all keeps database check password out of command line" '-p$password' $installAll
 Assert-Contains "install-all table check ignores migration metadata" "table_name <> 'schema_migrations'" $installAll
+Assert-Contains "health check uses scoped mysql password for database check" "Invoke-HealthMysqlScalar" $healthCheck
+Assert-NotContains "health check keeps database check password out of command line" '-p$mysqlPassword' $healthCheck
 Assert-Contains "health check table check ignores migration metadata" "table_name <> 'schema_migrations'" $healthCheck
 Assert-Contains "installer supports empty database for external migration runner" '[switch]$AllowEmptyDatabase' $installer
 Assert-Contains "installer honors empty database migration handoff" "AllowEmptyDatabase" $installer
