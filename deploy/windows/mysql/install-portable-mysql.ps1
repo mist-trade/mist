@@ -8,7 +8,8 @@ param(
     [string]$Database = "mist",
     [string]$AppUser = "mist_app",
     [string]$DumpFile = "",
-    [string]$SchemaFile = ""
+    [string]$SchemaFile = "",
+    [switch]$AllowEmptyDatabase
 )
 
 $ErrorActionPreference = "Stop"
@@ -241,7 +242,7 @@ Invoke-MySqlCli `
 # an explicit migration/import step, not package-local MySQL installation.
 Write-PortableMysqlState -Paths $paths -ServiceName $ServiceName -Port $Port -Version $Version
 
-$tableQuery = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$Database';"
+$tableQuery = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$Database' AND table_name <> 'schema_migrations';"
 $tableCount = [int](Invoke-MySqlScalar `
     -MysqlExe $paths.MysqlExe `
     -HostName "127.0.0.1" `
@@ -255,6 +256,8 @@ if ($tableCount -le 0) {
         Invoke-PortableMysqlSqlFile -Paths $paths -Port $Port -RootPassword $rootPassword -Database $Database -SqlFile $DumpFile
     } elseif ($SchemaFile) {
         Invoke-PortableMysqlSqlFile -Paths $paths -Port $Port -RootPassword $rootPassword -Database $Database -SqlFile $SchemaFile
+    } elseif ($AllowEmptyDatabase) {
+        Write-Host "Portable MySQL database '$Database' has no business tables yet; database migrations will run next." -ForegroundColor Yellow
     } else {
         throw "Portable MySQL database '$Database' has no tables. Run database migrations or provide -MysqlDumpFile D:\backups\mist.sql or -MysqlSchemaFile D:\backups\schema.sql."
     }
@@ -267,7 +270,7 @@ $tableCount = [int](Invoke-MySqlScalar `
     -User "root" `
     -Password $rootPassword `
     -Query $tableQuery)
-if ($tableCount -le 0) {
+if ($tableCount -le 0 -and -not ($AllowEmptyDatabase -and -not $DumpFile -and -not $SchemaFile)) {
     throw "Portable MySQL database '$Database' still has no tables after bootstrap"
 }
 

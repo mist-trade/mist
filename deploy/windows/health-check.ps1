@@ -95,7 +95,7 @@ function Test-PortableMySql {
         return $false
     }
 
-    $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$mysqlDatabase';"
+    $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$mysqlDatabase' AND table_name <> 'schema_migrations';"
     $args = @("-h", $mysqlHost, "-P", $mysqlPort, "-u", $mysqlUser, "-N", "-B", "-e", $query)
     if ($mysqlPassword) {
         $args = @("-h", $mysqlHost, "-P", $mysqlPort, "-u", $mysqlUser, "-p$mysqlPassword", "-N", "-B", "-e", $query)

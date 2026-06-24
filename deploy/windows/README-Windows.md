@@ -63,12 +63,11 @@ Set-ExecutionPolicy -Scope Process Bypass
 Portable MySQL path:
 
 ```powershell
-.\install-all.ps1 -InstallPortableMySQL
+.\install-all.ps1 -InstallPortableMySQL -RunDatabaseMigrations
 ```
 
-This installs or reconciles package-local MySQL. It does not create Mist
-business tables automatically. If the database has no tables, the installer
-stops with a prompt to run migrations or provide a dump/schema.
+This installs or reconciles package-local MySQL, runs idempotent bundled
+migrations, and preserves existing `mysql/data` on later deployments.
 
 Portable MySQL path, importing an existing dump:
 
@@ -82,10 +81,11 @@ Portable MySQL path, importing an explicit schema:
 .\install-all.ps1 -InstallPortableMySQL -MysqlSchemaFile D:\backups\schema.sql
 ```
 
-Future migrations are reserved under:
+Migrations are stored and tracked under:
 
 ```text
 database/migrations
+database/run-migrations.ps1
 ```
 
 Portable MySQL binds only to `127.0.0.1:3307`. `MistBackend` still listens on

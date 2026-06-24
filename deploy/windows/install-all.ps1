@@ -4,6 +4,7 @@ param(
     [switch]$SkipDatabaseCheck,
     [switch]$SkipDatasourceTest,
     [switch]$InstallPortableMySQL,
+    [switch]$RunDatabaseMigrations,
     [int]$MysqlPort = 3307,
     [string]$MysqlDumpFile = "",
     [string]$MysqlSchemaFile = ""
@@ -72,6 +73,47 @@ function Ensure-EnvFile($dir, $label) {
     exit 1
 }
 
+function Invoke-DatabaseMigrations {
+    param([string]$BackendEnvFile)
+
+    $content = Get-Content $BackendEnvFile -Raw
+    $hostName = Get-EnvValue $content "mysql_server_host"
+    $port = Get-EnvValue $content "mysql_server_port"
+    $user = Get-EnvValue $content "mysql_server_username"
+    $password = Get-EnvValue $content "mysql_server_password"
+    $database = Get-EnvValue $content "mysql_server_database"
+
+    if (-not $hostName) { $hostName = "127.0.0.1" }
+    if (-not $port) { $port = "3306" }
+    if (-not $database) { $database = "mist" }
+
+    if (-not $user) {
+        Write-Fail "Backend .env must include mysql_server_username before running migrations."
+        exit 1
+    }
+
+    $runner = Join-Path $RootDir "database\run-migrations.ps1"
+    if (-not (Test-Path $runner -PathType Leaf)) {
+        Write-Fail "Database migration runner not found: $runner"
+        exit 1
+    }
+
+    $mysqlExe = ""
+    $portableMysqlExe = Join-Path $RootDir "mysql\runtime\mysql-8.4.10\bin\mysql.exe"
+    if ($hostName -eq "127.0.0.1" -and $port -eq "$MysqlPort" -and (Test-Path $portableMysqlExe -PathType Leaf)) {
+        $mysqlExe = $portableMysqlExe
+    }
+
+    & $runner `
+        -RootDir $RootDir `
+        -HostName $hostName `
+        -Port ([int]$port) `
+        -Database $database `
+        -User $user `
+        -Password $password `
+        -MysqlExe $mysqlExe
+}
+
 function Test-DatabaseInitialized {
     param([string]$BackendEnvFile)
 
@@ -110,7 +152,7 @@ function Test-DatabaseInitialized {
         exit 1
     }
 
-    $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$database';"
+    $query = "SELECT COUNT(*) FROM information_schema.tables WHERE table_schema='$database' AND table_name <> 'schema_migrations';"
     $args = @("-h", $hostName, "-P", $port, "-u", $user, "-N", "-B", "-e", $query)
     if ($password) { $args = @("-h", $hostName, "-P", $port, "-u", $user, "-p$password", "-N", "-B", "-e", $query) }
 
@@ -156,12 +198,16 @@ if ($InstallPortableMySQL) {
         exit 1
     }
 
-    $portable = & $mysqlInstaller -RootDir $RootDir -Port $MysqlPort -DumpFile $MysqlDumpFile -SchemaFile $MysqlSchemaFile
+    $portable = & $mysqlInstaller -RootDir $RootDir -Port $MysqlPort -DumpFile $MysqlDumpFile -SchemaFile $MysqlSchemaFile -AllowEmptyDatabase:$RunDatabaseMigrations
     Set-EnvValue $backendEnv "mysql_server_host" $portable.Host
     Set-EnvValue $backendEnv "mysql_server_port" "$($portable.Port)"
     Set-EnvValue $backendEnv "mysql_server_username" $portable.AppUser
     Set-EnvValue $backendEnv "mysql_server_password" $portable.AppPassword
     Set-EnvValue $backendEnv "mysql_server_database" $portable.Database
+}
+
+if ($RunDatabaseMigrations) {
+    Invoke-DatabaseMigrations -BackendEnvFile $backendEnv
 }
 
 Test-DatabaseInitialized -BackendEnvFile $backendEnv
