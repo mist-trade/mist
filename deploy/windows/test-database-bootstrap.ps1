@@ -77,6 +77,8 @@ Assert-NotContains "installer does not auto import bundled schema" "using bundle
 Assert-Contains "installer error reserves migration step" "Run database migrations or provide -MysqlDumpFile" $installer
 Assert-Contains "installer records runtime before migration gate" "Record runtime state before the business-table gate" $installer
 Assert-Contains "installer rejects both mysql bootstrap files" "Use either -DumpFile or -SchemaFile, not both." $installer
+Assert-Contains "installer ownership error includes service command" "Existing service command" $installer
+Assert-Contains "installer ownership error includes expected mysqld path" "Expected mysqld path" $installer
 Assert-Contains "installer recovers interrupted bootstrap" "recover an interrupted bootstrap" $installer
 Assert-Contains "service ownership accepts matching interrupted bootstrap" "state.json is written after bootstrap completes" $common
 

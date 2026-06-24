@@ -119,7 +119,8 @@ foreach ($required in @($paths.MysqldExe, $paths.MysqlExe, $paths.MysqlDumpExe))
 }
 
 if (-not (Test-PortableMysqlServiceOwnedByAppliance -ServiceName $ServiceName -MysqldExe $paths.MysqldExe -MyIni $paths.MyIni -StateFile $paths.StateFile)) {
-    throw "$ServiceName exists but is not owned by this appliance"
+    $existingServiceCommand = Get-WindowsServicePathName -ServiceName $ServiceName
+    throw "$ServiceName exists but is not owned by this appliance. Existing service command: $existingServiceCommand. Expected mysqld path: $($paths.MysqldExe). Expected defaults file: $($paths.MyIni). If this is a stale MistMySQL service from an earlier failed install, uninstall that service with mysql\scripts\uninstall-portable-mysql.ps1 -KeepData, then rerun deploy."
 }
 
 New-Item -ItemType Directory -Force -Path $paths.MysqlDir, $paths.DataDir, $paths.LogsDir | Out-Null
