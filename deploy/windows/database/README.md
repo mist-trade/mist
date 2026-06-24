@@ -2,23 +2,29 @@
 
 The Windows appliance does not use TypeORM synchronize in production. Portable
 MySQL installation is limited to the runtime, service, credentials, and local
-data directory; it does not create business tables by default.
+data directory; business tables are created only by explicit migrations or
+operator-provided imports.
 
 Use one of these paths:
 
-1. Import a known-good dump from the existing Mist database.
-2. Import a schema file generated from a known-good database.
-3. In a later change, run database migrations from `database/migrations`.
+1. Run the bundled idempotent migrations from `database/migrations`.
+2. Import a known-good dump from an existing Mist database.
+3. Import a schema file generated from a known-good database.
 
-Fresh portable MySQL install without creating business tables:
+Fresh portable MySQL install with bundled migrations:
 
 ```powershell
-..\install-all.ps1 -InstallPortableMySQL
+..\install-all.ps1 -InstallPortableMySQL -RunDatabaseMigrations
 ```
 
-If the `mist` database has no tables, install stops after MySQL is installed and
-prints a migration/import prompt. This keeps package upgrades from silently
-changing production schema.
+Migrations are tracked in `schema_migrations` and skipped when they have already
+been applied. They do not overwrite `mysql\data`.
+
+Run migrations manually:
+
+```powershell
+.\run-migrations.ps1 -HostName 127.0.0.1 -Port 3307 -Database mist -User mist_app -Password "<password from backend\.env>"
+```
 
 Example dump import:
 

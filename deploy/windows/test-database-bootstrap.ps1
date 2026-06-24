@@ -60,19 +60,49 @@ function Assert-NotContains {
 
 $schemaPath = Join-Path $RootDir "database\schema.sql"
 $migrationsReadmePath = Join-Path $RootDir "database\migrations\README.md"
+$migrationRunnerPath = Join-Path $RootDir "database\run-migrations.ps1"
+$initialMigrationPath = Join-Path $RootDir "database\migrations\001_init_core_tables.sql"
+$installAllPath = Join-Path $RootDir "install-all.ps1"
+$healthCheckPath = Join-Path $RootDir "health-check.ps1"
 $installerPath = Join-Path $RootDir "mysql\install-portable-mysql.ps1"
 $commonPath = Join-Path $RootDir "mysql\mysql-common.ps1"
 
 Assert-FileNotExists "bundled empty schema is not shipped" $schemaPath
 Assert-FileExists "database migrations placeholder exists" $migrationsReadmePath
+Assert-FileExists "database migration runner exists" $migrationRunnerPath
+Assert-FileExists "initial core table migration exists" $initialMigrationPath
+Assert-FileExists "install-all script exists" $installAllPath
+Assert-FileExists "health-check script exists" $healthCheckPath
 Assert-FileExists "portable mysql installer exists" $installerPath
 Assert-FileExists "portable mysql common helpers exist" $commonPath
 
 $migrationsReadme = Get-Content $migrationsReadmePath -Raw
+$migrationRunner = Get-Content $migrationRunnerPath -Raw
+$initialMigration = Get-Content $initialMigrationPath -Raw
+$installAll = Get-Content $installAllPath -Raw
+$healthCheck = Get-Content $healthCheckPath -Raw
 $installer = Get-Content $installerPath -Raw
 $common = Get-Content $commonPath -Raw
 
-Assert-Contains "migrations placeholder explains future step" "Future database migrations live here." $migrationsReadme
+Assert-Contains "migrations readme documents explicit runner" ".\run-migrations.ps1" $migrationsReadme
+Assert-Contains "migration runner creates version table" "CREATE TABLE IF NOT EXISTS ``schema_migrations``" $migrationRunner
+Assert-Contains "migration runner skips already applied versions" "Already applied" $migrationRunner
+Assert-Contains "migration runner records applied versions" "INSERT INTO ``schema_migrations``" $migrationRunner
+Assert-Contains "initial migration creates securities" "CREATE TABLE IF NOT EXISTS ``securities``" $initialMigration
+Assert-Contains "initial migration creates security source configs" "CREATE TABLE IF NOT EXISTS ``security_source_configs``" $initialMigration
+Assert-Contains "initial migration creates k" "CREATE TABLE IF NOT EXISTS ``k``" $initialMigration
+Assert-Contains "initial migration creates ef extension" "CREATE TABLE IF NOT EXISTS ``k_extensions_ef``" $initialMigration
+Assert-Contains "initial migration creates tdx extension" "CREATE TABLE IF NOT EXISTS ``k_extensions_tdx``" $initialMigration
+Assert-Contains "initial migration creates mqmt extension" "CREATE TABLE IF NOT EXISTS ``k_extensions_mqmt``" $initialMigration
+Assert-NotContains "initial migration never drops tables" "DROP TABLE" $initialMigration.ToUpperInvariant()
+Assert-Contains "install-all exposes migration switch" '[switch]$RunDatabaseMigrations' $installAll
+Assert-Contains "install-all invokes migration runner" "database\run-migrations.ps1" $installAll
+Assert-Contains "install-all lets portable mysql return empty db for migrations" "-AllowEmptyDatabase:`$RunDatabaseMigrations" $installAll
+Assert-Contains "install-all table check ignores migration metadata" "table_name <> 'schema_migrations'" $installAll
+Assert-Contains "health check table check ignores migration metadata" "table_name <> 'schema_migrations'" $healthCheck
+Assert-Contains "installer supports empty database for external migration runner" '[switch]$AllowEmptyDatabase' $installer
+Assert-Contains "installer honors empty database migration handoff" "AllowEmptyDatabase" $installer
+Assert-Contains "installer table check ignores migration metadata" "table_name <> 'schema_migrations'" $installer
 Assert-NotContains "installer does not auto import bundled schema" "using bundled database\schema.sql" $installer
 Assert-Contains "installer error reserves migration step" "Run database migrations or provide -MysqlDumpFile" $installer
 Assert-Contains "installer records runtime before migration gate" "Record runtime state before the business-table gate" $installer
