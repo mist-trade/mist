@@ -64,6 +64,7 @@ $migrationRunnerPath = Join-Path $RootDir "database\run-migrations.ps1"
 $initialMigrationPath = Join-Path $RootDir "database\migrations\001_init_core_tables.sql"
 $installAllPath = Join-Path $RootDir "install-all.ps1"
 $healthCheckPath = Join-Path $RootDir "health-check.ps1"
+$backendInstallerPath = Join-Path $RootDir "backend\install-service.ps1"
 $installerPath = Join-Path $RootDir "mysql\install-portable-mysql.ps1"
 $commonPath = Join-Path $RootDir "mysql\mysql-common.ps1"
 
@@ -73,6 +74,7 @@ Assert-FileExists "database migration runner exists" $migrationRunnerPath
 Assert-FileExists "initial core table migration exists" $initialMigrationPath
 Assert-FileExists "install-all script exists" $installAllPath
 Assert-FileExists "health-check script exists" $healthCheckPath
+Assert-FileExists "backend service installer exists" $backendInstallerPath
 Assert-FileExists "portable mysql installer exists" $installerPath
 Assert-FileExists "portable mysql common helpers exist" $commonPath
 
@@ -81,6 +83,7 @@ $migrationRunner = Get-Content $migrationRunnerPath -Raw
 $initialMigration = Get-Content $initialMigrationPath -Raw
 $installAll = Get-Content $installAllPath -Raw
 $healthCheck = Get-Content $healthCheckPath -Raw
+$backendInstaller = Get-Content $backendInstallerPath -Raw
 $installer = Get-Content $installerPath -Raw
 $common = Get-Content $commonPath -Raw
 
@@ -98,12 +101,19 @@ Assert-NotContains "initial migration never drops tables" "DROP TABLE" $initialM
 Assert-Contains "install-all exposes migration switch" '[switch]$RunDatabaseMigrations' $installAll
 Assert-Contains "install-all invokes migration runner" "database\run-migrations.ps1" $installAll
 Assert-Contains "install-all lets portable mysql return empty db for migrations" "-AllowEmptyDatabase:`$RunDatabaseMigrations" $installAll
+Assert-Contains "install-all stops on datasource script failures" "Invoke-ApplianceScript" $installAll
+Assert-Contains "install-all passes backend host explicitly to health check" '-BackendHost "127.0.0.1"' $installAll
 Assert-Contains "install-all uses scoped mysql password for database check" "Invoke-InstallMysqlScalar" $installAll
 Assert-NotContains "install-all keeps database check password out of command line" '-p$password' $installAll
 Assert-Contains "install-all table check ignores migration metadata" "table_name <> 'schema_migrations'" $installAll
+Assert-Contains "health check defaults empty backend host to localhost" '[string]::IsNullOrWhiteSpace($BackendHost)' $healthCheck
 Assert-Contains "health check uses scoped mysql password for database check" "Invoke-HealthMysqlScalar" $healthCheck
 Assert-NotContains "health check keeps database check password out of command line" '-p$mysqlPassword' $healthCheck
 Assert-Contains "health check table check ignores migration metadata" "table_name <> 'schema_migrations'" $healthCheck
+Assert-Contains "backend installer stops existing service before reinstall" "stop `$ServiceName" $backendInstaller
+Assert-Contains "backend installer deletes existing service before reinstall" "remove `$ServiceName confirm" $backendInstaller
+Assert-Contains "backend installer overwrites existing service application" "set `$ServiceName Application `$nodeExe" $backendInstaller
+Assert-Contains "backend installer overwrites existing service parameters" "set `$ServiceName AppParameters" $backendInstaller
 Assert-Contains "installer supports empty database for external migration runner" '[switch]$AllowEmptyDatabase' $installer
 Assert-Contains "installer honors empty database migration handoff" "AllowEmptyDatabase" $installer
 Assert-Contains "installer grants references for migration foreign keys" "CREATE, ALTER, INDEX, DROP, REFERENCES" $installer

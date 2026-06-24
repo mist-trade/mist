@@ -10,6 +10,9 @@ $ErrorActionPreference = "Stop"
 
 $RootDir = $PSScriptRoot
 $BackendEnv = Join-Path $RootDir "backend\.env"
+if ([string]::IsNullOrWhiteSpace($BackendHost)) {
+    $BackendHost = "127.0.0.1"
+}
 
 function Get-EnvValue($path, $name) {
     if (-not (Test-Path $path -PathType Leaf)) { return "" }

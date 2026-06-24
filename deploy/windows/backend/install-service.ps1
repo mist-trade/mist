@@ -17,6 +17,7 @@ $LogsDir = Join-Path $BackendDir "logs"
 
 function Write-Step($msg) { Write-Host "`n===== $msg =====" -ForegroundColor Cyan }
 function Write-Ok($msg)   { Write-Host "  [OK] $msg" -ForegroundColor Green }
+function Write-Warn($msg) { Write-Host "  [WARN] $msg" -ForegroundColor Yellow }
 function Write-Fail($msg) { Write-Host "  [FAIL] $msg" -ForegroundColor Red }
 
 function Resolve-NssmExe {
@@ -77,13 +78,36 @@ $prevEAP = $ErrorActionPreference
 $ErrorActionPreference = "Continue"
 $existing = & $nssmExe status $ServiceName 2>&1
 $ErrorActionPreference = $prevEAP
+$existingText = ($existing | Out-String).Trim()
 
-if ($existing -match "SERVICE_RUNNING|SERVICE_STOPPED") {
-    Write-Host "  $ServiceName already exists (status: $existing), updating configuration" -ForegroundColor Yellow
-} else {
-    & $nssmExe install $ServiceName $nodeExe "dist\apps\mist\main.js"
+if ($existingText -match "SERVICE_") {
+    Write-Warn "$ServiceName already exists (status: $existingText), removing stale service before reinstall"
+
+    $prevEAP = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    & $nssmExe stop $ServiceName | Out-Host
+    $stopExit = $LASTEXITCODE
+    $ErrorActionPreference = $prevEAP
+    if ($stopExit -ne 0 -and $existingText -match "SERVICE_RUNNING") {
+        Write-Warn "$ServiceName stop returned exit code $stopExit; attempting removal anyway"
+    }
+
+    & $nssmExe remove $ServiceName confirm
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "Failed to remove existing $ServiceName service"
+        exit $LASTEXITCODE
+    }
+    Write-Ok "$ServiceName old service removed"
 }
 
+& $nssmExe install $ServiceName $nodeExe "dist\apps\mist\main.js"
+if ($LASTEXITCODE -ne 0) {
+    Write-Fail "Failed to install $ServiceName service"
+    exit $LASTEXITCODE
+}
+
+& $nssmExe set $ServiceName Application $nodeExe
+& $nssmExe set $ServiceName AppParameters "dist\apps\mist\main.js"
 & $nssmExe set $ServiceName AppDirectory $BackendDir
 & $nssmExe set $ServiceName DisplayName "Mist Backend"
 & $nssmExe set $ServiceName Description "Mist stock analysis API backend (port 8001)"

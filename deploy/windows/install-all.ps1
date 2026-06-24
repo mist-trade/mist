@@ -73,6 +73,20 @@ function Ensure-EnvFile($dir, $label) {
     exit 1
 }
 
+function Invoke-ApplianceScript {
+    param(
+        [string]$Label,
+        [scriptblock]$Command
+    )
+
+    $global:LASTEXITCODE = 0
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        Write-Fail "$Label failed with exit code $LASTEXITCODE"
+        exit $LASTEXITCODE
+    }
+}
+
 function Invoke-InstallMysqlScalar {
     param(
         [string]$MysqlExe,
@@ -248,18 +262,18 @@ Test-DatabaseInitialized -BackendEnvFile $backendEnv
 Write-Step "Install datasource services"
 $datasourceDeploy = Join-Path $DatasourceDir "scripts\deploy_windows.ps1"
 if ($SkipDatasourceTest) {
-    & $datasourceDeploy -Only install
-    & $datasourceDeploy -Only service
+    Invoke-ApplianceScript "datasource install" { & $datasourceDeploy -Only install }
+    Invoke-ApplianceScript "datasource service install" { & $datasourceDeploy -Only service }
 } else {
-    & $datasourceDeploy
+    Invoke-ApplianceScript "datasource install" { & $datasourceDeploy }
 }
 
 Write-Step "Install backend service"
 $backendInstaller = Join-Path $BackendDir "scripts\install-service.ps1"
-& $backendInstaller -Start
+Invoke-ApplianceScript "backend service install" { & $backendInstaller -Start }
 
 Write-Step "Health check"
-& (Join-Path $RootDir "health-check.ps1")
+Invoke-ApplianceScript "health-check.ps1" { & (Join-Path $RootDir "health-check.ps1") -BackendHost "127.0.0.1" }
 
 Write-Host "`n===== Install complete =====" -ForegroundColor Green
 Write-Host "Set this on the Mac / LLM machine:" -ForegroundColor Cyan
