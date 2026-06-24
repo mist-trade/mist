@@ -7,6 +7,7 @@ $ErrorActionPreference = "Stop"
 if (-not $RootDir) {
     $RootDir = $PSScriptRoot
 }
+$RepoRoot = Split-Path (Split-Path $RootDir -Parent) -Parent
 
 function Assert-Contains {
     param(
@@ -67,6 +68,7 @@ $healthCheckPath = Join-Path $RootDir "health-check.ps1"
 $backendInstallerPath = Join-Path $RootDir "backend\install-service.ps1"
 $installerPath = Join-Path $RootDir "mysql\install-portable-mysql.ps1"
 $commonPath = Join-Path $RootDir "mysql\mysql-common.ps1"
+$workflowPath = Join-Path $RepoRoot ".github\workflows\windows-appliance.yml"
 
 Assert-FileNotExists "bundled empty schema is not shipped" $schemaPath
 Assert-FileExists "database migrations placeholder exists" $migrationsReadmePath
@@ -77,6 +79,7 @@ Assert-FileExists "health-check script exists" $healthCheckPath
 Assert-FileExists "backend service installer exists" $backendInstallerPath
 Assert-FileExists "portable mysql installer exists" $installerPath
 Assert-FileExists "portable mysql common helpers exist" $commonPath
+Assert-FileExists "windows appliance workflow exists" $workflowPath
 
 $migrationsReadme = Get-Content $migrationsReadmePath -Raw
 $migrationRunner = Get-Content $migrationRunnerPath -Raw
@@ -86,6 +89,7 @@ $healthCheck = Get-Content $healthCheckPath -Raw
 $backendInstaller = Get-Content $backendInstallerPath -Raw
 $installer = Get-Content $installerPath -Raw
 $common = Get-Content $commonPath -Raw
+$workflow = Get-Content $workflowPath -Raw
 
 Assert-Contains "migrations readme documents explicit runner" ".\run-migrations.ps1" $migrationsReadme
 Assert-Contains "migration runner creates version table" "CREATE TABLE IF NOT EXISTS ``schema_migrations``" $migrationRunner
@@ -126,5 +130,8 @@ Assert-Contains "installer ownership error includes service command" "Existing s
 Assert-Contains "installer ownership error includes expected mysqld path" "Expected mysqld path" $installer
 Assert-Contains "installer recovers interrupted bootstrap" "recover an interrupted bootstrap" $installer
 Assert-Contains "service ownership accepts matching interrupted bootstrap" "state.json is written after bootstrap completes" $common
+Assert-Contains "workflow creates datasource runtime directory" 'datasource\runtime' $workflow
+Assert-Contains "workflow resolves uv executable" 'Get-Command uv' $workflow
+Assert-Contains "workflow packages datasource uv runtime" 'runtime\uv.exe' $workflow
 
 Write-Host "`nDatabase bootstrap tests passed." -ForegroundColor Green
