@@ -1,5 +1,10 @@
 # Design: Windows API appliance packaging
 
+> Superseded service-management note (2026-06-27): NSSM/`MistTDX`/`MistQMT`
+> references in this historical design describe the first package iteration.
+> Current deployment uses WinSW for `MistBackend` and
+> `mist-tdx-datasource`; QMT service installation is skipped.
+
 ## Target topology
 
 ```text

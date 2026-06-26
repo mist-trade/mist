@@ -1,5 +1,10 @@
 # Change: Package Windows API appliance
 
+> Superseded service-management note (2026-06-27): NSSM/`MistTDX`/`MistQMT`
+> references in this historical change are superseded for the current appliance
+> by `refactor-tdx-python-datasource`. Current deployment uses WinSW for
+> `MistBackend` and `mist-tdx-datasource`; QMT service installation is skipped.
+
 ## Why
 
 The deployment target has changed. The Windows machine with market-data

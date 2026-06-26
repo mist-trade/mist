@@ -177,6 +177,19 @@ Alternative considered: keep NSSM. Existing scripts already use NSSM, but the
 target design calls for WinSW and the service runner logic becomes simpler when
 restart policy lives in the wrapper.
 
+## Resolved Deployment Decisions
+
+- Keep `9001` as the Windows appliance migration default for the TDX
+  datasource. The service remains configurable through `DATASOURCE_HOST`,
+  `DATASOURCE_PORT`, and backend `TDX_BASE_URL`; `18709` is not the appliance
+  default.
+- Install `mist-tdx-datasource` and `MistBackend` through WinSW. Stop and
+  delete legacy `MistTDX` and `MistQMT` service registrations during deployment
+  cleanup, but do not install QMT as an appliance service yet.
+- Automated deployment may set `SkipDatasourceTest=true` to avoid creating
+  temporary TDX strategy registrations. Manual smoke can run later with
+  `health-check.ps1 -IncludeMySQL` on the Windows API machine.
+
 ## Risks / Trade-offs
 
 - TDX client or TQ authorization is not running -> `/health` reports
@@ -225,10 +238,6 @@ back to the old TDX datasource instance and stop the WinSW service.
 
 ## Open Questions
 
-- Should the production default port become `18709` immediately, or should
-  `9001` remain the default until the Windows appliance is migrated?
-- Does ops want WinSW to replace only TDX first, or TDX and QMT together in a
-  later packaging change?
 - Which exact TDX JSON-RPC method names should back normalized bars and
   snapshots in the first implementation?
 - Should the first normalized WebSocket route reuse `/ws/quote/{client_id}` for

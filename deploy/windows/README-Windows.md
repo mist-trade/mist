@@ -183,10 +183,11 @@ Restart-Service mist-tdx-datasource
 Restart-Service MistBackend
 ```
 
-The datasource runner delays normal restarts and stops retrying after repeated
-early crashes. This usually means the SDK path, terminal login, `.env`, or port
-binding needs attention. After fixing the issue, remove the crash-loop state
-file and restart the affected service:
+WinSW restarts the datasource after failures with 10 second and 30 second
+delays, then resets the failure count after 1 hour (`resetfailure`). Repeated
+failures usually mean the SDK path, terminal login, `.env`, or port binding
+needs attention. Check the WinSW logs, fix the underlying issue, then restart
+the affected service:
 
 ```powershell
 Restart-Service mist-tdx-datasource

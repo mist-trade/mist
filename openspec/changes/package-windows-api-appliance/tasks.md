@@ -1,5 +1,10 @@
 # Tasks: Package Windows API appliance
 
+> Superseded service-management note (2026-06-27): tasks mentioning
+> NSSM/`MistTDX`/`MistQMT` are historical for the first package iteration.
+> Current deployment uses WinSW for `MistBackend` and
+> `mist-tdx-datasource`; QMT service installation is skipped.
+
 ## 1. Confirm deployment contract
 
 - [x] 1.1 Confirm the Windows API machine will host MySQL.

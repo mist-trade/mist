@@ -1,5 +1,10 @@
 # Tasks: Bundle portable MySQL
 
+> Superseded service-management note (2026-06-27): `MistMySQL` remains current,
+> but datasource/backend service references to `MistTDX`/`MistQMT` are
+> historical. Current deployment uses WinSW for `MistBackend` and
+> `mist-tdx-datasource`; QMT service installation is skipped.
+
 ## 1. Confirm portable MySQL contract
 
 - [x] 1.1 Choose the pinned MySQL Windows ZIP version.
