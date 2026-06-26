@@ -292,7 +292,11 @@ $backendInstaller = Join-Path $BackendDir "scripts\install-service.ps1"
 Invoke-ApplianceScript "backend service install" { & $backendInstaller -WinSWExe $winswExe -Start }
 
 Write-Step "Health check"
-Invoke-ApplianceScript "health-check.ps1" { & (Join-Path $RootDir "health-check.ps1") -BackendHost "127.0.0.1" }
+if ($SkipDatasourceTest) {
+    Invoke-ApplianceScript "health-check.ps1" { & (Join-Path $RootDir "health-check.ps1") -BackendHost "127.0.0.1" -SkipTDX }
+} else {
+    Invoke-ApplianceScript "health-check.ps1" { & (Join-Path $RootDir "health-check.ps1") -BackendHost "127.0.0.1" }
+}
 
 Write-Host "`n===== Install complete =====" -ForegroundColor Green
 Write-Host "Set this on the Mac / LLM machine:" -ForegroundColor Cyan

@@ -114,10 +114,12 @@ Assert-Contains "install-all disables legacy MistTDX through WinSW installer" "-
 Assert-Contains "install-all documents skipped QMT service" "QMT service installation is skipped by appliance" $installAll
 Assert-NotContains "install-all no longer installs QMT through NSSM" "-ServiceInstance qmt" $installAll
 Assert-Contains "install-all passes backend host explicitly to health check" '-BackendHost "127.0.0.1"' $installAll
+Assert-Contains "install-all skips TDX health when datasource live test is skipped" "-SkipTDX" $installAll
 Assert-Contains "install-all uses scoped mysql password for database check" "Invoke-InstallMysqlScalar" $installAll
 Assert-NotContains "install-all keeps database check password out of command line" '-p$password' $installAll
 Assert-Contains "install-all table check ignores migration metadata" "table_name <> 'schema_migrations'" $installAll
 Assert-Contains "health check defaults empty backend host to localhost" '[string]::IsNullOrWhiteSpace($BackendHost)' $healthCheck
+Assert-Contains "health check supports skipping TDX for deferred smoke" '[switch]$SkipTDX' $healthCheck
 Assert-Contains "health check uses scoped mysql password for database check" "Invoke-HealthMysqlScalar" $healthCheck
 Assert-NotContains "health check keeps database check password out of command line" '-p$mysqlPassword' $healthCheck
 Assert-Contains "health check table check ignores migration metadata" "table_name <> 'schema_migrations'" $healthCheck
