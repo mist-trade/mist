@@ -129,6 +129,8 @@ Assert-Contains "backend installer copies WinSW executable" "Copy-Item -Path `$R
 Assert-Contains "backend installer renders WinSW XML" "mist-backend.xml" $backendInstaller
 Assert-Contains "backend installer removes legacy MistBackend service" "sc.exe delete `$ServiceName" $backendInstaller
 Assert-NotContains "backend installer no longer uses NSSM" "NSSM" $backendInstaller
+Assert-Contains "backend installer accepts started-successfully output" "started successfully" $backendInstaller
+Assert-Contains "backend installer clears native exit code after success" '$global:LASTEXITCODE = 0' $backendInstaller
 Assert-Contains "backend WinSW XML has service id placeholder" "{{SERVICE_NAME}}" $backendServiceXml
 Assert-Contains "backend WinSW XML runs bundled node" "{{NODE_EXE}}" $backendServiceXml
 Assert-Contains "backend WinSW XML runs Mist entrypoint" "{{BACKEND_ARGUMENTS}}" $backendServiceXml
