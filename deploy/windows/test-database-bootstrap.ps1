@@ -145,6 +145,10 @@ Assert-Contains "installer ownership error includes expected mysqld path" "Expec
 Assert-Contains "installer recovers interrupted bootstrap" "recover an interrupted bootstrap" $installer
 Assert-Contains "service ownership accepts matching interrupted bootstrap" "state.json is written after bootstrap completes" $common
 Assert-Contains "workflow creates datasource runtime directory" 'datasource\runtime' $workflow
+Assert-Contains "workflow exposes datasource ref input" 'datasource_ref:' $workflow
+Assert-Contains "workflow defaults datasource ref to master" "DATASOURCE_REF: `${{ github.event.inputs.datasource_ref || 'master' }}" $workflow
+Assert-Contains "workflow checks out requested datasource ref" "ref: `${{ env.DATASOURCE_REF }}" $workflow
+Assert-Contains "workflow records datasource ref in manifest" "datasourceRef = `$env:DATASOURCE_REF" $workflow
 Assert-Contains "workflow creates WinSW directory" 'winsw' $workflow
 Assert-NotContains "workflow does not create NSSM directory" 'nssm' $workflow
 Assert-Contains "workflow resolves uv executable" 'Get-Command uv' $workflow
