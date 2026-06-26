@@ -219,8 +219,8 @@ if ($Start) {
     if ($StartResult.ExitCode -eq 0) {
         Write-Ok "$ServiceName start requested"
     }
-    elseif ($StartResult.Output -match "already|running|SERVICE_RUNNING") {
-        Write-Warn "$ServiceName is already running"
+    elseif ($StartResult.Output -match "already|running|SERVICE_RUNNING|started successfully") {
+        Write-Warn "$ServiceName start returned exit code $($StartResult.ExitCode), but WinSW output indicates the service is running"
     }
     else {
         throw "Unable to start $ServiceName. $($StartResult.Output)"
@@ -228,3 +228,4 @@ if ($Start) {
 }
 
 Write-Ok "WinSW service files: $ServiceDir"
+$global:LASTEXITCODE = 0
