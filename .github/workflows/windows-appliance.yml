@@ -25,6 +25,8 @@ jobs:
       DATASOURCE_REPOSITORY: mist-trade/mist-datasource
       DATASOURCE_REF: ${{ github.event.inputs.datasource_ref || 'master' }}
       ARTIFACT_NAME: mist-api-appliance-win-x64
+      WINSW_VERSION: v2.12.0
+      WINSW_X64_SHA256: 05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da
       MYSQL_VERSION: 8.4.10
       MYSQL_ZIP_URL: https://cdn.mysql.com/Downloads/MySQL-8.4/mysql-8.4.10-winx64.zip
       MYSQL_ZIP_SHA256: 3b950db31c33fb59252568c012bd9ee5fac50811e778ca7c8f1a0dc91686cd6f
@@ -99,20 +101,25 @@ jobs:
           cd mist-datasource
           uv lock
 
-      - name: Install WinSW for appliance package
+      - name: Download WinSW for appliance package
         shell: pwsh
         run: |
-          choco install winsw -y --no-progress
-          $winsw = Get-Command winsw -ErrorAction SilentlyContinue
-          if (-not $winsw) { $winsw = Get-Command WinSW -ErrorAction SilentlyContinue }
-          if (-not $winsw) {
-            $winsw = Get-ChildItem -Path "$env:ChocolateyInstall\lib\winsw" -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue |
-              Select-Object -First 1
+          $ErrorActionPreference = "Stop"
+          $winswDir = Join-Path $env:RUNNER_TEMP "winsw"
+          $winswPath = Join-Path $winswDir "winsw.exe"
+          $winswUrl = "https://github.com/winsw/winsw/releases/download/$env:WINSW_VERSION/WinSW-x64.exe"
+
+          if (Test-Path $winswDir) { Remove-Item $winswDir -Recurse -Force }
+          New-Item -ItemType Directory -Path $winswDir | Out-Null
+
+          Invoke-WebRequest -Uri $winswUrl -OutFile $winswPath
+
+          $sha256 = (Get-FileHash -Path $winswPath -Algorithm SHA256).Hash.ToLowerInvariant()
+          if ($sha256 -ne $env:WINSW_X64_SHA256) {
+            throw "WinSW SHA256 mismatch. Expected $env:WINSW_X64_SHA256, got $sha256"
           }
-          if (-not $winsw) {
-            throw "WinSW executable not found after choco install winsw."
-          }
-          $winswPath = if ($winsw.Source) { $winsw.Source } else { $winsw.FullName }
+
+          "WINSW_EXE=$winswPath" >> $env:GITHUB_ENV
           Write-Host "WinSW=$winswPath"
 
       - name: Download MySQL portable runtime
@@ -240,18 +247,10 @@ jobs:
           $uv = (Get-Command uv).Source
           Copy-Item $uv (Join-Path $pkg "datasource\runtime\uv.exe")
 
-          $winsw = Get-Command winsw -ErrorAction SilentlyContinue
-          if (-not $winsw) { $winsw = Get-Command WinSW -ErrorAction SilentlyContinue }
-          $winswPath = if ($winsw) { $winsw.Source } else { "" }
-          if (-not $winswPath) {
-            $winswFile = Get-ChildItem -Path "$env:ChocolateyInstall\lib\winsw" -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue |
-              Select-Object -First 1
-            if ($winswFile) { $winswPath = $winswFile.FullName }
+          if (-not $env:WINSW_EXE -or -not (Test-Path $env:WINSW_EXE -PathType Leaf)) {
+            throw "Downloaded WinSW executable not found for appliance package: $env:WINSW_EXE"
           }
-          if (-not $winswPath) {
-            throw "WinSW executable not found for appliance package."
-          }
-          Copy-Item $winswPath (Join-Path $pkg "winsw\winsw.exe")
+          Copy-Item $env:WINSW_EXE (Join-Path $pkg "winsw\winsw.exe")
 
           $datasourceSha = git -C $datasourceDir rev-parse HEAD
           $version = if ($env:GITHUB_REF -like "refs/tags/*") { $env:GITHUB_REF.Replace("refs/tags/", "") } else { "manual-$env:GITHUB_RUN_NUMBER" }
