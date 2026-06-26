@@ -2,6 +2,7 @@
 
 param(
     [string]$BackendHost = "127.0.0.1",
+    [switch]$SkipTDX,
     [switch]$IncludeQMT,
     [switch]$IncludeMySQL
 )
@@ -189,7 +190,11 @@ if ($shouldCheckMySql) {
     $ok = (Test-PortableMySql) -and $ok
 }
 
-$ok = (Test-TdxDatasourceHealth "http://127.0.0.1:9001/health") -and $ok
+if ($SkipTDX) {
+    Write-Host "  [WARN] Skipping mist-tdx-datasource health check" -ForegroundColor Yellow
+} else {
+    $ok = (Test-TdxDatasourceHealth "http://127.0.0.1:9001/health") -and $ok
+}
 
 if ($IncludeQMT) {
     $ok = (Test-Http "MistQMT" "http://127.0.0.1:9002/health" -Optional) -and $ok
