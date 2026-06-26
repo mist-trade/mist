@@ -120,6 +120,8 @@ Assert-NotContains "install-all keeps database check password out of command lin
 Assert-Contains "install-all table check ignores migration metadata" "table_name <> 'schema_migrations'" $installAll
 Assert-Contains "health check defaults empty backend host to localhost" '[string]::IsNullOrWhiteSpace($BackendHost)' $healthCheck
 Assert-Contains "health check supports skipping TDX for deferred smoke" '[switch]$SkipTDX' $healthCheck
+Assert-Contains "health check braces backend host in health URL" 'http://${BackendHost}:8001/app/hello' $healthCheck
+Assert-Contains "health check braces backend host in securities URL" 'http://${BackendHost}:8001/security/v1/all' $healthCheck
 Assert-Contains "health check uses scoped mysql password for database check" "Invoke-HealthMysqlScalar" $healthCheck
 Assert-NotContains "health check keeps database check password out of command line" '-p$mysqlPassword' $healthCheck
 Assert-Contains "health check table check ignores migration metadata" "table_name <> 'schema_migrations'" $healthCheck

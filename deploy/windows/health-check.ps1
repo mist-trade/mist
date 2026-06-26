@@ -200,8 +200,8 @@ if ($IncludeQMT) {
     $ok = (Test-Http "MistQMT" "http://127.0.0.1:9002/health" -Optional) -and $ok
 }
 
-$ok = (Test-Http "MistBackend health" "http://$BackendHost:8001/app/hello") -and $ok
-$ok = (Test-Http "MistBackend securities" "http://$BackendHost:8001/security/v1/all") -and $ok
+$ok = (Test-Http "MistBackend health" "http://${BackendHost}:8001/app/hello") -and $ok
+$ok = (Test-Http "MistBackend securities" "http://${BackendHost}:8001/security/v1/all") -and $ok
 
 if (-not $ok) {
     Write-Host "`nHealth check failed." -ForegroundColor Red
