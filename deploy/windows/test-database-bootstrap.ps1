@@ -149,13 +149,18 @@ Assert-Contains "workflow exposes datasource ref input" 'datasource_ref:' $workf
 Assert-Contains "workflow defaults datasource ref to master" "DATASOURCE_REF: `${{ github.event.inputs.datasource_ref || 'master' }}" $workflow
 Assert-Contains "workflow checks out requested datasource ref" "ref: `${{ env.DATASOURCE_REF }}" $workflow
 Assert-Contains "workflow records datasource ref in manifest" "datasourceRef = `$env:DATASOURCE_REF" $workflow
+Assert-Contains "workflow pins WinSW version" "WINSW_VERSION: v2.12.0" $workflow
+Assert-Contains "workflow pins WinSW SHA256" "WINSW_X64_SHA256: 05b82d46ad331cc16bdc00de5c6332c1ef818df8ceefcd49c726553209b3a0da" $workflow
+Assert-Contains "workflow downloads WinSW from GitHub release" 'https://github.com/winsw/winsw/releases/download/$env:WINSW_VERSION/WinSW-x64.exe' $workflow
+Assert-Contains "workflow verifies WinSW hash" "WinSW SHA256 mismatch" $workflow
 Assert-Contains "workflow creates WinSW directory" 'winsw' $workflow
 Assert-NotContains "workflow does not create NSSM directory" 'nssm' $workflow
 Assert-Contains "workflow resolves uv executable" 'Get-Command uv' $workflow
 Assert-Contains "workflow packages datasource uv runtime" 'runtime\uv.exe' $workflow
-Assert-Contains "workflow installs WinSW for appliance package" "Install WinSW" $workflow
+Assert-Contains "workflow downloads WinSW for appliance package" "Download WinSW" $workflow
 Assert-Contains "workflow packages WinSW executable" 'winsw\winsw.exe' $workflow
 Assert-NotContains "workflow no longer installs NSSM" "Install NSSM" $workflow
 Assert-NotContains "workflow no longer packages NSSM executable" 'nssm\nssm.exe' $workflow
+Assert-NotContains "workflow no longer installs WinSW through Chocolatey" "choco install winsw" $workflow
 
 Write-Host "`nDatabase bootstrap tests passed." -ForegroundColor Green
