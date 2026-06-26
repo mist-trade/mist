@@ -43,6 +43,34 @@ function Test-Http($name, $url, [switch]$Optional) {
     }
 }
 
+function Test-TdxDatasourceHealth {
+    param([string]$Url)
+
+    $name = "mist-tdx-datasource"
+    try {
+        $resp = Invoke-WebRequest -Uri $Url -TimeoutSec 8 -UseBasicParsing
+        if ($resp.StatusCode -lt 200 -or $resp.StatusCode -ge 300) {
+            Write-Host "  [FAIL] $name returned HTTP $($resp.StatusCode)" -ForegroundColor Red
+            return $false
+        }
+
+        $body = $resp.Content | ConvertFrom-Json
+        foreach ($key in @("tdxHttpReachable", "tqInitialized", "eventQueueDepth", "collectorState")) {
+            if (-not ($body.PSObject.Properties.Name -contains $key)) {
+                Write-Host "  [FAIL] $name health missing $key" -ForegroundColor Red
+                return $false
+            }
+        }
+
+        Write-Host "  [OK] $name -> $Url" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Host "  [FAIL] $name unavailable -> $Url" -ForegroundColor Red
+        Write-Host "         $_" -ForegroundColor Yellow
+        return $false
+    }
+}
+
 function Resolve-HealthMysqlExe {
     $portable = Join-Path $RootDir "mysql\runtime\mysql-8.4.10\bin\mysql.exe"
     if (Test-Path $portable -PathType Leaf) { return $portable }
@@ -161,7 +189,7 @@ if ($shouldCheckMySql) {
     $ok = (Test-PortableMySql) -and $ok
 }
 
-$ok = (Test-Http "MistTDX" "http://127.0.0.1:9001/health") -and $ok
+$ok = (Test-TdxDatasourceHealth "http://127.0.0.1:9001/health") -and $ok
 
 if ($IncludeQMT) {
     $ok = (Test-Http "MistQMT" "http://127.0.0.1:9002/health" -Optional) -and $ok

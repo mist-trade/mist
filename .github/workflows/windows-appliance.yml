@@ -92,12 +92,21 @@ jobs:
           cd mist-datasource
           uv lock
 
-      - name: Install NSSM for appliance package
+      - name: Install WinSW for appliance package
         shell: pwsh
         run: |
-          choco install nssm -y --no-progress
-          $nssm = (Get-Command nssm).Source
-          Write-Host "NSSM=$nssm"
+          choco install winsw -y --no-progress
+          $winsw = Get-Command winsw -ErrorAction SilentlyContinue
+          if (-not $winsw) { $winsw = Get-Command WinSW -ErrorAction SilentlyContinue }
+          if (-not $winsw) {
+            $winsw = Get-ChildItem -Path "$env:ChocolateyInstall\lib\winsw" -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+          }
+          if (-not $winsw) {
+            throw "WinSW executable not found after choco install winsw."
+          }
+          $winswPath = if ($winsw.Source) { $winsw.Source } else { $winsw.FullName }
+          Write-Host "WinSW=$winswPath"
 
       - name: Download MySQL portable runtime
         shell: pwsh
@@ -179,7 +188,7 @@ jobs:
           New-Item -ItemType Directory -Path (Join-Path $pkg "mysql\data") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "mysql\logs") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "mysql\scripts") | Out-Null
-          New-Item -ItemType Directory -Path (Join-Path $pkg "nssm") | Out-Null
+          New-Item -ItemType Directory -Path (Join-Path $pkg "winsw") | Out-Null
           New-Item -ItemType Directory -Path (Join-Path $pkg "third-party-notices\mysql") | Out-Null
 
           Copy-Item (Join-Path $mistDir "deploy\windows\install-all.ps1") $pkg
@@ -198,7 +207,7 @@ jobs:
           Copy-Item (Join-Path $mistDir "package.json") $backendDir
           Copy-Item (Join-Path $mistDir "pnpm-lock.yaml") $backendDir
           Copy-Item (Join-Path $mistDir "deploy\windows\backend.env.example") (Join-Path $backendDir ".env.example")
-          Copy-Item (Join-Path $mistDir "deploy\windows\backend\*.ps1") (Join-Path $backendDir "scripts")
+          Copy-Item (Join-Path $mistDir "deploy\windows\backend\*") (Join-Path $backendDir "scripts") -Recurse
           Copy-Item (Get-Command node).Source (Join-Path $backendDir "runtime\node.exe")
 
           Push-Location $backendDir
@@ -224,8 +233,18 @@ jobs:
           $uv = (Get-Command uv).Source
           Copy-Item $uv (Join-Path $pkg "datasource\runtime\uv.exe")
 
-          $nssm = (Get-Command nssm).Source
-          Copy-Item $nssm (Join-Path $pkg "nssm\nssm.exe")
+          $winsw = Get-Command winsw -ErrorAction SilentlyContinue
+          if (-not $winsw) { $winsw = Get-Command WinSW -ErrorAction SilentlyContinue }
+          $winswPath = if ($winsw) { $winsw.Source } else { "" }
+          if (-not $winswPath) {
+            $winswFile = Get-ChildItem -Path "$env:ChocolateyInstall\lib\winsw" -Filter "*.exe" -Recurse -ErrorAction SilentlyContinue |
+              Select-Object -First 1
+            if ($winswFile) { $winswPath = $winswFile.FullName }
+          }
+          if (-not $winswPath) {
+            throw "WinSW executable not found for appliance package."
+          }
+          Copy-Item $winswPath (Join-Path $pkg "winsw\winsw.exe")
 
           $datasourceSha = git -C $datasourceDir rev-parse HEAD
           $version = if ($env:GITHUB_REF -like "refs/tags/*") { $env:GITHUB_REF.Replace("refs/tags/", "") } else { "manual-$env:GITHUB_RUN_NUMBER" }

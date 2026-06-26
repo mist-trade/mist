@@ -10,14 +10,22 @@ $RootDir = $PSScriptRoot
 $BackendDir = Join-Path $RootDir "backend"
 $DatasourceDir = Join-Path $RootDir "datasource"
 
-function Resolve-NssmExe {
-    $cmd = Get-Command nssm -ErrorAction SilentlyContinue
-    if ($cmd) { return $cmd.Source }
+function Remove-LegacyWindowsService {
+    param([string]$ServiceName)
 
-    $candidate = Join-Path $RootDir "nssm\nssm.exe"
-    if (Test-Path $candidate -PathType Leaf) { return $candidate }
+    $service = Get-Service -Name $ServiceName -ErrorAction SilentlyContinue
+    if ($service -and $service.Status -ne "Stopped") {
+        Stop-Service -Name $ServiceName -Force -ErrorAction SilentlyContinue
+    }
 
-    return $null
+    $previousErrorActionPreference = $ErrorActionPreference
+    $ErrorActionPreference = "Continue"
+    try {
+        sc.exe delete $ServiceName | Out-Host
+    }
+    finally {
+        $ErrorActionPreference = $previousErrorActionPreference
+    }
 }
 
 $backendUninstall = Join-Path $BackendDir "scripts\uninstall-service.ps1"
@@ -25,23 +33,18 @@ if (Test-Path $backendUninstall -PathType Leaf) {
     & $backendUninstall
 }
 
+$tdxWinswUninstall = Join-Path $DatasourceDir "scripts\winsw\uninstall-tdx-datasource.ps1"
+if (Test-Path $tdxWinswUninstall -PathType Leaf) {
+    & $tdxWinswUninstall -ProjectDir $DatasourceDir
+}
+
 $portableMysqlUninstall = Join-Path $RootDir "mysql\scripts\uninstall-portable-mysql.ps1"
 if (Test-Path $portableMysqlUninstall -PathType Leaf) {
     & $portableMysqlUninstall -RootDir $RootDir -RemoveData:$RemovePortableMySQLData
 }
 
-$nssmExe = Resolve-NssmExe
-if (-not $nssmExe) {
-    Write-Host "NSSM not found; datasource services were not removed." -ForegroundColor Yellow
-    exit 0
-}
-
 foreach ($service in @("MistTDX", "MistQMT")) {
-    $prevEAP = $ErrorActionPreference
-    $ErrorActionPreference = "Continue"
-    & $nssmExe stop $service
-    & $nssmExe remove $service confirm
-    $ErrorActionPreference = $prevEAP
+    Remove-LegacyWindowsService -ServiceName $service
 }
 
 Write-Host "Appliance service removal requested." -ForegroundColor Green

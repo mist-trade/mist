@@ -1,0 +1,22 @@
+<service>
+  <id>{{SERVICE_NAME}}</id>
+  <name>{{SERVICE_NAME}}</name>
+  <description>Mist stock analysis API backend (port 8001).</description>
+
+  <workingdirectory>{{BACKEND_DIR}}</workingdirectory>
+  <executable>{{NODE_EXE}}</executable>
+  <arguments>{{BACKEND_ARGUMENTS}}</arguments>
+
+  <env name="NODE_ENV" value="production" />
+
+  <startmode>Automatic</startmode>
+  <onfailure action="restart" delay="10 sec" />
+  <onfailure action="restart" delay="30 sec" />
+  <resetfailure>1 hour</resetfailure>
+
+  <logpath>{{LOG_DIR}}</logpath>
+  <log mode="roll-by-size">
+    <sizeThreshold>10485760</sizeThreshold>
+    <keepFiles>8</keepFiles>
+  </log>
+</service>

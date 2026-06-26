@@ -12,7 +12,14 @@ import {
 import { DataSource as TypeOrmDataSource } from 'typeorm';
 import { format, parseISO } from 'date-fns';
 import { ITdxSourceFetcher } from './tdx-source.interface';
-import { TdxResponse, TdxSnapshot, TdxExtension } from './types';
+import {
+  TdxResponse,
+  TdxSnapshot,
+  TdxExtension,
+  TdxEnvelope,
+  TdxBarsResponseData,
+  TdxSnapshotsResponseData,
+} from './types';
 
 @Injectable()
 export class TdxSource implements ITdxSourceFetcher {
@@ -55,31 +62,37 @@ export class TdxSource implements ITdxSourceFetcher {
     }
 
     try {
-      const response = await this.axios.get<{
-        data: {
-          [field: string]: {
-            [stockCode: string]: { [timestamp: string]: string | number };
-          };
-        };
-      }>('/api/tdx/market-data', {
-        params: {
-          stocks: formatCode,
-          fields: 'Open,High,Low,Close,Volume,Amount,ForwardFactor',
+      const response = await this.axios.post<TdxEnvelope<TdxBarsResponseData>>(
+        '/v1/bars/query',
+        {
+          symbols: [formatCode],
           period: periodFormat,
-          start_time: format(startDate, 'yyyyMMdd'),
-          end_time: format(endDate, 'yyyyMMdd'),
-          dividend_type: 'none',
+          startTime: startDate.toISOString(),
+          endTime: endDate.toISOString(),
         },
-      });
+      );
+      const envelope = response.data;
 
-      if (!response.data?.data) {
+      if (!envelope?.ok) {
+        this.throwEnvelopeError(envelope, 'TDX bars query failed');
+      }
+      if (!Array.isArray(envelope.data?.bars)) {
         throw new HttpException(
-          'Invalid response from TDX API',
+          'Invalid normalized TDX bars response',
           HttpStatus.BAD_GATEWAY,
         );
       }
 
-      return this.parseMarketDataResponse(response.data.data, formatCode);
+      return envelope.data.bars.map((bar) => ({
+        timestamp: parseISO(bar.barTime),
+        open: bar.open,
+        high: bar.high,
+        low: bar.low,
+        close: bar.close,
+        volume: bar.volume,
+        amount: bar.amount,
+        forwardFactor: bar.forwardFactor,
+      }));
     } catch (error) {
       this.logger.error(`TDX fetchK error: ${error.message}`);
       if (error instanceof HttpException) {
@@ -94,23 +107,48 @@ export class TdxSource implements ITdxSourceFetcher {
 
   async fetchSnapshot(stockCode: string): Promise<TdxSnapshot> {
     try {
-      const response = await this.axios.get<{
-        data: {
-          stock_code: string;
-          snapshot: any;
-        };
-      }>('/api/tdx/market-snapshot', {
-        params: { stock_code: stockCode },
+      const response = await this.axios.post<
+        TdxEnvelope<TdxSnapshotsResponseData>
+      >('/v1/snapshots/query', {
+        symbols: [stockCode],
       });
+      const envelope = response.data;
 
-      if (!response.data?.data) {
+      if (!envelope?.ok) {
+        this.throwEnvelopeError(envelope, 'TDX snapshot query failed');
+      }
+      if (!Array.isArray(envelope.data?.snapshots)) {
         throw new HttpException(
-          'Invalid response from TDX snapshot API',
+          'Invalid normalized TDX snapshot response',
           HttpStatus.BAD_GATEWAY,
         );
       }
 
-      return this.parseSnapshot(response.data.data.snapshot, stockCode);
+      const snapshot = envelope.data.snapshots[0];
+      if (!snapshot) {
+        throw new HttpException(
+          'TDX snapshot response did not contain snapshots',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+      if (typeof snapshot.lastClose !== 'number') {
+        throw new HttpException(
+          'Invalid normalized TDX snapshot response: lastClose is required',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      return {
+        stockCode: snapshot.symbol || stockCode,
+        now: snapshot.last,
+        open: snapshot.open,
+        high: snapshot.high,
+        low: snapshot.low,
+        lastClose: snapshot.lastClose,
+        volume: snapshot.volume,
+        amount: snapshot.amount,
+        timestamp: snapshot.asOf ? parseISO(snapshot.asOf) : new Date(),
+      };
     } catch (error) {
       this.logger.error(`TDX fetchSnapshot error: ${error.message}`);
       if (error instanceof HttpException) {
@@ -231,6 +269,15 @@ export class TdxSource implements ITdxSourceFetcher {
 
   isSupportedPeriod(period: Period): boolean {
     return this.periodMappingService.isSupported(period, DataSource.TDX);
+  }
+
+  private throwEnvelopeError(
+    envelope: TdxEnvelope<unknown> | undefined,
+    fallbackMessage: string,
+  ): never {
+    const code = envelope?.error?.code || 'TDX_HTTP_ERROR';
+    const message = envelope?.error?.message || fallbackMessage;
+    throw new HttpException(`${code}: ${message}`, HttpStatus.BAD_GATEWAY);
   }
 
   /**

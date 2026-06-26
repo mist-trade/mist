@@ -1,6 +1,5 @@
 /**
- * Parsed K-line data from mist-datasource /api/tdx/market-data
- * Raw HTTP response {field: {stockCode: [values]}} is parsed into this format
+ * K-line data mapped from mist-datasource TDX /v1/bars/query.
  */
 export interface TdxResponse {
   timestamp: Date;
@@ -13,9 +12,60 @@ export interface TdxResponse {
   forwardFactor?: number;
 }
 
+export interface TdxDatasourceError {
+  code: string;
+  message: string;
+  retryable: boolean;
+  details: Record<string, unknown>;
+}
+
+export interface TdxEnvelope<T> {
+  ok: boolean;
+  requestId?: string;
+  provider: string;
+  data: T | null;
+  meta: Record<string, unknown> | null;
+  error: TdxDatasourceError | null;
+}
+
+export interface TdxNormalizedBar {
+  symbol: string;
+  period: string;
+  barTime: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount: number;
+  provider: string;
+  receivedAt: string;
+  forwardFactor?: number;
+}
+
+export interface TdxNormalizedSnapshot {
+  symbol: string;
+  last: number;
+  open: number;
+  high: number;
+  low: number;
+  volume: number;
+  amount: number;
+  provider: string;
+  asOf?: string;
+  lastClose: number;
+}
+
+export interface TdxBarsResponseData {
+  bars: TdxNormalizedBar[];
+}
+
+export interface TdxSnapshotsResponseData {
+  snapshots: TdxNormalizedSnapshot[];
+}
+
 /**
- * Real-time snapshot from mist-datasource WebSocket
- * Parsed from WS message {type: "quote", data: {stock_code, snapshot: {...}}}
+ * Real-time snapshot mapped from mist-datasource TDX /v1/snapshots/query.
  */
 export interface TdxSnapshot {
   stockCode: string; // e.g., "SH600519"

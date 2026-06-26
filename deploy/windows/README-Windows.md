@@ -9,8 +9,7 @@ machine.
 Windows API machine
   - MySQL, external or package-local portable
   - TDX / miniQMT clients
-  - MistTDX on 127.0.0.1:9001
-  - MistQMT on 127.0.0.1:9002, optional
+  - mist-tdx-datasource on 127.0.0.1:9001
   - MistBackend on 0.0.0.0:8001
 
 Mac / LLM machine
@@ -37,14 +36,14 @@ TDX_SDK_PATH=F:/quant/tdx/PYPlugins/user
 `TDX_SDK_PATH` points to the `user` directory that contains `tqcenter.py`.
 `TPythClient.dll` stays one level above it.
 
-QMT expected layout:
+QMT expected layout, for later manual or future service enablement:
 
 ```text
 QMT_PATH=F:/quant/qmt
 QMT_SDK_PATH=
 ```
 
-Leave `QMT_SDK_PATH` empty to skip QMT service installation.
+The appliance currently does not install or start a QMT Windows service.
 
 ## Install
 
@@ -53,6 +52,12 @@ Leave `QMT_SDK_PATH` empty to skip QMT service installation.
 2. Confirm TDX / miniQMT clients are installed, authorized, running, and logged in.
 3. Extract the package to a stable path, for example `D:/MistAPI`.
 4. Copy or edit `backend/.env` and `datasource/.env`.
+   During the TDX datasource migration, keep the backend default:
+
+   ```text
+   TDX_BASE_URL=http://127.0.0.1:9001
+   ```
+
 5. Run Administrator PowerShell:
 
 ```powershell
@@ -118,45 +123,80 @@ MIST_API_BASE_URL=http://<windows-lan-ip>:8001
 
 ## Datasource services
 
-The appliance installs datasource services through the datasource deployment
-entrypoint:
+The TDX service remains the Python `mist-datasource` TDX adapter. It runs as the
+WinSW-managed Windows service `mist-tdx-datasource` and exposes normalized
+HTTP/WebSocket APIs on `127.0.0.1:9001` for the Mist backend. The backend
+`TDX_BASE_URL` default remains `http://127.0.0.1:9001`.
 
-```text
-datasource/scripts/deploy_windows.ps1
-```
+`MistBackend` is also installed through WinSW. The appliance does not require or
+bundle NSSM. During deployment, old `MistBackend`, `MistTDX`, and `MistQMT`
+service registrations are stopped and deleted before the WinSW services are
+installed.
 
-`MistTDX` and `MistQMT` are reconciled on every install. If a service already
-belongs to a Mist datasource package, the installer updates its working
-directory, command, logs, and restart policy. If another unrelated service uses
-the same name, installation fails instead of overwriting it.
-
-Useful NSSM commands:
+Install or update the TDX WinSW service from the datasource package:
 
 ```powershell
-nssm status MistTDX
-nssm status MistQMT
-nssm restart MistTDX
-nssm restart MistQMT
-nssm stop MistTDX
+cd datasource
+.\scripts\winsw\install-tdx-datasource.ps1 -WinSWExe D:\tools\winsw\winsw.exe
+.\scripts\winsw\test-tdx-datasource.ps1
+```
+
+If the legacy NSSM `MistTDX` service is still present, stop or disable it before
+starting `mist-tdx-datasource`, or let the installer do that explicitly:
+
+```powershell
+.\scripts\winsw\install-tdx-datasource.ps1 -WinSWExe D:\tools\winsw\winsw.exe -DisableLegacyMistTDX
+```
+
+Uninstall only the WinSW TDX service:
+
+```powershell
+.\scripts\winsw\uninstall-tdx-datasource.ps1
+```
+
+This does not remove TDX terminal files, proprietary SDK files, or strategy
+files. TDX desktop login, authorization checks, and strategy cleanup remain
+outside public service automation; operators or private guards should use
+`http://127.0.0.1:9001/health` to inspect `tdxHttpReachable`, `tqInitialized`,
+`eventQueueDepth`, and `collectorState`.
+
+The new TDX path does not require `DATASOURCE_DB`. NestJS/MySQL remains the owner
+of durable subscription intent and K-line persistence.
+
+WinSW logs are under:
+
+```text
+datasource/logs/mist-tdx-datasource
+```
+
+QMT is intentionally paused in the appliance service layer. Keep the miniQMT
+client and paths in place if you need them later, but this package does not
+register or start `MistQMT`.
+
+Useful service commands:
+
+```powershell
+.\datasource\scripts\winsw\test-tdx-datasource.ps1
+Get-Service mist-tdx-datasource
+Get-Service MistBackend
+Restart-Service mist-tdx-datasource
+Restart-Service MistBackend
 ```
 
 The datasource runner delays normal restarts and stops retrying after repeated
 early crashes. This usually means the SDK path, terminal login, `.env`, or port
 binding needs attention. After fixing the issue, remove the crash-loop state
-file and restart the service:
+file and restart the affected service:
 
 ```powershell
-Remove-Item datasource\logs\service-runner-tdx-state.json -ErrorAction SilentlyContinue
-Remove-Item datasource\logs\service-runner-qmt-state.json -ErrorAction SilentlyContinue
-nssm restart MistTDX
-nssm restart MistQMT
+Restart-Service mist-tdx-datasource
+Restart-Service MistBackend
 ```
 
 The most useful logs are:
 
 ```text
-datasource/logs/tdx-stdout.log
-datasource/logs/tdx-stderr.log
-datasource/logs/qmt-stdout.log
-datasource/logs/qmt-stderr.log
+datasource/logs/mist-tdx-datasource
+backend/logs/backend-stdout.log
+backend/logs/backend-stderr.log
 ```

@@ -261,16 +261,35 @@ Test-DatabaseInitialized -BackendEnvFile $backendEnv
 
 Write-Step "Install datasource services"
 $datasourceDeploy = Join-Path $DatasourceDir "scripts\deploy_windows.ps1"
+$tdxWinswInstall = Join-Path $DatasourceDir "scripts\winsw\install-tdx-datasource.ps1"
+$winswExe = Join-Path $RootDir "winsw\winsw.exe"
+$datasourceUvExe = Join-Path $DatasourceDir "runtime\uv.exe"
+if (-not (Test-Path $tdxWinswInstall -PathType Leaf)) {
+    Write-Fail "TDX WinSW installer not found: $tdxWinswInstall"
+    exit 1
+}
+if (-not (Test-Path $winswExe -PathType Leaf)) {
+    Write-Fail "WinSW executable not found: $winswExe"
+    exit 1
+}
 if ($SkipDatasourceTest) {
     Invoke-ApplianceScript "datasource install" { & $datasourceDeploy -Only install }
-    Invoke-ApplianceScript "datasource service install" { & $datasourceDeploy -Only service }
 } else {
-    Invoke-ApplianceScript "datasource install" { & $datasourceDeploy }
+    Invoke-ApplianceScript "datasource install" { & $datasourceDeploy -Only install }
+    Invoke-ApplianceScript "datasource live test" { & $datasourceDeploy -Only test }
 }
+Invoke-ApplianceScript "tdx winsw service install" {
+    & $tdxWinswInstall `
+        -ProjectDir $DatasourceDir `
+        -WinSWExe $winswExe `
+        -Executable $datasourceUvExe `
+        -DisableLegacyMistTDX
+}
+Write-Warn "QMT service installation is skipped by appliance. Start QMT manually or add a WinSW path later."
 
 Write-Step "Install backend service"
 $backendInstaller = Join-Path $BackendDir "scripts\install-service.ps1"
-Invoke-ApplianceScript "backend service install" { & $backendInstaller -Start }
+Invoke-ApplianceScript "backend service install" { & $backendInstaller -WinSWExe $winswExe -Start }
 
 Write-Step "Health check"
 Invoke-ApplianceScript "health-check.ps1" { & (Join-Path $RootDir "health-check.ps1") -BackendHost "127.0.0.1" }
