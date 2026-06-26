@@ -1,8 +1,10 @@
 import {
+  Inject,
   Injectable,
   Logger,
   OnModuleInit,
   OnModuleDestroy,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { WebSocket } from 'ws';
@@ -12,11 +14,26 @@ import { TdxResponse, TdxSnapshot } from './types';
 import { TimezoneService } from '@app/timezone';
 
 type SnapshotCallback = (snapshot: TdxSnapshot) => void | Promise<void>;
+export interface TdxRealtimeBar {
+  symbol: string;
+  period: Period;
+  timestamp: Date;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount: number;
+}
+
+type BarCallback = (bar: TdxRealtimeBar) => void | Promise<void>;
 type CandleCompleteCallback = (
   candle: TdxResponse,
   security: Security,
   period: Period,
 ) => void | Promise<void>;
+
+export const TDX_WEBSOCKET_CTOR = 'TDX_WEBSOCKET_CTOR';
 
 @Injectable()
 export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
@@ -27,16 +44,21 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
   private ws: WebSocket | null = null;
   private readonly subscriptions = new Set<string>();
   private snapshotCallbacks: SnapshotCallback[] = [];
+  private barCallbacks: BarCallback[] = [];
   private candleCallbacks: CandleCompleteCallback[] = [];
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
   private readonly reconnectDelay = 5000;
   private readonly heartbeatIntervalMs = 30000;
+  private isShuttingDown = false;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly aggregator: KCandleAggregator,
     private readonly timezoneService: TimezoneService,
+    @Optional()
+    @Inject(TDX_WEBSOCKET_CTOR)
+    private readonly webSocketCtor: typeof WebSocket = WebSocket,
   ) {
     this.baseUrl =
       this.configService.get<string>('TDX_BASE_URL') || 'http://127.0.0.1:9001';
@@ -56,6 +78,7 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleInit(): Promise<void> {
+    this.isShuttingDown = false;
     this.connect();
   }
 
@@ -65,6 +88,10 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
 
   onSnapshot(callback: SnapshotCallback): void {
     this.snapshotCallbacks.push(callback);
+  }
+
+  onBar(callback: BarCallback): void {
+    this.barCallbacks.push(callback);
   }
 
   onCandleComplete(callback: CandleCompleteCallback): void {
@@ -83,8 +110,9 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
 
   getConnectionStatus(): 'connected' | 'disconnected' | 'connecting' {
     if (!this.ws) return 'disconnected';
-    if (this.ws.readyState === WebSocket.OPEN) return 'connected';
-    if (this.ws.readyState === WebSocket.CONNECTING) return 'connecting';
+    if (this.ws.readyState === this.webSocketCtor.OPEN) return 'connected';
+    if (this.ws.readyState === this.webSocketCtor.CONNECTING)
+      return 'connecting';
     return 'disconnected';
   }
 
@@ -100,14 +128,17 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
   }
 
   private connect(): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
+    if (
+      this.ws?.readyState === this.webSocketCtor.OPEN ||
+      this.ws?.readyState === this.webSocketCtor.CONNECTING
+    ) {
       return;
     }
 
     this.logger.log(`Connecting to TDX WebSocket: ${this.wsUrl}`);
 
     try {
-      this.ws = new WebSocket(this.wsUrl);
+      this.ws = new this.webSocketCtor(this.wsUrl);
 
       this.ws.on('open', () => {
         this.logger.log('TDX WebSocket connected');
@@ -125,7 +156,11 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       });
 
       this.ws.on('close', () => {
+        if (this.isShuttingDown) {
+          return;
+        }
         this.logger.warn('TDX WebSocket disconnected, reconnecting...');
+        this.clearHeartbeat();
         this.scheduleReconnect();
       });
     } catch (error) {
@@ -135,11 +170,13 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
   }
 
   private disconnect(): void {
+    this.isShuttingDown = true;
     this.clearReconnectTimeout();
     this.clearHeartbeat();
     if (this.ws) {
-      this.ws.close();
+      const socket = this.ws;
       this.ws = null;
+      socket.close();
     }
   }
 
@@ -155,6 +192,12 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       if (message.type === 'quote') {
         const snapshot = this.parseSnapshot(message.data);
         this.processSnapshot(snapshot);
+        return;
+      }
+
+      if (message.type === 'bar') {
+        const bar = this.parseBar(message.data);
+        this.processBar(bar);
       }
     } catch (error) {
       this.logger.error(`Failed to handle WebSocket message: ${error}`);
@@ -168,15 +211,86 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
     const s = data.snapshot;
     return {
       stockCode: data.stock_code,
-      now: Number(s.Now || s.now),
-      open: Number(s.Open || s.open),
-      high: Number(s.Max || s.high),
-      low: Number(s.Min || s.low),
-      lastClose: Number(s.LastClose || s.lastClose),
-      volume: Number(s.Volume || s.volume),
-      amount: Number(s.Amount || s.amount),
+      now: this.readNumber(s, ['Now', 'now', 'Last', 'last', 'Close', 'close']),
+      open: this.readNumber(s, ['Open', 'open']),
+      high: this.readNumber(s, ['Max', 'max', 'High', 'high']),
+      low: this.readNumber(s, ['Min', 'min', 'Low', 'low']),
+      lastClose: this.readNumber(s, ['LastClose', 'lastClose']),
+      volume: this.readNumber(s, ['Volume', 'volume']),
+      amount: this.readNumber(s, ['Amount', 'amount']),
       timestamp: this.timezoneService.getCurrentBeijingTime(),
     };
+  }
+
+  private parseBar(data: Record<string, unknown>): TdxRealtimeBar {
+    const symbol = String(data.symbol || '').trim();
+    const timestampValue = data.timestamp || data.barTime;
+    const timestamp = new Date(String(timestampValue));
+
+    if (!symbol) {
+      throw new Error('TDX bar symbol is required');
+    }
+    if (Number.isNaN(timestamp.getTime())) {
+      throw new Error(`Invalid TDX bar timestamp: ${timestampValue}`);
+    }
+
+    return {
+      symbol,
+      period: this.parsePeriod(data.period),
+      timestamp,
+      open: Number(data.open),
+      high: Number(data.high),
+      low: Number(data.low),
+      close: Number(data.close),
+      volume: Number(data.volume),
+      amount: Number(data.amount || 0),
+    };
+  }
+
+  private parsePeriod(value: unknown): Period {
+    const period = String(value || '').trim();
+    if (period === '1M') {
+      return Period.MONTH;
+    }
+
+    const aliases: Record<string, Period> = {
+      '1': Period.ONE_MIN,
+      '1m': Period.ONE_MIN,
+      '1min': Period.ONE_MIN,
+      '5': Period.FIVE_MIN,
+      '5m': Period.FIVE_MIN,
+      '5min': Period.FIVE_MIN,
+      '15': Period.FIFTEEN_MIN,
+      '15m': Period.FIFTEEN_MIN,
+      '15min': Period.FIFTEEN_MIN,
+      '30': Period.THIRTY_MIN,
+      '30m': Period.THIRTY_MIN,
+      '30min': Period.THIRTY_MIN,
+      '60': Period.SIXTY_MIN,
+      '60m': Period.SIXTY_MIN,
+      '60min': Period.SIXTY_MIN,
+      '1d': Period.DAY,
+      day: Period.DAY,
+      '1w': Period.WEEK,
+      week: Period.WEEK,
+      month: Period.MONTH,
+    };
+
+    const mapped = aliases[period.toLowerCase()];
+    if (!mapped) {
+      throw new Error(`Unsupported TDX bar period: ${period}`);
+    }
+    return mapped;
+  }
+
+  private readNumber(source: Record<string, unknown>, keys: string[]): number {
+    for (const key of keys) {
+      const value = source[key];
+      if (value !== undefined && value !== null) {
+        return Number(value);
+      }
+    }
+    return 0;
   }
 
   private processSnapshot(snapshot: TdxSnapshot): void {
@@ -207,16 +321,26 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
+  private processBar(bar: TdxRealtimeBar): void {
+    for (const callback of this.barCallbacks) {
+      try {
+        const result = callback(bar);
+        void Promise.resolve(result).catch((error) => {
+          this.logger.error(`Bar callback error: ${error}`);
+        });
+      } catch (error) {
+        this.logger.error(`Bar callback error: ${error}`);
+      }
+    }
+  }
+
   private sendSubscription(): void {
-    if (
-      this.ws?.readyState !== WebSocket.OPEN ||
-      this.subscriptions.size === 0
-    ) {
+    if (this.ws?.readyState !== this.webSocketCtor.OPEN) {
       return;
     }
 
     const message = JSON.stringify({
-      type: 'subscribe',
+      type: 'sync_subscriptions',
       stocks: Array.from(this.subscriptions),
     });
 
@@ -229,7 +353,7 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
 
     // Send ping every 30 seconds
     this.heartbeatInterval = setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
+      if (this.ws?.readyState === this.webSocketCtor.OPEN) {
         this.ws.send(JSON.stringify({ type: 'ping' }));
       } else {
         this.clearHeartbeat();
@@ -282,7 +406,14 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
 
     for (const callback of this.candleCallbacks) {
       try {
-        callback(tdxResponse, security as Security, candle.period);
+        const result = callback(
+          tdxResponse,
+          security as Security,
+          candle.period,
+        );
+        void Promise.resolve(result).catch((error) => {
+          this.logger.error(`Candle callback error: ${error}`);
+        });
       } catch (error) {
         this.logger.error(`Candle callback error: ${error}`);
       }
