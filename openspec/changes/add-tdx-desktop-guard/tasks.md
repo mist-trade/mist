@@ -1,5 +1,9 @@
 # Tasks: Add TDX desktop guard automation
 
+> Service-management update (2026-06-27): tasks mentioning `MistTDX` should be
+> implemented through configurable service names. The current appliance TDX
+> service is WinSW `mist-tdx-datasource`.
+
 ## 1. Confirm scope and repository boundary
 
 - [x] 1.1 Confirm `tdx-guard` lives in private `mist-deploy`.

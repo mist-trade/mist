@@ -1,5 +1,10 @@
 # Change: Add TDX desktop guard automation
 
+> Service-management update (2026-06-27): this private guard should use
+> configurable service names. The current appliance TDX service is WinSW
+> `mist-tdx-datasource`; legacy `MistTDX` references below describe the earlier
+> NSSM package path.
+
 ## Why
 
 The Windows API appliance now depends on a logged-in TDX desktop terminal and a
@@ -75,4 +80,3 @@ action is required.
 - Windows Task Scheduler configuration on the API machine.
 - Local machine-only guard config, state, logs, and screenshots.
 - Optional HTTP notification receiver on the bot machine.
-

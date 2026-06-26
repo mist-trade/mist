@@ -1,5 +1,10 @@
 # Change: Bundle portable MySQL for Windows appliance
 
+> Superseded service-management note (2026-06-27): the portable MySQL design
+> keeps `MistMySQL`, but datasource/backend service references to
+> `MistTDX`/`MistQMT` are historical. Current deployment uses WinSW for
+> `MistBackend` and `mist-tdx-datasource`; QMT service installation is skipped.
+
 ## Why
 
 The Windows API appliance still requires an operator to install and initialize

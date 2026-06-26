@@ -1,5 +1,10 @@
 # Design: TDX desktop guard automation
 
+> Service-management update (2026-06-27): this private guard should use
+> configurable service names. The current appliance TDX service is WinSW
+> `mist-tdx-datasource`; legacy `MistTDX`/NSSM references below describe the
+> earlier package path.
+
 ## Repository boundary
 
 `tdx-guard` belongs in the private `mist-deploy` repository.
@@ -250,4 +255,3 @@ Windows manual verification:
 - Run Runtime Guard with `MistTDX` healthy.
 - Simulate TDX logout and confirm notification or auto-login behavior.
 - Confirm no GUI automation runs from the service runner session.
-

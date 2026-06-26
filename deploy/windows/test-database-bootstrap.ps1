@@ -69,6 +69,7 @@ $backendInstallerPath = Join-Path $RootDir "backend\install-service.ps1"
 $backendServiceXmlPath = Join-Path $RootDir "backend\mist-backend.xml"
 $installerPath = Join-Path $RootDir "mysql\install-portable-mysql.ps1"
 $commonPath = Join-Path $RootDir "mysql\mysql-common.ps1"
+$windowsReadmePath = Join-Path $RootDir "README-Windows.md"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\windows-appliance.yml"
 
 Assert-FileNotExists "bundled empty schema is not shipped" $schemaPath
@@ -81,6 +82,7 @@ Assert-FileExists "backend service installer exists" $backendInstallerPath
 Assert-FileExists "backend WinSW XML template exists" $backendServiceXmlPath
 Assert-FileExists "portable mysql installer exists" $installerPath
 Assert-FileExists "portable mysql common helpers exist" $commonPath
+Assert-FileExists "windows appliance README exists" $windowsReadmePath
 Assert-FileExists "windows appliance workflow exists" $workflowPath
 
 $migrationsReadme = Get-Content $migrationsReadmePath -Raw
@@ -92,6 +94,7 @@ $backendInstaller = Get-Content $backendInstallerPath -Raw
 $backendServiceXml = Get-Content $backendServiceXmlPath -Raw
 $installer = Get-Content $installerPath -Raw
 $common = Get-Content $commonPath -Raw
+$windowsReadme = Get-Content $windowsReadmePath -Raw
 $workflow = Get-Content $workflowPath -Raw
 
 Assert-Contains "migrations readme documents explicit runner" ".\run-migrations.ps1" $migrationsReadme
@@ -150,6 +153,10 @@ Assert-Contains "installer ownership error includes service command" "Existing s
 Assert-Contains "installer ownership error includes expected mysqld path" "Expected mysqld path" $installer
 Assert-Contains "installer recovers interrupted bootstrap" "recover an interrupted bootstrap" $installer
 Assert-Contains "service ownership accepts matching interrupted bootstrap" "state.json is written after bootstrap completes" $common
+Assert-Contains "windows README documents WinSW restart policy" "WinSW restarts" $windowsReadme
+Assert-Contains "windows README documents WinSW failure reset window" "resetfailure" $windowsReadme
+Assert-Contains "windows README points to TDX WinSW logs" "datasource/logs/mist-tdx-datasource" $windowsReadme
+Assert-NotContains "windows README no longer mentions legacy crash-loop state" "crash-loop state" $windowsReadme
 Assert-Contains "workflow creates datasource runtime directory" 'datasource\runtime' $workflow
 Assert-Contains "workflow exposes datasource ref input" 'datasource_ref:' $workflow
 Assert-Contains "workflow defaults datasource ref to master" "DATASOURCE_REF: `${{ github.event.inputs.datasource_ref || 'master' }}" $workflow

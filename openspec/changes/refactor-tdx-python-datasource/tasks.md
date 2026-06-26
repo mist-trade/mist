@@ -1,8 +1,13 @@
 # Tasks: Refactor TDX Python datasource
 
+Status note (2026-06-27): Windows appliance deployment is green for portable
+MySQL, restored state, WinSW `MistBackend`, WinSW `mist-tdx-datasource`, and
+manual `health-check.ps1 -IncludeMySQL`. This is not yet full live market-data
+smoke for raw calls, normalized bars, or WebSocket bar delivery.
+
 ## 1. Confirm Integration Boundaries
 
-- [ ] 1.1 Confirm whether the migrated TDX datasource default port is `9001` or
+- [x] 1.1 Confirm whether the migrated TDX datasource default port is `9001` or
       `18709`, and document the chosen migration default.
 - [ ] 1.2 Inventory Mist backend calls to `/api/tdx/*` and `/ws/quote/*`.
 - [ ] 1.3 Inventory `mist-datasource` TDX routes, adapter methods, tests, and
@@ -107,21 +112,22 @@
 
 ## 8. Add WinSW Windows Service Path
 
-- [ ] 8.1 Add a WinSW XML template for `mist-tdx-datasource`.
-- [ ] 8.2 Add install, update, status, start, stop, and uninstall scripts for
-      the WinSW service.
+- [x] 8.1 Add a WinSW XML template for `mist-tdx-datasource`.
+- [ ] 8.2 Add remaining status/start/stop convenience scripts for the WinSW
+      service; install, uninstall, and smoke-test scripts already exist.
 - [ ] 8.3 Add environment template entries for `TDX_HTTP_URL`, `TDX_PATH`,
       `DATASOURCE_HOST`, `DATASOURCE_PORT`,
       `TDX_MINUTE_PERIOD`, collection delays, reconciliation interval, and max
       subscriptions, plus `TDX_WS_QUEUE_MAX_SIZE`.
-- [ ] 8.4 Ensure deployment packaging references external TDX client and SDK
+- [x] 8.4 Ensure deployment packaging references external TDX client and SDK
       paths without bundling proprietary files.
-- [ ] 8.5 Add migration documentation from legacy NSSM `MistTDX` to WinSW
+- [x] 8.5 Add migration documentation from legacy NSSM `MistTDX` to WinSW
       `mist-tdx-datasource`.
-- [ ] 8.6 Update Windows appliance docs for service name, health URL, logs,
+- [x] 8.6 Update Windows appliance docs for service name, health URL, logs,
       backend `TDX_BASE_URL`, rollback, and troubleshooting.
-- [ ] 8.7 Add a Windows smoke-test script for health, raw call, normalized bars,
-      WebSocket subscription sync, bar event delivery, and restart recovery.
+- [ ] 8.7 Extend Windows smoke-test coverage beyond health/service checks to raw
+      call, normalized bars, WebSocket subscription sync, bar event delivery,
+      and restart recovery.
 
 ## 9. Verify
 
