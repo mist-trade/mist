@@ -53,6 +53,7 @@ jobs:
 
       - name: Package executable
         shell: bash
+        timeout-minutes: 20
         run: |
           chmod +x tools/build-executable.sh
           ./tools/build-executable.sh ${{ matrix.platform }}
