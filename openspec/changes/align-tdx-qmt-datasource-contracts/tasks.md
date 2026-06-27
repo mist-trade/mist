@@ -138,16 +138,16 @@
 
 ## 8. Align QMT Implementation Path
 
-- [ ] 8.1 Compare current `src/adapter/qmt` methods with the provider-neutral
+- [x] 8.1 Compare current `src/adapter/qmt` methods with the provider-neutral
       capability family list and record the first parity target set.
-- [ ] 8.2 Add QMT mock/provider tests for bars, sector membership, calendar,
+- [x] 8.2 Add QMT mock/provider tests for bars, sector membership, calendar,
       security metadata, reference data, finance/report data, formulas, and
       explicit unsupported responses.
-- [ ] 8.3 Ensure shared datasource models do not include TDX-only field names in
+- [x] 8.3 Ensure shared datasource models do not include TDX-only field names in
       normalized public responses.
-- [ ] 8.4 Add QMT alignment notes to each normalized endpoint docstring or
+- [x] 8.4 Add QMT alignment notes to each normalized endpoint docstring or
       coverage-row owner so future QMT implementation has a concrete mapping.
-- [ ] 8.5 Keep QMT service startup optional in Windows runtime checks until QMT
+- [x] 8.5 Keep QMT service startup optional in Windows runtime checks until QMT
       SDK path and login requirements are finalized.
 
 ## 9. Extend Smoke And Verification
