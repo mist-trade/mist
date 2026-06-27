@@ -122,17 +122,17 @@
 
 ## 7. Keep Raw Calls And Trading Boundaries Safe
 
-- [ ] 7.1 Document that `/v1/raw/tdx/call` is an operator/debug escape hatch and
+- [x] 7.1 Document that `/v1/raw/tdx/call` is an operator/debug escape hatch and
       is not a stable backend dependency.
-- [ ] 7.2 Add a backend-side guard test or static check that fails when normal
+- [x] 7.2 Add a backend-side guard test or static check that fails when normal
       Mist collection code starts depending on `/v1/raw/tdx/call`.
-- [ ] 7.3 Add tests that trading/account method names are classified as
+- [x] 7.3 Add tests that trading/account method names are classified as
       do-not-expose in the coverage matrix.
-- [ ] 7.4 Add tests that subscription methods are classified internal-only and
+- [x] 7.4 Add tests that subscription methods are classified internal-only and
       remain reachable to NestJS only through normalized WebSocket commands.
-- [ ] 7.5 Add tests that `get_real_time_data` remains classified as
+- [x] 7.5 Add tests that `get_real_time_data` remains classified as
       example-helper-not-api unless a native TDX runtime method is verified.
-- [ ] 7.6 Add review notes for client-control and user-sector mutation methods
+- [x] 7.6 Add review notes for client-control and user-sector mutation methods
       so future work cannot accidentally productize them without a separate
       admin/operator or trading spec.
 
