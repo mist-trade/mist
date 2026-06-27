@@ -165,9 +165,6 @@
 - [x] 9.6 Run `uv run pytest tests/unit` in `mist-datasource`.
 - [x] 9.7 Run targeted integration tests for the TDX `/v1` routes and WebSocket
       bridge in `mist-datasource`.
-- [ ] 9.8 Run `uv run ruff check src tests` in `mist-datasource`.
-      Current run is blocked by existing QMT mock/adapter `ARG002` unused
-      argument findings outside this change's touched files; touched-file ruff
-      passes.
+- [x] 9.8 Run `uv run ruff check src tests` in `mist-datasource`.
 - [ ] 9.9 Run the Windows runtime smoke script against a logged-in TDX terminal
       after deployment.
