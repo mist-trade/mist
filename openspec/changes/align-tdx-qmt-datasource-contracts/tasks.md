@@ -158,7 +158,7 @@
       phase-3 finance/report probes, and phase-4 formula probes.
 - [x] 9.3 Keep runtime smoke checks validating native TDX HTTP shape before the
       corresponding normalized `/v1` shape.
-- [ ] 9.4 Add fixture-based tests for documented TDX HTTP `Value` wrappers and
+- [x] 9.4 Add fixture-based tests for documented TDX HTTP `Value` wrappers and
       any live-runtime variants captured during Windows smoke testing.
 - [x] 9.5 Add test commands to the datasource verification docs for unit tests,
       integration tests, script self-tests, and Windows live runtime checks.
