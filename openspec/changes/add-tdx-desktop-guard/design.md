@@ -23,10 +23,10 @@ adapter. It is a private operations toolkit for the Windows API machine.
 Use this stack for the first version:
 
 ```text
-PowerShell          orchestration, NSSM, health checks, result files
+PowerShell          orchestration, legacy service wrapper, health checks, result files
 AutoHotkey v2       GUI automation for TDX windows, menus, and clicks
 Task Scheduler      run GUI automation in the logged-in user desktop session
-NSSM                keep managing Mist services
+legacy service wrapper                keep managing Mist services
 HTTP JSON           send notifications to a LAN receiver on the bot machine
 ```
 

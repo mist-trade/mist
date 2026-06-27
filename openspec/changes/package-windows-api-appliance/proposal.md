@@ -15,7 +15,7 @@ should stay lightweight and call the Windows machine over the LAN through
 
 The current repositories and GitHub Actions are not aligned with this shape.
 `mist` has Docker and executable workflows, while `mist-datasource` has the
-Windows NSSM deployment script but no release workflow. The first production
+Windows legacy service wrapper deployment script but no release workflow. The first production
 path should be a Windows deployment zip, not a single exe.
 
 ## What changes

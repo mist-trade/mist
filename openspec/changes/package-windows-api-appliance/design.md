@@ -62,8 +62,8 @@ mist-api-appliance/
     README-Windows.md
     manifest.json
 
-    nssm/
-        nssm.exe
+    old-service-wrapper/
+        old-service-wrapper.exe
 
     backend/
         runtime/
@@ -83,8 +83,8 @@ mist-api-appliance/
             deploy_windows.ps1
             preflight-sdk.ps1
             windows-common.ps1
-            service-common.ps1
-            service-runner.ps1
+            removed service helper
+            removed service runner
         pyproject.toml
         uv.lock
         .env.example
@@ -220,11 +220,11 @@ windows-common.ps1
     Console output helpers, .env parsing, command resolution, and HTTP health
     polling shared by datasource scripts.
 
-service-common.ps1
-    NSSM service reconciliation for MistTDX and MistQMT.
+removed service helper
+    legacy service wrapper service reconciliation for MistTDX and MistQMT.
 
-service-runner.ps1
-    Long-running NSSM application entrypoint. It launches uvicorn, records
+removed service runner
+    Long-running legacy service wrapper application entrypoint. It launches uvicorn, records
     crash-loop state, and exits with a sentinel code when the service should
     stop instead of retrying forever.
 ```
@@ -255,19 +255,19 @@ not silently start the backend against an empty production database.
 
 ## Service layout
 
-Use NSSM for the first version because `mist-datasource` already uses NSSM and
+Use legacy service wrapper for the first version because `mist-datasource` already uses legacy service wrapper and
 it keeps all services consistent.
 
 ```text
 MistTDX
     AppDirectory = appliance/datasource
     Command      = powershell.exe -NoProfile -ExecutionPolicy Bypass
-                   -File scripts/service-runner.ps1 -Instance tdx
+                   -File scripts/removed service runner -Instance tdx
 
 MistQMT
     AppDirectory = appliance/datasource
     Command      = powershell.exe -NoProfile -ExecutionPolicy Bypass
-                   -File scripts/service-runner.ps1 -Instance qmt
+                   -File scripts/removed service runner -Instance qmt
 
 MistBackend
     AppDirectory = appliance/backend
@@ -278,11 +278,11 @@ MistBackend
 `MistTDX` and `MistQMT` should bind to localhost by default. `MistBackend`
 should bind to `0.0.0.0` so the Mac or LLM machine can call it over the LAN.
 
-### Datasource NSSM reconciliation
+### Datasource legacy service wrapper reconciliation
 
 Datasource service registration should be idempotent. The service step should
 build a desired service definition for each enabled datasource instance and
-reconcile NSSM to that definition.
+reconcile legacy service wrapper to that definition.
 
 For each of `MistTDX` and `MistQMT`:
 
@@ -296,22 +296,22 @@ else:
     fail with a clear message instead of overwriting an unrelated service
 ```
 
-Existing services can be treated as Mist datasource services when their NSSM
+Existing services can be treated as Mist datasource services when their legacy service wrapper
 configuration points at a datasource directory containing expected markers such
 as `pyproject.toml`, `tdx/`, and `qmt/`, or when their command already points at
-`tdx.main:app`, `qmt.main:app`, or `service-runner.ps1`. This allows upgrades
-from the first manual NSSM layout while avoiding silent takeover of unrelated
+`tdx.main:app`, `qmt.main:app`, or `removed service runner`. This allows upgrades
+from the first manual legacy service wrapper layout while avoiding silent takeover of unrelated
 Windows services.
 
 ### Datasource crash-loop protection
 
-NSSM should provide a delay between restarts, while `service-runner.ps1` should
+legacy service wrapper should provide a delay between restarts, while `removed service runner` should
 decide when repeated failures are no longer useful.
 
 Expected behavior:
 
 ```text
-service-runner.ps1 -Instance tdx
+removed service runner -Instance tdx
     |
     +-- read crash state from logs/service-runner-tdx-state.json
     +-- if too many recent crashes exist, exit with sentinel code 88
@@ -330,7 +330,7 @@ Max crashes/window:   5
 Sentinel exit code:   88
 ```
 
-NSSM should be configured so normal non-zero exits restart with delay, while
+legacy service wrapper should be configured so normal non-zero exits restart with delay, while
 the sentinel exit code stops the service:
 
 ```text
@@ -340,8 +340,8 @@ AppExit Default  Restart
 AppExit 88       Exit
 ```
 
-The exact NSSM field names and behavior should be verified against the packaged
-`nssm.exe` during implementation on Windows. If a given NSSM version does not
+The exact legacy service wrapper field names and behavior should be verified against the packaged
+`old-service-wrapper.exe` during implementation on Windows. If a given legacy service wrapper version does not
 support one of these fields, the implementation should fail installation with a
 clear message rather than silently running without crash-loop protection.
 

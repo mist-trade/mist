@@ -1,4 +1,4 @@
-import { AngentsConfig } from '@app/config';
+import { AgentsConfig } from '@app/config';
 import { Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { LlmService } from '../llm/llm.service';
@@ -25,7 +25,7 @@ export class RoleService {
       name: 'Commander',
       state,
     });
-    const agentsConfig = this.configService.get<AngentsConfig>('agents');
+    const agentsConfig = this.configService.get<AgentsConfig>('agents');
     if (agentsConfig) {
       this.llmService.getLLMByType(agentsConfig['Commander']);
     }

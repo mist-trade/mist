@@ -67,7 +67,7 @@ each app read its local `.env` file.
 #### Scenario: MistBackend starts as a Windows service
 
 - GIVEN the backend package has a configured `.env`
-- WHEN `MistBackend` starts through NSSM
+- WHEN `MistBackend` starts through legacy service wrapper
 - THEN its working directory SHALL be the backend package directory
 - AND the backend SHALL read the package-local `.env`
 
@@ -85,7 +85,7 @@ The datasource services SHALL bind to localhost by default because only
 
 ### Requirement: Datasource service registration shall be idempotent
 
-The datasource installer SHALL reconcile `MistTDX` and `MistQMT` NSSM services
+The datasource installer SHALL reconcile `MistTDX` and `MistQMT` legacy service wrapper services
 to the desired appliance configuration each time the service step runs.
 
 #### Scenario: Existing datasource service is updated
@@ -114,7 +114,7 @@ initialization, environment configuration, or port binding repeatedly fails.
 #### Scenario: Transient datasource crash is retried with delay
 
 - GIVEN `MistTDX` exits unexpectedly once
-- WHEN NSSM handles the exit
+- WHEN legacy service wrapper handles the exit
 - THEN the service SHALL restart only after a configured delay
 - AND the restart SHALL NOT happen in a tight immediate loop
 
@@ -123,7 +123,7 @@ initialization, environment configuration, or port binding repeatedly fails.
 - GIVEN `MistTDX` crashes repeatedly within the configured crash window
 - WHEN the datasource service runner reaches the maximum crash count
 - THEN it SHALL exit with a sentinel code
-- AND NSSM SHALL stop retrying that service
+- AND legacy service wrapper SHALL stop retrying that service
 - AND the logs SHALL explain that crash-loop protection stopped the service
 
 ### Requirement: MistBackend shall be LAN reachable
