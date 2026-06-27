@@ -78,15 +78,15 @@
 
 ## 4. Normalize Phase 2 Reference And Instrument Data
 
-- [ ] 4.1 Add normalized reference-data models for relation, IPO, share-capital,
+- [x] 4.1 Add normalized reference-data models for relation, IPO, share-capital,
       dividend-factor, convertible-bond, ETF, and related instrument data.
-- [ ] 4.2 Add TDX provider mappings for `get_relation`, `get_ipo_info`,
+- [x] 4.2 Add TDX provider mappings for `get_relation`, `get_ipo_info`,
       `get_gb_info`, `get_gb_info_by_date`, and `get_divid_factors`.
-- [ ] 4.3 Add TDX provider mappings for `get_kzz_info`, `get_cb_info`, and
+- [x] 4.3 Add TDX provider mappings for `get_kzz_info`, `get_cb_info`, and
       `get_trackzs_etf_info`.
-- [ ] 4.4 Add normalized routes and tests for reference/instrument endpoints,
+- [x] 4.4 Add normalized routes and tests for reference/instrument endpoints,
       including TDX native fixtures and QMT unsupported behavior.
-- [ ] 4.5 Extend provider manifests and documentation for each reference and
+- [x] 4.5 Extend provider manifests and documentation for each reference and
       instrument-data family.
 
 ## 5. Normalize Phase 3 Finance And Report Data
