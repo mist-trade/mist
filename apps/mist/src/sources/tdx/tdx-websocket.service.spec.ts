@@ -187,6 +187,103 @@ describe('TdxWebSocketService normalized bridge', () => {
     await service.onModuleDestroy();
   });
 
+  it('resends full sync_subscriptions when datasource sends ready', async () => {
+    const { service } = createService();
+    service.subscribe('600519.SH');
+    service.subscribe('000001.SZ');
+
+    await service.onModuleInit();
+    await flushSocketOpen();
+    const socket = socketOf(service);
+    socket.sent = [];
+
+    handleMessage(service, { type: 'ready', provider: 'tdx' });
+
+    expect(socket.sent.map((payload) => JSON.parse(payload))).toEqual([
+      {
+        type: 'sync_subscriptions',
+        stocks: ['600519.SH', '000001.SZ'],
+      },
+    ]);
+
+    await service.onModuleDestroy();
+  });
+
+  it('creates a new socket and resends subscriptions after reconnect', async () => {
+    const { service } = createService();
+    (service as any).reconnectDelay = 1;
+    service.subscribe('600519.SH');
+
+    await service.onModuleInit();
+    await flushSocketOpen();
+    const firstSocket = socketOf(service);
+    firstSocket.sent = [];
+    firstSocket.readyState = FakeWebSocket.CLOSED;
+    firstSocket.emit('close');
+
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+    await flushSocketOpen();
+
+    expect(FakeWebSocket.instances).toHaveLength(2);
+    expect(JSON.parse(FakeWebSocket.instances[1].sent[0])).toEqual({
+      type: 'sync_subscriptions',
+      stocks: ['600519.SH'],
+    });
+
+    await service.onModuleDestroy();
+  });
+
+  it('logs subscribed and unsubscribed acknowledgements with accepted rejected and active symbols', () => {
+    const { service } = createService();
+    const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+    (service as any).logger = logger;
+
+    handleMessage(service, {
+      type: 'subscribed',
+      accepted: ['600519.SH'],
+      rejected: [{ symbol: '000001.SZ', reason: 'not tradable' }],
+      active: ['600519.SH'],
+    });
+    handleMessage(service, {
+      type: 'unsubscribed',
+      accepted: ['600519.SH'],
+      rejected: [],
+      active: [],
+    });
+
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('subscribed accepted=600519.SH active=600519.SH'),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('subscribed rejected=000001.SZ:not tradable'),
+    );
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('unsubscribed accepted=600519.SH active='),
+    );
+  });
+
+  it('logs datasource error messages without dropping desired subscriptions', () => {
+    const { service } = createService();
+    const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+    (service as any).logger = logger;
+    service.subscribe('600519.SH');
+
+    handleMessage(service, {
+      type: 'error',
+      code: 'TDX_PROVIDER_ERROR',
+      message: 'provider unavailable',
+      retryable: true,
+      details: { provider: 'tdx' },
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'TDX datasource error code=TDX_PROVIDER_ERROR message=provider unavailable retryable=true details={"provider":"tdx"}',
+      ),
+    );
+    expect((service as any).subscriptions.has('600519.SH')).toBe(true);
+  });
+
   it('uses injected WebSocket constructor constants for connection status', async () => {
     const { service } = createService(
       new FakeAggregator(),
@@ -251,6 +348,8 @@ describe('TdxWebSocketService normalized bridge', () => {
         close: 10.2,
         volume: 1200,
         amount: 12345.6,
+        forwardFactor: 0.711862,
+        volInStock: 182942480,
       },
     });
 
@@ -264,6 +363,10 @@ describe('TdxWebSocketService normalized bridge', () => {
       close: 10.2,
       volume: 1200,
       amount: 12345.6,
+      extensions: {
+        forwardFactor: 0.711862,
+        volInStock: 182942480,
+      },
     });
     expect(aggregator.process).not.toHaveBeenCalled();
   });

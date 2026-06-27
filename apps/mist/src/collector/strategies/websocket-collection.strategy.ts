@@ -67,6 +67,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
             volume: candle.volume,
             amount: candle.amount || 0,
             period,
+            ...(candle.extensions ? { extensions: candle.extensions } : {}),
           };
 
           await this.collectorService.saveRawKData(
@@ -109,6 +110,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
         volume: bar.volume,
         amount: bar.amount || 0,
         period: bar.period,
+        ...(bar.extensions ? { extensions: bar.extensions } : {}),
       };
 
       await this.collectorService.saveRawKData(

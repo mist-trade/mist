@@ -107,7 +107,14 @@ If MySQL was verified manually and the `mysql` CLI is not available:
 ```powershell
 .\health-check.ps1
 .\health-check.ps1 -IncludeMySQL
+.\health-check.ps1 -TdxTestSymbol 600519.SH
 ```
+
+`health-check.ps1 reads backend/.env TDX_BASE_URL` and falls back to
+`http://127.0.0.1:9001` only when it is missing. The TDX datasource checks call
+`/health` and `/providers` on that configured URL. The normalized
+`/v1/bars/query` probe is live-data sensitive, so it only runs when
+`-TdxTestSymbol` is provided.
 
 From the Mac:
 
@@ -182,6 +189,11 @@ Get-Service MistBackend
 Restart-Service mist-tdx-datasource
 Restart-Service MistBackend
 ```
+
+Rollback: stop `MistBackend` and `mist-tdx-datasource`, restore the previous
+`backend/.env` `TDX_BASE_URL` and service package, then restart `MistBackend`.
+If the datasource migration is the suspected cause, run `.\health-check.ps1
+-SkipTDX` to verify backend/MySQL health while keeping TDX checks deferred.
 
 WinSW restarts the datasource after failures with 10 second and 30 second
 delays, then resets the failure count after 1 hour (`resetfailure`). Repeated

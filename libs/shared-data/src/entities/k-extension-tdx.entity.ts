@@ -41,7 +41,16 @@ export class KExtensionTdx {
     nullable: true,
     comment: '前复权因子：用于处理复权数据',
   })
-  forwardFactor: number = 0;
+  forwardFactor: number | null = null;
+
+  @Column({
+    type: 'decimal',
+    precision: 20,
+    scale: 2,
+    nullable: true,
+    comment: '流通股本：TDX VolInStock 字段',
+  })
+  volInStock: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -50,7 +59,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '后复权因子：用于处理复权数据',
   })
-  backwardFactor: number = 0;
+  backwardFactor: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -59,7 +68,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '成交量比',
   })
-  volumeRatio: number = 0;
+  volumeRatio: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -68,7 +77,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '换手率（%）',
   })
-  turnoverRate: number = 0;
+  turnoverRate: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -77,7 +86,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '换手金额',
   })
-  turnoverAmount: number = 0;
+  turnoverAmount: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -86,7 +95,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '总市值',
   })
-  totalMarketValue: number = 0;
+  totalMarketValue: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -95,7 +104,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '流通市值',
   })
-  floatMarketValue: number = 0;
+  floatMarketValue: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -104,7 +113,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '每股收益',
   })
-  earningsPerShare: number = 0;
+  earningsPerShare: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -113,7 +122,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '市盈率',
   })
-  priceEarningsRatio: number = 0;
+  priceEarningsRatio: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -122,7 +131,7 @@ export class KExtensionTdx {
     nullable: true,
     comment: '市净率',
   })
-  priceToBookRatio: number = 0;
+  priceToBookRatio: number | null = null;
 
   @CreateDateColumn({ name: 'create_time' })
   createTime!: Date;

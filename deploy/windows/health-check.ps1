@@ -2,6 +2,7 @@
 
 param(
     [string]$BackendHost = "127.0.0.1",
+    [string]$TdxTestSymbol = "",
     [switch]$SkipTDX,
     [switch]$IncludeQMT,
     [switch]$IncludeMySQL
@@ -22,6 +23,14 @@ function Get-EnvValue($path, $name) {
     $match = [regex]::Match($content, $pattern)
     if (-not $match.Success) { return "" }
     return $match.Groups[1].Value.Trim().Trim('"').Trim("'")
+}
+
+function Resolve-TdxDatasourceBaseUrl {
+    $configured = Get-EnvValue $BackendEnv "TDX_BASE_URL"
+    if ([string]::IsNullOrWhiteSpace($configured)) {
+        $configured = "http://127.0.0.1:9001"
+    }
+    return $configured.TrimEnd("/")
 }
 
 function Test-Http($name, $url, [switch]$Optional) {
@@ -45,9 +54,10 @@ function Test-Http($name, $url, [switch]$Optional) {
 }
 
 function Test-TdxDatasourceHealth {
-    param([string]$Url)
+    param([string]$BaseUrl)
 
     $name = "mist-tdx-datasource"
+    $Url = "$BaseUrl/health"
     try {
         $resp = Invoke-WebRequest -Uri $Url -TimeoutSec 8 -UseBasicParsing
         if ($resp.StatusCode -lt 200 -or $resp.StatusCode -ge 300) {
@@ -67,6 +77,58 @@ function Test-TdxDatasourceHealth {
         return $true
     } catch {
         Write-Host "  [FAIL] $name unavailable -> $Url" -ForegroundColor Red
+        Write-Host "         $_" -ForegroundColor Yellow
+        return $false
+    }
+}
+
+function Test-TdxDatasourceProviders {
+    param([string]$BaseUrl)
+
+    return Test-Http "mist-tdx-datasource providers" "$BaseUrl/providers"
+}
+
+function Test-TdxBarsProbe {
+    param(
+        [string]$BaseUrl,
+        [string]$Symbol
+    )
+
+    if ([string]::IsNullOrWhiteSpace($Symbol)) {
+        Write-Host "  [WARN] Skipping normalized TDX bars probe; pass -TdxTestSymbol to enable it" -ForegroundColor Yellow
+        return $true
+    }
+
+    $url = "$BaseUrl/v1/bars/query"
+    $body = @{
+        symbols = @($Symbol)
+        period = "1d"
+        count = 1
+    } | ConvertTo-Json -Depth 5
+
+    try {
+        $resp = Invoke-WebRequest `
+            -Uri $url `
+            -Method Post `
+            -ContentType "application/json" `
+            -Body $body `
+            -TimeoutSec 15 `
+            -UseBasicParsing
+        if ($resp.StatusCode -lt 200 -or $resp.StatusCode -ge 300) {
+            Write-Host "  [FAIL] mist-tdx-datasource bars probe returned HTTP $($resp.StatusCode)" -ForegroundColor Red
+            return $false
+        }
+
+        $payload = $resp.Content | ConvertFrom-Json
+        if ($payload.ok -ne $true) {
+            Write-Host "  [FAIL] mist-tdx-datasource bars probe returned ok=false" -ForegroundColor Red
+            return $false
+        }
+
+        Write-Host "  [OK] mist-tdx-datasource bars probe -> $url ($Symbol)" -ForegroundColor Green
+        return $true
+    } catch {
+        Write-Host "  [FAIL] mist-tdx-datasource bars probe unavailable -> $url" -ForegroundColor Red
         Write-Host "         $_" -ForegroundColor Yellow
         return $false
     }
@@ -193,7 +255,11 @@ if ($shouldCheckMySql) {
 if ($SkipTDX) {
     Write-Host "  [WARN] Skipping mist-tdx-datasource health check" -ForegroundColor Yellow
 } else {
-    $ok = (Test-TdxDatasourceHealth "http://127.0.0.1:9001/health") -and $ok
+    $tdxBaseUrl = Resolve-TdxDatasourceBaseUrl
+    Write-Host "  [INFO] TDX datasource URL: $tdxBaseUrl" -ForegroundColor Cyan
+    $ok = (Test-TdxDatasourceHealth $tdxBaseUrl) -and $ok
+    $ok = (Test-TdxDatasourceProviders $tdxBaseUrl) -and $ok
+    $ok = (Test-TdxBarsProbe $tdxBaseUrl $TdxTestSymbol) -and $ok
 }
 
 if ($IncludeQMT) {

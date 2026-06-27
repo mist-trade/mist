@@ -19,7 +19,21 @@ import {
   TdxEnvelope,
   TdxBarsResponseData,
   TdxSnapshotsResponseData,
+  TdxNormalizedBar,
+  TdxDividendFactorsResponseData,
+  TdxDividendFactorItem,
 } from './types';
+
+const TDX_BAR_FIELDS = [
+  'Open',
+  'High',
+  'Low',
+  'Close',
+  'Volume',
+  'Amount',
+  'ForwardFactor',
+  'VolInStock',
+];
 
 @Injectable()
 export class TdxSource implements ITdxSourceFetcher {
@@ -69,6 +83,9 @@ export class TdxSource implements ITdxSourceFetcher {
           period: periodFormat,
           startTime: startDate.toISOString(),
           endTime: endDate.toISOString(),
+          fields: TDX_BAR_FIELDS,
+          dividendType: 'front',
+          fillData: true,
         },
       );
       const envelope = response.data;
@@ -83,16 +100,19 @@ export class TdxSource implements ITdxSourceFetcher {
         );
       }
 
-      return envelope.data.bars.map((bar) => ({
-        timestamp: parseISO(bar.barTime),
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-        volume: bar.volume,
-        amount: bar.amount,
-        forwardFactor: bar.forwardFactor,
-      }));
+      return envelope.data.bars.map((bar) => {
+        const extensions = this.extractBarExtensions(bar);
+        return {
+          timestamp: parseISO(bar.barTime),
+          open: bar.open,
+          high: bar.high,
+          low: bar.low,
+          close: bar.close,
+          volume: bar.volume,
+          amount: bar.amount,
+          ...(extensions ? { extensions } : {}),
+        };
+      });
     } catch (error) {
       this.logger.error(`TDX fetchK error: ${error.message}`);
       if (error instanceof HttpException) {
@@ -169,34 +189,52 @@ export class TdxSource implements ITdxSourceFetcher {
     { timestamp: Date; forwardFactor: number; backwardFactor: number }[]
   > {
     try {
-      const response = await this.axios.get<{
-        data: {
-          date: string[];
-          forward_factor: number[];
-          backward_factor: number[];
-        };
-      }>('/api/tdx/divid-factors', {
-        params: {
-          stock_code: stockCode,
-          start_time: format(startDate, 'yyyyMMdd'),
-          end_time: format(endDate, 'yyyyMMdd'),
-        },
+      const response = await this.axios.post<
+        TdxEnvelope<TdxDividendFactorsResponseData>
+      >('/v1/reference/dividend-factors/query', {
+        symbol: stockCode,
+        startTime: format(startDate, 'yyyyMMdd'),
+        endTime: format(endDate, 'yyyyMMdd'),
       });
+      const envelope = response.data;
 
-      if (!response.data?.data) {
+      if (!envelope?.ok || !Array.isArray(envelope.data?.items)) {
         return [];
       }
 
-      const { date, forward_factor, backward_factor } = response.data.data;
-      return date.map((d, i) => ({
-        timestamp: parseISO(d),
-        forwardFactor: forward_factor[i],
-        backwardFactor: backward_factor[i],
-      }));
+      return envelope.data.items.flatMap((item) => {
+        const mapped = this.mapDividendFactorItem(item);
+        return mapped ? [mapped] : [];
+      });
     } catch (error) {
       this.logger.error(`TDX fetchDividFactors error: ${error.message}`);
       return [];
     }
+  }
+
+  private mapDividendFactorItem(
+    item: TdxDividendFactorItem,
+  ): { timestamp: Date; forwardFactor: number; backwardFactor: number } | null {
+    if (
+      item.forwardFactor == null ||
+      item.backwardFactor == null ||
+      !item.date
+    ) {
+      return null;
+    }
+
+    return {
+      timestamp: parseISO(this.normalizeDividendDate(item.date)),
+      forwardFactor: item.forwardFactor,
+      backwardFactor: item.backwardFactor,
+    };
+  }
+
+  private normalizeDividendDate(date: string): string {
+    if (/^\d{8}$/.test(date)) {
+      return `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+    }
+    return date;
   }
 
   async saveK(
@@ -230,28 +268,12 @@ export class TdxSource implements ITdxSourceFetcher {
       try {
         const savedKs = await manager.save(K, kEntities);
 
-        const extensions = savedKs.map((k, i) => {
-          const ext: Partial<TdxExtension> = {
-            fullCode: formatCode,
-          };
-          if (data[i].forwardFactor !== undefined) {
-            ext.forwardFactor = data[i].forwardFactor;
-          }
-          return manager.create(KExtensionTdx, {
-            k,
-            fullCode: ext.fullCode || '',
-            forwardFactor: ext.forwardFactor ?? 0,
-            backwardFactor: 0,
-            volumeRatio: 0,
-            turnoverRate: 0,
-            turnoverAmount: 0,
-            totalMarketValue: 0,
-            floatMarketValue: 0,
-            earningsPerShare: 0,
-            priceEarningsRatio: 0,
-            priceToBookRatio: 0,
-          });
-        });
+        const extensions = savedKs.map((k, i) =>
+          manager.create(
+            KExtensionTdx,
+            this.buildExtensionPayload(k, data[i].extensions, formatCode),
+          ),
+        );
 
         await manager.save(KExtensionTdx, extensions);
       } catch (error: any) {
@@ -278,5 +300,65 @@ export class TdxSource implements ITdxSourceFetcher {
     const code = envelope?.error?.code || 'TDX_HTTP_ERROR';
     const message = envelope?.error?.message || fallbackMessage;
     throw new HttpException(`${code}: ${message}`, HttpStatus.BAD_GATEWAY);
+  }
+
+  private extractBarExtensions(
+    bar: TdxNormalizedBar,
+  ): TdxExtension | undefined {
+    const extension: TdxExtension = {};
+    if (bar.forwardFactor != null) {
+      extension.forwardFactor = bar.forwardFactor;
+    }
+    if (bar.volInStock != null) {
+      extension.volInStock = bar.volInStock;
+    }
+    return Object.keys(extension).length > 0 ? extension : undefined;
+  }
+
+  private buildExtensionPayload(
+    k: K,
+    ext: TdxExtension | undefined,
+    fallbackFullCode: string,
+  ): Partial<KExtensionTdx> {
+    const payload: Partial<KExtensionTdx> = {
+      k,
+      fullCode: ext?.fullCode ?? fallbackFullCode,
+    };
+
+    if (ext?.forwardFactor != null) {
+      payload.forwardFactor = ext.forwardFactor;
+    }
+    if (ext?.volInStock != null) {
+      payload.volInStock = ext.volInStock;
+    }
+    if (ext?.backwardFactor != null) {
+      payload.backwardFactor = ext.backwardFactor;
+    }
+    if (ext?.volumeRatio != null) {
+      payload.volumeRatio = ext.volumeRatio;
+    }
+    if (ext?.turnoverRate != null) {
+      payload.turnoverRate = ext.turnoverRate;
+    }
+    if (ext?.turnoverAmount != null) {
+      payload.turnoverAmount = ext.turnoverAmount;
+    }
+    if (ext?.totalMarketValue != null) {
+      payload.totalMarketValue = ext.totalMarketValue;
+    }
+    if (ext?.floatMarketValue != null) {
+      payload.floatMarketValue = ext.floatMarketValue;
+    }
+    if (ext?.earningsPerShare != null) {
+      payload.earningsPerShare = ext.earningsPerShare;
+    }
+    if (ext?.priceEarningsRatio != null) {
+      payload.priceEarningsRatio = ext.priceEarningsRatio;
+    }
+    if (ext?.priceToBookRatio != null) {
+      payload.priceToBookRatio = ext.priceToBookRatio;
+    }
+
+    return payload;
   }
 }

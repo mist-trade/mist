@@ -9,7 +9,7 @@ export interface TdxResponse {
   close: number;
   volume: number;
   amount: number;
-  forwardFactor?: number;
+  extensions?: TdxExtension;
 }
 
 export interface TdxDatasourceError {
@@ -40,7 +40,8 @@ export interface TdxNormalizedBar {
   amount: number;
   provider: string;
   receivedAt: string;
-  forwardFactor?: number;
+  forwardFactor?: number | null;
+  volInStock?: number | null;
 }
 
 export interface TdxNormalizedSnapshot {
@@ -62,6 +63,18 @@ export interface TdxBarsResponseData {
 
 export interface TdxSnapshotsResponseData {
   snapshots: TdxNormalizedSnapshot[];
+}
+
+export interface TdxDividendFactorItem {
+  symbol?: string;
+  date?: string | null;
+  forwardFactor?: number | null;
+  backwardFactor?: number | null;
+  provider?: string;
+}
+
+export interface TdxDividendFactorsResponseData {
+  items: TdxDividendFactorItem[];
 }
 
 /**
@@ -86,6 +99,7 @@ export interface TdxSnapshot {
 export interface TdxExtension {
   fullCode?: string;
   forwardFactor?: number;
+  volInStock?: number;
   backwardFactor?: number;
   volumeRatio?: number;
   turnoverRate?: number;
