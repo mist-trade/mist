@@ -52,6 +52,7 @@ jobs:
         run: pnpm run build
 
       - name: Package executable
+        shell: bash
         run: |
           chmod +x tools/build-executable.sh
           ./tools/build-executable.sh ${{ matrix.platform }}
@@ -61,4 +62,5 @@ jobs:
         with:
           name: mist-${{ matrix.platform }}
           path: dist/executables/${{ matrix.output }}
+          if-no-files-found: error
           retention-days: 7
