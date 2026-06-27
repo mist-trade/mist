@@ -37,8 +37,6 @@ pnpm run test:e2e                   # E2E tests (mist app)
 pnpm run test:chan:shanghai-2024-2025  # Specific Chan Theory test
 pnpm run test:full                  # Run tests + sync results to frontend
 pnpm run test:gen-types             # Generate TS types from JSON test results
-pnpm run test:deep                  # Deep integration tests
-pnpm run test:deep:watch            # Watch deep tests
 
 # Database migrations
 pnpm run migration:generate -- -n MigrationName
@@ -154,7 +152,6 @@ All HTTP endpoints wrap responses in:
 - Unit tests: `*.spec.ts` alongside source files
 - E2E tests: `apps/*/test/*.e2e-spec.ts`
 - Chan Theory tests: `apps/mist/src/chan/test/`
-- Deep integration tests: `test-integration/deep-test/`
 - Config validation uses Joi schemas from `@app/config`
 - Husky + lint-staged pre-commit hooks run ESLint + Prettier on `*.ts` files
 - Source type naming: `{Source}{Purpose}` — prefix by data source (`Ef`/`Tdx`/`Mqmt`), suffix by usage: `Extension` (DB fields), `Response` (HTTP API response), `Snapshot` (WebSocket data). Examples: `EfExtension`, `EfMinuteResponse`, `TdxExtension`, `TdxResponse`, `TdxSnapshot`

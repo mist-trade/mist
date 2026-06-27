@@ -558,7 +558,12 @@ describe('Shanghai Index 2024-2025 - Chan Algorithm Test Suite', () => {
         },
       };
 
-      const resultsDir = path.join(process.cwd(), 'test-results');
+      const resultsDir = path.join(
+        process.cwd(),
+        'test-data',
+        'test-results',
+        'raw',
+      );
       if (!fs.existsSync(resultsDir)) {
         fs.mkdirSync(resultsDir, { recursive: true });
       }

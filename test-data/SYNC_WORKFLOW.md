@@ -21,7 +21,7 @@
 ### 步骤 1：运行后端测试（生成测试结果）
 
 ```bash
-cd /Users/xiyugao/code/mist/mist
+cd /Users/moyui/sean/mist/mist
 pnpm run test:chan:shanghai-2024-2025
 ```
 
@@ -66,7 +66,7 @@ const summary = shanghaiIndex20242025Results.summary;
 pnpm run test:full
 ```
 
-此命令执行：`test` → `test:sync`
+此命令执行：`test` → `test:sync`。如果只需要更新缠论演示结果，先运行对应的 `test:chan:*` 命令，再执行 `test:gen-types` 和 `test:sync`。
 
 ## 📁 目录结构
 
