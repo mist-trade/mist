@@ -3,6 +3,9 @@ name: Experimental Build Executables
 on:
   workflow_dispatch:
 
+env:
+  PNPM_VERSION: 9.15.3
+
 jobs:
   build:
     name: Build for ${{ matrix.platform }}
@@ -40,10 +43,10 @@ jobs:
           node-version: 24.x
 
       - name: Install pnpm
-        run: npm install -g pnpm
+        run: npm install -g pnpm@${{ env.PNPM_VERSION }}
 
       - name: Install dependencies
-        run: pnpm install
+        run: pnpm install --frozen-lockfile --ignore-scripts
 
       - name: Build project
         run: pnpm run build
