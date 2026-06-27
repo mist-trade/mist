@@ -3,7 +3,7 @@ version: '3.8'
 services:
   mist:
     container_name: mist-backend
-    image: ghcr.io/${REPO_OWNER:-moyui}/mist:${VERSION:-latest}
+    image: ghcr.io/${REPO_OWNER:-mist-trade}/mist:${VERSION:-latest}
     env_file:
       - .env
     ports:
@@ -21,7 +21,7 @@ services:
 
   mcp-server:
     container_name: mist-mcp-server
-    image: ghcr.io/${REPO_OWNER:-moyui}/mist:${VERSION:-latest}
+    image: ghcr.io/${REPO_OWNER:-mist-trade}/mist:${VERSION:-latest}
     env_file:
       - .env
     ports:

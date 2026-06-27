@@ -15,14 +15,21 @@ on:
           - minor
           - major
         default: 'patch'
+      dry_run:
+        description: '只测试生成 release notes 和 packages，不创建 tag/release/Docker 镜像'
+        required: false
+        type: boolean
+        default: false
 
 jobs:
   release:
-    name: Create Release and Build Docker Images
+    name: Create Release, Packages, and Docker Images
     runs-on: ubuntu-latest
     permissions:
       contents: write
       packages: write
+    env:
+      PNPM_VERSION: 9.15.3
 
     steps:
       - name: Checkout code
@@ -32,7 +39,7 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}  # 需要写入权限来创建 tag
 
       - name: Calculate and create tag (manual trigger only)
-        if: github.event_name == 'workflow_dispatch'
+        if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true'
         id: create_tag
         run: |
           # 获取最新版本标签
@@ -82,8 +89,13 @@ jobs:
         run: |
           # 如果是手动触发，使用上一步骤的版本；否则从 tag 中提取
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            VERSION=${{ steps.create_tag.outputs.version }}
-            TAG=${{ steps.create_tag.outputs.tag }}
+            if [ "${{ github.event.inputs.dry_run }}" == "true" ]; then
+              VERSION="dry-run-${GITHUB_RUN_NUMBER}"
+              TAG="dry-run-${GITHUB_RUN_NUMBER}"
+            else
+              VERSION=${{ steps.create_tag.outputs.version }}
+              TAG=${{ steps.create_tag.outputs.tag }}
+            fi
           else
             # 从 GitHub_REF 中提取版本号（如 refs/tags/v1.0.0 -> 1.0.0）
             VERSION=${GITHUB_REF#refs/tags/v}
@@ -94,80 +106,68 @@ jobs:
           echo "tag=$TAG" >> $GITHUB_OUTPUT
           echo "📦 Version: $VERSION"
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+
+      - name: Install pnpm
+        run: npm install -g pnpm@${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Build project
+        run: pnpm run build
+
       - name: Generate Release Notes
         id: release_notes
         run: |
-          # 获取上一个标签
-          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          chmod +x tools/generate-release-notes.sh
+          tools/generate-release-notes.sh \
+            "${{ steps.version.outputs.version }}" \
+            "${{ steps.version.outputs.tag }}" \
+            release_notes.md
 
-          # 生成 changelog
-          if [ -z "$PREV_TAG" ]; then
-            cat > release_notes.md << 'EOF'
-          ### 首次发布
+      - name: Build release packages
+        run: |
+          chmod +x tools/build-executable.sh tools/package-release.sh
+          tools/package-release.sh
 
-          这是 Mist Backend 的第一个稳定版本。
-
-          ## 主要功能
-
-          - 📊 实时股票数据采集和存储
-          - 📈 164+ 技术分析指标（MACD、RSI、KDJ等）
-          - 🧠 缠论（Chan Theory）自动化分析
-          - 🤖 多智能体AI系统用于交易决策
-          - 🔄 RESTful API with Swagger文档
-          - 🔌 MCP Server for AI应用集成
-          EOF
-          else
-            cat > release_notes.md << EOF
-          ### 更新内容
-
-          自 $PREV_TAG 以来的变更：
-
-          $(git log ${PREV_TAG}..HEAD --oneline --format="* %s (%h)")
-          EOF
-          fi
-
-          echo "" >> release_notes.md
-          echo "## Docker 镜像" >> release_notes.md
-          echo "" >> release_notes.md
-          echo '```bash' >> release_notes.md
-          echo "# 拉取最新版本" >> release_notes.md
-          echo "docker pull ghcr.io/moyui/mist:${{ steps.version.outputs.version }}" >> release_notes.md
-          echo "docker pull ghcr.io/moyui/mist:latest" >> release_notes.md
-          echo '```' >> release_notes.md
-
-          echo "" >> release_notes.md
-          echo "## 快速开始" >> release_notes.md
-          echo "" >> release_notes.md
-          echo '```bash' >> release_notes.md
-          echo "docker run -d \\" >> release_notes.md
-          echo "  -p 8001:8001 \\" >> release_notes.md
-          echo "  -p 8008:8008 \\" >> release_notes.md
-          echo "  -e mysql_server_host=host.docker.internal \\" >> release_notes.md
-          echo "  -e mysql_server_password=your_password \\" >> release_notes.md
-          echo "  ghcr.io/moyui/mist:${{ steps.version.outputs.version }}" >> release_notes.md
-          echo '```' >> release_notes.md
-
-          # 显示 release notes
-          cat release_notes.md
+      - name: Upload release packages as workflow artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: mist-release-packages-${{ steps.version.outputs.tag }}
+          path: release/mist-*
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Create GitHub Release
+        if: github.event.inputs.dry_run != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.version.outputs.tag }}
-          name: Mist ${{ steps.version.outputs.version }}
+          name: Mist Backend ${{ steps.version.outputs.version }}
           body_path: release_notes.md
+          files: |
+            release/mist-macos-amd64
+            release/mist-windows-x86.exe
+          fail_on_unmatched_files: true
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up QEMU
+        if: github.event.inputs.dry_run != 'true'
         uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
+        if: github.event.inputs.dry_run != 'true'
         uses: docker/setup-buildx-action@v4
 
       - name: Login to GHCR
+        if: github.event.inputs.dry_run != 'true'
         uses: docker/login-action@v4
         with:
           registry: ghcr.io
@@ -175,6 +175,7 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push main Docker image
+        if: github.event.inputs.dry_run != 'true'
         uses: docker/build-push-action@v5
         with:
           context: .
@@ -198,18 +199,23 @@ jobs:
         run: |
           echo "### 🎉 Mist ${{ steps.version.outputs.version }} 发布成功！" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
+          echo "#### 📦 Release 包" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- \`mist-macos-amd64\`" >> $GITHUB_STEP_SUMMARY
+          echo "- \`mist-windows-x86.exe\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### 📦 Docker 镜像标签" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "| 服务 | 标签 | 镜像地址 |" >> $GITHUB_STEP_SUMMARY
           echo "|------|------|----------|" >> $GITHUB_STEP_SUMMARY
-          echo "| **主应用** | latest | \`ghcr.io/moyui/mist:latest\` |" >> $GITHUB_STEP_SUMMARY
-          echo "| **主应用** | ${{ steps.version.outputs.version }} | \`ghcr.io/moyui/mist:${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **主应用** | latest | \`ghcr.io/${{ github.repository }}:latest\` |" >> $GITHUB_STEP_SUMMARY
+          echo "| **主应用** | ${{ steps.version.outputs.version }} | \`ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}\` |" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "#### 🚀 使用方法" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo '```bash' >> $GITHUB_STEP_SUMMARY
           echo "# 1. 拉取镜像" >> $GITHUB_STEP_SUMMARY
-          echo "docker pull ghcr.io/moyui/mist:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "# 2. 使用 docker-compose 启动" >> $GITHUB_STEP_SUMMARY
           echo "VERSION=${{ steps.version.outputs.version }} docker-compose up -d" >> $GITHUB_STEP_SUMMARY
