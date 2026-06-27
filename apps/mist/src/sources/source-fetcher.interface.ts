@@ -16,6 +16,7 @@ export interface EfExtension {
 export interface TdxExtension {
   fullCode?: string;
   forwardFactor?: number;
+  volInStock?: number;
   backwardFactor?: number;
   volumeRatio?: number;
   turnoverRate?: number;

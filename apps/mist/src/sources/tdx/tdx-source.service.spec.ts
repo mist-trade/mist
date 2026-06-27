@@ -8,8 +8,11 @@ import {
   Period,
   Security,
   DataSource as AppDataSource,
+  K,
+  KExtensionTdx,
 } from '@app/shared-data';
 import { UtilsService, PeriodMappingService } from '@app/utils';
+import { TdxResponse } from './types';
 
 describe('TdxSource', () => {
   let service: TdxSource;
@@ -133,6 +136,118 @@ describe('TdxSource', () => {
         service.saveK([], {} as Security, Period.ONE_MIN),
       ).resolves.toBeUndefined();
     });
+
+    it('saves structured TDX extensions without opaque raw payloads or zero defaults', async () => {
+      const manager = {
+        create: jest.fn((entity, payload) => ({ entity, ...payload })),
+        save: jest.fn((entity, payload) => {
+          if (entity === K) {
+            return Promise.resolve(
+              payload.map((item: unknown, index: number) => ({
+                ...(item as Record<string, unknown>),
+                id: index + 1,
+              })),
+            );
+          }
+          return Promise.resolve(payload);
+        }),
+      };
+      mockTypeOrmDataSource.transaction.mockImplementation(
+        async (...args: any[]) => {
+          const callback = args.find((arg) => typeof arg === 'function');
+          return callback(manager as any);
+        },
+      );
+
+      const data: TdxResponse[] = [
+        {
+          timestamp: new Date('2026-06-26T00:00:00+08:00'),
+          open: 1199,
+          high: 1199,
+          low: 1168.1,
+          close: 1168.63,
+          volume: 5006647,
+          amount: 592201.44,
+          extensions: {
+            forwardFactor: 0.711862,
+            volInStock: 182942480,
+          },
+        },
+      ];
+      const security = {
+        code: '600519',
+        sourceConfigs: [{ source: AppDataSource.TDX, formatCode: '600519.SH' }],
+      } as Security;
+
+      await service.saveK(data, security, Period.DAY);
+
+      const extensionCreateCall = manager.create.mock.calls.find(
+        ([entity]) => entity === KExtensionTdx,
+      );
+      expect(extensionCreateCall?.[1]).toEqual(
+        expect.objectContaining({
+          fullCode: '600519.SH',
+          forwardFactor: 0.711862,
+          volInStock: 182942480,
+        }),
+      );
+      expect(extensionCreateCall?.[1]).not.toHaveProperty('raw');
+      expect(extensionCreateCall?.[1]).not.toHaveProperty('backwardFactor', 0);
+      expect(extensionCreateCall?.[1]).not.toHaveProperty('volumeRatio', 0);
+    });
+  });
+
+  describe('fetchDividFactors', () => {
+    it('uses normalized dividend-factors endpoint and maps explicit factor items only', async () => {
+      mockAxiosPost.mockResolvedValueOnce({
+        data: {
+          ok: true,
+          provider: 'tdx',
+          data: {
+            items: [
+              {
+                symbol: '600519.SH',
+                date: '20250101',
+                forwardFactor: 1.2345,
+                backwardFactor: 0.9876,
+                provider: 'tdx',
+              },
+              {
+                symbol: '600519.SH',
+                date: '20250601',
+                bonus: 1.23,
+                provider: 'tdx',
+              },
+            ],
+          },
+          meta: { transport: 'http', asOf: '2026-06-26T15:01:00+08:00' },
+          error: null,
+        },
+      });
+
+      const result = await service.fetchDividFactors(
+        '600519.SH',
+        new Date('2025-01-01T00:00:00+08:00'),
+        new Date('2025-12-31T00:00:00+08:00'),
+      );
+
+      expect(mockAxiosPost).toHaveBeenCalledWith(
+        '/v1/reference/dividend-factors/query',
+        {
+          symbol: '600519.SH',
+          startTime: '20250101',
+          endTime: '20251231',
+        },
+      );
+      expect(mockAxiosGet).not.toHaveBeenCalled();
+      expect(result).toEqual([
+        {
+          timestamp: new Date('2025-01-01T00:00:00+08:00'),
+          forwardFactor: 1.2345,
+          backwardFactor: 0.9876,
+        },
+      ]);
+    });
   });
 
   describe('normalized /v1 HTTP contract', () => {
@@ -201,6 +316,69 @@ describe('TdxSource', () => {
         volume: 1200,
         amount: 12345.6,
       });
+    });
+
+    it('fetchK requests and maps structured TDX bar extension fields', async () => {
+      mockAxiosPost.mockResolvedValueOnce({
+        data: {
+          ok: true,
+          provider: 'tdx',
+          data: {
+            bars: [
+              {
+                symbol: '600519.SH',
+                period: '1d',
+                barTime: '2026-06-26T00:00:00+08:00',
+                open: 1199,
+                high: 1199,
+                low: 1168.1,
+                close: 1168.63,
+                volume: 5006647,
+                amount: 592201.44,
+                forwardFactor: 0.711862,
+                volInStock: 182942480,
+                unreviewedProviderField: 'not-owned',
+                provider: 'tdx',
+                receivedAt: '2026-06-26T15:01:00+08:00',
+              },
+            ],
+          },
+          meta: { transport: 'http', asOf: '2026-06-26T15:01:00+08:00' },
+          error: null,
+        },
+      });
+
+      const result = await service.fetchK({
+        code: '600519',
+        formatCode: '600519.SH',
+        period: Period.DAY,
+        startDate: new Date('2026-06-01T00:00:00+08:00'),
+        endDate: new Date('2026-06-26T23:59:59+08:00'),
+      });
+
+      expect(mockAxiosPost).toHaveBeenCalledWith(
+        '/v1/bars/query',
+        expect.objectContaining({
+          fields: [
+            'Open',
+            'High',
+            'Low',
+            'Close',
+            'Volume',
+            'Amount',
+            'ForwardFactor',
+            'VolInStock',
+          ],
+          dividendType: 'front',
+          fillData: true,
+        }),
+      );
+      expect(result[0].extensions).toEqual({
+        forwardFactor: 0.711862,
+        volInStock: 182942480,
+      });
+      expect(result[0]).not.toHaveProperty('raw');
+      expect(result[0]).not.toHaveProperty('unreviewedProviderField');
     });
 
     it('throws bad gateway when normalized bars payload is not an array', async () => {
