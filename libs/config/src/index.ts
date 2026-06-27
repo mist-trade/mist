@@ -1,6 +1,6 @@
-import { agentsConfig } from './agnets.config';
+import { agentsConfig } from './agents.config';
 
-export * from './agnets.config';
+export * from './agents.config';
 export * from './validation.schema';
 
 export const TEAM_MEMBERS = [

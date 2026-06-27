@@ -39,7 +39,7 @@
 
 - [x] 4.1 Add `install-service.ps1` for `MistBackend`.
 - [x] 4.2 Add `uninstall-service.ps1` for `MistBackend`.
-- [x] 4.3 Set NSSM `AppDirectory` to the backend package directory.
+- [x] 4.3 Set legacy service wrapper `AppDirectory` to the backend package directory.
 - [x] 4.4 Configure stdout and stderr log files with rotation.
 - [x] 4.5 Ensure backend service reads `.env` from its package directory.
 
@@ -92,17 +92,17 @@
       deployment entrypoint, but refactor repeated logic into datasource-owned
       helper scripts.
 - [x] 10.2 Add `windows-common.ps1` for datasource PowerShell logging, `.env`
-      parsing, NSSM resolution, and HTTP health polling.
-- [x] 10.3 Add `service-common.ps1` with an idempotent
-      `Ensure-DatasourceNssmService` helper for `MistTDX` and `MistQMT`.
-- [x] 10.4 Update datasource NSSM registration to install missing services,
+      parsing, legacy service wrapper resolution, and HTTP health polling.
+- [x] 10.3 Add `removed service helper` with an idempotent
+      `Ensure-DatasourceService` helper for `MistTDX` and `MistQMT`.
+- [x] 10.4 Update datasource legacy service wrapper registration to install missing services,
       update existing Mist datasource services, and refuse to overwrite
       unrelated services.
-- [x] 10.5 Add `service-runner.ps1` as the NSSM application entrypoint for TDX
+- [x] 10.5 Add `removed service runner` as the legacy service wrapper application entrypoint for TDX
       and QMT uvicorn processes.
-- [ ] 10.6 Configure NSSM restart throttling, restart delay, and sentinel exit
+- [ ] 10.6 Configure legacy service wrapper restart throttling, restart delay, and sentinel exit
       behavior for datasource services; verify the settings against the
-      packaged `nssm.exe` on Windows.
+      packaged `old-service-wrapper.exe` on Windows.
 - [x] 10.7 Implement crash-loop state tracking so repeated early exits stop the
       service instead of retrying forever.
 - [x] 10.8 Remove duplicate datasource preflight orchestration from

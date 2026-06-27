@@ -1,4 +1,4 @@
-import type { AngentsConfig } from '@app/config';
+import type { AgentsConfig } from '@app/config';
 import { LlmType } from '@app/config';
 import { createReactAgent } from '@langchain/langgraph/prebuilt';
 import { Injectable } from '@nestjs/common';
@@ -16,7 +16,7 @@ export class AgentsService {
 
   // todo 这些是需要用tool function的调用
   getCommanderAgent(): ReturnType<typeof createReactAgent> {
-    const agentsConfig = this.configService.get<AngentsConfig>('agents');
+    const agentsConfig = this.configService.get<AgentsConfig>('agents');
     const llmType = agentsConfig?.['Commander'] || LlmType.Basic;
 
     const llm = this.llmService.getLLMByType(llmType);

@@ -44,7 +44,7 @@ Windows operations guard, not by public application repositories.
   process.
 - Making the public appliance package depend on AutoHotkey.
 - Exposing the notification receiver to the public internet.
-- Replacing NSSM for `MistTDX`, `MistQMT`, or `MistBackend`.
+- Replacing legacy service wrapper for `MistTDX`, `MistQMT`, or `MistBackend`.
 - Guaranteeing fully unattended login when TDX requires captcha, MFA, or manual
   confirmation.
 - Building a general GUI automation framework for arbitrary Windows apps.
