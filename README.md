@@ -332,10 +332,6 @@ pnpm run test:watch
 # 运行特定测试
 pnpm run test:chan:shanghai-2024-2025
 
-# 深度集成测试
-pnpm run test:deep
-pnpm run test:deep:watch
-
 # 运行测试并同步到前端
 pnpm run test:full
 

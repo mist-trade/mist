@@ -572,8 +572,13 @@ describe('Shanghai Index 2024 - Chan Algorithm Test Suite', () => {
         },
       };
 
-      // Create test-results directory if it doesn't exist
-      const resultsDir = path.join(process.cwd(), 'test-results');
+      // Create generated results directory if it doesn't exist
+      const resultsDir = path.join(
+        process.cwd(),
+        'test-data',
+        'test-results',
+        'raw',
+      );
       if (!fs.existsSync(resultsDir)) {
         fs.mkdirSync(resultsDir, { recursive: true });
       }
