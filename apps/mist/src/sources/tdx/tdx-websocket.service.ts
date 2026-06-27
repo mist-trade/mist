@@ -10,7 +10,7 @@ import { ConfigService } from '@nestjs/config';
 import { WebSocket } from 'ws';
 import { KCandleAggregator, CompletedCandle } from './kcandle-aggregator';
 import { Period, Security } from '@app/shared-data';
-import { TdxResponse, TdxSnapshot } from './types';
+import { TdxExtension, TdxResponse, TdxSnapshot } from './types';
 import { TimezoneService } from '@app/timezone';
 
 type SnapshotCallback = (snapshot: TdxSnapshot) => void | Promise<void>;
@@ -24,6 +24,7 @@ export interface TdxRealtimeBar {
   close: number;
   volume: number;
   amount: number;
+  extensions?: TdxExtension;
 }
 
 type BarCallback = (bar: TdxRealtimeBar) => void | Promise<void>;
@@ -189,6 +190,22 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
         return;
       }
 
+      if (message.type === 'ready') {
+        this.logger.log('TDX datasource ready, resyncing subscriptions');
+        this.sendSubscription();
+        return;
+      }
+
+      if (message.type === 'subscribed' || message.type === 'unsubscribed') {
+        this.logSubscriptionAck(message.type, message);
+        return;
+      }
+
+      if (message.type === 'error') {
+        this.logDatasourceError(message);
+        return;
+      }
+
       if (message.type === 'quote') {
         const snapshot = this.parseSnapshot(message.data);
         this.processSnapshot(snapshot);
@@ -234,6 +251,8 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       throw new Error(`Invalid TDX bar timestamp: ${timestampValue}`);
     }
 
+    const extensions = this.extractBarExtensions(data);
+
     return {
       symbol,
       period: this.parsePeriod(data.period),
@@ -244,6 +263,7 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       close: Number(data.close),
       volume: Number(data.volume),
       amount: Number(data.amount || 0),
+      ...(extensions ? { extensions } : {}),
     };
   }
 
@@ -291,6 +311,98 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       }
     }
     return 0;
+  }
+
+  private readOptionalNumber(
+    source: Record<string, unknown>,
+    keys: string[],
+  ): number | undefined {
+    for (const key of keys) {
+      const value = source[key];
+      if (value !== undefined && value !== null) {
+        const numeric = Number(value);
+        if (Number.isFinite(numeric)) {
+          return numeric;
+        }
+      }
+    }
+    return undefined;
+  }
+
+  private extractBarExtensions(
+    data: Record<string, unknown>,
+  ): TdxExtension | undefined {
+    const extension: TdxExtension = {};
+    const forwardFactor = this.readOptionalNumber(data, ['forwardFactor']);
+    const volInStock = this.readOptionalNumber(data, ['volInStock']);
+
+    if (forwardFactor !== undefined) {
+      extension.forwardFactor = forwardFactor;
+    }
+    if (volInStock !== undefined) {
+      extension.volInStock = volInStock;
+    }
+
+    return Object.keys(extension).length > 0 ? extension : undefined;
+  }
+
+  private logSubscriptionAck(
+    type: string,
+    message: Record<string, unknown>,
+  ): void {
+    const accepted = this.formatSymbolList(message.accepted);
+    const active = this.formatSymbolList(message.active);
+    const rejected = this.formatRejectedSymbols(message.rejected);
+
+    this.logger.log(
+      `TDX datasource ${type} accepted=${accepted} active=${active}`,
+    );
+    if (rejected) {
+      this.logger.warn(`TDX datasource ${type} rejected=${rejected}`);
+    }
+  }
+
+  private formatSymbolList(value: unknown): string {
+    if (!Array.isArray(value)) {
+      return '';
+    }
+    return value.map((item) => String(item)).join(',');
+  }
+
+  private formatRejectedSymbols(value: unknown): string {
+    if (!Array.isArray(value)) {
+      return '';
+    }
+    return value
+      .map((item) => {
+        if (item && typeof item === 'object') {
+          const record = item as Record<string, unknown>;
+          const symbol = String(record.symbol ?? record.code ?? '');
+          const reason = record.reason ? `:${String(record.reason)}` : '';
+          return `${symbol}${reason}`;
+        }
+        return String(item);
+      })
+      .filter(Boolean)
+      .join(',');
+  }
+
+  private logDatasourceError(message: Record<string, unknown>): void {
+    const nested =
+      message.error && typeof message.error === 'object'
+        ? (message.error as Record<string, unknown>)
+        : message;
+    const code = String(nested.code ?? 'TDX_DATASOURCE_ERROR');
+    const errorMessage = String(nested.message ?? 'unknown datasource error');
+    const retryable = Boolean(nested.retryable);
+    const details =
+      nested.details && typeof nested.details === 'object'
+        ? nested.details
+        : {};
+
+    this.logger.error(
+      `TDX datasource error code=${code} message=${errorMessage} retryable=${retryable} details=${JSON.stringify(details)}`,
+    );
   }
 
   private processSnapshot(snapshot: TdxSnapshot): void {

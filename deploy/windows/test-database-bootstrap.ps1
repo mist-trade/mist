@@ -63,6 +63,7 @@ $schemaPath = Join-Path $RootDir "database\schema.sql"
 $migrationsReadmePath = Join-Path $RootDir "database\migrations\README.md"
 $migrationRunnerPath = Join-Path $RootDir "database\run-migrations.ps1"
 $initialMigrationPath = Join-Path $RootDir "database\migrations\001_init_core_tables.sql"
+$tdxVolInStockMigrationPath = Join-Path $RootDir "database\migrations\002_add_tdx_vol_in_stock.sql"
 $installAllPath = Join-Path $RootDir "install-all.ps1"
 $healthCheckPath = Join-Path $RootDir "health-check.ps1"
 $backendInstallerPath = Join-Path $RootDir "backend\install-service.ps1"
@@ -71,11 +72,13 @@ $installerPath = Join-Path $RootDir "mysql\install-portable-mysql.ps1"
 $commonPath = Join-Path $RootDir "mysql\mysql-common.ps1"
 $windowsReadmePath = Join-Path $RootDir "README-Windows.md"
 $workflowPath = Join-Path $RepoRoot ".github\workflows\windows-appliance.yml"
+$backendDatasourceDocPath = Join-Path $RepoRoot "docs\backend-datasource-integration.md"
 
 Assert-FileNotExists "bundled empty schema is not shipped" $schemaPath
 Assert-FileExists "database migrations placeholder exists" $migrationsReadmePath
 Assert-FileExists "database migration runner exists" $migrationRunnerPath
 Assert-FileExists "initial core table migration exists" $initialMigrationPath
+Assert-FileExists "TDX VolInStock migration exists" $tdxVolInStockMigrationPath
 Assert-FileExists "install-all script exists" $installAllPath
 Assert-FileExists "health-check script exists" $healthCheckPath
 Assert-FileExists "backend service installer exists" $backendInstallerPath
@@ -84,10 +87,12 @@ Assert-FileExists "portable mysql installer exists" $installerPath
 Assert-FileExists "portable mysql common helpers exist" $commonPath
 Assert-FileExists "windows appliance README exists" $windowsReadmePath
 Assert-FileExists "windows appliance workflow exists" $workflowPath
+Assert-FileExists "backend datasource integration docs exist" $backendDatasourceDocPath
 
 $migrationsReadme = Get-Content $migrationsReadmePath -Raw
 $migrationRunner = Get-Content $migrationRunnerPath -Raw
 $initialMigration = Get-Content $initialMigrationPath -Raw
+$tdxVolInStockMigration = Get-Content $tdxVolInStockMigrationPath -Raw
 $installAll = Get-Content $installAllPath -Raw
 $healthCheck = Get-Content $healthCheckPath -Raw
 $backendInstaller = Get-Content $backendInstallerPath -Raw
@@ -96,6 +101,7 @@ $installer = Get-Content $installerPath -Raw
 $common = Get-Content $commonPath -Raw
 $windowsReadme = Get-Content $windowsReadmePath -Raw
 $workflow = Get-Content $workflowPath -Raw
+$backendDatasourceDoc = Get-Content $backendDatasourceDocPath -Raw
 
 Assert-Contains "migrations readme documents explicit runner" ".\run-migrations.ps1" $migrationsReadme
 Assert-Contains "migration runner creates version table" "CREATE TABLE IF NOT EXISTS ``schema_migrations``" $migrationRunner
@@ -108,6 +114,9 @@ Assert-Contains "initial migration creates ef extension" "CREATE TABLE IF NOT EX
 Assert-Contains "initial migration creates tdx extension" "CREATE TABLE IF NOT EXISTS ``k_extensions_tdx``" $initialMigration
 Assert-Contains "initial migration creates mqmt extension" "CREATE TABLE IF NOT EXISTS ``k_extensions_mqmt``" $initialMigration
 Assert-NotContains "initial migration never drops tables" "DROP TABLE" $initialMigration.ToUpperInvariant()
+Assert-Contains "TDX VolInStock migration targets tdx extension table" "k_extensions_tdx" $tdxVolInStockMigration
+Assert-Contains "TDX VolInStock migration adds column" "volInStock" $tdxVolInStockMigration
+Assert-Contains "TDX VolInStock migration is guarded by information schema" "information_schema.COLUMNS" $tdxVolInStockMigration
 Assert-Contains "install-all exposes migration switch" '[switch]$RunDatabaseMigrations' $installAll
 Assert-Contains "install-all invokes migration runner" "database\run-migrations.ps1" $installAll
 Assert-Contains "install-all lets portable mysql return empty db for migrations" "-AllowEmptyDatabase:`$RunDatabaseMigrations" $installAll
@@ -129,8 +138,14 @@ Assert-Contains "health check uses scoped mysql password for database check" "In
 Assert-NotContains "health check keeps database check password out of command line" '-p$mysqlPassword' $healthCheck
 Assert-Contains "health check table check ignores migration metadata" "table_name <> 'schema_migrations'" $healthCheck
 Assert-Contains "health check names TDX WinSW service" "mist-tdx-datasource" $healthCheck
+Assert-Contains "health check resolves TDX base URL from backend env" "Resolve-TdxDatasourceBaseUrl" $healthCheck
+Assert-Contains "health check reads backend TDX_BASE_URL" 'Get-EnvValue $BackendEnv "TDX_BASE_URL"' $healthCheck
 Assert-Contains "health check verifies TDX collector state" "collectorState" $healthCheck
 Assert-Contains "health check verifies TDX queue depth" "eventQueueDepth" $healthCheck
+Assert-Contains "health check probes datasource providers" "/providers" $healthCheck
+Assert-Contains "health check supports controlled bars probe symbol" '[string]$TdxTestSymbol = ""' $healthCheck
+Assert-Contains "health check probes normalized bars only when symbol is set" "Test-TdxBarsProbe" $healthCheck
+Assert-NotContains "health check no longer hardcodes only TDX health URL" 'Test-TdxDatasourceHealth "http://127.0.0.1:9001/health"' $healthCheck
 Assert-Contains "backend installer uses WinSW" "WinSW" $backendInstaller
 Assert-Contains "backend installer copies WinSW executable" "Copy-Item -Path `$ResolvedWinSWExe -Destination `$ServiceExe -Force" $backendInstaller
 Assert-Contains "backend installer renders WinSW XML" "mist-backend.xml" $backendInstaller
@@ -156,7 +171,17 @@ Assert-Contains "service ownership accepts matching interrupted bootstrap" "stat
 Assert-Contains "windows README documents WinSW restart policy" "WinSW restarts" $windowsReadme
 Assert-Contains "windows README documents WinSW failure reset window" "resetfailure" $windowsReadme
 Assert-Contains "windows README points to TDX WinSW logs" "datasource/logs/mist-tdx-datasource" $windowsReadme
+Assert-Contains "windows README documents configured TDX_BASE_URL health source" "health-check.ps1 reads backend/.env TDX_BASE_URL" $windowsReadme
+Assert-Contains "windows README documents providers probe" "/providers" $windowsReadme
+Assert-Contains "windows README documents optional normalized bars probe" "-TdxTestSymbol" $windowsReadme
+Assert-Contains "windows README documents backend datasource rollback" "Rollback" $windowsReadme
 Assert-NotContains "windows README no longer mentions legacy crash-loop state" "crash-loop state" $windowsReadme
+Assert-Contains "backend datasource docs identify TdxSource" "TdxSource" $backendDatasourceDoc
+Assert-Contains "backend datasource docs identify TdxWebSocketService" "TdxWebSocketService" $backendDatasourceDoc
+Assert-Contains "backend datasource docs identify TDX_BASE_URL" "TDX_BASE_URL" $backendDatasourceDoc
+Assert-Contains "backend datasource docs identify bars endpoint" "/v1/bars/query" $backendDatasourceDoc
+Assert-Contains "backend datasource docs identify snapshots endpoint" "/v1/snapshots/query" $backendDatasourceDoc
+Assert-Contains "backend datasource docs identify websocket endpoint" "/ws/quote/{client_id}" $backendDatasourceDoc
 Assert-Contains "workflow creates datasource runtime directory" 'datasource\runtime' $workflow
 Assert-Contains "workflow exposes datasource ref input" 'datasource_ref:' $workflow
 Assert-Contains "workflow defaults datasource ref to master" "DATASOURCE_REF: `${{ github.event.inputs.datasource_ref || 'master' }}" $workflow

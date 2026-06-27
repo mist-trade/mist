@@ -101,6 +101,33 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
     );
   });
 
+  it('preserves structured TDX extension fields from normalized bar events', async () => {
+    const security = createSecurity('600519');
+    const { collectorService, emitBar } = createHarness(security);
+
+    await emitBar({
+      ...createBar('600519.SH'),
+      extensions: {
+        forwardFactor: 0.711862,
+        volInStock: 182942480,
+      },
+    });
+
+    expect(collectorService.saveRawKData).toHaveBeenCalledWith(
+      security,
+      [
+        expect.objectContaining({
+          extensions: {
+            forwardFactor: 0.711862,
+            volInStock: 182942480,
+          },
+        }),
+      ],
+      DataSource.TDX,
+      Period.ONE_MIN,
+    );
+  });
+
   it.each([
     ['600519.SH', '600519'],
     ['000001.SZ', '000001'],
