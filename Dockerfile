@@ -8,7 +8,7 @@ RUN --mount=type=cache,target=/root/.npm \
     npm install -g pnpm
 
 # Copy dependency files
-COPY package*.json pnpm-lock.yaml ./
+COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.npm \
     pnpm config set registry https://registry.npmmirror.com && \
     pnpm install --frozen-lockfile
@@ -30,7 +30,7 @@ RUN npm install -g pnpm
 WORKDIR /app
 
 # Install Node.js production dependencies (using Taobao registry)
-COPY package*.json pnpm-lock.yaml ./
+COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
 RUN --mount=type=cache,target=/root/.npm \
     pnpm config set registry https://registry.npmmirror.com && \
     pnpm install --prod --frozen-lockfile --ignore-scripts
