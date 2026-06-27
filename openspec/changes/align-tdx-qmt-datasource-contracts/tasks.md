@@ -106,18 +106,18 @@
 
 ## 6. Normalize Phase 4 Formula Data And Execution
 
-- [ ] 6.1 Add normalized formula-data models for `formula_format_data`,
+- [x] 6.1 Add normalized formula-data models for `formula_format_data`,
       `formula_set_data`, `formula_set_data_info`, `formula_get_data`,
       `formula_get_all`, and `formula_get_info`.
-- [ ] 6.2 Add normalized formula-execution models for `formula_zb`,
+- [x] 6.2 Add normalized formula-execution models for `formula_zb`,
       `formula_xg`, `formula_exp`, `formula_process_mul_zb`,
       `formula_process_mul_xg`, and `formula_process_mul_exp`.
-- [ ] 6.3 Add execution limits, timeout handling, stable formula error codes,
+- [x] 6.3 Add execution limits, timeout handling, stable formula error codes,
       and request-size validation before exposing formula execution beyond
       operator smoke tests.
-- [ ] 6.4 Add TDX provider mappings, routes, fixtures, and contract tests for
+- [x] 6.4 Add TDX provider mappings, routes, fixtures, and contract tests for
       formula data and execution.
-- [ ] 6.5 Add QMT manifest entries and explicit unsupported tests for formula
+- [x] 6.5 Add QMT manifest entries and explicit unsupported tests for formula
       endpoints until QMT equivalents are implemented.
 
 ## 7. Keep Raw Calls And Trading Boundaries Safe
@@ -154,9 +154,9 @@
 
 - [x] 9.1 Update `scripts/run-runtime-checks.ps1` to include provider manifest
       validation and normalized phase-1 probes.
-- [ ] 9.2 Add optional smoke flags for phase-2 reference/instrument probes,
+- [x] 9.2 Add optional smoke flags for phase-2 reference/instrument probes,
       phase-3 finance/report probes, and phase-4 formula probes.
-- [ ] 9.3 Keep runtime smoke checks validating native TDX HTTP shape before the
+- [x] 9.3 Keep runtime smoke checks validating native TDX HTTP shape before the
       corresponding normalized `/v1` shape.
 - [ ] 9.4 Add fixture-based tests for documented TDX HTTP `Value` wrappers and
       any live-runtime variants captured during Windows smoke testing.
