@@ -91,17 +91,17 @@
 
 ## 5. Normalize Phase 3 Finance And Report Data
 
-- [ ] 5.1 Add normalized finance-data models for `get_financial_data` and
+- [x] 5.1 Add normalized finance-data models for `get_financial_data` and
       `get_financial_data_by_date`.
-- [ ] 5.2 Add normalized report and aggregate-data models for
+- [x] 5.2 Add normalized report and aggregate-data models for
       `get_gp_one_data`, `get_gpjy_value`, `get_gpjy_value_by_date`,
       `get_bkjy_value`, `get_bkjy_value_by_date`, `get_scjy_value`,
       `get_scjy_value_by_date`, and `get_report_data`.
-- [ ] 5.3 Add TDX provider mappings, routes, fixtures, and error handling for
+- [x] 5.3 Add TDX provider mappings, routes, fixtures, and error handling for
       finance/report endpoints.
-- [ ] 5.4 Add QMT manifest entries and explicit unsupported tests for
+- [x] 5.4 Add QMT manifest entries and explicit unsupported tests for
       finance/report endpoints until QMT equivalents are implemented.
-- [ ] 5.5 Extend runtime smoke checks with at least one lightweight finance or
+- [x] 5.5 Extend runtime smoke checks with at least one lightweight finance or
       report probe that is stable outside trading hours.
 
 ## 6. Normalize Phase 4 Formula Data And Execution
