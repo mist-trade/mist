@@ -17,6 +17,19 @@ import {
 import { DataSource as TypeOrmDataSource, In } from 'typeorm';
 import { format, parseISO } from 'date-fns';
 
+const EF_EXTENSION_UPSERT_COLUMNS = [
+  'fullCode',
+  'amplitude',
+  'changePct',
+  'changeAmt',
+  'turnoverRate',
+  'volumeCount',
+  'innerVolume',
+  'outerVolume',
+  'prevClose',
+  'prevOpen',
+];
+
 @Injectable()
 export class EastMoneySource implements ISourceFetcher {
   private readonly axios: AxiosInstance;
@@ -225,9 +238,28 @@ export class EastMoneySource implements ISourceFetcher {
         );
 
       if (extensions.length > 0) {
-        await manager.upsert(KExtensionEf, extensions, {
-          conflictPaths: ['kId'],
-        });
+        const extensionValues = extensions.map((extension) => ({
+          kId: extension.kId,
+          fullCode: extension.fullCode,
+          amplitude: extension.amplitude,
+          changePct: extension.changePct,
+          changeAmt: extension.changeAmt,
+          turnoverRate: extension.turnoverRate,
+          volumeCount: extension.volumeCount,
+          innerVolume: extension.innerVolume,
+          outerVolume: extension.outerVolume,
+          prevClose: extension.prevClose,
+          prevOpen: extension.prevOpen,
+        }));
+
+        await manager
+          .createQueryBuilder()
+          .insert()
+          .into(KExtensionEf)
+          .values(extensionValues)
+          .orUpdate(EF_EXTENSION_UPSERT_COLUMNS, ['k_id'])
+          .updateEntity(false)
+          .execute();
       }
     });
   }

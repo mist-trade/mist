@@ -35,6 +35,21 @@ const TDX_BAR_FIELDS = [
   'VolInStock',
 ];
 
+const TDX_EXTENSION_UPSERT_COLUMNS = [
+  'fullCode',
+  'forwardFactor',
+  'volInStock',
+  'backwardFactor',
+  'volumeRatio',
+  'turnoverRate',
+  'turnoverAmount',
+  'totalMarketValue',
+  'floatMarketValue',
+  'earningsPerShare',
+  'priceEarningsRatio',
+  'priceToBookRatio',
+];
+
 function normalizeTdxPeriodFormat(
   period: Period,
   periodFormat: string,
@@ -305,9 +320,30 @@ export class TdxSource implements ITdxSourceFetcher {
         .filter((extension): extension is KExtensionTdx => extension != null);
 
       if (extensions.length > 0) {
-        await manager.upsert(KExtensionTdx, extensions, {
-          conflictPaths: ['kId'],
-        });
+        const extensionValues = extensions.map((extension) => ({
+          kId: extension.kId,
+          fullCode: extension.fullCode,
+          forwardFactor: extension.forwardFactor,
+          volInStock: extension.volInStock,
+          backwardFactor: extension.backwardFactor,
+          volumeRatio: extension.volumeRatio,
+          turnoverRate: extension.turnoverRate,
+          turnoverAmount: extension.turnoverAmount,
+          totalMarketValue: extension.totalMarketValue,
+          floatMarketValue: extension.floatMarketValue,
+          earningsPerShare: extension.earningsPerShare,
+          priceEarningsRatio: extension.priceEarningsRatio,
+          priceToBookRatio: extension.priceToBookRatio,
+        }));
+
+        await manager
+          .createQueryBuilder()
+          .insert()
+          .into(KExtensionTdx)
+          .values(extensionValues)
+          .orUpdate(TDX_EXTENSION_UPSERT_COLUMNS, ['k_id'])
+          .updateEntity(false)
+          .execute();
       }
     });
   }
