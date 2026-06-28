@@ -124,6 +124,37 @@ Alternative considered: add a centralized logging stack. That is too heavy for
 the first hybrid deployment and can be added later if service count or retention
 needs grow.
 
+### Provide a local datasource operations entrypoint
+
+Operators need a Windows-local command for the host-only datasource service, not
+only a GitHub Actions workflow. `mist-deploy` should provide
+`scripts/manage-tdx-datasource.ps1` with `start`, `stop`, `restart`, and
+`status` actions. The GitHub Actions datasource workflow should call this script
+instead of duplicating PowerShell inline. The script owns datasource runtime
+preflight: `.env` resolution, `TDX_SDK_PATH`, `tqcenter.py`,
+`TPythClient.dll`, `mist_datasource.py`, native TDX HTTP port `17709`, WinSW
+service state, health polling, and recent log/XML diagnostics on failure.
+
+### Reuse the datasource runtime smoke suite
+
+The complete business smoke already lives in `mist-datasource` as
+`scripts/run-runtime-checks.ps1`. The Docker deployment should not reimplement
+those endpoint checks. `mist-deploy` should provide a wrapper that locates the
+deployed datasource script under `F:\quant\MistAPI\datasource` and forwards
+parameters for basic HTTP, WebSocket, finance/report, reference/instrument, and
+formula smoke modes. Default smoke should remain read-only and safe for routine
+deploy verification.
+
+### Add bounded retention for generated operational artifacts
+
+The first version should add simple file-system retention for generated
+artifacts under `E:\quant\MistDocker`: MySQL dumps under `backups` and
+diagnostic snapshots under `diagnostics`. Default retention should keep recent
+evidence while preventing unbounded disk growth: 14 days and at least 20 MySQL
+backup files, plus 14 days and at least 20 diagnostics directories. Datasource
+WinSW logs remain owned by the datasource service; diagnostics may copy recent
+snippets but should not delete datasource logs by default.
+
 ## Risks / Trade-offs
 
 - Docker Desktop startup or WSL2 state blocks backend startup -> deployment
@@ -153,7 +184,10 @@ needs grow.
 5. Update deployment flow to pull the requested Mist image tag, start MySQL,
    run migrations, start `mist-backend` and `chan-api`, then run health checks.
 6. Add diagnostics collection for Docker services and the WinSW datasource.
-7. Validate on the Windows API machine with Docker Desktop running, datasource
+7. Add local datasource service operations and a runtime smoke wrapper that
+   reuses the deployed `mist-datasource` smoke scripts.
+8. Add retention cleanup for Docker-root backups and diagnostics.
+9. Validate on the Windows API machine with Docker Desktop running, datasource
    WinSW running, and Mac-side checks against ports `8001` and `8008`.
 
 Rollback:
