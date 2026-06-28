@@ -77,4 +77,4 @@
 - [x] 9.5 Add `scripts/run-tdx-runtime-smoke.ps1` that reuses deployed `mist-datasource\scripts\run-runtime-checks.ps1`.
 - [x] 9.6 Add retention cleanup for MySQL backup dumps and diagnostics snapshots under the Docker root.
 - [x] 9.7 Document local datasource operations, runtime smoke modes, and retention defaults in the Docker Windows runbook.
-- [ ] 9.8 Run OpenSpec validation, local PowerShell tests, and Windows workflow smoke for the changed deploy scripts.
+- [x] 9.8 Run OpenSpec validation, local PowerShell tests, and Windows workflow smoke for the changed deploy scripts.
