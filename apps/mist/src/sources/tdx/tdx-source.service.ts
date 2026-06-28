@@ -35,6 +35,16 @@ const TDX_BAR_FIELDS = [
   'VolInStock',
 ];
 
+function normalizeTdxPeriodFormat(
+  period: Period,
+  periodFormat: string,
+): string {
+  if (period === Period.SIXTY_MIN) {
+    return '1h';
+  }
+  return periodFormat;
+}
+
 @Injectable()
 export class TdxSource implements ITdxSourceFetcher {
   private readonly axios: AxiosInstance;
@@ -64,9 +74,9 @@ export class TdxSource implements ITdxSourceFetcher {
   }): Promise<TdxResponse[]> {
     const { formatCode, period, startDate, endDate } = params;
 
-    const periodFormat = this.periodMappingService.toSourceFormat(
+    const periodFormat = normalizeTdxPeriodFormat(
       period,
-      DataSource.TDX,
+      this.periodMappingService.toSourceFormat(period, DataSource.TDX),
     );
     if (!periodFormat) {
       throw new HttpException(

@@ -318,6 +318,49 @@ describe('TdxSource', () => {
       });
     });
 
+    it('normalizes 60 minute bars to the native TDX 1h token', async () => {
+      mockAxiosPost.mockResolvedValueOnce({
+        data: {
+          ok: true,
+          provider: 'tdx',
+          data: {
+            bars: [
+              {
+                symbol: '600519.SH',
+                period: '1h',
+                barTime: '2026-06-26T10:30:00+08:00',
+                open: 1199,
+                high: 1199,
+                low: 1180.42,
+                close: 1181.25,
+                volume: 2161000,
+                amount: 256979.45,
+                provider: 'tdx',
+                receivedAt: '2026-06-26T10:31:00+08:00',
+              },
+            ],
+          },
+          meta: { transport: 'http', asOf: '2026-06-26T10:31:00+08:00' },
+          error: null,
+        },
+      });
+
+      await service.fetchK({
+        code: '600519',
+        formatCode: '600519.SH',
+        period: Period.SIXTY_MIN,
+        startDate: new Date('2026-06-26T09:30:00+08:00'),
+        endDate: new Date('2026-06-26T15:00:00+08:00'),
+      });
+
+      expect(mockAxiosPost).toHaveBeenCalledWith(
+        '/v1/bars/query',
+        expect.objectContaining({
+          period: '1h',
+        }),
+      );
+    });
+
     it('fetchK requests and maps structured TDX bar extension fields', async () => {
       mockAxiosPost.mockResolvedValueOnce({
         data: {
