@@ -1,6 +1,5 @@
 module.exports = {
   displayName: 'mcp-server',
-  preset: '../../tsconfig.spec.json',
   testEnvironment: 'node',
   roots: ['<rootDir>/src'],
   moduleFileExtensions: ['js', 'json', 'ts'],
@@ -15,8 +14,6 @@ module.exports = {
     '^@app/config$': '<rootDir>/../../libs/config/src',
     '^@app/constants/(.*)$': '<rootDir>/../../libs/constants/src/$1',
     '^@app/constants$': '<rootDir>/../../libs/constants/src',
-    '^@app/prompts/(.*)$': '<rootDir>/../../libs/prompts/src/$1',
-    '^@app/prompts$': '<rootDir>/../../libs/prompts/src',
     '^@app/utils/(.*)$': '<rootDir>/../../libs/utils/src/$1',
     '^@app/utils$': '<rootDir>/../../libs/utils/src',
     '^@app/timezone/(.*)$': '<rootDir>/../../libs/timezone/src/$1',

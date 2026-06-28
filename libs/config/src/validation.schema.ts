@@ -33,30 +33,6 @@ export const appEnvSchema = Joi.object({
 }).concat(commonEnvSchema);
 
 /**
- * Saya app-specific environment variable validation
- */
-export const sayaEnvSchema = Joi.object({
-  // Reasoning LLM
-  REASONING_API_KEY: Joi.string().required(),
-  REASONING_BASE_URL: Joi.string().uri().required(),
-  REASONING_MODEL: Joi.string().optional(),
-  // Fast LLM
-  FAST_API_KEY: Joi.string().required(),
-  FAST_BASE_URL: Joi.string().uri().optional(),
-  FAST_MODEL: Joi.string().optional(),
-  // Vision LLM
-  VL_API_KEY: Joi.string().optional(),
-  VL_BASE_URL: Joi.string().uri().optional(),
-  VL_MODEL: Joi.string().optional(),
-  // Other
-  DEBUG: Joi.boolean().default(false),
-  APP_ENV: Joi.string()
-    .valid('development', 'production', 'test')
-    .default('development'),
-  TAVILY_API_KEY: Joi.string().required(),
-}).concat(commonEnvSchema);
-
-/**
  * Mist app-specific environment variable validation
  */
 export const mistEnvSchema = commonEnvSchema.append({

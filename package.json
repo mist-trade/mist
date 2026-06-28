@@ -20,7 +20,6 @@
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:dev:mist": "nest start mist",
-    "start:dev:saya": "nest start saya",
     "start:dev:chan": "nest start chan",
     "start:dev:mcp-server": "nest start mcp-server",
     "start:debug": "nest start --debug --watch",
@@ -46,9 +45,6 @@
     ]
   },
   "dependencies": {
-    "@langchain/core": "^0.3.62",
-    "@langchain/deepseek": "^0.1.0",
-    "@langchain/langgraph": "^0.3.6",
     "@modelcontextprotocol/sdk": "^1.0.4",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^10.0.0",
@@ -126,7 +122,6 @@
       "<rootDir>/libs/"
     ],
     "moduleNameMapper": {
-      "^@app/prompts(|/.*)$": "<rootDir>/libs/prompts/src/$1",
       "^@app/config(|/.*)$": "<rootDir>/libs/config/src/$1",
       "^@app/utils(|/.*)$": "<rootDir>/libs/utils/src/$1",
       "^@app/timezone(|/.*)$": "<rootDir>/libs/timezone/src/$1",
