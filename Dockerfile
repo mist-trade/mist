@@ -37,6 +37,8 @@ RUN --mount=type=cache,target=/root/.npm \
 
 # Copy build output from builder stage
 COPY --from=builder /app/dist ./dist
+COPY --from=builder /app/tools ./tools
+COPY --from=builder /app/deploy/windows/database ./deploy/windows/database
 COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
 
 # Expose ports
