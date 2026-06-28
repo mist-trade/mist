@@ -15,7 +15,7 @@ RUN --mount=type=cache,target=/root/.npm \
 
 # Copy source and build
 COPY . .
-RUN pnpm run build
+RUN pnpm run build:docker
 
 # Stage 2: Production - Run with Node.js
 FROM node:24-alpine
@@ -56,3 +56,4 @@ COPY docker-start.sh ./
 RUN chmod +x docker-start.sh
 
 ENTRYPOINT ["./docker-entrypoint.sh"]
+CMD ["node", "dist/apps/mist/main.js"]
