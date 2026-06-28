@@ -3,6 +3,7 @@ import { ConfigModule } from '@nestjs/config';
 import { chanEnvSchema } from '@app/config';
 import { ChanModule } from '../../mist/src/chan/chan.module';
 import * as path from 'path';
+import { HealthController } from './health.controller';
 
 @Module({
   imports: [
@@ -23,5 +24,6 @@ import * as path from 'path';
     }),
     ChanModule,
   ],
+  controllers: [HealthController],
 })
 export class ChanAppModule {}
