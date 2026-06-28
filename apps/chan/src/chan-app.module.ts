@@ -1,9 +1,18 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { chanEnvSchema } from '@app/config';
 import { ChanModule } from '../../mist/src/chan/chan.module';
 import * as path from 'path';
 import { HealthController } from './health.controller';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import {
+  K,
+  KExtensionEf,
+  KExtensionMqmt,
+  KExtensionTdx,
+  Security,
+  SecuritySourceConfig,
+} from '@app/shared-data';
 
 @Module({
   imports: [
@@ -21,6 +30,34 @@ import { HealthController } from './health.controller';
         allowUnknown: true,
         abortEarly: false,
       },
+    }),
+    TypeOrmModule.forRootAsync({
+      useFactory(configService: ConfigService) {
+        return {
+          type: 'mysql',
+          host: configService.get('mysql_server_host'),
+          port: configService.get('mysql_server_port'),
+          username: configService.get('mysql_server_username'),
+          password: configService.get('mysql_server_password'),
+          database: configService.get('mysql_server_database'),
+          synchronize: configService.get('NODE_ENV') !== 'production',
+          logging: configService.get('NODE_ENV') !== 'production',
+          entities: [
+            K,
+            KExtensionEf,
+            KExtensionTdx,
+            KExtensionMqmt,
+            Security,
+            SecuritySourceConfig,
+          ],
+          poolSize: 10,
+          connectorPackage: 'mysql2',
+          extra: {
+            authPlugins: 'sha256_password',
+          },
+        };
+      },
+      inject: [ConfigService],
     }),
     ChanModule,
   ],
