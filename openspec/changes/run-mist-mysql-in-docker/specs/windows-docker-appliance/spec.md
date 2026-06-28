@@ -97,3 +97,57 @@ the relevant Docker and WinSW state into a timestamped diagnostics directory.
 - **WHEN** a deployment completes or fails
 - **THEN** the deployment saves a short diagnostic snapshot that includes recent
   Docker logs and datasource service state
+
+### Requirement: Local datasource operations are scriptable
+The system SHALL provide a Windows-local datasource operations command that can
+start, stop, restart, and inspect the host `mist-tdx-datasource` service without
+requiring a GitHub Actions dispatch.
+
+#### Scenario: Operator restarts datasource locally
+- **WHEN** the operator runs the datasource operations script with action
+  `restart`
+- **THEN** the script validates datasource root, SDK path, `tqcenter.py`,
+  `TPythClient.dll`, strategy identity file, and native TDX HTTP port
+- **AND** the script restarts the `mist-tdx-datasource` WinSW service
+- **AND** the script waits for the configured datasource health endpoint
+
+#### Scenario: Datasource workflow reuses local script
+- **WHEN** the GitHub Actions datasource management workflow runs
+- **THEN** it calls the same datasource operations script used by local
+  operators
+- **AND** the workflow does not maintain a separate inline implementation of
+  datasource preflight, start, restart, and health logic
+
+### Requirement: Runtime smoke can exercise datasource business paths
+The system SHALL expose a deployment-side command for running the existing
+`mist-datasource` runtime smoke suite against the deployed datasource service.
+
+#### Scenario: Operator runs default runtime smoke
+- **WHEN** the operator runs the deployment-side datasource smoke wrapper
+- **THEN** it invokes the deployed datasource `scripts\run-runtime-checks.ps1`
+- **AND** it verifies datasource health, provider manifest, normalized bars,
+  snapshots, sectors, calendar/security paths, and WebSocket ping/pong
+
+#### Scenario: Operator runs deeper runtime smoke modes
+- **WHEN** the operator passes finance/report or reference/instrument smoke
+  switches
+- **THEN** the wrapper forwards those switches to `run-runtime-checks.ps1`
+- **AND** the wrapper keeps formula and live subscription-changing checks
+  opt-in rather than default
+
+### Requirement: Generated backups and diagnostics have retention cleanup
+The system SHALL provide bounded retention for generated MySQL backup dumps and
+Docker diagnostics snapshots under the Docker deployment root.
+
+#### Scenario: Deployment prunes old MySQL backups
+- **WHEN** the deployment creates a MySQL dump under the Docker backup path
+- **THEN** it removes backup files older than the configured retention days
+- **AND** it keeps at least the configured minimum count of newest backup files
+
+#### Scenario: Deployment prunes old diagnostics snapshots
+- **WHEN** the deployment writes diagnostics under the Docker diagnostics path
+- **THEN** it removes diagnostics directories older than the configured
+  retention days
+- **AND** it keeps at least the configured minimum count of newest diagnostics
+  directories
+- **AND** it does not delete datasource WinSW logs by default

@@ -67,3 +67,14 @@
 - [ ] 8.7 Deploy on the Windows API machine with datasource WinSW already running.
 - [ ] 8.8 Verify container-to-host datasource connectivity from the Mist containers.
 - [ ] 8.9 Verify Mac can reach `http://<windows-lan-ip>:8001` and `http://<windows-lan-ip>:8008` when enabled.
+
+## 9. Add Local Datasource Operations, Runtime Smoke, And Retention
+
+- [x] 9.1 Update OpenSpec design/spec/tasks for local datasource operations, runtime smoke reuse, and retention cleanup.
+- [x] 9.2 Add deployment-script tests for the datasource operations script, runtime smoke wrapper, workflow reuse, and retention defaults.
+- [x] 9.3 Add `scripts/manage-tdx-datasource.ps1` for local `start`, `stop`, `restart`, and `status` operations on `mist-tdx-datasource`.
+- [x] 9.4 Refactor `manage-windows-datasource.yml` to call `scripts/manage-tdx-datasource.ps1`.
+- [x] 9.5 Add `scripts/run-tdx-runtime-smoke.ps1` that reuses deployed `mist-datasource\scripts\run-runtime-checks.ps1`.
+- [x] 9.6 Add retention cleanup for MySQL backup dumps and diagnostics snapshots under the Docker root.
+- [x] 9.7 Document local datasource operations, runtime smoke modes, and retention defaults in the Docker Windows runbook.
+- [ ] 9.8 Run OpenSpec validation, local PowerShell tests, and Windows workflow smoke for the changed deploy scripts.
