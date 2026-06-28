@@ -28,6 +28,7 @@ describe('PeriodMappingService', () => {
 
   it('should convert periods for TDX', () => {
     expect(service.toSourceFormat(Period.ONE_MIN, DataSource.TDX)).toBe('1m');
+    expect(service.toSourceFormat(Period.SIXTY_MIN, DataSource.TDX)).toBe('1h');
     expect(service.toSourceFormat(Period.DAY, DataSource.TDX)).toBe('1d');
   });
 

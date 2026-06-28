@@ -20,7 +20,7 @@ export class PeriodMappingService {
       [Period.FIVE_MIN]: '5m',
       [Period.FIFTEEN_MIN]: '15m',
       [Period.THIRTY_MIN]: '30m',
-      [Period.SIXTY_MIN]: '60m',
+      [Period.SIXTY_MIN]: '1h',
       [Period.DAY]: '1d',
       [Period.WEEK]: '1w',
       [Period.MONTH]: '1M',
