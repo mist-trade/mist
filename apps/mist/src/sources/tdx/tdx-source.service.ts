@@ -35,6 +35,8 @@ const TDX_BAR_FIELDS = [
   'VolInStock',
 ];
 
+const K_UPSERT_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'amount'];
+
 const TDX_EXTENSION_UPSERT_COLUMNS = [
   'fullCode',
   'forwardFactor',
@@ -291,9 +293,32 @@ export class TdxSource implements ITdxSourceFetcher {
         }),
       );
 
-      await manager.upsert(K, kEntities, {
-        conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
-      });
+      const kValues = kEntities.map((k) => ({
+        securityId: k.securityId,
+        source: k.source,
+        period: k.period,
+        timestamp: k.timestamp,
+        open: k.open,
+        high: k.high,
+        low: k.low,
+        close: k.close,
+        volume: k.volume,
+        amount: k.amount,
+      }));
+
+      await manager
+        .createQueryBuilder()
+        .insert()
+        .into(K)
+        .values(kValues)
+        .orUpdate(K_UPSERT_COLUMNS, [
+          'securityId',
+          'source',
+          'period',
+          'timestamp',
+        ])
+        .updateEntity(false)
+        .execute();
 
       const savedKs = await manager.find(K, {
         where: {

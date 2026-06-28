@@ -12,6 +12,15 @@ import {
 import { UtilsService, PeriodMappingService } from '@app/utils';
 import { DataSource as TypeOrmDataSource } from 'typeorm';
 
+const createInsertBuilderMock = () => ({
+  insert: jest.fn().mockReturnThis(),
+  into: jest.fn().mockReturnThis(),
+  values: jest.fn().mockReturnThis(),
+  orUpdate: jest.fn().mockReturnThis(),
+  updateEntity: jest.fn().mockReturnThis(),
+  execute: jest.fn().mockResolvedValue(undefined),
+});
+
 describe('EastMoneySource', () => {
   let service: EastMoneySource;
   let axiosInstance: jest.Mocked<AxiosInstance>;
@@ -281,6 +290,7 @@ describe('EastMoneySource', () => {
     let mockManagerUpsert: jest.Mock;
     let mockManagerFind: jest.Mock;
     let mockManagerCreateQueryBuilder: jest.Mock;
+    let mockKInsertBuilder: ReturnType<typeof createInsertBuilderMock>;
     let mockExtensionInsertBuilder: {
       insert: jest.Mock;
       into: jest.Mock;
@@ -314,15 +324,22 @@ describe('EastMoneySource', () => {
         }
         return Promise.resolve([]);
       });
-      mockExtensionInsertBuilder = {
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        updateEntity: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue(undefined),
-      };
-      mockManagerCreateQueryBuilder = jest.fn(() => mockExtensionInsertBuilder);
+      mockKInsertBuilder = createInsertBuilderMock();
+      mockKInsertBuilder.execute.mockImplementation(() => {
+        const values = mockKInsertBuilder.values.mock.calls[0]?.[0] ?? [];
+        savedKRows = values.map(
+          (item: Record<string, unknown>, index: number) => ({
+            ...item,
+            id: index + 1,
+          }),
+        );
+        return Promise.resolve(undefined);
+      });
+      mockExtensionInsertBuilder = createInsertBuilderMock();
+      mockManagerCreateQueryBuilder = jest
+        .fn()
+        .mockReturnValueOnce(mockKInsertBuilder)
+        .mockReturnValue(mockExtensionInsertBuilder);
       mockTransaction = jest.fn((cb) =>
         cb({
           create: mockManagerCreate,
@@ -374,18 +391,23 @@ describe('EastMoneySource', () => {
           close: 10.8,
         }),
       );
-      expect(mockManagerUpsert).toHaveBeenCalledWith(
-        K,
+      expect(mockManagerUpsert).not.toHaveBeenCalled();
+      expect(mockManagerCreateQueryBuilder).toHaveBeenCalledTimes(2);
+      expect(mockKInsertBuilder.into).toHaveBeenCalledWith(K);
+      expect(mockKInsertBuilder.values).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
             securityId: mockSecurity.id,
             timestamp: mockData[0].timestamp,
           }),
         ]),
-        expect.objectContaining({
-          conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
-        }),
       );
+      expect(mockKInsertBuilder.orUpdate).toHaveBeenCalledWith(
+        ['open', 'high', 'low', 'close', 'volume', 'amount'],
+        ['securityId', 'source', 'period', 'timestamp'],
+      );
+      expect(mockKInsertBuilder.updateEntity).toHaveBeenCalledWith(false);
+      expect(mockKInsertBuilder.execute).toHaveBeenCalledTimes(1);
       // extensions created for item with extensions
       expect(mockManagerCreate).toHaveBeenCalledWith(
         KExtensionEf,
@@ -400,7 +422,7 @@ describe('EastMoneySource', () => {
         expect.anything(),
         expect.anything(),
       );
-      expect(mockManagerCreateQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(mockManagerCreateQueryBuilder).toHaveBeenCalledTimes(2);
       expect(mockExtensionInsertBuilder.into).toHaveBeenCalledWith(
         KExtensionEf,
       );
@@ -462,6 +484,20 @@ describe('EastMoneySource', () => {
           },
         ],
       ]);
+      const kInsertBuilder = createInsertBuilderMock();
+      kInsertBuilder.execute.mockImplementation(() => {
+        const values = kInsertBuilder.values.mock.calls[0]?.[0] ?? [];
+        for (const item of values as Array<Record<string, unknown>>) {
+          const timestamp = item.timestamp as Date;
+          const existing = storedKs.get(key(timestamp));
+          storedKs.set(key(timestamp), {
+            ...existing,
+            ...item,
+            id: existing?.id ?? nextId++,
+          });
+        }
+        return Promise.resolve(undefined);
+      });
       const manager = {
         create: jest.fn((_, data) => data),
         save: jest.fn((entity, entities) => {
@@ -499,6 +535,7 @@ describe('EastMoneySource', () => {
           }
           return Promise.resolve([]);
         }),
+        createQueryBuilder: jest.fn(() => kInsertBuilder),
       };
       mockTransaction.mockImplementation((cb) => cb(manager));
 
@@ -533,16 +570,21 @@ describe('EastMoneySource', () => {
           close: 1198,
         }),
       );
-      expect(manager.upsert).toHaveBeenCalledWith(
-        K,
+      expect(manager.upsert).not.toHaveBeenCalled();
+      expect(manager.createQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(kInsertBuilder.into).toHaveBeenCalledWith(K);
+      expect(kInsertBuilder.values).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ timestamp: existingTimestamp }),
           expect.objectContaining({ timestamp: olderTimestamp }),
         ]),
-        expect.objectContaining({
-          conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
-        }),
       );
+      expect(kInsertBuilder.orUpdate).toHaveBeenCalledWith(
+        ['open', 'high', 'low', 'close', 'volume', 'amount'],
+        ['securityId', 'source', 'period', 'timestamp'],
+      );
+      expect(kInsertBuilder.updateEntity).toHaveBeenCalledWith(false);
+      expect(kInsertBuilder.execute).toHaveBeenCalledTimes(1);
     });
 
     it('should skip extension creation for daily data (no extensions)', async () => {
@@ -566,14 +608,17 @@ describe('EastMoneySource', () => {
         K,
         expect.objectContaining({ open: 3000 }),
       );
-      expect(mockManagerUpsert).toHaveBeenCalledTimes(1);
-      expect(mockManagerUpsert).toHaveBeenCalledWith(
-        K,
+      expect(mockManagerUpsert).not.toHaveBeenCalled();
+      expect(mockManagerCreateQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(mockKInsertBuilder.into).toHaveBeenCalledWith(K);
+      expect(mockKInsertBuilder.values).toHaveBeenCalledWith(
         expect.arrayContaining([expect.objectContaining({ open: 3000 })]),
-        expect.objectContaining({
-          conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
-        }),
       );
+      expect(mockKInsertBuilder.orUpdate).toHaveBeenCalledWith(
+        ['open', 'high', 'low', 'close', 'volume', 'amount'],
+        ['securityId', 'source', 'period', 'timestamp'],
+      );
+      expect(mockExtensionInsertBuilder.execute).not.toHaveBeenCalled();
     });
   });
 });

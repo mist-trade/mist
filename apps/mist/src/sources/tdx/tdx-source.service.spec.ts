@@ -14,6 +14,15 @@ import {
 import { UtilsService, PeriodMappingService } from '@app/utils';
 import { TdxResponse } from './types';
 
+const createInsertBuilderMock = () => ({
+  insert: jest.fn().mockReturnThis(),
+  into: jest.fn().mockReturnThis(),
+  values: jest.fn().mockReturnThis(),
+  orUpdate: jest.fn().mockReturnThis(),
+  updateEntity: jest.fn().mockReturnThis(),
+  execute: jest.fn().mockResolvedValue(undefined),
+});
+
 describe('TdxSource', () => {
   let service: TdxSource;
   let mockAxiosGet: jest.Mock;
@@ -159,14 +168,24 @@ describe('TdxSource', () => {
           },
         ],
       ]);
-      const extensionInsertBuilder = {
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        updateEntity: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue(undefined),
-      };
+      const kInsertBuilder = createInsertBuilderMock();
+      kInsertBuilder.execute.mockImplementation(() => {
+        if (kInsertBuilder.into.mock.calls[0]?.[0] !== K) {
+          return Promise.resolve(undefined);
+        }
+        const values = kInsertBuilder.values.mock.calls[0]?.[0] ?? [];
+        for (const item of values as Array<Record<string, unknown>>) {
+          const timestamp = item.timestamp as Date;
+          const existing = storedKs.get(key(timestamp));
+          storedKs.set(key(timestamp), {
+            ...existing,
+            ...item,
+            id: existing?.id ?? nextId++,
+          });
+        }
+        return Promise.resolve(undefined);
+      });
+      const extensionInsertBuilder = createInsertBuilderMock();
 
       const manager = {
         create: jest.fn((_, payload) => payload),
@@ -205,7 +224,10 @@ describe('TdxSource', () => {
           }
           return Promise.resolve([]);
         }),
-        createQueryBuilder: jest.fn(() => extensionInsertBuilder),
+        createQueryBuilder: jest
+          .fn()
+          .mockReturnValueOnce(kInsertBuilder)
+          .mockReturnValueOnce(extensionInsertBuilder),
       };
       mockTypeOrmDataSource.transaction.mockImplementation(
         async (...args: any[]) => {
@@ -245,22 +267,26 @@ describe('TdxSource', () => {
           close: 1198,
         }),
       );
-      expect(manager.upsert).toHaveBeenCalledWith(
-        K,
+      expect(manager.upsert).not.toHaveBeenCalled();
+      expect(manager.createQueryBuilder).toHaveBeenCalledTimes(2);
+      expect(kInsertBuilder.into).toHaveBeenCalledWith(K);
+      expect(kInsertBuilder.values).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ timestamp: existingTimestamp }),
           expect.objectContaining({ timestamp: olderTimestamp }),
         ]),
-        expect.objectContaining({
-          conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
-        }),
       );
+      expect(kInsertBuilder.orUpdate).toHaveBeenCalledWith(
+        ['open', 'high', 'low', 'close', 'volume', 'amount'],
+        ['securityId', 'source', 'period', 'timestamp'],
+      );
+      expect(kInsertBuilder.updateEntity).toHaveBeenCalledWith(false);
+      expect(kInsertBuilder.execute).toHaveBeenCalledTimes(1);
       expect(manager.upsert).not.toHaveBeenCalledWith(
         KExtensionTdx,
         expect.anything(),
         expect.anything(),
       );
-      expect(manager.createQueryBuilder).toHaveBeenCalledTimes(1);
       expect(extensionInsertBuilder.into).toHaveBeenCalledWith(KExtensionTdx);
       expect(extensionInsertBuilder.values).toHaveBeenCalledWith(
         expect.arrayContaining([
@@ -290,14 +316,8 @@ describe('TdxSource', () => {
     });
 
     it('saves structured TDX extensions without opaque raw payloads or zero defaults', async () => {
-      const extensionInsertBuilder = {
-        insert: jest.fn().mockReturnThis(),
-        into: jest.fn().mockReturnThis(),
-        values: jest.fn().mockReturnThis(),
-        orUpdate: jest.fn().mockReturnThis(),
-        updateEntity: jest.fn().mockReturnThis(),
-        execute: jest.fn().mockResolvedValue(undefined),
-      };
+      const kInsertBuilder = createInsertBuilderMock();
+      const extensionInsertBuilder = createInsertBuilderMock();
       const manager = {
         create: jest.fn((entity, payload) => ({ entity, ...payload })),
         save: jest.fn((entity, payload) => {
@@ -323,7 +343,10 @@ describe('TdxSource', () => {
           }
           return Promise.resolve([]);
         }),
-        createQueryBuilder: jest.fn(() => extensionInsertBuilder),
+        createQueryBuilder: jest
+          .fn()
+          .mockReturnValueOnce(kInsertBuilder)
+          .mockReturnValueOnce(extensionInsertBuilder),
       };
       mockTypeOrmDataSource.transaction.mockImplementation(
         async (...args: any[]) => {

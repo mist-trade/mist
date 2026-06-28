@@ -17,6 +17,8 @@ import {
 import { DataSource as TypeOrmDataSource, In } from 'typeorm';
 import { format, parseISO } from 'date-fns';
 
+const K_UPSERT_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'amount'];
+
 const EF_EXTENSION_UPSERT_COLUMNS = [
   'fullCode',
   'amplitude',
@@ -199,9 +201,32 @@ export class EastMoneySource implements ISourceFetcher {
           amount: d.amount || 0,
         }),
       );
-      await manager.upsert(K, kEntities, {
-        conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
-      });
+      const kValues = kEntities.map((k) => ({
+        securityId: k.securityId,
+        source: k.source,
+        period: k.period,
+        timestamp: k.timestamp,
+        open: k.open,
+        high: k.high,
+        low: k.low,
+        close: k.close,
+        volume: k.volume,
+        amount: k.amount,
+      }));
+
+      await manager
+        .createQueryBuilder()
+        .insert()
+        .into(K)
+        .values(kValues)
+        .orUpdate(K_UPSERT_COLUMNS, [
+          'securityId',
+          'source',
+          'period',
+          'timestamp',
+        ])
+        .updateEntity(false)
+        .execute();
 
       const savedKs = await manager.find(K, {
         where: {
