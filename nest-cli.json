@@ -21,24 +21,6 @@
         "tsConfigPath": "apps/mist/tsconfig.app.json"
       }
     },
-    "saya": {
-      "type": "application",
-      "root": "apps/saya",
-      "entryFile": "main",
-      "sourceRoot": "apps/saya/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/saya/tsconfig.app.json"
-      }
-    },
-    "prompts": {
-      "type": "library",
-      "root": "libs/prompts",
-      "entryFile": "index",
-      "sourceRoot": "libs/prompts/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/prompts/tsconfig.lib.json"
-      }
-    },
     "config": {
       "type": "library",
       "root": "libs/config",

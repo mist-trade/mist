@@ -8,13 +8,13 @@
 
 ## 📖 项目简介
 
-Mist 是一个功能完整的股票市场分析系统，支持 A 股全市场（沪深两市）的技术分析与智能决策支持。采用 Monorepo 架构，集成了传统技术分析、缠论分析以及 AI 智能体系统，提供完整的 API 服务和 MCP Server 接口。
+Mist 是一个功能完整的股票市场分析系统，支持 A 股全市场（沪深两市）的技术分析与智能决策支持。采用 Monorepo 架构，集成了传统技术分析、缠论分析、MCP Server 以及面向 AstrBot 的 `mist-skills` 集成路径。
 
 ### ✨ 核心功能
 
 - **技术指标计算**：MACD、RSI、KDJ、ADX、ATR 等 164+ 种技术指标
 - **缠论分析**：笔（Bi）、分型（Fenxing）、中枢（Channel）自动识别与计算
-- **AI 多智能体**：基于 LangChain/LangGraph 的 7 角色智能体协作分析
+- **AI/机器人集成**：通过 MCP Server 和 `mist-skills` 为外部 AI 工具与 AstrBot 提供结构化分析能力
 - **MCP Server**：基于 Model Context Protocol 的 AI 集成接口，提供 17+ 工具
 - **多数据源管理**：支持东方财富（ef）、通达信（tdx）、迈吉马克特（mqmt）等多个数据源
 - **多周期数据**：支持 1min、5min、15min、30min、60min、daily 等多种时间周期
@@ -31,12 +31,10 @@ Mist 是一个功能完整的股票市场分析系统，支持 A 股全市场（
 mist/
 ├── apps/                  # 应用程序
 │   ├── mist/              # 主应用 - 技术分析与缠论 (Port 8001)
-│   ├── saya/              # AI 智能体系统 (Port 8002)
 │   ├── schedule/          # 定时任务 (Port 8003)
 │   ├── chan/              # 缠论测试入口 (Port 8008)
 │   └── mcp-server/        # MCP Server (Port 8009)
 ├── libs/                  # 共享库
-│   ├── prompts/           # AI 提示词模板
 │   ├── config/            # 配置管理
 │   ├── utils/             # 共享工具
 │   ├── shared-data/       # 数据模型
@@ -50,7 +48,6 @@ mist/
 | 应用 | 端口 | 功能描述 |
 |------|------|----------|
 | **mist** | 8001 | 主应用 - 数据采集、技术指标、缠论分析 |
-| **saya** | 8002 | AI 智能体系统 - 多智能体协作分析 |
 | **schedule** | 8003 | 定时任务 - 周期性数据采集 |
 | **chan** | 8008 | 缠论测试 - K 线合并、笔计算、中枢识别 |
 | **mcp-server** | 8009 | MCP Server - AI 应用集成接口 |
@@ -190,11 +187,9 @@ pnpm install
 ```bash
 # 复制示例配置
 cp apps/mist/src/.env.example apps/mist/src/.env
-cp apps/saya/src/.env.example apps/saya/src/.env
 
 # 编辑配置文件
 # apps/mist/src/.env - MySQL、Redis 等配置
-# apps/saya/src/.env - LLM API 配置
 ```
 
 #### 数据库设置
@@ -208,7 +203,6 @@ CREATE DATABASE mist DEFAULT CHARACTER SET utf8mb4;
 ```bash
 # 开发模式 - 运行特定应用
 pnpm run start:dev:mist       # 主应用 (port 8001)
-pnpm run start:dev:saya       # AI 智能体系统 (port 8002)
 pnpm run start:dev:schedule   # 定时任务 (port 8003)
 pnpm run start:dev:chan       # 缠论测试入口 (port 8008)
 pnpm run start:dev:mcp-server # MCP Server (port 8009)
@@ -254,19 +248,11 @@ pnpm run start:prod
 
 **API 文档**：http://localhost:8001/api-docs
 
-### AI 智能体系统 (saya)
+### AI/机器人集成
 
-基于 LangChain/LangGraph 的多智能体架构：
-
-| 角色 | 职责 |
-|------|------|
-| **Commander** | 接收用户指令、任务规划与协调 |
-| **DataEngineer** | 数据获取、处理、计算、向量存储 |
-| **Strategist** | 应用预定义策略规则，输出交易信号 |
-| **PatternFinder** | 历史模式匹配与概率分析 |
-| **SentimentAnalyst** | 新闻/社交媒体情绪分析 |
-| **Reporter** | 生成报告和预警 |
-| **RiskMonitor** | 市场和组合风险监控 |
+当前支持路径是外部 AI 工具通过 MCP Server 调用 Mist 能力，AstrBot 通过
+`mist-skills` 调用 Mist REST API。策略信号和主动告警由后续后端模块承载，
+不再通过独立后端模型编排服务。
 
 ### MCP Server (mcp-server)
 
@@ -520,7 +506,7 @@ docker build -t mist:latest .
 | 组件 | 技术 |
 |------|------|
 | 应用框架 | NestJS 10 |
-| AI/LLM | LangChain/LangGraph, DeepSeek |
+| AI/机器人集成 | MCP Server, mist-skills/AstrBot |
 | 技术分析 | node-talib (164+ 函数) |
 | 数据库 | MySQL with TypeORM |
 | WebSocket 客户端 | ws (连接 mist-datasource 实时行情) |
@@ -607,7 +593,7 @@ BSD-3-Clause
 ## 📮 相关文档
 
 - [开发指南](CLAUDE.md) - Claude Code 开发指引
-- [AI 智能体详细说明](apps/saya/README.md)
+- [AstrBot 集成规范](openspec/specs/astrbot-integration/spec.md)
 - [缠论算法说明](apps/chan/README.md)
 - [项目路线图](Roadmap.md)
 - [技术指标文档](Talib.md)

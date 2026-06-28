@@ -40,7 +40,7 @@ F:\quant\MistAPI\datasource
 `E:\quant\MistDocker\.env` is the Docker environment file. It must contain
 `MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data` for the MySQL bind mount.
 
-`apps/schedule`, `apps/saya`, and `apps/mcp-server` are not part of the default
+`apps/schedule` and `apps/mcp-server` are not part of the default
 production Docker stack. `apps/schedule` needs a separate production ownership
 decision before it is deployed.
 

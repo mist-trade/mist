@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Mist** is a stock market analysis system for A-shares (沪深两市). NestJS monorepo with 5 apps and 6 shared libs using pnpm workspaces. Uses MySQL + TypeORM, TDX for data, and LangGraph for AI agents.
+**Mist** is a stock market analysis system for A-shares (沪深两市). NestJS monorepo with 4 apps and 5 shared libs using pnpm workspaces. Uses MySQL + TypeORM, TDX for data, MCP Server for AI-tool integration, and `mist-skills` for AstrBot integration.
 
 ## Commands
 
@@ -13,7 +13,6 @@ pnpm install                        # Install dependencies
 
 # Development (watch mode)
 pnpm run start:dev:mist             # Main app - port 8001
-pnpm run start:dev:saya             # AI agents - port 8002
 pnpm run start:dev:schedule         # Scheduled tasks - port 8003
 pnpm run start:dev:chan             # Chan Theory test entry - port 8008
 pnpm run start:dev:mcp-server       # MCP server - port 8009
@@ -51,8 +50,7 @@ pnpm run migration:revert
 | App | Port | Purpose | Key Modules |
 |-----|------|---------|-------------|
 | **mist** | 8001 | Main stock analysis | chan, collector, indicator, security, sources |
-| **saya** | 8002 | AI multi-agent system | agents, builder, llm, role, template, tools |
-| **schedule** 8003 | Periodic data collection | Reuses CollectorModule from mist |
+| **schedule** | 8003 | Periodic data collection | Reuses CollectorModule from mist |
 | **chan** | 8008 | Chan Theory test/debug | Imports ChanModule from mist |
 | **mcp-server** | 8009 | MCP server for AI integration | 5 MCP services (Chan, Indicator, Data, Schedule, Segment) |
 
@@ -81,16 +79,10 @@ Apps reuse modules from `apps/mist/src/` via direct imports:
 - Source-specific extension entities: `KExtensionEf`, `KExtensionTdx`, `KExtensionMqmt`
 - All entities registered in app.module.ts TypeORM config
 
-**Multi-Agent Architecture** (saya app):
-- 7 agent roles: Commander, DataEngineer, Strategist, PatternFinder, SentimentAnalyst, Reporter, RiskMonitor
-- LangGraph orchestration with DeepSeek LLM
-- Prompt templates in `libs/prompts/`
-
 ### Libraries (`libs/`)
 
 | Library | Import | Purpose |
 |---------|--------|---------|
-| **prompts** | `@app/prompts` | AI agent prompt templates |
 | **config** | `@app/config` | Joi validation schemas per app (e.g. `mistEnvSchema`, `chanEnvSchema`) |
 | **utils** | `@app/utils` | `DataSourceService`, `PeriodMappingService` |
 | **timezone** | `@app/timezone` | Timezone service (date-fns-tz) |
@@ -100,7 +92,6 @@ Apps reuse modules from `apps/mist/src/` via direct imports:
 ### Path Mappings
 
 ```typescript
-@app/prompts        → libs/prompts/src
 @app/config         → libs/config/src
 @app/utils          → libs/utils/src
 @app/timezone       → libs/timezone/src
@@ -128,7 +119,6 @@ Copy `.env.example` to `.env`. Key variables:
 - Redis: `redis_server_host/port/db`
 - Data source: `DEFAULT_DATA_SOURCE` (ef/tdx/mqmt)
 - AKTools: `AKTOOLS_BASE_URL` (default http://localhost:8080)
-- LLM (saya): `REASONING_*`, `FAST_*`, `VL_*` model configs, `TAVILY_API_KEY`
 
 Ports are hardcoded as defaults in each app's `main.ts`. Override via `PORT` env var or docker-compose.
 
