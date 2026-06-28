@@ -21,6 +21,25 @@ Mac / LLM machine
   - MIST_API_BASE_URL=http://<windows-lan-ip>:8001
 ```
 
+## Default Windows Layout
+
+```text
+E:\quant\MistDocker
+  compose.yaml
+  .env
+  mysql-data\
+  backups\
+  diagnostics\
+
+F:\quant\MistAPI\datasource
+  .env
+  logs\
+  services\mist-tdx-datasource\
+```
+
+`E:\quant\MistDocker\.env` is the Docker environment file. It must contain
+`MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data` for the MySQL bind mount.
+
 `apps/schedule`, `apps/saya`, and `apps/mcp-server` are not part of the default
 production Docker stack. `apps/schedule` needs a separate production ownership
 decision before it is deployed.

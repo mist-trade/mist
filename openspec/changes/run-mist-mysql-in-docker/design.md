@@ -11,9 +11,10 @@ The target machine may store Docker deployment files on a different drive from
 the datasource installation. The initial default layout is:
 
 ```text
-E:\MistDocker
+E:\quant\MistDocker
     compose.yaml
     .env
+    mysql-data\
     backups\
     diagnostics\
 
@@ -100,6 +101,17 @@ Alternative considered: keep migrations only in `mist-deploy`. That creates
 drift risk because Mist code and database changes would need to be synchronized
 across repositories manually.
 
+### Persist MySQL through an explicit host bind directory
+
+MySQL data is stored in `E:\quant\MistDocker\mysql-data` by default through
+the Compose `MYSQL_DATA_DIR` bind mount. This keeps the Docker deployment
+layout visible to the Windows operator and places data, backups, diagnostics,
+Compose, and `.env` under the same `E:\quant\MistDocker` root.
+
+Alternative considered: Docker named volume. That is a reasonable default for
+opaque Docker-managed storage, but this deployment favors simple Windows-side
+inspection and backup handoff.
+
 ### Keep logs native but collect diagnostics through one command
 
 Docker services continue writing to stdout/stderr and WinSW continues writing
@@ -119,9 +131,9 @@ needs grow.
 - Containers cannot reach the host datasource through `host.docker.internal` ->
   add a container-side datasource health probe and document the required
   datasource bind/firewall adjustment.
-- MySQL data stored in Docker is harder to inspect directly than portable MySQL
-  files -> provide explicit backup and restore commands using `mysqldump` and
-  keep backup files under the Docker root.
+- MySQL data is now visible under the Docker root, but manual file-level edits
+  are still unsafe while MySQL is running -> provide explicit backup and restore
+  commands using `mysqldump` and keep backup files under the Docker root.
 - Logs are split between Docker and WinSW -> provide `collect-logs.ps1` or an
   equivalent diagnostics command that captures both sides.
 - Schedule app behavior remains undecided -> exclude it from the default stack
@@ -132,6 +144,7 @@ needs grow.
 1. Add a production Dockerfile/CMD and Compose stack for `mist-backend`,
    `chan-api`, and MySQL.
 2. Add environment templates for the Docker stack, including MySQL credentials,
+   `MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data`,
    `TDX_BASE_URL=http://host.docker.internal:9001`, image tag, and exposed
    ports.
 3. Add a migration runner path that applies Mist database migrations to the
@@ -154,9 +167,6 @@ Rollback:
 
 ## Open Questions
 
-- Should MySQL persistence default to a Docker named volume or an explicit
-  `E:\MistDocker\mysql-data` bind mount? Named volume is usually safer for
-  Docker Desktop performance; bind mount is more visible for manual backups.
 - Should `chan-api` be exposed on LAN port `8008` immediately, or only on the
   Windows host until a concrete external consumer needs it?
 - What exact health endpoint should `chan-api` expose if `/app/hello` remains

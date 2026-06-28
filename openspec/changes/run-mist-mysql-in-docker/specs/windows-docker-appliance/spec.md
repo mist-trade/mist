@@ -34,10 +34,10 @@ The system SHALL allow Docker deployment state and datasource service state to
 live under separate root directories.
 
 #### Scenario: Docker root and datasource root use different drives
-- **WHEN** the operator configures Docker root as `E:\MistDocker`
+- **WHEN** the operator configures Docker root as `E:\quant\MistDocker`
 - **AND** the operator configures datasource root as `F:\quant\MistAPI\datasource`
 - **THEN** deployment scripts use the Docker root for Compose files, Docker
-  environment, backups, and diagnostics
+  environment, MySQL data, backups, and diagnostics
 - **AND** deployment scripts use the datasource root for datasource `.env`,
   WinSW service files, and datasource logs
 
@@ -46,7 +46,8 @@ The system SHALL persist MySQL data across container restarts and provide an
 explicit backup path before upgrades that may change the database schema.
 
 #### Scenario: MySQL data survives container recreation
-- **WHEN** the MySQL container is recreated during a normal Mist deployment
+- **WHEN** the MySQL container is recreated during a normal Mist deployment with
+  `MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data`
 - **THEN** existing MySQL data remains available after the new container starts
 
 #### Scenario: Deployment creates pre-upgrade database backup

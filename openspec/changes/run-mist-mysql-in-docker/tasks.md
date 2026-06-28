@@ -1,7 +1,7 @@
 ## 1. Confirm Runtime Contract
 
-- [ ] 1.1 Decide whether MySQL persistence defaults to a Docker named volume or `E:\MistDocker\mysql-data` bind mount.
-- [ ] 1.2 Confirm default Docker root path, datasource root path, backup path, and diagnostics path.
+- [ ] 1.1 Confirm MySQL persistence defaults to the `E:\quant\MistDocker\mysql-data` bind mount.
+- [ ] 1.2 Confirm default Docker root path, datasource root path, MySQL data path, backup path, and diagnostics path.
 - [ ] 1.3 Confirm whether `chan-api` should be exposed on LAN port `8008` or host-local only in the first deployment.
 - [ ] 1.4 Define the first production health endpoint for `chan-api`.
 
@@ -17,7 +17,7 @@
 
 - [ ] 3.1 Add a production Compose file for `mysql`, `mist-backend`, and `chan-api`.
 - [ ] 3.2 Add a Docker environment template with image tag, MySQL credentials, ports, `DEFAULT_DATA_SOURCE=tdx`, and `TDX_BASE_URL=http://host.docker.internal:9001`.
-- [ ] 3.3 Configure MySQL persistence according to the decision from task 1.1.
+- [ ] 3.3 Configure MySQL persistence with `MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data`.
 - [ ] 3.4 Add container restart policies suitable for the Windows API machine.
 - [ ] 3.5 Add a container-side datasource reachability probe for `host.docker.internal:9001`.
 

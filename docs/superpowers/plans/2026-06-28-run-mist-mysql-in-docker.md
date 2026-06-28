@@ -20,14 +20,13 @@
 
 ## Locked Defaults For First Implementation
 
-- Docker root: `E:\MistDocker`
+- Docker root: `E:\quant\MistDocker`
 - Datasource root: `F:\quant\MistAPI\datasource`
 - Backend port: `8001`
 - Chan port: `8008`
 - Datasource URL inside containers: `http://host.docker.internal:9001`
-- MySQL persistence: Docker named volume `mist-mysql-data`
-- MySQL backups and diagnostics: files under `E:\MistDocker\backups` and `E:\MistDocker\diagnostics`
-- Optional future data-path override: support a bind mount such as `E:\MistDocker\mysql-data`, but do not make it the default until Windows Docker Desktop performance and file-lock behavior are verified on the target machine.
+- MySQL persistence: bind mount `MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data`
+- MySQL backups and diagnostics: files under `E:\quant\MistDocker\backups` and `E:\quant\MistDocker\diagnostics`
 
 ## Repository Boundaries
 
@@ -191,7 +190,7 @@
     - `mist-backend` publishes `8001`.
     - `chan-api` publishes `8008`.
     - Both app services set `TDX_BASE_URL=http://host.docker.internal:9001`.
-    - `mysql` uses persistent volume `mist-mysql-data`.
+    - `mysql` uses `MYSQL_DATA_DIR` as a bind mount for `/var/lib/mysql`.
   - Test command on Windows:
     ```powershell
     powershell -ExecutionPolicy Bypass -File .\scripts\test-docker-compose-config.ps1
@@ -228,6 +227,7 @@
     - `MYSQL_DATABASE=mist`
     - `MYSQL_USER=mist`
     - `MYSQL_PASSWORD=change-me-app`
+    - `MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data`
     - `MIST_BACKEND_PORT=8001`
     - `CHAN_API_PORT=8008`
     - `TDX_BASE_URL=http://host.docker.internal:9001`
@@ -249,10 +249,10 @@
     - Create `scripts/deploy-docker-appliance.ps1`
     - Create `scripts/test-deploy-docker-appliance.ps1`
   - Test coverage:
-    - Default `DockerRoot` is `E:\MistDocker`.
+    - Default `DockerRoot` is `E:\quant\MistDocker`.
     - Default `DatasourceRoot` is `F:\quant\MistAPI\datasource`.
     - Script preserves existing `.env`.
-    - Script creates `backups` and `diagnostics` under `DockerRoot`.
+    - Script creates `mysql-data`, `backups`, and `diagnostics` under `DockerRoot`.
     - Script never installs or deletes `mist-tdx-datasource`.
     - Script can update `MIST_IMAGE_TAG` in the Docker `.env` file.
     - Script has a rollback path that restores the previous image tag.
@@ -263,7 +263,7 @@
 
 - [ ] Implement `scripts/deploy-docker-appliance.ps1`.
   - Parameters:
-    - `DockerRoot = "E:\MistDocker"`
+    - `DockerRoot = "E:\quant\MistDocker"`
     - `DatasourceRoot = "F:\quant\MistAPI\datasource"`
     - `Image = "ghcr.io/mist-trade/mist"`
     - `ImageTag = "latest"`
@@ -275,10 +275,10 @@
     - `LoadOnly`
   - Flow:
     1. Assert Docker CLI and Docker Compose are usable.
-    2. Create Docker root, backup root, diagnostics root.
+    2. Create Docker root, MySQL data root, backup root, diagnostics root.
     3. Copy `docker/compose.yaml` to `DockerRoot\compose.yaml`.
     4. Copy `docker/.env.example` to `DockerRoot\.env` only when `.env` does not exist.
-    5. Update image variables in `.env` from parameters without overwriting secrets.
+    5. Update image variables and `MYSQL_DATA_DIR` in `.env` from parameters without overwriting secrets.
     6. Start MySQL only:
        ```powershell
        docker compose --env-file .env -f compose.yaml up -d mysql
@@ -303,7 +303,7 @@
   - Could live inside `deploy-docker-appliance.ps1` first; extract later only if it becomes bulky.
   - Output path:
     ```text
-    E:\MistDocker\backups\mist-YYYYMMDD-HHmmss.sql
+    E:\quant\MistDocker\backups\mist-YYYYMMDD-HHmmss.sql
     ```
   - Use `docker compose exec -T mysql mysqldump` against the app database.
   - Record the backup path in deployment output.
@@ -353,7 +353,7 @@
 
 - [ ] Implement `scripts/health-check-docker-appliance.ps1`.
   - Parameters:
-    - `DockerRoot = "E:\MistDocker"`
+    - `DockerRoot = "E:\quant\MistDocker"`
     - `DatasourceRoot = "F:\quant\MistAPI\datasource"`
     - `BackendHost = "127.0.0.1"`
     - `BackendPort = 8001`
@@ -390,7 +390,7 @@
     - Create `scripts/collect-docker-appliance-diagnostics.ps1`
     - Create `scripts/test-docker-appliance-diagnostics.ps1`
   - Assertions:
-    - Creates timestamped directory under `E:\MistDocker\diagnostics`.
+    - Creates timestamped directory under `E:\quant\MistDocker\diagnostics`.
     - Writes Docker version/info when available.
     - Writes Compose service status.
     - Writes recent logs for `mysql`, `mist-backend`, and `chan-api`.
@@ -427,7 +427,7 @@
 - [ ] Verification:
   ```powershell
   powershell -ExecutionPolicy Bypass -File .\scripts\test-docker-appliance-diagnostics.ps1
-  powershell -ExecutionPolicy Bypass -File .\scripts\collect-docker-appliance-diagnostics.ps1 -DockerRoot E:\MistDocker -DatasourceRoot F:\quant\MistAPI\datasource
+  powershell -ExecutionPolicy Bypass -File .\scripts\collect-docker-appliance-diagnostics.ps1 -DockerRoot E:\quant\MistDocker -DatasourceRoot F:\quant\MistAPI\datasource
   ```
 
 - [ ] Commit checkpoint after Phase 7.
@@ -492,9 +492,9 @@
   - Must include:
     - First-time setup:
       ```powershell
-      New-Item -ItemType Directory -Force E:\MistDocker
-      Copy-Item .\docker\.env.example E:\MistDocker\.env
-      notepad E:\MistDocker\.env
+      New-Item -ItemType Directory -Force E:\quant\MistDocker
+      Copy-Item .\docker\.env.example E:\quant\MistDocker\.env
+      notepad E:\quant\MistDocker\.env
       ```
     - Normal upgrade:
       ```powershell
@@ -511,7 +511,8 @@
          - Docker Desktop is running.
          - The self-hosted runner is online with labels: self-hosted, windows, mist-api.
          - `mist-tdx-datasource` WinSW service is running.
-         - `E:\MistDocker\.env` exists and contains machine-local MySQL secrets.
+         - `E:\quant\MistDocker\.env` exists and contains machine-local MySQL secrets.
+         - `E:\quant\MistDocker\mysql-data` is the intended MySQL bind directory.
          - `F:\quant\MistAPI\datasource` contains datasource `.env`, service files, and logs.
          - If the GHCR package is private, the deploy workflow has a read token secret such as `GHCR_READ_TOKEN`.
 
@@ -522,7 +523,7 @@
          - `image_repository`: `ghcr.io/mist-trade/mist`
          - `image_tag`: target image tag, for example `<git-sha>` or `v1.2.3`
          - `previous_image_tag`: the currently healthy tag, used for app rollback
-         - `docker_root`: `E:\MistDocker`
+         - `docker_root`: `E:\quant\MistDocker`
          - `datasource_root`: `F:\quant\MistAPI\datasource`
          - `skip_migration`: `false` for normal production deploys
          - `skip_backup`: `false` for normal production deploys
@@ -532,15 +533,16 @@
          - checkout `mist-deploy`
          - authenticate to GHCR when a read token is configured
          - call `scripts\deploy-docker-appliance.ps1`
-         - copy or reconcile `E:\MistDocker\compose.yaml`
-         - preserve `E:\MistDocker\.env`
+         - copy or reconcile `E:\quant\MistDocker\compose.yaml`
+         - preserve `E:\quant\MistDocker\.env`
+         - write `MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data`
          - pull the requested Mist image
          - start or verify Docker MySQL
-         - write a pre-migration backup under `E:\MistDocker\backups`
+         - write a pre-migration backup under `E:\quant\MistDocker\backups`
          - run `mist-migrate`
          - start `mist-backend` and `chan-api`
          - run hybrid health checks
-         - save diagnostics under `E:\MistDocker\diagnostics`
+         - save diagnostics under `E:\quant\MistDocker\diagnostics`
 
       6. Treat the deployment as successful only when:
          - GitHub Actions job is green.
@@ -618,13 +620,14 @@
   - Preconditions:
     - Docker Desktop running.
     - `mist-tdx-datasource` WinSW service running.
-    - `E:\MistDocker\.env` configured.
+    - `E:\quant\MistDocker\.env` configured.
+    - `E:\quant\MistDocker\mysql-data` available for the MySQL bind mount.
     - Datasource health reachable from the host.
   - Commands:
     ```powershell
     .\scripts\deploy-docker-appliance.ps1 -ImageTag <tag> -PreviousImageTag <old-tag>
     .\scripts\health-check-docker-appliance.ps1
-    docker compose --env-file E:\MistDocker\.env -f E:\MistDocker\compose.yaml exec mist-backend curl -fsS http://host.docker.internal:9001/health
+    docker compose --env-file E:\quant\MistDocker\.env -f E:\quant\MistDocker\compose.yaml exec mist-backend curl -fsS http://host.docker.internal:9001/health
     ```
   - Expected result:
     - MySQL healthy.
@@ -647,7 +650,7 @@
 ## Known Risks And Handling
 
 - If `host.docker.internal:9001` is not reachable from containers, first check datasource bind address and Windows firewall. Keep datasource local to the Windows API machine; do not expose it broadly on LAN without a concrete need.
-- If MySQL named volume is operationally inconvenient, add a documented `MYSQL_DATA_DIR` bind-mount mode and verify it on the target Windows Docker Desktop installation before making it the default.
+- Do not edit files under `E:\quant\MistDocker\mysql-data` while the MySQL container is running; use `mysqldump` backups and diagnostics for operational changes.
 - If migration fails, deployment must stop before reporting app health. Operators should use the pre-migration backup and diagnostics snapshot to decide whether to restore.
 - If `chan-api` later should become host-local only, change only the Compose port binding and health script input; keep the container service and health endpoint unchanged.
 - Do not add `apps/schedule` to Compose until there is a separate OpenSpec change defining its production data-source ownership.
