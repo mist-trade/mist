@@ -68,6 +68,19 @@ describe('IndicatorService', () => {
     expect(result.histogram[0]).toBeCloseTo(-1.280203, 6);
   });
 
+  it('calculates MACD from database decimal strings', async () => {
+    const roundedClose = close.map((value) => Number(value.toFixed(2)));
+    const result = await service.runMACD(
+      roundedClose.map((value) => value.toFixed(2)) as unknown as number[],
+    );
+    const expected = await service.runMACD(roundedClose);
+
+    expect(result.macd).toHaveLength(47);
+    expect(result.macd[0]).toBeCloseTo(expected.macd[0], 10);
+    expect(result.signal[0]).toBeCloseTo(expected.signal[0], 10);
+    expect(result.histogram[0]).toBeCloseTo(expected.histogram[0], 10);
+  });
+
   it('keeps the RSI response shape and period-based alignment', async () => {
     const result = await service.runRSI(close, 14);
 
