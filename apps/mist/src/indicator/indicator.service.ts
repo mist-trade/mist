@@ -69,8 +69,9 @@ export class IndicatorService {
     signal: number[];
     histogram: number[];
   }> {
+    const numericPrices = prices.map(Number);
     const values = MACD.calculate({
-      values: prices,
+      values: numericPrices,
       fastPeriod: 12,
       slowPeriod: 26,
       signalPeriod: 9,
@@ -87,7 +88,7 @@ export class IndicatorService {
     const histogram = values.map((value) => value.histogram as number);
 
     return {
-      begIndex: this.begIndex(prices.length, macd.length),
+      begIndex: this.begIndex(numericPrices.length, macd.length),
       nbElement: macd.length,
       macd,
       signal,
