@@ -9,7 +9,7 @@ import {
   KExtensionTdx,
   Security,
 } from '@app/shared-data';
-import { DataSource as TypeOrmDataSource } from 'typeorm';
+import { DataSource as TypeOrmDataSource, In } from 'typeorm';
 import { format, parseISO } from 'date-fns';
 import { ITdxSourceFetcher } from './tdx-source.interface';
 import {
@@ -263,6 +263,7 @@ export class TdxSource implements ITdxSourceFetcher {
       const kEntities = data.map((d) =>
         manager.create(K, {
           security,
+          securityId: security.id,
           source: DataSource.TDX,
           period,
           timestamp: d.timestamp,
@@ -275,26 +276,38 @@ export class TdxSource implements ITdxSourceFetcher {
         }),
       );
 
-      try {
-        const savedKs = await manager.save(K, kEntities);
+      await manager.upsert(K, kEntities, {
+        conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
+      });
 
-        const extensions = savedKs.map((k, i) =>
-          manager.create(
-            KExtensionTdx,
-            this.buildExtensionPayload(k, data[i].extensions, formatCode),
-          ),
-        );
+      const savedKs = await manager.find(K, {
+        where: {
+          security: { id: security.id },
+          source: DataSource.TDX,
+          period,
+          timestamp: In(data.map((d) => d.timestamp)),
+        },
+      });
+      const savedKByTimestamp = new Map(
+        savedKs.map((k) => [k.timestamp.getTime(), k]),
+      );
 
-        await manager.save(KExtensionTdx, extensions);
-      } catch (error: any) {
-        if (
-          error.code === 'ER_DUP_ENTRY' ||
-          error.message?.includes('Duplicate')
-        ) {
-          this.logger.warn('Duplicate K-line entry, skipping');
-          return;
-        }
-        throw error;
+      const extensions = data
+        .map((d) => {
+          const k = savedKByTimestamp.get(d.timestamp.getTime());
+          if (!k) return null;
+
+          return manager.create(KExtensionTdx, {
+            ...this.buildExtensionPayload(k, d.extensions, formatCode),
+            kId: k.id,
+          });
+        })
+        .filter((extension): extension is KExtensionTdx => extension != null);
+
+      if (extensions.length > 0) {
+        await manager.upsert(KExtensionTdx, extensions, {
+          conflictPaths: ['kId'],
+        });
       }
     });
   }

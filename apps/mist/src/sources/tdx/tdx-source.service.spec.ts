@@ -137,6 +137,125 @@ describe('TdxSource', () => {
       ).resolves.toBeUndefined();
     });
 
+    it('keeps new rows when a requested range overlaps existing TDX rows', async () => {
+      const existingTimestamp = new Date('2026-06-26T00:00:00+08:00');
+      const olderTimestamp = new Date('2026-06-25T00:00:00+08:00');
+      const key = (timestamp: Date) => timestamp.getTime();
+      const security = {
+        id: 1,
+        code: '600519',
+        sourceConfigs: [{ source: AppDataSource.TDX, formatCode: '600519.SH' }],
+      } as Security;
+      let nextId = 20;
+      const storedKs = new Map<number, Record<string, unknown>>([
+        [
+          key(existingTimestamp),
+          {
+            id: 10,
+            security,
+            source: AppDataSource.TDX,
+            period: Period.DAY,
+            timestamp: existingTimestamp,
+          },
+        ],
+      ]);
+
+      const manager = {
+        create: jest.fn((_, payload) => payload),
+        save: jest.fn((entity, payload) => {
+          if (entity === K) {
+            const duplicate = payload.find((item: { timestamp: Date }) =>
+              storedKs.has(key(item.timestamp)),
+            );
+            if (duplicate) {
+              const error = new Error('Duplicate entry') as Error & {
+                code: string;
+              };
+              error.code = 'ER_DUP_ENTRY';
+              return Promise.reject(error);
+            }
+          }
+          return Promise.resolve(payload);
+        }),
+        upsert: jest.fn((entity, payload) => {
+          if (entity === K) {
+            for (const item of payload as Array<Record<string, unknown>>) {
+              const timestamp = item.timestamp as Date;
+              const existing = storedKs.get(key(timestamp));
+              storedKs.set(key(timestamp), {
+                ...existing,
+                ...item,
+                id: existing?.id ?? nextId++,
+              });
+            }
+          }
+          return Promise.resolve(undefined);
+        }),
+        find: jest.fn((entity) => {
+          if (entity === K) {
+            return Promise.resolve(Array.from(storedKs.values()));
+          }
+          return Promise.resolve([]);
+        }),
+      };
+      mockTypeOrmDataSource.transaction.mockImplementation(
+        async (...args: any[]) => {
+          const callback = args.find((arg) => typeof arg === 'function');
+          return callback(manager as any);
+        },
+      );
+
+      await service.saveK(
+        [
+          {
+            timestamp: existingTimestamp,
+            open: 1199,
+            high: 1199,
+            low: 1168.1,
+            close: 1168.63,
+            volume: 5006647,
+            amount: 592201.44,
+          },
+          {
+            timestamp: olderTimestamp,
+            open: 1205,
+            high: 1210,
+            low: 1190,
+            close: 1198,
+            volume: 4200000,
+            amount: 501000,
+          },
+        ],
+        security,
+        Period.DAY,
+      );
+
+      expect(storedKs.get(key(olderTimestamp))).toEqual(
+        expect.objectContaining({
+          id: 20,
+          close: 1198,
+        }),
+      );
+      expect(manager.upsert).toHaveBeenCalledWith(
+        K,
+        expect.arrayContaining([
+          expect.objectContaining({ timestamp: existingTimestamp }),
+          expect.objectContaining({ timestamp: olderTimestamp }),
+        ]),
+        expect.objectContaining({
+          conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
+        }),
+      );
+      expect(manager.upsert).toHaveBeenCalledWith(
+        KExtensionTdx,
+        expect.arrayContaining([
+          expect.objectContaining({ kId: 10 }),
+          expect.objectContaining({ kId: 20 }),
+        ]),
+        expect.objectContaining({ conflictPaths: ['kId'] }),
+      );
+    });
+
     it('saves structured TDX extensions without opaque raw payloads or zero defaults', async () => {
       const manager = {
         create: jest.fn((entity, payload) => ({ entity, ...payload })),
@@ -150,6 +269,18 @@ describe('TdxSource', () => {
             );
           }
           return Promise.resolve(payload);
+        }),
+        upsert: jest.fn(() => Promise.resolve(undefined)),
+        find: jest.fn((entity) => {
+          if (entity === K) {
+            return Promise.resolve(
+              data.map((item: TdxResponse, index: number) => ({
+                ...item,
+                id: index + 1,
+              })),
+            );
+          }
+          return Promise.resolve([]);
         }),
       };
       mockTypeOrmDataSource.transaction.mockImplementation(

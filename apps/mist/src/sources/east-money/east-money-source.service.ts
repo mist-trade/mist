@@ -14,7 +14,7 @@ import {
   KExtensionEf,
   Security,
 } from '@app/shared-data';
-import { DataSource as TypeOrmDataSource } from 'typeorm';
+import { DataSource as TypeOrmDataSource, In } from 'typeorm';
 import { format, parseISO } from 'date-fns';
 
 @Injectable()
@@ -174,6 +174,7 @@ export class EastMoneySource implements ISourceFetcher {
       const kEntities = data.map((d) =>
         manager.create(K, {
           security,
+          securityId: security.id,
           source: DataSource.EAST_MONEY,
           period,
           timestamp: d.timestamp,
@@ -185,28 +186,48 @@ export class EastMoneySource implements ISourceFetcher {
           amount: d.amount || 0,
         }),
       );
-      const savedKs = await manager.save(K, kEntities);
+      await manager.upsert(K, kEntities, {
+        conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
+      });
+
+      const savedKs = await manager.find(K, {
+        where: {
+          security: { id: security.id },
+          source: DataSource.EAST_MONEY,
+          period,
+          timestamp: In(data.map((d) => d.timestamp)),
+        },
+      });
+      const savedKByTimestamp = new Map(
+        savedKs.map((k) => [k.timestamp.getTime(), k]),
+      );
 
       // Only save extensions for items that have them (minute-level data)
-      const itemsWithExt = savedKs
-        .map((k, i) => ({
-          k,
-          ext: data[i].extensions as EfExtension | undefined,
+      const extensions = data
+        .map((d) => ({
+          k: savedKByTimestamp.get(d.timestamp.getTime()),
+          ext: d.extensions as EfExtension | undefined,
         }))
-        .filter(({ ext }) => ext != null);
-
-      if (itemsWithExt.length > 0) {
-        const extensions = itemsWithExt.map(({ k, ext }) =>
+        .filter(
+          (item): item is { k: K; ext: EfExtension } =>
+            item.k != null && item.ext != null,
+        )
+        .map(({ k, ext }) =>
           manager.create(KExtensionEf, {
             k,
-            fullCode: ext!.fullCode ?? '',
-            amplitude: ext!.amplitude ?? 0,
-            changePct: ext!.changePct ?? 0,
-            changeAmt: ext!.changeAmt ?? 0,
-            turnoverRate: ext!.turnoverRate ?? 0,
+            kId: k.id,
+            fullCode: ext.fullCode ?? '',
+            amplitude: ext.amplitude ?? 0,
+            changePct: ext.changePct ?? 0,
+            changeAmt: ext.changeAmt ?? 0,
+            turnoverRate: ext.turnoverRate ?? 0,
           }),
         );
-        await manager.save(KExtensionEf, extensions);
+
+      if (extensions.length > 0) {
+        await manager.upsert(KExtensionEf, extensions, {
+          conflictPaths: ['kId'],
+        });
       }
     });
   }
