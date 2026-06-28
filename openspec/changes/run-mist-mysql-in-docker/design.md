@@ -199,9 +199,10 @@ Rollback:
 - Leave the datasource WinSW service untouched unless datasource-specific
   deployment changed.
 
-## Open Questions
+## Resolved Questions
 
-- Should `chan-api` be exposed on LAN port `8008` immediately, or only on the
-  Windows host until a concrete external consumer needs it?
-- What exact health endpoint should `chan-api` expose if `/app/hello` remains
-  specific to `apps/mist`?
+- `chan-api` is exposed on LAN port `8008` in the first deployment so Mac-side
+  smoke and future consumers can verify it the same way as `mist-backend`.
+- `chan-api` uses `/app/hello` as the first production availability endpoint.
+  A more domain-specific endpoint can be added later without changing the
+  initial Docker deployment contract.
