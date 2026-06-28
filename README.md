@@ -63,6 +63,11 @@ mist/
 
 ### 方式一：Docker 部署（推荐用于生产环境）
 
+Windows API 机器的正式部署以 `mist-deploy` 仓库为入口：Docker Desktop
+运行 `mysql`、`mist-backend`、`chan-api`，`mist-tdx-datasource` 继续作为
+WinSW 服务运行在 Windows Host。详细说明见
+[`deploy/docker/README-Windows-Docker.md`](deploy/docker/README-Windows-Docker.md)。
+
 #### 快速启动
 
 ```bash
