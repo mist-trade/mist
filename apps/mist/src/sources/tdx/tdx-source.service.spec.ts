@@ -159,6 +159,14 @@ describe('TdxSource', () => {
           },
         ],
       ]);
+      const extensionInsertBuilder = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        updateEntity: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
 
       const manager = {
         create: jest.fn((_, payload) => payload),
@@ -197,6 +205,7 @@ describe('TdxSource', () => {
           }
           return Promise.resolve([]);
         }),
+        createQueryBuilder: jest.fn(() => extensionInsertBuilder),
       };
       mockTypeOrmDataSource.transaction.mockImplementation(
         async (...args: any[]) => {
@@ -246,17 +255,49 @@ describe('TdxSource', () => {
           conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
         }),
       );
-      expect(manager.upsert).toHaveBeenCalledWith(
+      expect(manager.upsert).not.toHaveBeenCalledWith(
         KExtensionTdx,
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(manager.createQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(extensionInsertBuilder.into).toHaveBeenCalledWith(KExtensionTdx);
+      expect(extensionInsertBuilder.values).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({ kId: 10 }),
           expect.objectContaining({ kId: 20 }),
         ]),
-        expect.objectContaining({ conflictPaths: ['kId'] }),
       );
+      expect(extensionInsertBuilder.orUpdate).toHaveBeenCalledWith(
+        [
+          'fullCode',
+          'forwardFactor',
+          'volInStock',
+          'backwardFactor',
+          'volumeRatio',
+          'turnoverRate',
+          'turnoverAmount',
+          'totalMarketValue',
+          'floatMarketValue',
+          'earningsPerShare',
+          'priceEarningsRatio',
+          'priceToBookRatio',
+        ],
+        ['k_id'],
+      );
+      expect(extensionInsertBuilder.updateEntity).toHaveBeenCalledWith(false);
+      expect(extensionInsertBuilder.execute).toHaveBeenCalledTimes(1);
     });
 
     it('saves structured TDX extensions without opaque raw payloads or zero defaults', async () => {
+      const extensionInsertBuilder = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        updateEntity: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
       const manager = {
         create: jest.fn((entity, payload) => ({ entity, ...payload })),
         save: jest.fn((entity, payload) => {
@@ -282,6 +323,7 @@ describe('TdxSource', () => {
           }
           return Promise.resolve([]);
         }),
+        createQueryBuilder: jest.fn(() => extensionInsertBuilder),
       };
       mockTypeOrmDataSource.transaction.mockImplementation(
         async (...args: any[]) => {

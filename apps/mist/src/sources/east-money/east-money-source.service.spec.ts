@@ -280,6 +280,15 @@ describe('EastMoneySource', () => {
     let mockManagerSave: jest.Mock;
     let mockManagerUpsert: jest.Mock;
     let mockManagerFind: jest.Mock;
+    let mockManagerCreateQueryBuilder: jest.Mock;
+    let mockExtensionInsertBuilder: {
+      insert: jest.Mock;
+      into: jest.Mock;
+      values: jest.Mock;
+      orUpdate: jest.Mock;
+      updateEntity: jest.Mock;
+      execute: jest.Mock;
+    };
     let ds: { transaction: jest.Mock };
 
     beforeEach(() => {
@@ -305,12 +314,22 @@ describe('EastMoneySource', () => {
         }
         return Promise.resolve([]);
       });
+      mockExtensionInsertBuilder = {
+        insert: jest.fn().mockReturnThis(),
+        into: jest.fn().mockReturnThis(),
+        values: jest.fn().mockReturnThis(),
+        orUpdate: jest.fn().mockReturnThis(),
+        updateEntity: jest.fn().mockReturnThis(),
+        execute: jest.fn().mockResolvedValue(undefined),
+      };
+      mockManagerCreateQueryBuilder = jest.fn(() => mockExtensionInsertBuilder);
       mockTransaction = jest.fn((cb) =>
         cb({
           create: mockManagerCreate,
           save: mockManagerSave,
           upsert: mockManagerUpsert,
           find: mockManagerFind,
+          createQueryBuilder: mockManagerCreateQueryBuilder,
         }),
       );
 
@@ -376,8 +395,16 @@ describe('EastMoneySource', () => {
           changePct: 1.2,
         }),
       );
-      expect(mockManagerUpsert).toHaveBeenCalledWith(
+      expect(mockManagerUpsert).not.toHaveBeenCalledWith(
         KExtensionEf,
+        expect.anything(),
+        expect.anything(),
+      );
+      expect(mockManagerCreateQueryBuilder).toHaveBeenCalledTimes(1);
+      expect(mockExtensionInsertBuilder.into).toHaveBeenCalledWith(
+        KExtensionEf,
+      );
+      expect(mockExtensionInsertBuilder.values).toHaveBeenCalledWith(
         expect.arrayContaining([
           expect.objectContaining({
             kId: 1,
@@ -385,8 +412,26 @@ describe('EastMoneySource', () => {
             changePct: 1.2,
           }),
         ]),
-        expect.objectContaining({ conflictPaths: ['kId'] }),
       );
+      expect(mockExtensionInsertBuilder.orUpdate).toHaveBeenCalledWith(
+        [
+          'fullCode',
+          'amplitude',
+          'changePct',
+          'changeAmt',
+          'turnoverRate',
+          'volumeCount',
+          'innerVolume',
+          'outerVolume',
+          'prevClose',
+          'prevOpen',
+        ],
+        ['k_id'],
+      );
+      expect(mockExtensionInsertBuilder.updateEntity).toHaveBeenCalledWith(
+        false,
+      );
+      expect(mockExtensionInsertBuilder.execute).toHaveBeenCalledTimes(1);
     });
 
     it('should be a no-op for empty data', async () => {
