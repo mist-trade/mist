@@ -278,15 +278,40 @@ describe('EastMoneySource', () => {
     let mockTransaction: jest.Mock;
     let mockManagerCreate: jest.Mock;
     let mockManagerSave: jest.Mock;
+    let mockManagerUpsert: jest.Mock;
+    let mockManagerFind: jest.Mock;
     let ds: { transaction: jest.Mock };
 
     beforeEach(() => {
+      let savedKRows: Array<Record<string, unknown>> = [];
       mockManagerCreate = jest.fn((_, data) => data);
       mockManagerSave = jest
         .fn()
         .mockImplementation((_, entities) => Promise.resolve(entities));
+      mockManagerUpsert = jest.fn((entity, entities) => {
+        if (entity === K) {
+          savedKRows = entities.map(
+            (item: Record<string, unknown>, index: number) => ({
+              ...item,
+              id: index + 1,
+            }),
+          );
+        }
+        return Promise.resolve(undefined);
+      });
+      mockManagerFind = jest.fn((entity) => {
+        if (entity === K) {
+          return Promise.resolve(savedKRows);
+        }
+        return Promise.resolve([]);
+      });
       mockTransaction = jest.fn((cb) =>
-        cb({ create: mockManagerCreate, save: mockManagerSave }),
+        cb({
+          create: mockManagerCreate,
+          save: mockManagerSave,
+          upsert: mockManagerUpsert,
+          find: mockManagerFind,
+        }),
       );
 
       // Re-configure the TypeOrmDataSource mock for saveK tests
@@ -296,7 +321,7 @@ describe('EastMoneySource', () => {
       ds.transaction = mockTransaction;
     });
 
-    it('should save base K and extension entities in a transaction', async () => {
+    it('should upsert base K and extension entities in a transaction', async () => {
       const mockData: KData[] = [
         {
           timestamp: new Date('2024-01-01T09:30:00.000Z'),
@@ -330,15 +355,37 @@ describe('EastMoneySource', () => {
           close: 10.8,
         }),
       );
-      // base K saved, then extensions created
-      expect(mockManagerSave).toHaveBeenCalledTimes(2);
+      expect(mockManagerUpsert).toHaveBeenCalledWith(
+        K,
+        expect.arrayContaining([
+          expect.objectContaining({
+            securityId: mockSecurity.id,
+            timestamp: mockData[0].timestamp,
+          }),
+        ]),
+        expect.objectContaining({
+          conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
+        }),
+      );
       // extensions created for item with extensions
       expect(mockManagerCreate).toHaveBeenCalledWith(
         KExtensionEf,
         expect.objectContaining({
+          kId: 1,
           amplitude: 2.5,
           changePct: 1.2,
         }),
+      );
+      expect(mockManagerUpsert).toHaveBeenCalledWith(
+        KExtensionEf,
+        expect.arrayContaining([
+          expect.objectContaining({
+            kId: 1,
+            amplitude: 2.5,
+            changePct: 1.2,
+          }),
+        ]),
+        expect.objectContaining({ conflictPaths: ['kId'] }),
       );
     });
 
@@ -348,6 +395,109 @@ describe('EastMoneySource', () => {
       expect(mockTransaction).not.toHaveBeenCalled();
       expect(mockManagerCreate).not.toHaveBeenCalled();
       expect(mockManagerSave).not.toHaveBeenCalled();
+      expect(mockManagerUpsert).not.toHaveBeenCalled();
+      expect(mockManagerFind).not.toHaveBeenCalled();
+    });
+
+    it('keeps new rows when a requested range overlaps existing East Money rows', async () => {
+      const existingTimestamp = new Date('2026-06-26T00:00:00.000Z');
+      const olderTimestamp = new Date('2026-06-25T00:00:00.000Z');
+      const key = (timestamp: Date) => timestamp.getTime();
+      const mockSecurity = { id: 1, code: '000001' } as Security;
+      let nextId = 20;
+      const storedKs = new Map<number, Record<string, unknown>>([
+        [
+          key(existingTimestamp),
+          {
+            id: 10,
+            security: mockSecurity,
+            source: DataSource.EAST_MONEY,
+            period: Period.DAY,
+            timestamp: existingTimestamp,
+          },
+        ],
+      ]);
+      const manager = {
+        create: jest.fn((_, data) => data),
+        save: jest.fn((entity, entities) => {
+          if (entity === K) {
+            const duplicate = entities.find((item: { timestamp: Date }) =>
+              storedKs.has(key(item.timestamp)),
+            );
+            if (duplicate) {
+              const error = new Error('Duplicate entry') as Error & {
+                code: string;
+              };
+              error.code = 'ER_DUP_ENTRY';
+              return Promise.reject(error);
+            }
+          }
+          return Promise.resolve(entities);
+        }),
+        upsert: jest.fn((entity, entities) => {
+          if (entity === K) {
+            for (const item of entities as Array<Record<string, unknown>>) {
+              const timestamp = item.timestamp as Date;
+              const existing = storedKs.get(key(timestamp));
+              storedKs.set(key(timestamp), {
+                ...existing,
+                ...item,
+                id: existing?.id ?? nextId++,
+              });
+            }
+          }
+          return Promise.resolve(undefined);
+        }),
+        find: jest.fn((entity) => {
+          if (entity === K) {
+            return Promise.resolve(Array.from(storedKs.values()));
+          }
+          return Promise.resolve([]);
+        }),
+      };
+      mockTransaction.mockImplementation((cb) => cb(manager));
+
+      await service.saveK(
+        [
+          {
+            timestamp: existingTimestamp,
+            open: 1199,
+            high: 1199,
+            low: 1168.1,
+            close: 1168.63,
+            volume: 5006647,
+            period: Period.DAY,
+          },
+          {
+            timestamp: olderTimestamp,
+            open: 1205,
+            high: 1210,
+            low: 1190,
+            close: 1198,
+            volume: 4200000,
+            period: Period.DAY,
+          },
+        ],
+        mockSecurity,
+        Period.DAY,
+      );
+
+      expect(storedKs.get(key(olderTimestamp))).toEqual(
+        expect.objectContaining({
+          id: 20,
+          close: 1198,
+        }),
+      );
+      expect(manager.upsert).toHaveBeenCalledWith(
+        K,
+        expect.arrayContaining([
+          expect.objectContaining({ timestamp: existingTimestamp }),
+          expect.objectContaining({ timestamp: olderTimestamp }),
+        ]),
+        expect.objectContaining({
+          conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
+        }),
+      );
     });
 
     it('should skip extension creation for daily data (no extensions)', async () => {
@@ -366,13 +516,19 @@ describe('EastMoneySource', () => {
       await service.saveK(mockData, {} as Security, Period.DAY);
 
       expect(mockTransaction).toHaveBeenCalledTimes(1);
-      // base K created and saved, but only once (no extensions)
       expect(mockManagerCreate).toHaveBeenCalledTimes(1);
       expect(mockManagerCreate).toHaveBeenCalledWith(
         K,
         expect.objectContaining({ open: 3000 }),
       );
-      expect(mockManagerSave).toHaveBeenCalledTimes(1);
+      expect(mockManagerUpsert).toHaveBeenCalledTimes(1);
+      expect(mockManagerUpsert).toHaveBeenCalledWith(
+        K,
+        expect.arrayContaining([expect.objectContaining({ open: 3000 })]),
+        expect.objectContaining({
+          conflictPaths: ['securityId', 'source', 'period', 'timestamp'],
+        }),
+      );
     });
   });
 });

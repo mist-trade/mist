@@ -26,6 +26,9 @@ export class KExtensionEf {
   @JoinColumn({ name: 'k_id' })
   k!: K;
 
+  @Column({ name: 'k_id', select: false })
+  kId!: number;
+
   @Column({
     type: 'varchar',
     length: 20,
