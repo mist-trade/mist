@@ -33,36 +33,47 @@ The guard SHALL NOT run during normal Docker deployments of `mysql`, `mist-backe
 - **AND** it does not remove or recreate the `mist-tdx-datasource` WinSW
   service.
 
-### Requirement: Deploy Guard Protects Datasource Update And Restart
+### Requirement: Normal Datasource Management Does Not Run Desktop Cleanup
 
-Deploy Guard SHALL run only as an optional pre-start or pre-update guard for `mist-tdx-datasource` operations that may touch TDX strategy state.
+Normal datasource management SHALL control the `mist-tdx-datasource` WinSW service without invoking AutoHotkey or TDX desktop cleanup.
 
-#### Scenario: Datasource restart triggers strategy cleanup
+#### Scenario: Datasource restart manages only the service
 
-- **GIVEN** `Manage Windows Datasource` is triggered with deploy guarding enabled
-- **AND** the requested action will start or restart `mist-tdx-datasource`
-- **WHEN** `scripts/manage-tdx-datasource.ps1` reaches the guarded phase
-- **THEN** it invokes `tdx-guard/deploy-guard.ps1`
-- **AND** `deploy-guard.ps1` stops `mist-tdx-datasource` if needed
-- **AND** `deploy-guard.ps1` triggers the `MistDeployGuard` scheduled task
-- **AND** datasource management waits for `tdx-guard/state/deploy-result.json`
-  before starting the service.
+- **GIVEN** `Manage Windows Datasource` is triggered for `start`, `restart`, or
+  `stop`
+- **WHEN** `scripts/manage-tdx-datasource.ps1` runs
+- **THEN** it does not invoke `tdx-guard/deploy-guard.ps1`
+- **AND** it does not trigger `MistDeployGuard`
+- **AND** it does not click or automate the TDX desktop.
 
-#### Scenario: Strategy cleanup is uncertain
+#### Scenario: Datasource manager has no deploy guard switches
 
-- **GIVEN** Deploy Guard times out or receives a failed result
-- **WHEN** `deploy-guard.ps1` exits
-- **THEN** it exits non-zero
-- **AND** datasource management stops before restarting `mist-tdx-datasource`
-- **AND** a guard event is sent when notification is configured.
+- **GIVEN** an operator opens the `Manage Windows Datasource` workflow
+- **WHEN** the workflow inputs are displayed
+- **THEN** no deploy guard toggle or guard timeout input is offered
+- **AND** `scripts/manage-tdx-datasource.ps1` exposes no `-RunDeployGuard`,
+  `-GuardRoot`, or `-GuardTimeoutSeconds` parameters.
 
-#### Scenario: Emergency datasource operation bypasses guard
+### Requirement: Explicit TDX Recovery Handles Stale Strategy And Login State
 
-- **GIVEN** an operator needs to manage the datasource service urgently
-- **WHEN** guard is disabled for `Manage Windows Datasource` or the local
-  management script
-- **THEN** the script can still run `status`, `start`, `restart`, or `stop`
-  without invoking AutoHotkey.
+TDX desktop recovery SHALL be a separate operator action from normal datasource management.
+
+#### Scenario: Operator triggers TDX recovery
+
+- **GIVEN** TDX is logged out, stuck, or suspected to have duplicate or stale
+  `mist_datasource.py` strategy state
+- **WHEN** the operator triggers `Recover Windows TDX Datasource`
+- **THEN** the workflow invokes `tdx-guard/restart-login-register.ps1`
+- **AND** the recovery flow stops existing `TdxW.exe`
+- **AND** it starts TDX, triggers the calibrated login task, restarts
+  `mist-tdx-datasource`, and runs datasource smoke checks.
+
+#### Scenario: Recovery stays explicit
+
+- **GIVEN** ordinary Docker deployment or datasource management is triggered
+- **WHEN** those workflows run
+- **THEN** they do not run `restart-login-register.ps1`
+- **AND** they do not kill the TDX desktop terminal.
 
 ### Requirement: Deploy Guard Uses Interactive Desktop Automation
 
@@ -70,12 +81,12 @@ Deploy Guard SHALL use a Windows Scheduled Task running in the logged-in user se
 
 #### Scenario: Runner requests interactive cleanup
 
-- **GIVEN** a GitHub runner service starts datasource management
+- **GIVEN** an operator intentionally runs `tdx-guard/deploy-guard.ps1`
 - **WHEN** Deploy Guard needs to click TDX
 - **THEN** PowerShell triggers the `MistDeployGuard` scheduled task
 - **AND** the scheduled task is configured to run only when the desktop user is
   logged on
-- **AND** AutoHotkey writes a structured result file for the runner-side script.
+- **AND** AutoHotkey writes a structured result file for the PowerShell script.
 
 ### Requirement: Runtime Guard Monitors TDX Session Health
 

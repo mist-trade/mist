@@ -35,8 +35,11 @@ Docker image and not by the reusable `mist-datasource` adapter code.
 - Reframe `tdx-guard` as a private TDX + datasource operations toolkit under
   `mist-deploy`.
 - Keep ordinary Docker stack deployments independent from guard automation.
-- Integrate Deploy Guard with datasource management flows, especially
-  `Manage Windows Datasource` and `scripts/manage-tdx-datasource.ps1`.
+- Keep normal datasource management flows focused on WinSW service
+  status/start/restart/stop, without triggering desktop cleanup.
+- Add an explicit `Recover Windows TDX Datasource` operator entrypoint for TDX
+  logout, stuck initialization, duplicate strategy, and stale
+  `mist_datasource.py` recovery.
 - Use PowerShell for orchestration, WinSW service control, health checks, result
   files, notifications, and GitHub runner integration.
 - Use AutoHotkey v2 only for interactive desktop actions against TDX.
@@ -65,8 +68,10 @@ The Windows API machine gains a private operations layer:
 
 ```text
 mist-deploy/tdx-guard/
-    deploy-guard.ps1       # one-shot datasource pre-start/pre-update cleanup
+    deploy-guard.ps1       # manual/experimental strategy cleanup helper
     runtime-guard.ps1      # scheduled runtime TDX/session monitor
+    restart-login-register.ps1
+                           # explicit operator recovery flow
     install-tasks.ps1      # registers interactive scheduled tasks
     guard-common.ps1
     config.example.json
@@ -78,9 +83,11 @@ mist-deploy/tdx-guard/
 ```
 
 Normal Docker deploys continue through `Deploy Windows Mist Stack` without
-touching TDX GUI state. Datasource management can optionally stop
-`mist-tdx-datasource`, run Deploy Guard to clear stale TDX strategy state, then
-restart or update the WinSW service.
+touching TDX GUI state. Normal datasource management continues through `Manage
+Windows Datasource` without desktop cleanup. When TDX must be recovered, the
+operator uses `Recover Windows TDX Datasource`, which stops TDX, runs the
+calibrated login task, restarts `mist-tdx-datasource`, and verifies the
+datasource smoke path.
 
 Runtime Guard can detect TDX session loss, notify the operator, optionally run a
 conservative login automation path, and restart `mist-tdx-datasource` only after
