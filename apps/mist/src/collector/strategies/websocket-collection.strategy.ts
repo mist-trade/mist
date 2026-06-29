@@ -162,6 +162,25 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
     }
   }
 
+  async unsubscribeForSecurity(security: Security): Promise<number> {
+    if (this.source === DataSource.TDX && this.tdxWsService) {
+      const formatCode = this.getFormatCode(security);
+      this.tdxWsService.unsubscribe(formatCode);
+      this.subscriptions.delete(formatCode);
+
+      this.logger.log(
+        `Unsubscribed TDX WebSocket for ${security.code} (${formatCode})`,
+      );
+
+      return 1;
+    }
+
+    this.logger.warn(
+      `WebSocket unsubscribe for ${this.source} is not yet implemented. Security ${security.code} may remain subscribed.`,
+    );
+    return 0;
+  }
+
   async collectForSecurity(
     security: Security,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
