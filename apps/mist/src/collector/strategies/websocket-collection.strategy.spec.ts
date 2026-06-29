@@ -200,4 +200,22 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
     expect(tdxWsService.subscribe).toHaveBeenCalledWith('600519.SH');
     expect(tdxWsService.unsubscribe).toHaveBeenCalledWith('600519.SH');
   });
+
+  it('can unsubscribe one test streaming security without stopping the strategy', async () => {
+    const { strategy, tdxWsService } = createHarness(createSecurity());
+    const security = {
+      ...createSecurity('600519'),
+      sourceConfigs: [
+        {
+          source: DataSource.TDX,
+          enabled: true,
+          formatCode: '600519.SH',
+        },
+      ],
+    } as Security;
+
+    await expect(strategy.unsubscribeForSecurity(security)).resolves.toBe(1);
+
+    expect(tdxWsService.unsubscribe).toHaveBeenCalledWith('600519.SH');
+  });
 });
