@@ -117,27 +117,20 @@ a lightweight real TDX SDK call.
 
 ## Deploy Guard
 
-Deploy Guard is a one-shot datasource pre-start/pre-update workflow. It is not
-part of ordinary Docker app deployment.
+Deploy Guard is a manual/experimental strategy cleanup helper. It is not part
+of ordinary Docker app deployment, and it is not wired into normal datasource
+management.
 
 ```text
-Manage Windows Datasource workflow
+manual operator
     |
-    +-- scripts/manage-tdx-datasource.ps1
+    +-- tdx-guard/deploy-guard.ps1
           |
-          +-- optional: stop mist-tdx-datasource
-          +-- optional: run tdx-guard/deploy-guard.ps1
-          |     |
-          |     +-- stop mist-tdx-datasource if still running
-          |     +-- stop leftover datasource process on port 9001
-          |     +-- trigger MistDeployGuard scheduled task
-          |     +-- wait for state/deploy-result.json
-          |     +-- fail fast on timeout or TDX cleanup error
-          |
-          +-- update datasource checkout or copied source
-          +-- ensure TDX_SDK_PATH and mist_datasource.py identity
-          +-- start or restart mist-tdx-datasource
-          +-- health check datasource
+          +-- stop mist-tdx-datasource if still running
+          +-- stop leftover datasource process on port 9001
+          +-- trigger MistDeployGuard scheduled task
+          +-- wait for state/deploy-result.json
+          +-- fail fast on timeout or TDX cleanup error
 ```
 
 `deploy-guard.ps1` responsibilities:
@@ -158,8 +151,33 @@ Manage Windows Datasource workflow
 - Capture a screenshot on failure.
 
 Deploy Guard should not attempt to log in to TDX. If TDX is not open or not
-logged in, it should fail and notify the operator. Login recovery belongs to
-Runtime Guard.
+logged in, it should fail and notify the operator. It remains available as a
+calibrated prototype, but the supported operator recovery entrypoint is
+`Recover Windows TDX Datasource`.
+
+## Explicit TDX Recovery
+
+`Recover Windows TDX Datasource` is the GitHub Actions entrypoint for phone-side
+operator recovery when TDX must be restarted or the old `mist_datasource.py`
+strategy state is suspected to be blocking registration.
+
+```text
+Recover Windows TDX Datasource workflow
+    |
+    +-- tdx-guard/restart-login-register.ps1
+          |
+          +-- stop existing TdxW.exe
+          +-- start TDX desktop terminal
+          +-- trigger MistRuntimeLogin scheduled task
+          +-- wait for TDX/TQ initialization
+          +-- scripts/manage-tdx-datasource.ps1 -Action restart
+          +-- scripts/winsw/test-tdx-datasource.ps1 smoke check
+```
+
+This flow is intentionally separate from `Manage Windows Datasource`. Normal
+service management should remain reversible and low-risk. TDX recovery is a
+deliberate operator action because it kills the desktop terminal and relies on
+logged-in-session GUI automation.
 
 ## Runtime Guard
 
@@ -240,8 +258,8 @@ AstrBot, NapCat, QQ, logs, or another notification channel.
 
 Deploy Guard:
 
-- Fail closed for datasource update/start flows. If strategy cleanup is
-  uncertain, stop the datasource operation.
+- Fail closed for the manual cleanup run. If strategy cleanup is uncertain,
+  report failure rather than continuing silently.
 - Write `state/deploy-result.json` for every terminal outcome.
 - Include screenshot/log paths in failure results.
 - Do not block ordinary Docker stack deployments.
@@ -262,17 +280,20 @@ Local script tests:
 - Parse all PowerShell scripts with the PowerShell AST parser.
 - Unit-test config loading, result writing, notification payloads, timeout
   handling, and cooldown decisions.
-- Test `manage-tdx-datasource.ps1` passes guard switches explicitly and keeps
-  the emergency no-guard path.
+- Test `manage-tdx-datasource.ps1` does not invoke Deploy Guard and keeps
+  ordinary service management independent from GUI automation.
 - Test `Deploy Windows Mist Stack` does not call `tdx-guard`.
-- Test `Manage Windows Datasource` exposes datasource guard inputs.
+- Test `Manage Windows Datasource` does not expose datasource guard inputs.
+- Test `Recover Windows TDX Datasource` calls `restart-login-register.ps1` and
+  does not call `deploy-guard.ps1`.
 
 Windows manual verification:
 
 - Register scheduled tasks.
 - Run Deploy Guard with TDX open and strategy present.
 - Run Deploy Guard with TDX closed and confirm failure notification.
-- Run datasource update with guard disabled and enabled.
+- Run datasource start/restart/stop from `Manage Windows Datasource`.
+- Run `Recover Windows TDX Datasource` during a controlled TDX recovery.
 - Run Runtime Guard with `mist-tdx-datasource` healthy.
 - Simulate TDX logout and confirm notification or conservative auto-login.
 - Confirm no GUI automation runs from the service runner session.

@@ -46,7 +46,7 @@
 - [x] 4.5 Add tests that generated scheduled task commands use explicit paths
       and do not require PowerShell Core.
 
-## 5. Implement Deploy Guard for datasource operations
+## 5. Keep Deploy Guard as a manual cleanup prototype
 
 - [x] 5.1 Add `tdx-guard/deploy-guard.ps1`.
 - [x] 5.2 Stop `mist-tdx-datasource` before GUI cleanup.
@@ -68,16 +68,17 @@
 - [x] 6.7 Capture a screenshot on failure.
 - [ ] 6.8 Verify manually on the Windows API machine.
 
-## 7. Integrate guard with datasource management, not Docker deployment
+## 7. Separate normal datasource management from explicit TDX recovery
 
-- [x] 7.1 Add optional guard inputs to `Manage Windows Datasource`, defaulting
-      disabled until manual verification.
-- [x] 7.2 Add matching switches to `scripts/manage-tdx-datasource.ps1`, such as
-      `-RunDeployGuard`, `-GuardRoot`, and `-GuardTimeoutSeconds`.
-- [x] 7.3 Run Deploy Guard only for datasource `start` or `restart` paths that
-      will touch TDX strategy state.
-- [x] 7.4 Preserve emergency datasource operations without guard.
-- [x] 7.5 Update workflow/script tests to assert explicit guard parameters.
+- [x] 7.1 Keep `Manage Windows Datasource` focused on ordinary
+      `status`/`start`/`restart`/`stop` service management.
+- [x] 7.2 Remove Deploy Guard switches from `scripts/manage-tdx-datasource.ps1`
+      and the `Manage Windows Datasource` workflow.
+- [x] 7.3 Keep TDX desktop restart/login/register behind the explicit
+      `Recover Windows TDX Datasource` workflow.
+- [x] 7.4 Preserve emergency datasource operations without GUI automation.
+- [x] 7.5 Update workflow/script tests to assert the normal management path does
+      not expose deploy guard parameters.
 - [x] 7.6 Add a test that `Deploy Windows Mist Stack` does not call
       `tdx-guard`.
 
@@ -126,8 +127,8 @@
 - [x] 11.5 Document how to disable Runtime Guard.
 - [x] 11.6 Document how to inspect logs, result files, and screenshots.
 - [x] 11.7 Document when to use guard:
-      datasource update/start/restart problems, TDX login/session problems, and
-      stale `mist_datasource.py` strategy cleanup.
+      ordinary datasource service management, explicit TDX recovery, TDX
+      login/session problems, and stale `mist_datasource.py` strategy cleanup.
 
 ## 12. Validation
 
