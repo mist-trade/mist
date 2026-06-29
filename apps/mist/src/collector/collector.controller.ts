@@ -8,7 +8,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
-import { DataSource } from '@app/shared-data';
+import { DataSource, Security } from '@app/shared-data';
 import { CollectDto } from './dto/collect.dto';
 import { TdxStreamingTestSubscribeDto } from './dto/tdx-streaming-test-subscribe.dto';
 import { CollectionStrategyRegistry } from './strategies/collection-strategy.registry';
@@ -84,10 +84,10 @@ export class CollectorController {
   ): Promise<{ code: string; period: number; count: number; testOnly: true }> {
     this.assertTestOnly(dto);
     const security = await this.securityService.findSecurityByCode(dto.code);
-    await this.assertEnabledTdxSource(dto.code);
+    const securityWithSources = await this.attachEnabledTdxSources(security);
 
     const count = await this.tdxStreamingStrategy.collectForSecurity(
-      security,
+      securityWithSources,
       dto.period,
     );
 
@@ -107,10 +107,12 @@ export class CollectorController {
   ): Promise<{ code: string; period: number; count: number; testOnly: true }> {
     this.assertTestOnly(dto);
     const security = await this.securityService.findSecurityByCode(dto.code);
-    await this.assertEnabledTdxSource(dto.code);
+    const securityWithSources = await this.attachEnabledTdxSources(security);
 
     const count =
-      await this.tdxStreamingStrategy.unsubscribeForSecurity(security);
+      await this.tdxStreamingStrategy.unsubscribeForSecurity(
+        securityWithSources,
+      );
 
     return {
       code: dto.code,
@@ -120,17 +122,26 @@ export class CollectorController {
     };
   }
 
-  private async assertEnabledTdxSource(code: string): Promise<void> {
+  private async attachEnabledTdxSources(security: Security): Promise<Security> {
+    const sourceConfigs = await this.assertEnabledTdxSource(security.code);
+    return { ...security, sourceConfigs } as Security;
+  }
+
+  private async assertEnabledTdxSource(
+    code: string,
+  ): Promise<Awaited<ReturnType<SecurityService['getSecuritySources']>>> {
     const sourceConfigs = await this.securityService.getSecuritySources(code);
-    const hasTdxSource = sourceConfigs.some(
+    const tdxSourceConfigs = sourceConfigs.filter(
       (config) => config.source === DataSource.TDX && config.enabled,
     );
 
-    if (!hasTdxSource) {
+    if (tdxSourceConfigs.length === 0) {
       throw new BadRequestException(
         `No enabled TDX data source configured for security: ${code}`,
       );
     }
+
+    return tdxSourceConfigs;
   }
 
   private assertTestOnly(dto: TdxStreamingTestSubscribeDto): void {

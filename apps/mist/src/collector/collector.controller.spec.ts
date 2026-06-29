@@ -51,7 +51,16 @@ describe('CollectorController test-only TDX streaming endpoint', () => {
     expect(securityService.findSecurityByCode).toHaveBeenCalledWith('600030');
     expect(securityService.getSecuritySources).toHaveBeenCalledWith('600030');
     expect(tdxStreamingStrategy.collectForSecurity).toHaveBeenCalledWith(
-      security,
+      expect.objectContaining({
+        ...security,
+        sourceConfigs: [
+          expect.objectContaining({
+            source: DataSource.TDX,
+            enabled: true,
+            formatCode: '600030.SH',
+          }),
+        ],
+      }),
       Period.ONE_MIN,
     );
   });
@@ -106,7 +115,16 @@ describe('CollectorController test-only TDX streaming endpoint', () => {
     });
 
     expect(tdxStreamingStrategy.unsubscribeForSecurity).toHaveBeenCalledWith(
-      security,
+      expect.objectContaining({
+        ...security,
+        sourceConfigs: [
+          expect.objectContaining({
+            source: DataSource.TDX,
+            enabled: true,
+            formatCode: '600030.SH',
+          }),
+        ],
+      }),
     );
   });
 });
