@@ -4,7 +4,6 @@
 Define the NapCat-AstrBot integration path that uses `mist-skills` to call the
 Mist backend for pull-based market data, technical indicator, and Chan Theory
 queries.
-
 ## Requirements
 ### Requirement: AstrBot shall use mist-skills as the Mist integration layer
 The system SHALL integrate the deployed NapCat-AstrBot runtime with Mist through
@@ -64,3 +63,22 @@ The initial integration SHALL NOT require proactive alert push.
 - **GIVEN** a future Mist scheduler detects a market signal
 - **WHEN** the first NapCat-AstrBot integration is delivered
 - **THEN** no proactive QQ message delivery SHALL be required by this change
+
+### Requirement: Saya shall not be a supported AstrBot integration path
+
+The system SHALL expose Mist to AstrBot through `mist-skills` and SHALL NOT
+require or advertise Saya as a runtime, fallback, or setup dependency for QQ
+market-analysis requests.
+
+#### Scenario: User prepares AstrBot integration
+
+- **WHEN** a user follows current AstrBot integration docs
+- **THEN** the docs SHALL configure `mist-skills` with `MIST_API_BASE_URL`
+- **AND** the docs SHALL NOT instruct the user to start or configure Saya
+
+#### Scenario: Repository entrypoints are inspected
+
+- **WHEN** a user inspects current runnable app scripts and Nest project entries
+- **THEN** Saya SHALL NOT appear as a supported runnable application
+- **AND** supported app entries SHALL remain available for Mist REST services and
+  current integration surfaces
