@@ -52,10 +52,9 @@ The cleanup process SHALL verify each tracked removal with repository-appropriat
 - **THEN** frontend import search and targeted Jest, lint, or TypeScript checks run successfully or the skipped verification is explicitly reported
 
 #### Scenario: Deployment assumptions change
-- **WHEN** Windows appliance or deployment runner scripts are changed
+- **WHEN** Windows Docker deployment or datasource runner scripts are changed
 - **THEN** the related PowerShell script tests run successfully or the skipped verification is explicitly reported
 
 #### Scenario: Deep integration harness is changed or removed
 - **WHEN** `test-integration/deep-test` scripts, configs, or docs are changed
 - **THEN** the cleanup plan either verifies the modernized deep-test command against the current datasource contract or removes the package scripts and docs together with the retired harness
-

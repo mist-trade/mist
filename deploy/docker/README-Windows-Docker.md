@@ -1,7 +1,6 @@
 # Mist Windows Docker Deployment
 
-This is the production deployment shape for the Windows API machine after
-`run-mist-mysql-in-docker`.
+This is the production deployment shape for the Windows API machine.
 
 ## Topology
 
@@ -71,6 +70,12 @@ Database migrations are bundled with the Mist image and run explicitly through:
 node tools/run-migrations.mjs
 ```
 
+Migration SQL files are bundled from:
+
+```text
+deploy/database/migrations
+```
+
 Production deployments must not rely on TypeORM `synchronize`; `apps/mist`
 already disables synchronize when `NODE_ENV=production`.
 
@@ -84,7 +89,8 @@ TDX_BASE_URL=http://host.docker.internal:9001
 ```
 
 If container-to-host health checks fail, first verify the datasource bind
-address and Windows firewall. Do not add a datasource container in this change.
+address and Windows firewall. Do not add a datasource container to the
+production stack.
 
 ## Deployment Owner
 
@@ -100,7 +106,7 @@ Normal production deployment is:
 The GitHub Actions workflow is:
 
 ```text
-Deploy Windows Docker Appliance
+Deploy Windows Mist Stack
 ```
 
 Use a release tag or commit SHA for production. Use `latest` only for an

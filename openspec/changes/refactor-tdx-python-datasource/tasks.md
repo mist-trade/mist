@@ -1,9 +1,9 @@
 # Tasks: Refactor TDX Python datasource
 
-Status note (2026-06-27): Windows appliance deployment is green for portable
-MySQL, restored state, WinSW `MistBackend`, WinSW `mist-tdx-datasource`, and
-manual `health-check.ps1 -IncludeMySQL`. This is not yet full live market-data
-smoke for raw calls, normalized bars, or WebSocket bar delivery.
+Status note (2026-06-29): the current Windows API deployment baseline is Docker
+for MySQL, `mist-backend`, and `chan-api`, plus host WinSW
+`mist-tdx-datasource`. This is not yet full live market-data smoke for raw
+calls, normalized bars, or WebSocket bar delivery.
 
 ## 1. Confirm Integration Boundaries
 
@@ -123,7 +123,7 @@ smoke for raw calls, normalized bars, or WebSocket bar delivery.
       paths without bundling proprietary files.
 - [x] 8.5 Add migration documentation from legacy NSSM `MistTDX` to WinSW
       `mist-tdx-datasource`.
-- [x] 8.6 Update Windows appliance docs for service name, health URL, logs,
+- [x] 8.6 Update Windows host datasource docs for service name, health URL, logs,
       backend `TDX_BASE_URL`, rollback, and troubleshooting.
 - [ ] 8.7 Extend Windows smoke-test coverage beyond health/service checks to raw
       call, normalized bars, WebSocket subscription sync, bar event delivery,

@@ -37,10 +37,11 @@ Run focused backend tests with Watchman disabled:
 env JEST_HASTE_MAP_FORCE_NODE_FS=1 pnpm exec jest apps/mist/src/sources/tdx/tdx-source.service.spec.ts apps/mist/src/sources/tdx/tdx-websocket.service.spec.ts apps/mist/src/collector/strategies/websocket-collection.strategy.spec.ts apps/mist/src/sources/tdx/tdx-raw-endpoint.guard.spec.ts --runInBand --watchman=false
 ```
 
-On Windows, start MySQL, the Python datasource, and MistBackend with matching
-`TDX_BASE_URL`, then run:
+On Windows, run the deployment-side hybrid health check from `mist-deploy`:
 
 ```powershell
-.\deploy\windows\health-check.ps1
-.\deploy\windows\health-check.ps1 -TdxTestSymbol 600519.SH
+.\scripts\health-check-docker-appliance.ps1
 ```
+
+That check verifies Docker `mysql`, `mist-backend`, and `chan-api`, then probes
+the host datasource and the container-to-host datasource path.
