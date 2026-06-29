@@ -157,24 +157,19 @@ fallback.
   and details without dropping the desired subscription set
 
 ### Requirement: Deployment health verifies backend-datasource connection
-The Windows deployment health check SHALL verify the datasource URL configured
-for backend and SHALL include at least one normalized datasource API probe.
+The Windows Docker deployment health check SHALL verify the datasource URL used
+by backend containers from both the Windows host and the backend container.
 
-#### Scenario: Health check resolves backend datasource URL
-- **WHEN** `deploy/windows/health-check.ps1` runs
-- **THEN** it resolves `TDX_BASE_URL` from the backend env file before probing
-  datasource health
+#### Scenario: Health check probes the container datasource URL
+- **WHEN** the Windows Docker health check runs
+- **THEN** it verifies datasource health from the host
+- **AND** it verifies datasource health from the `mist-backend` container
+  through `http://host.docker.internal:9001/health`
 
 #### Scenario: Datasource health is checked
 - **WHEN** the health check probes the configured datasource
 - **THEN** it verifies `GET /health` and reports whether the datasource service
   is reachable
-
-#### Scenario: Normalized API is checked
-- **WHEN** the health check runs with a configured test TDX symbol and TDX is
-  available
-- **THEN** it verifies a normalized datasource API such as `GET /providers` or
-  `POST /v1/bars/query`
 
 #### Scenario: Backend health remains checked
 - **WHEN** the deployment health check runs
@@ -197,8 +192,8 @@ deployment script URL resolution.
 
 #### Scenario: Deployment script tests cover configured URL
 - **WHEN** deployment script tests run
-- **THEN** they verify the Windows health check uses the backend-configured
-  `TDX_BASE_URL` instead of a hardcoded datasource URL
+- **THEN** they verify the Windows Docker health check covers both host
+  datasource health and container-to-host datasource health
 
 ### Requirement: Integration documentation
 The project SHALL document how the backend client connects to the datasource
@@ -215,4 +210,3 @@ and how to verify that connection locally and on Windows.
 - **WHEN** an operator deploys backend and datasource on Windows
 - **THEN** the docs show the startup order, health checks, normalized API probe,
   expected success output, and rollback path
-

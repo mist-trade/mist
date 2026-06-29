@@ -168,7 +168,7 @@ Use a WinSW service named `mist-tdx-datasource` for the new TDX datasource.
 WinSW owns lifecycle, restart policy, and log rolling. Python owns health,
 provider status, and collection behavior.
 
-The current appliance defaults can keep port `9001` for compatibility during
+The current Windows API machine defaults can keep port `9001` for compatibility during
 migration, but the new service must support explicit `DATASOURCE_HOST` and
 `DATASOURCE_PORT` configuration. If ops wants the design-doc default `18709`,
 that should be set through environment and the backend `TDX_BASE_URL`.
@@ -179,16 +179,15 @@ restart policy lives in the wrapper.
 
 ## Resolved Deployment Decisions
 
-- Keep `9001` as the Windows appliance migration default for the TDX
+- Keep `9001` as the Windows API machine default for the TDX
   datasource. The service remains configurable through `DATASOURCE_HOST`,
-  `DATASOURCE_PORT`, and backend `TDX_BASE_URL`; `18709` is not the appliance
+  `DATASOURCE_PORT`, and backend `TDX_BASE_URL`; `18709` is not the deployment
   default.
-- Install `mist-tdx-datasource` and `MistBackend` through WinSW. Stop and
-  delete legacy `MistTDX` and `MistQMT` service registrations during deployment
-  cleanup, but do not install QMT as an appliance service yet.
-- Automated deployment may set `SkipDatasourceTest=true` to avoid creating
-  temporary TDX strategy registrations. Manual smoke can run later with
-  `health-check.ps1 -IncludeMySQL` on the Windows API machine.
+- Keep `mist-tdx-datasource` as the WinSW host service. `MistBackend` now runs
+  in Docker as `mist-backend`; do not reinstall it as a Windows service.
+- Automated Docker deployment checks datasource health but does not change TDX
+  strategy subscriptions. Manual smoke can run later through the datasource
+  runtime smoke wrapper on the Windows API machine.
 
 ## Risks / Trade-offs
 
@@ -210,9 +209,9 @@ restart policy lives in the wrapper.
   instead of letting memory grow unbounded.
 - New `/v1` contract can diverge from current NestJS parsers -> write contract
   tests on both Python response models and NestJS adapter mapping.
-- WinSW migration conflicts with existing NSSM docs and guard scripts -> update
-  deployment docs and make private guard configuration refer to service names
-  and health URLs rather than NSSM-specific commands.
+- WinSW migration conflicts with existing NSSM docs and guard scripts -> keep
+  deployment docs and private guard configuration tied to service names and
+  health URLs rather than NSSM-specific commands.
 
 ## Migration Plan
 
@@ -229,8 +228,8 @@ restart policy lives in the wrapper.
 6. Update the backend TDX WebSocket consumer to send `sync_subscriptions`,
    ingest normalized bar events, and persist them idempotently instead of
    aggregating raw snapshots in NestJS.
-7. Update Windows appliance docs and service expectations from `MistTDX`/NSSM
-   to the new WinSW service where this TDX datasource path is used.
+7. Update Windows Docker/host datasource docs and service expectations from
+   `MistTDX`/NSSM to the `mist-tdx-datasource` WinSW service.
 
 Rollback strategy: keep the legacy datasource routes available until the backend
 adapter is switched and verified. If the new service fails, point `TDX_BASE_URL`

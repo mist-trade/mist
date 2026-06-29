@@ -2,14 +2,14 @@
 
 ### Requirement: Private TDX Guard Repository Boundary
 
-The TDX desktop guard SHALL live in the private `mist-deploy` repository and SHALL NOT be packaged into the public Windows API appliance artifact.
+The TDX desktop guard SHALL live in the private `mist-deploy` repository and SHALL NOT be packaged into the public Mist backend Docker image.
 
 #### Scenario: Guard files are private operations assets
 
-- **GIVEN** the Windows appliance build runs in `mist`
-- **WHEN** the appliance zip is assembled
+- **GIVEN** the Mist Docker image build runs in `mist`
+- **WHEN** the image is assembled
 - **THEN** `tdx-guard` scripts, AutoHotkey files, local config, logs, state, and
-  screenshots are not included in the appliance zip.
+  screenshots are not included in the image.
 - **AND** `tdx-guard` source files are maintained under `mist-deploy`.
 
 ### Requirement: Deploy Guard Uses Interactive Desktop Automation
@@ -18,7 +18,8 @@ Deploy Guard SHALL use a Windows Scheduled Task running in the logged-in user se
 
 #### Scenario: Deployment triggers strategy cleanup
 
-- **GIVEN** `scripts/deploy-appliance.ps1` has stopped `MistTDX`
+- **GIVEN** the datasource deployment or restart flow is about to touch TDX
+  strategy state
 - **WHEN** TDX deploy guarding is enabled
 - **THEN** the deployment invokes `tdx-guard/deploy-guard.ps1`
 - **AND** `deploy-guard.ps1` triggers the `MistDeployGuard` scheduled task
@@ -29,7 +30,7 @@ Deploy Guard SHALL use a Windows Scheduled Task running in the logged-in user se
 - **GIVEN** Deploy Guard times out or receives a failed result
 - **WHEN** `deploy-guard.ps1` exits
 - **THEN** it exits non-zero
-- **AND** appliance deployment stops before reinstalling datasource services
+- **AND** datasource deployment stops before restarting datasource services
 - **AND** a guard event is sent when notification is configured.
 
 ### Requirement: Runtime Guard Monitors TDX Session Health
