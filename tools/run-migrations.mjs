@@ -2,7 +2,7 @@ import { readdir, readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const DEFAULT_MIGRATION_DIR = 'deploy/windows/database/migrations';
+const DEFAULT_MIGRATION_DIR = 'deploy/database/migrations';
 
 export function loadMigrationConfig(env = process.env) {
   const database = readRequiredEnv(env, 'mysql_server_database');

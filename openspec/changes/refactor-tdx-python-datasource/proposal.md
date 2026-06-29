@@ -54,9 +54,9 @@ change introduces new capability specs instead of delta specs.
 - Mist backend TDX source adapter, WebSocket collection path, environment
   variables, and tests under `apps/mist/src/sources/tdx`,
   `apps/mist/src/collector/strategies`, and `libs/config`.
-- Windows appliance documentation and installer expectations under
-  `deploy/windows`, especially where current docs and scripts still refer to
-  NSSM-managed `MistTDX`.
+- Windows Docker/host datasource deployment documentation and service
+  expectations, especially where current docs and scripts still refer to
+  obsolete appliance or NSSM-managed `MistTDX` paths.
 - Operator workflows for starting TongDaXin, checking datasource health,
   syncing subscriptions from NestJS, verifying real-time bar events, and
   restarting the datasource service.

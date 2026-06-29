@@ -96,7 +96,7 @@ retention.
 - **THEN** WinSW rolls log files and keeps no more than the configured number of
   retained files
 
-### Requirement: Windows appliance documentation
+### Requirement: Windows host datasource documentation
 The Mist Windows deployment documentation SHALL describe the new TDX datasource
 service name, port, health URL, install flow, uninstall flow, logs, and
 rollback path.
