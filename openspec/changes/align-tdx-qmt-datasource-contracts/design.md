@@ -1,7 +1,8 @@
 ## Context
 
-The current green baseline has a working TDX Python datasource behind the Mist
-Windows appliance. It exposes normalized `/v1/bars/query`,
+The current green baseline has a working TDX Python datasource on the Windows
+API machine behind the Docker-managed Mist backend. It exposes normalized
+`/v1/bars/query`,
 `/v1/snapshots/query`, `/v1/sectors/query`, `/v1/raw/tdx/call`, health, and a
 WebSocket bridge. Live verification has proven that TDX native HTTP at
 `http://127.0.0.1:17709/` returns real K-line, snapshot, and sector data when
@@ -10,8 +11,8 @@ TongDaXin is running and logged in.
 The official TdxQuant surface is broader than those endpoints. It includes
 market data, security metadata, sectors, calendars, finance/report data,
 formula execution, subscription functions, client utilities, user sector
-mutation, and trading/account methods. Now that the full appliance path is
-working, Mist should aim for a broad non-trading data adapter instead of only a
+mutation, and trading/account methods. Now that the Docker backend plus host
+datasource path is working, Mist should aim for a broad non-trading data adapter instead of only a
 thin smoke-test surface. The datasource must still define a stable
 provider-neutral contract, classify the official TDX methods by exposure policy,
 and require any future QMT provider to map into the same contract.
