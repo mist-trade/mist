@@ -38,6 +38,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Prepare Docker image tags
+        id: docker_tags
+        shell: bash
+        run: |
+          {
+            echo "tags<<EOF"
+            echo "ghcr.io/${GITHUB_REPOSITORY}:${GITHUB_SHA}"
+            if [ "${GITHUB_REF}" = "refs/heads/master" ]; then
+              echo "ghcr.io/${GITHUB_REPOSITORY}:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push main app
         uses: docker/build-push-action@v5
         with:
@@ -45,12 +58,9 @@ jobs:
           file: ./Dockerfile
           platforms: ${{ matrix.platform.os }}/${{ matrix.platform.arch }}
           push: true
-          tags: |
-            ghcr.io/${{ github.repository }}:latest
-            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          tags: ${{ steps.docker_tags.outputs.tags }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
           labels: |
             org.opencontainers.image.title=Mist Backend
             org.opencontainers.image.description=股票市场分析和预警系统
-
