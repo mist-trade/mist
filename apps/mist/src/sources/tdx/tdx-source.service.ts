@@ -1,7 +1,11 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AxiosInstance } from 'axios';
-import { UtilsService, PeriodMappingService } from '@app/utils';
+import {
+  UtilsService,
+  PeriodMappingService,
+  normalizeSecurityCode,
+} from '@app/utils';
 import {
   DataSource,
   Period,
@@ -60,6 +64,10 @@ function normalizeTdxPeriodFormat(
     return '1h';
   }
   return periodFormat;
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value != null && typeof value === 'object' && !Array.isArray(value);
 }
 
 @Injectable()
@@ -152,12 +160,12 @@ export class TdxSource implements ITdxSourceFetcher {
     }
   }
 
-  async fetchSnapshot(stockCode: string): Promise<TdxSnapshot> {
+  async fetchSnapshot(formatCode: string): Promise<TdxSnapshot> {
     try {
       const response = await this.axios.post<
         TdxEnvelope<TdxSnapshotsResponseData>
       >('/v1/snapshots/query', {
-        symbols: [stockCode],
+        symbols: [formatCode],
       });
       const envelope = response.data;
 
@@ -185,8 +193,12 @@ export class TdxSource implements ITdxSourceFetcher {
         );
       }
 
+      const snapshotFormatCode = snapshot.symbol || formatCode;
+      const raw = isRecord(snapshot.raw) ? snapshot.raw : { ...snapshot };
+
       return {
-        stockCode: snapshot.symbol || stockCode,
+        code: normalizeSecurityCode(snapshotFormatCode),
+        formatCode: snapshotFormatCode,
         now: snapshot.last,
         open: snapshot.open,
         high: snapshot.high,
@@ -195,6 +207,7 @@ export class TdxSource implements ITdxSourceFetcher {
         volume: snapshot.volume,
         amount: snapshot.amount,
         timestamp: snapshot.asOf ? parseISO(snapshot.asOf) : new Date(),
+        raw,
       };
     } catch (error) {
       this.logger.error(`TDX fetchSnapshot error: ${error.message}`);
@@ -209,7 +222,7 @@ export class TdxSource implements ITdxSourceFetcher {
   }
 
   async fetchDividFactors(
-    stockCode: string,
+    formatCode: string,
     startDate: Date,
     endDate: Date,
   ): Promise<
@@ -219,7 +232,7 @@ export class TdxSource implements ITdxSourceFetcher {
       const response = await this.axios.post<
         TdxEnvelope<TdxDividendFactorsResponseData>
       >('/v1/reference/dividend-factors/query', {
-        symbol: stockCode,
+        symbol: formatCode,
         startTime: format(startDate, 'yyyyMMdd'),
         endTime: format(endDate, 'yyyyMMdd'),
       });

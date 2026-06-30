@@ -8,8 +8,11 @@ describe('KCandleAggregator', () => {
     time: string,
     price: number,
     volume: number,
+    code = '600519',
+    formatCode = '600519.SH',
   ): TdxSnapshot => ({
-    stockCode: 'SH600519',
+    code,
+    formatCode,
     now: price,
     open: 1750,
     high: 1760,
@@ -20,6 +23,12 @@ describe('KCandleAggregator', () => {
     timestamp: new Date(
       `2024-01-02T${time}${time.includes(':') && time.split(':').length === 3 ? '' : ':00'}Z`,
     ),
+    raw: {
+      Now: String(price),
+      Volume: String(volume),
+      Amount: String(volume * price),
+      NowVol: '100',
+    },
   });
 
   beforeEach(() => {
@@ -31,21 +40,9 @@ describe('KCandleAggregator', () => {
       const candles: any[] = [];
       aggregator.on('candle', (candle: any) => candles.push(candle));
 
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:30', 1750, 100),
-      );
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:30:30', 1755, 150),
-      );
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:31', 1760, 230),
-      );
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:30', 1750, 100));
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:30:30', 1755, 150));
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:31', 1760, 230));
 
       expect(candles).toHaveLength(1);
       expect(candles[0].volume).toBe(50);
@@ -56,7 +53,7 @@ describe('KCandleAggregator', () => {
     });
 
     it('should open a candle with the first observed snapshot price', () => {
-      aggregator.process('SH600519', Period.ONE_MIN, {
+      aggregator.process(Period.ONE_MIN, {
         ...mockSnapshot('09:30', 1750, 100),
         open: 1700,
       });
@@ -71,27 +68,15 @@ describe('KCandleAggregator', () => {
       aggregator.on('candle', (candle: any) => candles.push(candle));
 
       // 9:30:00 - first tick of first candle
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:30', 1750, 100),
-      );
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:30', 1750, 100));
       expect(candles.length).toBe(0);
 
       // 9:30:30 - still same candle
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:30:30', 1755, 150),
-      );
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:30:30', 1755, 150));
       expect(candles.length).toBe(0);
 
       // 9:31:00 - first tick of next candle, should emit 9:30 candle
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:31', 1760, 230),
-      );
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:31', 1760, 230));
       expect(candles.length).toBe(1);
       expect(candles[0].timestamp).toEqual(new Date('2024-01-02T09:30:00Z'));
       expect(candles[0].open).toBe(1750);
@@ -99,32 +84,17 @@ describe('KCandleAggregator', () => {
       expect(candles[0].low).toBe(1750);
       expect(candles[0].close).toBe(1755);
       expect(candles[0].volume).toBe(50);
+      expect(candles[0]).not.toHaveProperty('raw');
     });
 
     it('should track OHLC correctly across multiple ticks', () => {
       const candles: any[] = [];
       aggregator.on('candle', (candle: any) => candles.push(candle));
 
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:30', 1750, 100),
-      );
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:30:20', 1745, 150),
-      );
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:30:40', 1760, 180),
-      );
-      aggregator.process(
-        'SH600519',
-        Period.ONE_MIN,
-        mockSnapshot('09:31', 1755, 260),
-      );
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:30', 1750, 100));
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:30:20', 1745, 150));
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:30:40', 1760, 180));
+      aggregator.process(Period.ONE_MIN, mockSnapshot('09:31', 1755, 260));
 
       expect(candles.length).toBe(1);
       expect(candles[0].open).toBe(1750);
@@ -141,26 +111,14 @@ describe('KCandleAggregator', () => {
       aggregator.on('candle', (candle: any) => candles.push(candle));
 
       // 9:30-9:35 candle
-      aggregator.process(
-        'SH600519',
-        Period.FIVE_MIN,
-        mockSnapshot('09:30', 1750, 100),
-      );
-      aggregator.process(
-        'SH600519',
-        Period.FIVE_MIN,
-        mockSnapshot('09:35', 1760, 80),
-      );
+      aggregator.process(Period.FIVE_MIN, mockSnapshot('09:30', 1750, 100));
+      aggregator.process(Period.FIVE_MIN, mockSnapshot('09:35', 1760, 80));
 
       expect(candles.length).toBe(1);
       expect(candles[0].timestamp).toEqual(new Date('2024-01-02T09:30:00Z'));
 
       // 9:35-9:40 candle
-      aggregator.process(
-        'SH600519',
-        Period.FIVE_MIN,
-        mockSnapshot('09:40', 1770, 90),
-      );
+      aggregator.process(Period.FIVE_MIN, mockSnapshot('09:40', 1770, 90));
 
       expect(candles.length).toBe(2);
       expect(candles[1].timestamp).toEqual(new Date('2024-01-02T09:35:00Z'));
@@ -173,23 +131,20 @@ describe('KCandleAggregator', () => {
       aggregator.on('candle', (candle: any) => candles.push(candle));
 
       aggregator.process(
-        '600519.SH',
         Period.ONE_MIN,
-        mockSnapshot('09:30', 1750, 100),
+        mockSnapshot('09:30', 1750, 100, '600519.SH'),
       );
       aggregator.process(
-        'SH600519',
         Period.ONE_MIN,
-        mockSnapshot('09:30:30', 1755, 150),
+        mockSnapshot('09:30:30', 1755, 150, 'SH600519'),
       );
       aggregator.process(
-        '600519',
         Period.ONE_MIN,
-        mockSnapshot('09:31', 1760, 230),
+        mockSnapshot('09:31', 1760, 230, '600519'),
       );
 
       expect(candles).toHaveLength(1);
-      expect(candles[0].stockCode).toBe('600519');
+      expect(candles[0].code).toBe('600519');
       expect(candles[0].volume).toBe(50);
       expect(aggregator.getCurrent('600519', Period.ONE_MIN)?.volume).toBe(80);
     });
@@ -201,13 +156,14 @@ describe('KCandleAggregator', () => {
       const mockSh = (time: string) => mockSnapshot(time, 1750, 100);
       const mockSz = (time: string) => ({
         ...mockSnapshot(time, 12.5, 1000),
-        stockCode: 'SZ000001',
+        code: '000001',
+        formatCode: '000001.SZ',
       });
 
-      aggregator.process('SH600519', Period.ONE_MIN, mockSh('09:30'));
-      aggregator.process('SZ000001', Period.ONE_MIN, mockSz('09:30'));
-      aggregator.process('SH600519', Period.ONE_MIN, mockSh('09:31'));
-      aggregator.process('SZ000001', Period.ONE_MIN, mockSz('09:31'));
+      aggregator.process(Period.ONE_MIN, mockSh('09:30'));
+      aggregator.process(Period.ONE_MIN, mockSz('09:30'));
+      aggregator.process(Period.ONE_MIN, mockSh('09:31'));
+      aggregator.process(Period.ONE_MIN, mockSz('09:31'));
 
       expect(candles.length).toBe(2);
     });

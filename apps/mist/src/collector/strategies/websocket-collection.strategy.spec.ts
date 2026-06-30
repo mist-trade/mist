@@ -163,6 +163,7 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
       close: 10.2,
       volume: 1200,
       amount: 12345.6,
+      raw: { NowVol: '1449' },
     };
 
     await emitCandle(candle, '600519.SH', Period.FIVE_MIN);
@@ -174,6 +175,9 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
       DataSource.TDX,
       Period.FIVE_MIN,
     );
+    expect(
+      collectorService.saveRawKData.mock.calls[0][1][0],
+    ).not.toHaveProperty('raw');
   });
 
   it('keeps collectForSecurity subscribe and stop unsubscribe behavior', async () => {

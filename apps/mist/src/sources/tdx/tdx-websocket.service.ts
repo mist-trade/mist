@@ -12,6 +12,7 @@ import { KCandleAggregator, CompletedCandle } from './kcandle-aggregator';
 import { Period } from '@app/shared-data';
 import { TdxExtension, TdxResponse, TdxSnapshot } from './types';
 import { TimezoneService } from '@app/timezone';
+import { normalizeSecurityCode } from '@app/utils';
 
 type SnapshotCallback = (snapshot: TdxSnapshot) => void | Promise<void>;
 export interface TdxRealtimeBar {
@@ -99,13 +100,13 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
     this.candleCallbacks.push(callback);
   }
 
-  subscribe(stockCode: string): void {
-    this.subscriptions.add(stockCode);
+  subscribe(formatCode: string): void {
+    this.subscriptions.add(formatCode);
     this.sendSubscription();
   }
 
-  unsubscribe(stockCode: string): void {
-    this.subscriptions.delete(stockCode);
+  unsubscribe(formatCode: string): void {
+    this.subscriptions.delete(formatCode);
     this.sendSubscription();
   }
 
@@ -223,11 +224,17 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
 
   private parseSnapshot(data: {
     stock_code: string;
-    snapshot: any;
+    snapshot: Record<string, unknown>;
   }): TdxSnapshot {
-    const s = data.snapshot;
+    const formatCode = String(data.stock_code || '').trim();
+    if (!formatCode) {
+      throw new Error('TDX quote stock_code is required');
+    }
+
+    const s = data.snapshot || {};
     return {
-      stockCode: data.stock_code,
+      code: normalizeSecurityCode(formatCode),
+      formatCode,
       now: this.readNumber(s, ['Now', 'now', 'Last', 'last', 'Close', 'close']),
       open: this.readNumber(s, ['Open', 'open']),
       high: this.readNumber(s, ['Max', 'max', 'High', 'high']),
@@ -237,6 +244,7 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       amount: this.readNumber(s, ['Amount', 'amount']),
       timestamp:
         this.readTimestamp(s) || this.timezoneService.getCurrentBeijingTime(),
+      raw: s,
     };
   }
 
@@ -448,7 +456,7 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
 
     for (const period of periods) {
       try {
-        this.aggregator.process(snapshot.stockCode, period, snapshot);
+        this.aggregator.process(period, snapshot);
       } catch (error) {
         this.logger.error(`Aggregator error for ${period}: ${error}`);
       }
@@ -535,7 +543,7 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
 
     for (const callback of this.candleCallbacks) {
       try {
-        const result = callback(tdxResponse, candle.stockCode, candle.period);
+        const result = callback(tdxResponse, candle.code, candle.period);
         void Promise.resolve(result).catch((error) => {
           this.logger.error(`Candle callback error: ${error}`);
         });

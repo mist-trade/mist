@@ -663,6 +663,12 @@ describe('TdxSource', () => {
                 amount: 12345.6,
                 provider: 'tdx',
                 asOf: '2026-06-26T09:31:02+08:00',
+                raw: {
+                  Now: '10.2',
+                  NowVol: '1449',
+                  Buyp: ['10.19', '10.18'],
+                  Sellp: ['10.2', '10.21'],
+                },
               },
             ],
           },
@@ -678,7 +684,8 @@ describe('TdxSource', () => {
       });
       expect(mockAxiosGet).not.toHaveBeenCalled();
       expect(result).toEqual({
-        stockCode: '600519.SH',
+        code: '600519',
+        formatCode: '600519.SH',
         now: 10.2,
         open: 10.1,
         high: 10.3,
@@ -687,7 +694,14 @@ describe('TdxSource', () => {
         volume: 1200,
         amount: 12345.6,
         timestamp: new Date('2026-06-26T09:31:02+08:00'),
+        raw: {
+          Now: '10.2',
+          NowVol: '1449',
+          Buyp: ['10.19', '10.18'],
+          Sellp: ['10.2', '10.21'],
+        },
       });
+      expect(result).not.toHaveProperty('stockCode');
     });
 
     it('throws bad gateway when normalized snapshot is missing lastClose', async () => {

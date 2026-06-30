@@ -55,6 +55,7 @@ export interface TdxNormalizedSnapshot {
   provider: string;
   asOf?: string;
   lastClose: number;
+  raw?: Record<string, unknown>;
 }
 
 export interface TdxBarsResponseData {
@@ -81,7 +82,8 @@ export interface TdxDividendFactorsResponseData {
  * Real-time snapshot mapped from mist-datasource TDX /v1/snapshots/query.
  */
 export interface TdxSnapshot {
-  stockCode: string; // e.g., "SH600519"
+  code: string; // canonical internal code, e.g. "600519"
+  formatCode: string; // provider transport code, e.g. "600519.SH"
   now: number; // current price
   open: number;
   high: number;
@@ -90,6 +92,7 @@ export interface TdxSnapshot {
   volume: number;
   amount: number;
   timestamp: Date;
+  raw: Record<string, unknown>;
 }
 
 /**
