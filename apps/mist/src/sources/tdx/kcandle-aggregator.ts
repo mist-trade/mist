@@ -15,7 +15,7 @@ interface InProgressCandle {
 }
 
 export interface CompletedCandle extends InProgressCandle {
-  stockCode: string;
+  code: string;
   period: Period;
 }
 
@@ -49,22 +49,22 @@ export class KCandleAggregator {
    * Process a snapshot and update aggregation state
    * Emits completed candle when period boundary is crossed
    */
-  process(stockCode: string, period: Period, snapshot: TdxSnapshot): void {
-    const securityCode = normalizeSecurityCode(stockCode);
-    const key = this.makeKey(securityCode, period);
+  process(period: Period, snapshot: TdxSnapshot): void {
+    const code = normalizeSecurityCode(snapshot.code);
+    const key = this.makeKey(code, period);
     const candleTime = this.getCandleTime(snapshot.timestamp, period);
     const deltas = this.calculateDeltas(key, snapshot);
 
     const existing = this.candles.get(key);
 
     // DEBUG
-    // console.log(`[${stockCode}:${period}] snapshot=${snapshot.timestamp.toISOString()}, candleTime=${candleTime.toISOString()}, existing=${existing ? existing.timestamp.toISOString() : 'none'}`);
+    // console.log(`[${code}:${period}] snapshot=${snapshot.timestamp.toISOString()}, candleTime=${candleTime.toISOString()}, existing=${existing ? existing.timestamp.toISOString() : 'none'}`);
 
     // Check if period boundary crossed
     if (existing && existing.timestamp.getTime() !== candleTime.getTime()) {
       // Emit completed candle
       this.emitter.emit('candle', {
-        stockCode: securityCode,
+        code,
         period,
         ...existing,
       } as CompletedCandle);
@@ -100,12 +100,10 @@ export class KCandleAggregator {
   }
 
   /**
-   * Get current in-progress candle for a stock+period (for testing)
+   * Get current in-progress candle for a code+period (for testing)
    */
-  getCurrent(stockCode: string, period: Period): InProgressCandle | undefined {
-    return this.candles.get(
-      this.makeKey(normalizeSecurityCode(stockCode), period),
-    );
+  getCurrent(code: string, period: Period): InProgressCandle | undefined {
+    return this.candles.get(this.makeKey(normalizeSecurityCode(code), period));
   }
 
   /**
@@ -157,8 +155,8 @@ export class KCandleAggregator {
     }
   }
 
-  private makeKey(stockCode: string, period: Period): string {
-    return `${stockCode}:${period}`;
+  private makeKey(code: string, period: Period): string {
+    return `${code}:${period}`;
   }
 
   private calculateDeltas(

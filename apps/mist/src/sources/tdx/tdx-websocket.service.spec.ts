@@ -409,46 +409,63 @@ describe('TdxWebSocketService normalized bridge', () => {
     );
   });
 
-  it('keeps legacy quote snapshots flowing through KCandleAggregator', () => {
+  it('keeps quote snapshots flowing through KCandleAggregator with raw provider fields', () => {
     const { service, aggregator } = createService();
+    const snapshotCallback = jest.fn();
+    service.onSnapshot(snapshotCallback);
 
     handleMessage(service, {
       type: 'quote',
       data: {
         stock_code: '600519.SH',
         snapshot: {
-          Last: 10.2,
+          Now: 10.2,
           Open: 10.1,
-          High: 10.3,
-          Low: 10.0,
+          Max: 10.3,
+          Min: 10.0,
           LastClose: 9.9,
           Volume: 1200,
           Amount: 12345.6,
+          NowVol: '1449',
+          Buyp: ['10.19', '10.18'],
+          Buyv: ['10', '20'],
+          Sellp: ['10.2', '10.21'],
+          Sellv: ['30', '40'],
+          Average: '10.15',
+          Zangsu: '-0.25',
           AsOf: '2026-06-30T10:16:23+08:00',
         },
       },
     });
 
     expect(aggregator.process).toHaveBeenCalledWith(
-      '600519.SH',
       Period.ONE_MIN,
       expect.objectContaining({
-        stockCode: '600519.SH',
+        code: '600519',
+        formatCode: '600519.SH',
         now: 10.2,
         high: 10.3,
         low: 10.0,
         timestamp: new Date('2026-06-30T10:16:23+08:00'),
+        raw: expect.objectContaining({
+          NowVol: '1449',
+          Buyp: ['10.19', '10.18'],
+          Sellp: ['10.2', '10.21'],
+        }),
       }),
     );
+    const snapshot = aggregator.process.mock.calls[0][1];
+    expect(snapshot).not.toHaveProperty('stockCode');
+    expect(snapshotCallback).toHaveBeenCalledWith(snapshot);
   });
 
-  it('emits completed candles with the original symbol for downstream persistence', () => {
+  it('emits completed candles with canonical code for downstream persistence', () => {
     const { service, aggregator } = createService();
     const callback = jest.fn();
     service.onCandleComplete(callback);
 
     aggregator.emitCandle({
-      stockCode: 'SH600519',
+      code: '600519',
       period: Period.ONE_MIN,
       timestamp: new Date('2026-06-26T09:31:00+08:00'),
       open: 10.1,
@@ -464,9 +481,10 @@ describe('TdxWebSocketService normalized bridge', () => {
         close: 10.2,
         timestamp: new Date('2026-06-26T09:31:00+08:00'),
       }),
-      'SH600519',
+      '600519',
       Period.ONE_MIN,
     );
+    expect(callback.mock.calls[0][0]).not.toHaveProperty('raw');
   });
 
   it('logs rejected legacy candle callbacks without unhandled rejections', async () => {
@@ -476,7 +494,7 @@ describe('TdxWebSocketService normalized bridge', () => {
     service.onCandleComplete(jest.fn().mockRejectedValue(new Error('boom')));
 
     aggregator.emitCandle({
-      stockCode: 'SH600519',
+      code: '600519',
       period: Period.ONE_MIN,
       timestamp: new Date('2026-06-26T09:31:00+08:00'),
       open: 10.1,

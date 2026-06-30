@@ -10,13 +10,13 @@ export interface ITdxSourceFetcher extends ISourceFetcher<TdxResponse> {
   /**
    * Fetch real-time snapshot for a single stock
    */
-  fetchSnapshot(stockCode: string): Promise<TdxSnapshot>;
+  fetchSnapshot(formatCode: string): Promise<TdxSnapshot>;
 
   /**
    * Fetch dividend factors for a stock
    */
   fetchDividFactors(
-    stockCode: string,
+    formatCode: string,
     startDate: Date,
     endDate: Date,
   ): Promise<
