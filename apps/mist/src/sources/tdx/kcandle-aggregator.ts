@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { set } from 'date-fns';
 import { Period } from '@app/shared-data';
+import { normalizeSecurityCode } from '@app/utils';
 import { TdxSnapshot } from './types';
 
 interface InProgressCandle {
@@ -49,7 +50,8 @@ export class KCandleAggregator {
    * Emits completed candle when period boundary is crossed
    */
   process(stockCode: string, period: Period, snapshot: TdxSnapshot): void {
-    const key = this.makeKey(stockCode, period);
+    const securityCode = normalizeSecurityCode(stockCode);
+    const key = this.makeKey(securityCode, period);
     const candleTime = this.getCandleTime(snapshot.timestamp, period);
     const deltas = this.calculateDeltas(key, snapshot);
 
@@ -62,7 +64,7 @@ export class KCandleAggregator {
     if (existing && existing.timestamp.getTime() !== candleTime.getTime()) {
       // Emit completed candle
       this.emitter.emit('candle', {
-        stockCode,
+        stockCode: securityCode,
         period,
         ...existing,
       } as CompletedCandle);
@@ -101,7 +103,9 @@ export class KCandleAggregator {
    * Get current in-progress candle for a stock+period (for testing)
    */
   getCurrent(stockCode: string, period: Period): InProgressCandle | undefined {
-    return this.candles.get(this.makeKey(stockCode, period));
+    return this.candles.get(
+      this.makeKey(normalizeSecurityCode(stockCode), period),
+    );
   }
 
   /**

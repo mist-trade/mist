@@ -10,7 +10,11 @@ import {
 import { DataSource } from '@app/shared-data';
 
 export class AddSecuritySourceDto {
-  @ApiProperty({ description: 'Security code (e.g., 000001.SH, 399006.SZ)' })
+  @ApiProperty({
+    description:
+      'Canonical security code. Provider-formatted inputs are normalized.',
+    example: '600519',
+  })
   @IsNotEmpty()
   @IsString()
   code!: string;
@@ -20,7 +24,8 @@ export class AddSecuritySourceDto {
   source!: DataSource;
 
   @ApiProperty({
-    description: 'Data source specific code format',
+    description: 'Provider-specific transport code format',
+    example: '600519.SH',
     required: false,
   })
   @IsOptional()

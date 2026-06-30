@@ -2,6 +2,7 @@ import {
   Column,
   CreateDateColumn,
   Entity,
+  Index,
   JoinColumn,
   ManyToOne,
   PrimaryGeneratedColumn,
@@ -11,6 +12,9 @@ import { Security } from './security.entity';
 import { DataSource } from '../enums/data-source.enum';
 
 @Entity({ name: 'security_source_configs' })
+@Index('uq_security_source_configs_security_source', ['securityId', 'source'], {
+  unique: true,
+})
 export class SecuritySourceConfig {
   @PrimaryGeneratedColumn()
   id!: number;
