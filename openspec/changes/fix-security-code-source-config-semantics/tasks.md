@@ -22,5 +22,5 @@
 
 - [x] 4.1 Run focused security-service, collector, TDX streaming, and utility tests.
 - [x] 4.2 Run TypeScript compile checks.
-- [ ] 4.3 Verify live data after deployment: `GET /security/v1/all`, source config query for `600519`, and one TDX streaming smoke test.
-- [ ] 4.4 Confirm repeated source setup no longer creates extra rows in production.
+- [x] 4.3 Verify live data after deployment: `GET /security/v1/all`, source config query for `600519`, and one TDX streaming smoke test.
+- [x] 4.4 Confirm repeated source setup no longer creates extra rows in production.
