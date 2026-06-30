@@ -235,7 +235,8 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       lastClose: this.readNumber(s, ['LastClose', 'lastClose']),
       volume: this.readNumber(s, ['Volume', 'volume']),
       amount: this.readNumber(s, ['Amount', 'amount']),
-      timestamp: this.timezoneService.getCurrentBeijingTime(),
+      timestamp:
+        this.readTimestamp(s) || this.timezoneService.getCurrentBeijingTime(),
     };
   }
 
@@ -324,6 +325,27 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
         if (Number.isFinite(numeric)) {
           return numeric;
         }
+      }
+    }
+    return undefined;
+  }
+
+  private readTimestamp(source: Record<string, unknown>): Date | undefined {
+    for (const key of [
+      'AsOf',
+      'asOf',
+      'Timestamp',
+      'timestamp',
+      'Time',
+      'time',
+    ]) {
+      const value = source[key];
+      if (value === undefined || value === null || value === '') {
+        continue;
+      }
+      const timestamp = new Date(String(value));
+      if (!Number.isNaN(timestamp.getTime())) {
+        return timestamp;
       }
     }
     return undefined;

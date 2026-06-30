@@ -424,6 +424,7 @@ describe('TdxWebSocketService normalized bridge', () => {
           LastClose: 9.9,
           Volume: 1200,
           Amount: 12345.6,
+          AsOf: '2026-06-30T10:16:23+08:00',
         },
       },
     });
@@ -436,6 +437,7 @@ describe('TdxWebSocketService normalized bridge', () => {
         now: 10.2,
         high: 10.3,
         low: 10.0,
+        timestamp: new Date('2026-06-30T10:16:23+08:00'),
       }),
     );
   });

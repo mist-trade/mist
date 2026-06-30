@@ -55,6 +55,17 @@ describe('KCandleAggregator', () => {
       );
     });
 
+    it('should open a candle with the first observed snapshot price', () => {
+      aggregator.process('SH600519', Period.ONE_MIN, {
+        ...mockSnapshot('09:30', 1750, 100),
+        open: 1700,
+      });
+
+      expect(aggregator.getCurrent('SH600519', Period.ONE_MIN)?.open).toBe(
+        1750,
+      );
+    });
+
     it('should emit completed candle on minute boundary', () => {
       const candles: any[] = [];
       aggregator.on('candle', (candle: any) => candles.push(candle));
