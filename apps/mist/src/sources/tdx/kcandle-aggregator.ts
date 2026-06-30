@@ -18,12 +18,18 @@ export interface CompletedCandle extends InProgressCandle {
   period: Period;
 }
 
+interface LastSnapshotTotals {
+  volume: number;
+  amount: number;
+}
+
 /**
  * Pure logic component for aggregating TDX snapshots into K-line candles
  * Thread-safe (Node.js single-threaded event loop guarantees ordering)
  */
 export class KCandleAggregator {
   private readonly candles = new Map<string, InProgressCandle>();
+  private readonly lastSnapshotTotals = new Map<string, LastSnapshotTotals>();
   private readonly emitter = new EventEmitter();
 
   constructor() {
@@ -45,6 +51,7 @@ export class KCandleAggregator {
   process(stockCode: string, period: Period, snapshot: TdxSnapshot): void {
     const key = this.makeKey(stockCode, period);
     const candleTime = this.getCandleTime(snapshot.timestamp, period);
+    const deltas = this.calculateDeltas(key, snapshot);
 
     const existing = this.candles.get(key);
 
@@ -72,8 +79,8 @@ export class KCandleAggregator {
       candle.high = Math.max(candle.high, snapshot.now);
       candle.low = Math.min(candle.low, snapshot.now);
       candle.close = snapshot.now;
-      candle.volume += snapshot.volume;
-      candle.amount += snapshot.amount;
+      candle.volume += deltas.volume;
+      candle.amount += deltas.amount;
     } else {
       // New period: start fresh candle
       candle = {
@@ -82,8 +89,8 @@ export class KCandleAggregator {
         high: snapshot.now,
         low: snapshot.now,
         close: snapshot.now,
-        volume: snapshot.volume,
-        amount: snapshot.amount,
+        volume: deltas.volume,
+        amount: deltas.amount,
       };
     }
 
@@ -148,5 +155,30 @@ export class KCandleAggregator {
 
   private makeKey(stockCode: string, period: Period): string {
     return `${stockCode}:${period}`;
+  }
+
+  private calculateDeltas(
+    key: string,
+    snapshot: TdxSnapshot,
+  ): LastSnapshotTotals {
+    const previous = this.lastSnapshotTotals.get(key);
+    this.lastSnapshotTotals.set(key, {
+      volume: snapshot.volume,
+      amount: snapshot.amount,
+    });
+
+    if (!previous) {
+      return { volume: 0, amount: 0 };
+    }
+
+    return {
+      volume: this.nonNegativeDelta(snapshot.volume, previous.volume),
+      amount: this.nonNegativeDelta(snapshot.amount, previous.amount),
+    };
+  }
+
+  private nonNegativeDelta(current: number, previous: number): number {
+    const delta = current - previous;
+    return Number.isFinite(delta) && delta >= 0 ? delta : 0;
   }
 }

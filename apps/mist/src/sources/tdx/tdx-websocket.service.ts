@@ -9,7 +9,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { WebSocket } from 'ws';
 import { KCandleAggregator, CompletedCandle } from './kcandle-aggregator';
-import { Period, Security } from '@app/shared-data';
+import { Period } from '@app/shared-data';
 import { TdxExtension, TdxResponse, TdxSnapshot } from './types';
 import { TimezoneService } from '@app/timezone';
 
@@ -30,7 +30,7 @@ export interface TdxRealtimeBar {
 type BarCallback = (bar: TdxRealtimeBar) => void | Promise<void>;
 type CandleCompleteCallback = (
   candle: TdxResponse,
-  security: Security,
+  symbol: string,
   period: Period,
 ) => void | Promise<void>;
 
@@ -511,18 +511,9 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       amount: candle.amount,
     };
 
-    // Find security for this stock code (simplified - in production, cache this)
-    const security: Partial<Security> = {
-      code: candle.stockCode.replace(/^SH|SZ/, ''),
-    };
-
     for (const callback of this.candleCallbacks) {
       try {
-        const result = callback(
-          tdxResponse,
-          security as Security,
-          candle.period,
-        );
+        const result = callback(tdxResponse, candle.stockCode, candle.period);
         void Promise.resolve(result).catch((error) => {
           this.logger.error(`Candle callback error: ${error}`);
         });

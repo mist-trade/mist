@@ -440,7 +440,7 @@ describe('TdxWebSocketService normalized bridge', () => {
     );
   });
 
-  it('keeps legacy onCandleComplete callbacks compatible', () => {
+  it('emits completed candles with the original symbol for downstream persistence', () => {
     const { service, aggregator } = createService();
     const callback = jest.fn();
     service.onCandleComplete(callback);
@@ -462,7 +462,7 @@ describe('TdxWebSocketService normalized bridge', () => {
         close: 10.2,
         timestamp: new Date('2026-06-26T09:31:00+08:00'),
       }),
-      expect.objectContaining({ code: '600519' }),
+      'SH600519',
       Period.ONE_MIN,
     );
   });

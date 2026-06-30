@@ -55,38 +55,53 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
 
     // Handle completed candles - save to database
     this.tdxWsService.onCandleComplete(
-      async (candle: TdxResponse, security: Security, period: Period) => {
-        try {
-          // Convert TdxResponse to KData format
-          const kData = {
-            timestamp: candle.timestamp,
-            open: candle.open,
-            high: candle.high,
-            low: candle.low,
-            close: candle.close,
-            volume: candle.volume,
-            amount: candle.amount || 0,
-            period,
-            ...(candle.extensions ? { extensions: candle.extensions } : {}),
-          };
-
-          await this.collectorService.saveRawKData(
-            security,
-            [kData],
-            DataSource.TDX,
-            period,
-          );
-
-          this.logger.debug(
-            `Saved ${period} candle for ${security.code} at ${candle.timestamp}`,
-          );
-        } catch (error) {
-          this.logger.error(
-            `Failed to save candle for ${security.code}: ${error}`,
-          );
-        }
+      async (candle: TdxResponse, symbol: string, period: Period) => {
+        await this.handleTdxCandle(candle, symbol, period);
       },
     );
+  }
+
+  private async handleTdxCandle(
+    candle: TdxResponse,
+    symbol: string,
+    period: Period,
+  ): Promise<void> {
+    const code = this.toSecurityCode(symbol);
+
+    try {
+      const security = await this.collectorService.findSecurityByCode(code);
+      if (!security) {
+        this.logger.warn(
+          `Skipping TDX candle for ${symbol}: security ${code} not found`,
+        );
+        return;
+      }
+
+      const kData = {
+        timestamp: candle.timestamp,
+        open: candle.open,
+        high: candle.high,
+        low: candle.low,
+        close: candle.close,
+        volume: candle.volume,
+        amount: candle.amount || 0,
+        period,
+        ...(candle.extensions ? { extensions: candle.extensions } : {}),
+      };
+
+      await this.collectorService.saveRawKData(
+        security,
+        [kData],
+        DataSource.TDX,
+        period,
+      );
+
+      this.logger.debug(
+        `Saved ${period} TDX candle for ${security.code} at ${candle.timestamp}`,
+      );
+    } catch (error) {
+      this.logger.error(`Failed to save TDX candle for ${symbol}: ${error}`);
+    }
   }
 
   private async handleTdxBar(bar: TdxRealtimeBar): Promise<void> {
