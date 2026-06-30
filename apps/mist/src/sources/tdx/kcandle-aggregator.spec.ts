@@ -27,6 +27,34 @@ describe('KCandleAggregator', () => {
   });
 
   describe('1-minute aggregation', () => {
+    it('should aggregate cumulative snapshot volume and amount by deltas', () => {
+      const candles: any[] = [];
+      aggregator.on('candle', (candle: any) => candles.push(candle));
+
+      aggregator.process(
+        'SH600519',
+        Period.ONE_MIN,
+        mockSnapshot('09:30', 1750, 100),
+      );
+      aggregator.process(
+        'SH600519',
+        Period.ONE_MIN,
+        mockSnapshot('09:30:30', 1755, 150),
+      );
+      aggregator.process(
+        'SH600519',
+        Period.ONE_MIN,
+        mockSnapshot('09:31', 1760, 230),
+      );
+
+      expect(candles).toHaveLength(1);
+      expect(candles[0].volume).toBe(50);
+      expect(candles[0].amount).toBe(150 * 1755 - 100 * 1750);
+      expect(aggregator.getCurrent('SH600519', Period.ONE_MIN)?.volume).toBe(
+        80,
+      );
+    });
+
     it('should emit completed candle on minute boundary', () => {
       const candles: any[] = [];
       aggregator.on('candle', (candle: any) => candles.push(candle));
@@ -43,7 +71,7 @@ describe('KCandleAggregator', () => {
       aggregator.process(
         'SH600519',
         Period.ONE_MIN,
-        mockSnapshot('09:30:30', 1755, 50),
+        mockSnapshot('09:30:30', 1755, 150),
       );
       expect(candles.length).toBe(0);
 
@@ -51,7 +79,7 @@ describe('KCandleAggregator', () => {
       aggregator.process(
         'SH600519',
         Period.ONE_MIN,
-        mockSnapshot('09:31', 1760, 80),
+        mockSnapshot('09:31', 1760, 230),
       );
       expect(candles.length).toBe(1);
       expect(candles[0].timestamp).toEqual(new Date('2024-01-02T09:30:00Z'));
@@ -59,7 +87,7 @@ describe('KCandleAggregator', () => {
       expect(candles[0].high).toBe(1755);
       expect(candles[0].low).toBe(1750);
       expect(candles[0].close).toBe(1755);
-      expect(candles[0].volume).toBe(150);
+      expect(candles[0].volume).toBe(50);
     });
 
     it('should track OHLC correctly across multiple ticks', () => {
@@ -74,17 +102,17 @@ describe('KCandleAggregator', () => {
       aggregator.process(
         'SH600519',
         Period.ONE_MIN,
-        mockSnapshot('09:30:20', 1745, 50),
+        mockSnapshot('09:30:20', 1745, 150),
       );
       aggregator.process(
         'SH600519',
         Period.ONE_MIN,
-        mockSnapshot('09:30:40', 1760, 30),
+        mockSnapshot('09:30:40', 1760, 180),
       );
       aggregator.process(
         'SH600519',
         Period.ONE_MIN,
-        mockSnapshot('09:31', 1755, 80),
+        mockSnapshot('09:31', 1755, 260),
       );
 
       expect(candles.length).toBe(1);
@@ -92,7 +120,7 @@ describe('KCandleAggregator', () => {
       expect(candles[0].high).toBe(1760);
       expect(candles[0].low).toBe(1745);
       expect(candles[0].close).toBe(1760);
-      expect(candles[0].volume).toBe(180);
+      expect(candles[0].volume).toBe(80);
     });
   });
 

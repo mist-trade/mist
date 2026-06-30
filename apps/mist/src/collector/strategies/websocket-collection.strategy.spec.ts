@@ -6,7 +6,7 @@ import { TdxRealtimeBar } from '../../sources/tdx/tdx-websocket.service';
 type BarCallback = (bar: TdxRealtimeBar) => void | Promise<void>;
 type CandleCallback = (
   candle: any,
-  security: Security,
+  symbol: string,
   period: Period,
 ) => void | Promise<void>;
 
@@ -73,15 +73,11 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
         }
         await barCallback(bar);
       },
-      emitCandle: async (
-        candle: any,
-        securityForCandle: Security,
-        period: Period,
-      ) => {
+      emitCandle: async (candle: any, symbol: string, period: Period) => {
         if (!candleCallback) {
           throw new Error('candle callback was not registered');
         }
-        await candleCallback(candle, securityForCandle, period);
+        await candleCallback(candle, symbol, period);
       },
     };
   };
@@ -156,7 +152,7 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
     );
   });
 
-  it('keeps legacy completed candle persistence compatible', async () => {
+  it('resolves real security before saving completed snapshot candles', async () => {
     const security = createSecurity('600519');
     const { collectorService, emitCandle } = createHarness(security);
     const candle = {
@@ -169,8 +165,9 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
       amount: 12345.6,
     };
 
-    await emitCandle(candle, security, Period.FIVE_MIN);
+    await emitCandle(candle, '600519.SH', Period.FIVE_MIN);
 
+    expect(collectorService.findSecurityByCode).toHaveBeenCalledWith('600519');
     expect(collectorService.saveRawKData).toHaveBeenCalledWith(
       security,
       [expect.objectContaining({ close: 10.2, period: Period.FIVE_MIN })],
