@@ -85,7 +85,7 @@ export class KCandleAggregator {
       // New period: start fresh candle
       candle = {
         timestamp: candleTime,
-        open: snapshot.open,
+        open: snapshot.now,
         high: snapshot.now,
         low: snapshot.now,
         close: snapshot.now,
