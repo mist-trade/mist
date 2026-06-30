@@ -70,7 +70,9 @@ export class SecurityController {
   @ApiOperation({ summary: 'Get security by code' })
   @ApiParam({
     name: 'code',
-    description: 'Security code (e.g., 000001.SH, 399006.SZ)',
+    description:
+      'Canonical security code; provider-formatted inputs are normalized',
+    example: '600519',
   })
   @ApiResponse({ status: 200, description: 'Security found', type: Security })
   @ApiResponse({ status: 404, description: 'Security not found' })
@@ -81,7 +83,12 @@ export class SecurityController {
   @Put(':code/deactivate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Deactivate a security' })
-  @ApiParam({ name: 'code', description: 'Security code to deactivate' })
+  @ApiParam({
+    name: 'code',
+    description:
+      'Canonical security code to deactivate; provider-formatted inputs are normalized',
+    example: '600519',
+  })
   @ApiResponse({
     status: 200,
     description: 'Security successfully deactivated',
@@ -94,7 +101,12 @@ export class SecurityController {
   @Put(':code/activate')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Activate a deactivated security' })
-  @ApiParam({ name: 'code', description: 'Security code to activate' })
+  @ApiParam({
+    name: 'code',
+    description:
+      'Canonical security code to activate; provider-formatted inputs are normalized',
+    example: '600519',
+  })
   @ApiResponse({ status: 200, description: 'Security successfully activated' })
   @ApiResponse({ status: 404, description: 'Security not found' })
   async activateSecurity(@Param('code') code: string): Promise<void> {
@@ -114,7 +126,12 @@ export class SecurityController {
 
   @Get(':code/sources')
   @ApiOperation({ summary: 'Get source configuration for a security' })
-  @ApiParam({ name: 'code', description: 'Security code' })
+  @ApiParam({
+    name: 'code',
+    description:
+      'Canonical security code; provider-formatted inputs are normalized',
+    example: '600519',
+  })
   @ApiResponse({
     status: 200,
     description: 'Source configuration retrieved successfully',

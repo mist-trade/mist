@@ -107,15 +107,16 @@ Data is stored for multiple timeframes:
 
 ### TypeORM Synchronize Disabled
 
-In production, `synchronize: false` is set for safety. Use migrations:
+In production, `synchronize: false` is set for safety. Use the repository SQL
+migration runner:
 
 ```bash
-# Generate migration
-pnpm run migration:generate -- -n MigrationName
-
-# Run migration
-pnpm run migration:run
+pnpm run db:migrate
 ```
+
+Migration files live under `deploy/database/migrations`. Existing-database
+security identity cleanup can be audited with
+`deploy/database/audit-security-identity.sql` before running migrations.
 
 ## License
 

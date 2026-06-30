@@ -168,6 +168,32 @@ describe('KCandleAggregator', () => {
   });
 
   describe('multiple stocks and periods', () => {
+    it('should key candles by canonical security code across provider formats', () => {
+      const candles: any[] = [];
+      aggregator.on('candle', (candle: any) => candles.push(candle));
+
+      aggregator.process(
+        '600519.SH',
+        Period.ONE_MIN,
+        mockSnapshot('09:30', 1750, 100),
+      );
+      aggregator.process(
+        'SH600519',
+        Period.ONE_MIN,
+        mockSnapshot('09:30:30', 1755, 150),
+      );
+      aggregator.process(
+        '600519',
+        Period.ONE_MIN,
+        mockSnapshot('09:31', 1760, 230),
+      );
+
+      expect(candles).toHaveLength(1);
+      expect(candles[0].stockCode).toBe('600519');
+      expect(candles[0].volume).toBe(50);
+      expect(aggregator.getCurrent('600519', Period.ONE_MIN)?.volume).toBe(80);
+    });
+
     it('should track different stocks independently', () => {
       const candles: any[] = [];
       aggregator.on('candle', (candle: any) => candles.push(candle));

@@ -215,4 +215,44 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
 
     expect(tdxWsService.unsubscribe).toHaveBeenCalledWith('600519.SH');
   });
+
+  it('tracks active subscriptions by security code while using provider format for transport', async () => {
+    const { strategy, tdxWsService } = createHarness(createSecurity());
+    const subscribedSecurity = {
+      ...createSecurity('600519'),
+      sourceConfigs: [
+        {
+          source: DataSource.TDX,
+          enabled: true,
+          formatCode: '600519.SH',
+        },
+      ],
+    } as Security;
+
+    await strategy.collectForSecurity(subscribedSecurity, Period.ONE_MIN);
+    await strategy.unsubscribeForSecurity(createSecurity('600519'));
+
+    expect(tdxWsService.subscribe).toHaveBeenCalledWith('600519.SH');
+    expect(tdxWsService.unsubscribe).toHaveBeenCalledWith('600519.SH');
+  });
+
+  it('canonicalizes provider-formatted security codes for subscription tracking', async () => {
+    const { strategy, tdxWsService } = createHarness(createSecurity());
+    const subscribedSecurity = {
+      ...createSecurity('600519.SH'),
+      sourceConfigs: [
+        {
+          source: DataSource.TDX,
+          enabled: true,
+          formatCode: '600519.SH',
+        },
+      ],
+    } as Security;
+
+    await strategy.collectForSecurity(subscribedSecurity, Period.ONE_MIN);
+    await strategy.unsubscribeForSecurity(createSecurity('600519'));
+
+    expect(tdxWsService.subscribe).toHaveBeenCalledWith('600519.SH');
+    expect(tdxWsService.unsubscribe).toHaveBeenCalledWith('600519.SH');
+  });
 });

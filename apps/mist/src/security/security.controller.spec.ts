@@ -83,7 +83,7 @@ describe('SecurityController', () => {
     const addSecuritySourceDto: AddSecuritySourceDto = {
       code: '600001',
       source: DataSource.EAST_MONEY,
-      formatCode: '{}',
+      formatCode: 'sh600001',
     };
 
     const mockSecurity: Security = {
@@ -184,7 +184,7 @@ describe('SecurityController', () => {
     const mockSecurities: Security[] = [
       {
         id: 1,
-        code: '000001.SH',
+        code: '000001',
         name: '平安银行',
         type: SecurityType.STOCK,
         status: 'ACTIVE' as any,
@@ -195,7 +195,7 @@ describe('SecurityController', () => {
       },
       {
         id: 2,
-        code: '399006.SZ',
+        code: '399006',
         name: '创业板指',
         type: SecurityType.INDEX,
         status: 'ACTIVE' as any,

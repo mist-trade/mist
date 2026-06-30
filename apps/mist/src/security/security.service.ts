@@ -10,6 +10,7 @@ import {
   SecuritySourceConfig,
   SecurityStatus,
 } from '@app/shared-data';
+import { normalizeSecurityCode } from '@app/utils';
 import { InitSecurityDto } from './dto/init-security.dto';
 import { AddSecuritySourceDto } from './dto/add-security-source.dto';
 
@@ -23,7 +24,7 @@ export class SecurityService {
   ) {}
 
   formatCode(code: string): string {
-    return code.trim().toUpperCase();
+    return normalizeSecurityCode(code);
   }
 
   async initializeSecurity(
@@ -67,13 +68,28 @@ export class SecurityService {
       );
     }
 
-    const sourceConfig = this.sourceConfigRepository.create({
-      security: security,
-      source: addSecuritySourceDto.source,
-      formatCode: addSecuritySourceDto.formatCode || '',
-      priority: addSecuritySourceDto.priority ?? 0,
-      enabled: addSecuritySourceDto.enabled ?? true,
+    const existingSourceConfig = await this.sourceConfigRepository.findOne({
+      where: {
+        securityId: security.id,
+        source: addSecuritySourceDto.source,
+      },
     });
+
+    const sourceConfig = existingSourceConfig
+      ? Object.assign(existingSourceConfig, {
+          formatCode: addSecuritySourceDto.formatCode || '',
+          priority: addSecuritySourceDto.priority ?? 0,
+          enabled: addSecuritySourceDto.enabled ?? true,
+        })
+      : this.sourceConfigRepository.create({
+          security,
+          securityId: security.id,
+          source: addSecuritySourceDto.source,
+          formatCode: addSecuritySourceDto.formatCode || '',
+          priority: addSecuritySourceDto.priority ?? 0,
+          enabled: addSecuritySourceDto.enabled ?? true,
+        });
+
     await this.sourceConfigRepository.save(sourceConfig);
 
     return security;

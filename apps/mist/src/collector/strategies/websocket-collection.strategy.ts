@@ -9,6 +9,7 @@ import {
 import { TdxWebSocketService } from '../../sources/tdx/tdx-websocket.service';
 import { TdxResponse } from '../../sources/tdx/types';
 import { TdxRealtimeBar } from '../../sources/tdx/tdx-websocket.service';
+import { normalizeSecurityCode } from '@app/utils';
 
 /**
  * WebSocket data collection strategy
@@ -22,7 +23,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
   readonly source: DataSource;
   readonly mode: CollectionMode = 'streaming';
 
-  private subscriptions: Set<string> = new Set();
+  private subscriptions = new Map<string, string>();
   private tdxWsService: TdxWebSocketService | null = null;
 
   constructor(
@@ -66,7 +67,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
     symbol: string,
     period: Period,
   ): Promise<void> {
-    const code = this.toSecurityCode(symbol);
+    const code = normalizeSecurityCode(symbol);
 
     try {
       const security = await this.collectorService.findSecurityByCode(code);
@@ -105,7 +106,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
   }
 
   private async handleTdxBar(bar: TdxRealtimeBar): Promise<void> {
-    const code = this.toSecurityCode(bar.symbol);
+    const code = normalizeSecurityCode(bar.symbol);
 
     try {
       const security = await this.collectorService.findSecurityByCode(code);
@@ -170,8 +171,8 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
     if (this.source === DataSource.TDX && this.tdxWsService) {
       // TdxWebSocketService handles its own lifecycle via OnModuleDestroy
       // Just clear our subscriptions
-      for (const stockCode of this.subscriptions) {
-        this.tdxWsService.unsubscribe(stockCode);
+      for (const formatCode of this.subscriptions.values()) {
+        this.tdxWsService.unsubscribe(formatCode);
       }
       this.subscriptions.clear();
     }
@@ -179,12 +180,14 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
 
   async unsubscribeForSecurity(security: Security): Promise<number> {
     if (this.source === DataSource.TDX && this.tdxWsService) {
+      const code = normalizeSecurityCode(security.code);
       const formatCode = this.getFormatCode(security);
-      this.tdxWsService.unsubscribe(formatCode);
-      this.subscriptions.delete(formatCode);
+      const subscribedFormatCode = this.subscriptions.get(code) || formatCode;
+      this.tdxWsService.unsubscribe(subscribedFormatCode);
+      this.subscriptions.delete(code);
 
       this.logger.log(
-        `Unsubscribed TDX WebSocket for ${security.code} (${formatCode})`,
+        `Unsubscribed TDX WebSocket for ${security.code} (${subscribedFormatCode})`,
       );
 
       return 1;
@@ -208,9 +211,15 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
       }
 
       // Subscribe to real-time data for this security
+      const code = normalizeSecurityCode(security.code);
       const formatCode = this.getFormatCode(security);
+      const previousFormatCode = this.subscriptions.get(code);
+      if (previousFormatCode && previousFormatCode !== formatCode) {
+        this.tdxWsService.unsubscribe(previousFormatCode);
+      }
+
       this.tdxWsService.subscribe(formatCode);
-      this.subscriptions.add(formatCode);
+      this.subscriptions.set(code, formatCode);
 
       this.logger.log(
         `Subscribed to TDX WebSocket for ${security.code} (${formatCode})`,
@@ -233,20 +242,5 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
       (c) => c.source === DataSource.TDX && c.enabled,
     );
     return config?.formatCode || security.code;
-  }
-
-  private toSecurityCode(symbol: string): string {
-    const normalized = symbol.trim().toUpperCase();
-    const suffixed = normalized.match(/^(\d{6})\.(SH|SZ|BJ)$/);
-    if (suffixed) {
-      return suffixed[1];
-    }
-
-    const prefixed = normalized.match(/^(SH|SZ|BJ)(\d{6})$/);
-    if (prefixed) {
-      return prefixed[2];
-    }
-
-    return normalized;
   }
 }

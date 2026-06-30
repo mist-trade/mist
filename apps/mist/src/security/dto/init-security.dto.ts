@@ -3,7 +3,11 @@ import { IsNotEmpty, IsString, IsEnum } from 'class-validator';
 import { SecurityType } from '@app/shared-data';
 
 export class InitSecurityDto {
-  @ApiProperty({ description: 'Security code (e.g., 000001.SH, 399006.SZ)' })
+  @ApiProperty({
+    description:
+      'Canonical security code. Provider-formatted inputs are normalized.',
+    example: '600519',
+  })
   @IsNotEmpty()
   @IsString()
   code!: string;
