@@ -2,7 +2,6 @@
 
 ## Purpose
 Define the backend boundary between provider-neutral `Security.code` identity and provider-specific source transport codes so security lookup, source configuration, streaming subscription tracking, and K-line persistence use stable internal identities.
-
 ## Requirements
 ### Requirement: Canonical Security Code Identity
 The system SHALL store and look up `Security.code` as a provider-neutral canonical code. Canonical codes MUST remove common provider market decorations from supported stock symbols, including dotted suffix form such as `600519.SH` and market-prefix form such as `SH600519`.
@@ -17,14 +16,24 @@ The system SHALL store and look up `Security.code` as a provider-neutral canonic
 - **THEN** the backend queries `securities.code` using canonical code `600519`
 
 ### Requirement: Provider Format Code Boundary
+
 The system SHALL use `SecuritySourceConfig.formatCode` only as the provider-specific transport code for external data-source calls. Internal aggregation, persistence, lookup, and subscription tracking MUST use canonical `Security.code` or `Security.id`.
 
 #### Scenario: TDX streaming uses separate identity and transport codes
+
 - **WHEN** a security has `code=600519` and TDX `formatCode=600519.SH`
 - **THEN** the backend tracks the subscription internally by `600519`
 - **AND** sends `600519.SH` to the TDX datasource for subscribe/unsubscribe calls
 
+#### Scenario: Streaming snapshot model uses code and formatCode
+
+- **WHEN** the backend parses a TDX snapshot for provider symbol `600519.SH`
+- **THEN** the resulting snapshot uses `code=600519`
+- **AND** uses `formatCode=600519.SH`
+- **AND** does not expose `stockCode`
+
 #### Scenario: Completed K-line persistence uses security identity
+
 - **WHEN** a completed TDX streaming candle is emitted for provider symbol `600519.SH`
 - **THEN** the backend resolves canonical code `600519`
 - **AND** persists the K-line using the matched `Security.id`
