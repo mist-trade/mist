@@ -1,4 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
 import {
   ISourceFetcher,
   KFetchParams,
@@ -43,9 +44,12 @@ export class EastMoneySource implements ISourceFetcher {
     private readonly utilsService: UtilsService,
     private readonly periodMappingService: PeriodMappingService,
     private readonly typeOrmDataSource: TypeOrmDataSource,
+    private readonly configService: ConfigService,
   ) {
     this.axios = this.utilsService.createAxiosInstance({
-      baseURL: 'http://127.0.0.1:8080',
+      baseURL:
+        this.configService.get<string>('AKTOOLS_BASE_URL') ||
+        'http://127.0.0.1:8080',
       timeout: 30000,
     });
   }

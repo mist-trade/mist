@@ -15,4 +15,12 @@ describe('BiService', () => {
   it('should be defined', () => {
     expect(service).toBeDefined();
   });
+
+  it('removeBiByIndex should remove only the requested item', () => {
+    const bis = ['first', 'middle', 'last'];
+
+    service['removeBiByIndex'](bis, 1);
+
+    expect(bis).toEqual(['first', 'last']);
+  });
 });

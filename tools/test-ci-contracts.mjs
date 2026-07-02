@@ -58,6 +58,23 @@ function assertPackageScript(packageJson, scriptName, expectedPart, label) {
   return script;
 }
 
+function assertPackageScriptConfigTargetsExist(packageJson, scriptName, label) {
+  const script = packageJson.scripts?.[scriptName];
+  if (!script) {
+    return;
+  }
+
+  const configMatches = [...script.matchAll(/--config\s+([^\s]+)/g)];
+  for (const match of configMatches) {
+    const configPath = match[1].replace(/^['"]|['"]$/g, '');
+    if (!existsSync(join(repos.mist, configPath))) {
+      fail(
+        `${label} scripts.${scriptName} references missing config ${JSON.stringify(configPath)}`,
+      );
+    }
+  }
+}
+
 function assertEnvFilesUntracked() {
   const tracked = execFileSync('git', ['ls-files', '.env.development', '.env.production'], {
     cwd: repos.mist,
@@ -92,6 +109,7 @@ function assertMistBackendContracts() {
   assertPackageScript(packageJson, 'typecheck', 'tsc --noEmit', 'mist');
   assertPackageScript(packageJson, 'test:ci', '--runInBand', 'mist');
   assertPackageScript(packageJson, 'ci:contracts', 'tools/test-ci-contracts.mjs', 'mist');
+  assertPackageScriptConfigTargetsExist(packageJson, 'test:e2e', 'mist');
 
   const gitignore = read(join(repos.mist, '.gitignore'));
   assertIncludes(gitignore, '.env.*', 'mist .gitignore');
