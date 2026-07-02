@@ -6,9 +6,9 @@ flow. It is the operational companion to the OpenSpec evidence under
 
 Latest known-good evidence:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-02-production-baseline-rerun.md`
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-02-production-baseline-latest-rerun-5.md`
 - Backend baseline image:
-  `ghcr.io/mist-trade/mist:3aa23e3558da87899337d215cf52aa8663a755ba`
+  `ghcr.io/mist-trade/mist:5460d9a2861d55d9597ea88731134542de77c3c0`
 - Frontend baseline image:
   `ghcr.io/mist-trade/mist-fe:c9bb33588b55d8509526cf71b38ae4b26e52b790`
 - Deploy scripts baseline:
@@ -41,10 +41,10 @@ Deferred by default:
   production baseline.
 - On the Mac, use `pwsh-preview` for local PowerShell checks when needed.
 - Windows runner labels: `self-hosted`, `windows`, `mist-api`.
-- Docker root: `E:\quant\MistDocker`.
-- Datasource root: `F:\quant\MistAPI\datasource`.
-- Gateway hostname: `www.moyui.mist`, resolved locally on the Mac to
-  `192.168.31.182`.
+- Docker root: `<docker-root>`.
+- Datasource root: `<datasource-root>`.
+- Gateway hostname: `<gateway-hostname>`, resolved locally on the Mac to
+  `<windows-lan-ip>`.
 - The datasource remains a host-side WinSW service. The Docker app deploy must
   not reinstall, remove, or replace `mist-tdx-datasource`.
 
@@ -66,7 +66,7 @@ For a single-repo CI checkout simulation:
 
 ```bash
 mkdir -p /private/tmp/mist-ci-single
-ln -s /Users/moyui/sean/mist/mist /private/tmp/mist-ci-single/mist
+ln -s <mac-workspace-root>/mist /private/tmp/mist-ci-single/mist
 MIST_WORKSPACE_ROOT=/private/tmp/mist-ci-single pnpm run ci:contracts
 ```
 
@@ -107,8 +107,8 @@ gh workflow run deploy-windows-docker-appliance.yml \
   -f frontend_image_tag=<frontend-sha> \
   -f previous_frontend_image_tag=<previous-frontend-sha> \
   -f web_gateway_image=docker.m.daocloud.io/library/nginx:1.27-alpine \
-  -f docker_root='E:\quant\MistDocker' \
-  -f datasource_root='F:\quant\MistAPI\datasource' \
+  -f docker_root='<docker-root>' \
+  -f datasource_root='<datasource-root>' \
   -f skip_migration=false \
   -f skip_backup=false \
   -f skip_health_check=false \
@@ -130,7 +130,7 @@ Deployment evidence must include:
 - image pull success
 - MySQL healthy
 - backup path, for example
-  `E:\quant\MistDocker\backups\mist-YYYYMMDD-HHMMSS.sql`
+  `<docker-root>\backups\mist-YYYYMMDD-HHMMSS.sql`
 - migrations ran or were intentionally skipped
 - `mist-fe`, `mist-backend`, and `mist-chan-api` recreated
 - `mist-web-gateway` recreated after app service recreation
@@ -146,7 +146,7 @@ Deployment evidence must include:
   - `http://127.0.0.1:9001/health`
   - `http://host.docker.internal:9001/health` from the backend container
 - diagnostics path, for example
-  `E:\quant\MistDocker\diagnostics\YYYYMMDD-HHMMSS`
+  `<docker-root>\diagnostics\YYYYMMDD-HHMMSS`
 
 ## MySQL Restore Rehearsal
 
@@ -157,7 +157,7 @@ MySQL container.
 gh workflow run test-windows-mysql-restore.yml \
   --repo mist-trade/mist-deploy \
   --ref master \
-  -f docker_root='E:\quant\MistDocker' \
+  -f docker_root='<docker-root>' \
   -f backup_path='<backup-path-from-deploy>' \
   -f timeout_seconds=120 \
   -f keep_container=false
@@ -178,11 +178,11 @@ Run non-state-changing datasource smoke first:
 gh workflow run run-windows-tdx-runtime-smoke.yml \
   --repo mist-trade/mist-deploy \
   --ref master \
-  -f datasource_root='F:\quant\MistAPI\datasource' \
-  -f appliance_root='F:\quant\MistAPI' \
+  -f datasource_root='<datasource-root>' \
+  -f appliance_root='<appliance-root>' \
   -f base_url='http://127.0.0.1:9001' \
   -f ws_url='' \
-  -f client_id='deploy-runtime-smoke-<date>' \
+  -f client_id='<runtime-smoke-client-id>' \
   -f symbol='600519.SH' \
   -f raw_symbol='' \
   -f sector='880081.SH' \
@@ -223,7 +223,7 @@ Positive live quote verification uses the backend leader test endpoints:
 ```bash
 curl --noproxy '*' --connect-timeout 5 --max-time 20 -sS -i \
   -X POST \
-  http://www.moyui.mist/api/mist/v1/collector/test/tdx-streaming/subscribe \
+  http://<gateway-hostname>/api/mist/v1/collector/test/tdx-streaming/subscribe \
   -H 'Content-Type: application/json' \
   --data '{"code":"600519","period":1,"testOnly":true}'
 ```
@@ -231,7 +231,7 @@ curl --noproxy '*' --connect-timeout 5 --max-time 20 -sS -i \
 Then connect a read-only observer to datasource WebSocket and wait for `quote`:
 
 ```bash
-node -e "const url='ws://192.168.31.182:9001/ws/quote/codex-live-quote-observer'; const ws=new WebSocket(url); const timeout=setTimeout(()=>{console.error('timeout waiting for quote'); ws.close(); process.exit(2);},70000); ws.addEventListener('open',()=>console.log('open '+url)); ws.addEventListener('message',(event)=>{const text=String(event.data); console.log(text); let msg; try{msg=JSON.parse(text);}catch{return;} if(msg.type==='ready'){ws.send(JSON.stringify({type:'ping'}));} if(msg.type==='quote'){clearTimeout(timeout); console.log('quote_ok symbol='+((msg.data&&msg.data.symbol)||(msg.data&&msg.data.snapshot&&msg.data.snapshot.Code)||'')); ws.close(); process.exit(0);} }); ws.addEventListener('error',(event)=>{console.error('ws error', event.message || event.type); clearTimeout(timeout); process.exit(1);});"
+node -e "const url='ws://<windows-lan-ip>:9001/ws/quote/<observer-client-id>'; const ws=new WebSocket(url); const timeout=setTimeout(()=>{console.error('timeout waiting for quote'); ws.close(); process.exit(2);},70000); ws.addEventListener('open',()=>console.log('open '+url)); ws.addEventListener('message',(event)=>{const text=String(event.data); console.log(text); let msg; try{msg=JSON.parse(text);}catch{return;} if(msg.type==='ready'){ws.send(JSON.stringify({type:'ping'}));} if(msg.type==='quote'){clearTimeout(timeout); console.log('quote_ok symbol='+((msg.data&&msg.data.symbol)||(msg.data&&msg.data.snapshot&&msg.data.snapshot.Code)||'')); ws.close(); process.exit(0);} }); ws.addEventListener('error',(event)=>{console.error('ws error', event.message || event.type); clearTimeout(timeout); process.exit(1);});"
 ```
 
 Clean up through the backend leader:
@@ -239,7 +239,7 @@ Clean up through the backend leader:
 ```bash
 curl --noproxy '*' --connect-timeout 5 --max-time 20 -sS -i \
   -X POST \
-  http://www.moyui.mist/api/mist/v1/collector/test/tdx-streaming/unsubscribe \
+  http://<gateway-hostname>/api/mist/v1/collector/test/tdx-streaming/unsubscribe \
   -H 'Content-Type: application/json' \
   --data '{"code":"600519","period":1,"testOnly":true}'
 ```
@@ -248,7 +248,7 @@ Confirm cleanup:
 
 ```bash
 curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS \
-  http://192.168.31.182:9001/health
+  http://<windows-lan-ip>:9001/health
 ```
 
 Required evidence:
@@ -269,7 +269,7 @@ Required evidence:
 Confirm hostname resolution:
 
 ```bash
-dscacheutil -q host -a name www.moyui.mist
+dscacheutil -q host -a name <gateway-hostname>
 ```
 
 Probe gateway and datasource paths:
@@ -277,36 +277,36 @@ Probe gateway and datasource paths:
 ```bash
 curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
   -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://www.moyui.mist/
+  http://<gateway-hostname>/
 
 curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
   -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://www.moyui.mist/k
+  http://<gateway-hostname>/k
 
 curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
   -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://www.moyui.mist/api/mist/app/hello
+  http://<gateway-hostname>/api/mist/app/hello
 
 curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
   -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://www.moyui.mist/api/chan/app/hello
+  http://<gateway-hostname>/api/chan/app/hello
 
 curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
   -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://192.168.31.182/api/mist/app/hello
+  http://<windows-lan-ip>/api/mist/app/hello
 
 curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
   -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://192.168.31.182/api/chan/app/hello
+  http://<windows-lan-ip>/api/chan/app/hello
 
 curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
   -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://192.168.31.182:9001/health
+  http://<windows-lan-ip>:9001/health
 ```
 
 Known-good shape:
 
-- `www.moyui.mist` resolves to `192.168.31.182`
+- `<gateway-hostname>` resolves to `<windows-lan-ip>`
 - `/` returns HTTP 307 to `/k`
 - `/k` returns HTTP 200
 - Mist and Chan gateway API paths return HTTP 200

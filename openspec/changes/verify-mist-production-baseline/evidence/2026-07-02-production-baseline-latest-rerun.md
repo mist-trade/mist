@@ -13,13 +13,13 @@ deploy scripts.
 | Field | Value |
 | --- | --- |
 | Baseline date | 2026-07-02 |
-| Verification host | Mac workspace `/Users/moyui/sean/mist` |
-| Windows runner | `mist-api-windows-01`, machine `DESKTOP-T3B1O2J` |
-| Windows LAN IP | `192.168.31.182` |
-| Gateway hostname | `www.moyui.mist` |
+| Verification host | Mac workspace `<mac-workspace-root>` |
+| Windows runner | `<windows-runner-name>`, machine `<windows-machine-name>` |
+| Windows LAN IP | `<windows-lan-ip>` |
+| Gateway hostname | `<gateway-hostname>` |
 | Hostname resolution | Mac-local host resolution |
-| Docker root | `E:\quant\MistDocker` |
-| Datasource root | `F:\quant\MistAPI\datasource` |
+| Docker root | `<docker-root>` |
+| Datasource root | `<datasource-root>` |
 
 ## Latest Refs And Images
 
@@ -70,7 +70,7 @@ Deployment evidence:
 - Frontend image `c9bb33588b55d8509526cf71b38ae4b26e52b790` was deployed.
 - MySQL was running and healthy.
 - Pre-migration backup was created:
-  `E:\quant\MistDocker\backups\mist-20260702-173013.sql`.
+  `<docker-root>\backups\mist-<timestamp>.sql`.
 - Backup retention cleanup removed `0` item(s).
 - Migrations ran; `001_init_core_tables.sql`,
   `002_add_tdx_vol_in_stock.sql`, and
@@ -90,7 +90,7 @@ Deployment evidence:
   - host: `http://127.0.0.1:9001/health`
   - backend container: `http://host.docker.internal:9001/health`
 - Diagnostics were captured at:
-  `E:\quant\MistDocker\diagnostics\20260702-173022`.
+  `<docker-root>\diagnostics\<timestamp>`.
 - Deployment completed without reinstalling, removing, or replacing the
   host-side `mist-tdx-datasource` WinSW service.
 
@@ -104,8 +104,8 @@ Workflow: `Test Windows MySQL Restore` in `mist-trade/mist-deploy`.
 | URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28580029153` |
 | Job | `84737809947` |
 | Final status | Success |
-| Backup path | `E:\quant\MistDocker\backups\mist-20260702-173013.sql` |
-| Temporary container | `mist-mysql-restore-check-20260702-173254` |
+| Backup path | `<docker-root>\backups\mist-<timestamp>.sql` |
+| Temporary container | `mist-mysql-restore-check-<timestamp>` |
 
 Restore evidence:
 
@@ -113,7 +113,7 @@ Restore evidence:
 - Temporary MySQL container reached ready state.
 - Backup imported into the temporary database.
 - Restored schema validation passed.
-- `RestoreBackupPath=E:\quant\MistDocker\backups\mist-20260702-173013.sql`.
+- `RestoreBackupPath=<docker-root>\backups\mist-<timestamp>.sql`.
 - Temporary container was removed after validation.
 
 ## TDX Runtime Smoke
@@ -127,7 +127,7 @@ Workflow: `Run Windows TDX Runtime Smoke` in `mist-trade/mist-deploy`.
 | Job | `84738208310` |
 | Final status | Success |
 | Base URL | `http://127.0.0.1:9001` |
-| WebSocket URL | `ws://127.0.0.1:9001/ws/quote/deploy-runtime-smoke-20260702-latest` |
+| WebSocket URL | `ws://127.0.0.1:9001/ws/quote/<runtime-smoke-client-id>` |
 | Symbol | `600519.SH` |
 | Sector | `880081.SH` |
 | Period/count | `1d` / `2` |
@@ -158,17 +158,17 @@ Smoke evidence:
 
 Positive live quote verification used the backend leader test endpoints.
 
-1. `POST http://www.moyui.mist/api/mist/v1/collector/test/tdx-streaming/subscribe`
+1. `POST http://<gateway-hostname>/api/mist/v1/collector/test/tdx-streaming/subscribe`
    with `{"code":"600519","period":1,"testOnly":true}` returned HTTP `200`,
    `success=true`, and `count=1`.
 2. A Mac-side read-only WebSocket observer connected to
-   `ws://192.168.31.182:9001/ws/quote/codex-live-quote-observer-20260702-latest`.
+   `ws://<windows-lan-ip>:9001/ws/quote/<observer-client-id>`.
 3. The observer received a ready message showing
    `leaderClientId="mist-backend-tdx"` and `active=["600519.SH"]`.
 4. The observer received a `quote` event with snapshot fields including
    `Code="600519.SH"`, `Now=1203.0`, `LastClose=1193.01`, and
    `AsOf="2026-07-02T17:35:57.393837+08:00"`.
-5. `POST http://www.moyui.mist/api/mist/v1/collector/test/tdx-streaming/unsubscribe`
+5. `POST http://<gateway-hostname>/api/mist/v1/collector/test/tdx-streaming/unsubscribe`
    with the same body returned HTTP `200`, `success=true`, and `count=1`.
 6. Post-cleanup datasource health returned HTTP `200` with
    `subscribedCount=0`, `activeSubscriptions=[]`,
@@ -185,21 +185,21 @@ backend leader path and was cleaned up after verification.
 Host resolution:
 
 ```text
-name: www.moyui.mist
-ip_address: 192.168.31.182
+name: <gateway-hostname>
+ip_address: <windows-lan-ip>
 ```
 
 Gateway and API probes used `curl --noproxy '*'` from the Mac host.
 
 | Probe | Result |
 | --- | --- |
-| `http://www.moyui.mist/` | HTTP `307`, remote IP `192.168.31.182`, redirects to `/k`; frontend metadata title `Mist` |
-| `http://www.moyui.mist/k` | HTTP `200`, remote IP `192.168.31.182`, Next.js Mist page rendered |
-| `http://www.moyui.mist/api/mist/app/hello` | HTTP `200`, JSON `success=true`, `data="Hello World!"`, remote IP `192.168.31.182` |
-| `http://www.moyui.mist/api/chan/app/hello` | HTTP `200`, body `Hello World!`, remote IP `192.168.31.182` |
-| `http://192.168.31.182/api/mist/app/hello` | HTTP `200`, JSON `success=true`, `data="Hello World!"` |
-| `http://192.168.31.182/api/chan/app/hello` | HTTP `200`, body `Hello World!` |
-| `http://192.168.31.182:9001/health` | HTTP `200`, `status="ok"`, `tdxHttpReachable=true`, `tqInitialized=true`, `wsConnected=true`, `subscribedCount=0`, `activeSubscriptions=[]`, `eventQueueDepth=0`, `collectorState="running"` |
+| `http://<gateway-hostname>/` | HTTP `307`, remote IP `<windows-lan-ip>`, redirects to `/k`; frontend metadata title `Mist` |
+| `http://<gateway-hostname>/k` | HTTP `200`, remote IP `<windows-lan-ip>`, Next.js Mist page rendered |
+| `http://<gateway-hostname>/api/mist/app/hello` | HTTP `200`, JSON `success=true`, `data="Hello World!"`, remote IP `<windows-lan-ip>` |
+| `http://<gateway-hostname>/api/chan/app/hello` | HTTP `200`, body `Hello World!`, remote IP `<windows-lan-ip>` |
+| `http://<windows-lan-ip>/api/mist/app/hello` | HTTP `200`, JSON `success=true`, `data="Hello World!"` |
+| `http://<windows-lan-ip>/api/chan/app/hello` | HTTP `200`, body `Hello World!` |
+| `http://<windows-lan-ip>:9001/health` | HTTP `200`, `status="ok"`, `tdxHttpReachable=true`, `tqInitialized=true`, `wsConnected=true`, `subscribedCount=0`, `activeSubscriptions=[]`, `eventQueueDepth=0`, `collectorState="running"` |
 
 No LAN, firewall, gateway routing, or datasource reachability blocker remained
 in this latest rerun.
@@ -237,7 +237,7 @@ This latest rerun is known-good:
 
 Residual notes:
 
-- `www.moyui.mist` is still Mac-local host resolution, not LAN-wide DNS.
+- `<gateway-hostname>` is still Mac-local host resolution, not LAN-wide DNS.
 - Browser UI automation and full product API contract sweeps remain deferred.
 - GitHub Actions emitted Node 20 deprecation warnings for actions running under
   Node 24 compatibility behavior; the workflows themselves completed

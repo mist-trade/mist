@@ -1,12 +1,11 @@
-# Mist Production Baseline Latest Rerun Evidence - 2026-07-02 Round 4
+# Mist Production Baseline Latest Rerun Evidence - 2026-07-02 Round 5
 
-Status: known-good for the latest production baseline rerun.
+Status: known-good for the latest production baseline rerun requested on
+2026-07-02.
 
-This rerun used the latest `origin/master` refs at execution time. Deployment
-used a single Windows workflow run. During restore dispatch, the first local
-`gh workflow run` call hit a GitHub API TLS handshake timeout before any
-workflow run was created; the only restore workflow run for this baseline was
-`28598969472`.
+This rerun used the current pinned backend and frontend image tags that had
+already passed their GitHub image build workflows. The deploy target remained
+the single Docker-stack plus host-side TDX datasource chain.
 
 ## Baseline Context
 
@@ -21,18 +20,25 @@ workflow run was created; the only restore workflow run for this baseline was
 | Docker root | `<docker-root>` |
 | Datasource root | `<datasource-root>` |
 
-## Latest Refs And Images
+## Validated Refs And Images
 
-| Repository | Latest `origin/master` ref |
-| --- | --- |
-| `mist` | `2301b826e8eb1aa3d9b37e36f59ecc3f4b84cb3c` |
-| `mist-fe` | `c9bb33588b55d8509526cf71b38ae4b26e52b790` |
-| `mist-deploy` | `61e631e095f88bc7a51092b6ea909b2da868a981` |
-| `mist-datasource` | `922ae3e889be32832fe52bbe08fa1173ed3bbaba` |
+| Repository | Ref | Round 5 evidence |
+| --- | --- | --- |
+| `mist` | `5460d9a2861d55d9597ea88731134542de77c3c0` | Backend image built, deployed, and smoke-tested |
+| `mist-fe` | `c9bb33588b55d8509526cf71b38ae4b26e52b790` | Frontend image built, deployed, and gateway-tested |
+| `mist-deploy` | `61e631e095f88bc7a51092b6ea909b2da868a981` | Deployment, restore, and runtime smoke workflows ran from this ref |
+
+Related local or runtime refs:
+
+| Repository | Ref | Round 5 evidence |
+| --- | --- | --- |
+| `mist-datasource` | `922ae3e889be32832fe52bbe08fa1173ed3bbaba` | Local workspace ref only; this rerun smoke-tested the already deployed host WinSW service in place and did not reinstall or re-checkout datasource code |
+| `mist-monitoring` | `41020a5c672a2b30259307666a8054710be58bd2` | Local workspace ref only; monitoring deployment was not in this rerun scope |
+| `mist-skills` | `bb364f8bade78e7ebe22a674c4651bb5395628ee` | Local workspace ref only; skills deployment was not in this rerun scope |
 
 | Component | Image |
 | --- | --- |
-| Backend | `ghcr.io/mist-trade/mist:2301b826e8eb1aa3d9b37e36f59ecc3f4b84cb3c` |
+| Backend | `ghcr.io/mist-trade/mist:5460d9a2861d55d9597ea88731134542de77c3c0` |
 | Frontend | `ghcr.io/mist-trade/mist-fe:c9bb33588b55d8509526cf71b38ae4b26e52b790` |
 | Web gateway | `docker.m.daocloud.io/library/nginx:1.27-alpine` |
 
@@ -40,13 +46,23 @@ Image build evidence:
 
 | Repository | Workflow | Run | Status |
 | --- | --- | --- | --- |
-| `mist` | `Build Docker Images` | `28597986714` | Success for `2301b826e8eb1aa3d9b37e36f59ecc3f4b84cb3c` |
+| `mist` | `Build Docker Images` | `28601622624` | Success for `5460d9a2861d55d9597ea88731134542de77c3c0` |
 | `mist-fe` | `Build Frontend Docker Image` | `28564798552` | Success for `c9bb33588b55d8509526cf71b38ae4b26e52b790` |
 
 Rollback tags supplied to deployment:
 
-- Backend: `3d72b0b7746f3b30aa13e321836baa8b3ff0c509`
+- Backend: `2301b826e8eb1aa3d9b37e36f59ecc3f4b84cb3c`
 - Frontend: `c9bb33588b55d8509526cf71b38ae4b26e52b790`
+
+## Local Backend Gates
+
+Local verification from `<mac-workspace-root>/mist`:
+
+- `env TZ=UTC pnpm run test:ci`: 48 suites, 474 tests passed.
+- `pnpm run typecheck`: passed.
+- `pnpm run ci:contracts`: passed with `CI release contract checks passed.`
+- `pnpm run build:docker`: `mist`, `chan`, and `mcp-server` compiled
+  successfully.
 
 ## Windows Deployment Evidence
 
@@ -54,22 +70,27 @@ Workflow: `Deploy Windows Mist Stack` in `mist-trade/mist-deploy`.
 
 | Field | Value |
 | --- | --- |
-| Run | `28598640293` |
-| URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28598640293` |
-| Job | `84800623488` |
+| Run | `28601951723` |
+| URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28601951723` |
+| Job | `84812203369` |
 | Final status | Success |
 | `mist-deploy` ref | `61e631e095f88bc7a51092b6ea909b2da868a981` |
-| Backend image | `ghcr.io/mist-trade/mist:2301b826e8eb1aa3d9b37e36f59ecc3f4b84cb3c` |
+| Backend image | `ghcr.io/mist-trade/mist:5460d9a2861d55d9597ea88731134542de77c3c0` |
 | Frontend image | `ghcr.io/mist-trade/mist-fe:c9bb33588b55d8509526cf71b38ae4b26e52b790` |
 | Web gateway image | `docker.m.daocloud.io/library/nginx:1.27-alpine` |
+| `skip_pull` | `false` |
+| `skip_backup` | `false` |
+| `skip_migration` | `false` |
+| `skip_health_check` | `false` |
 
 Deployment evidence:
 
 - Inline GHCR login completed with `Login Succeeded`.
-- Backend image `2301b826e8eb1aa3d9b37e36f59ecc3f4b84cb3c` was pulled.
+- Backend image `5460d9a2861d55d9597ea88731134542de77c3c0` was pulled.
 - MySQL was running and healthy.
 - Pre-migration backup was created:
   `<docker-root>\backups\mist-<timestamp>.sql`.
+- Backup retention cleanup removed 0 item(s).
 - Migrations ran; `001_init_core_tables.sql`,
   `002_add_tdx_vol_in_stock.sql`, and
   `003_security_code_identity.sql` were already applied.
@@ -99,9 +120,9 @@ Workflow: `Test Windows MySQL Restore` in `mist-trade/mist-deploy`.
 
 | Field | Value |
 | --- | --- |
-| Run | `28598969472` |
-| URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28598969472` |
-| Job | `84801776319` |
+| Run | `28602202288` |
+| URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28602202288` |
+| Job | `84813070738` |
 | Final status | Success |
 | Backup path | `<docker-root>\backups\mist-<timestamp>.sql` |
 | Temporary container | `mist-mysql-restore-check-<timestamp>` |
@@ -121,9 +142,9 @@ Workflow: `Run Windows TDX Runtime Smoke` in `mist-trade/mist-deploy`.
 
 | Field | Value |
 | --- | --- |
-| Run | `28599106204` |
-| URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28599106204` |
-| Job | `84802256851` |
+| Run | `28602326245` |
+| URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28602326245` |
+| Job | `84813504856` |
 | Final status | Success |
 | Base URL | `http://127.0.0.1:9001` |
 | WebSocket URL | `ws://127.0.0.1:9001/ws/quote/<runtime-smoke-client-id>` |
@@ -161,7 +182,7 @@ Positive live quote verification used the backend leader test endpoints.
    with `{"code":"600519","period":1,"testOnly":true}` returned HTTP `200`,
    `success=true`, `count=1`, request id
    `http-<request-id>`, and timestamp
-   `2026-07-02T14:49:27Z`.
+   `2026-07-02T15:37:20Z`.
 2. A Mac-side read-only WebSocket observer connected to
    `ws://<windows-lan-ip>:9001/ws/quote/<observer-client-id>`.
 3. The observer received a ready message showing
@@ -171,13 +192,13 @@ Positive live quote verification used the backend leader test endpoints.
    `Code="600519.SH"`, `Now=1203.0`, `Last=1203.0`, `Open=1193.01`,
    `High=1215.52`, `Low=1190.51`, `LastClose=1193.01`, `Volume=50870.0`,
    `Amount=612236.06`, `Provider="tdx"`, and
-   `AsOf="2026-07-02T22:49:40.393077+08:00"`.
+   `AsOf="2026-07-02T23:37:39.514091+08:00"`.
 6. `POST http://<gateway-hostname>/api/mist/v1/collector/test/tdx-streaming/unsubscribe`
    with the same body returned HTTP `200`, `success=true`, request id
    `http-<request-id>`, and `count=1`.
 7. Post-cleanup datasource health returned HTTP `200` with
    `subscribedCount=0`, `activeSubscriptions=[]`,
-   `quoteCallbackCount=18`, `quoteCallbackRejectedCount=0`,
+   `quoteCallbackCount=22`, `quoteCallbackRejectedCount=0`,
    `lastQuoteCallbackSymbol="600519.SH"`,
    `lastQuoteCallbackAccepted=true`, `eventQueueDepth=0`, and
    `collectorState="running"`.
@@ -210,16 +231,23 @@ No LAN, firewall, gateway routing, or datasource reachability blocker remained
 in this rerun. `<gateway-hostname>` is still Mac-local host resolution rather than
 LAN-wide DNS.
 
-## Operational Notes
+## Smoke Test Findings
 
-- The deploy workflow completed in one run: `28598640293`.
-- The first local restore dispatch command failed with
-  `net/http: TLS handshake timeout` before GitHub returned a workflow URL. The
-  only restore workflow created and executed for this baseline was
-  `28598969472`, and it passed.
-- The first local TDX log download returned EOF after the TDX workflow had
-  succeeded. Re-reading the same successful workflow logs succeeded and showed
-  all selected runtime checks passed.
+No blocking smoke-test issue was found in Round 5. The Windows deployment,
+restore rehearsal, datasource runtime smoke, backend-leader live quote smoke,
+and Mac-side gateway probes all passed.
+
+Non-blocking findings and scope boundaries:
+
+- Datasource source provenance was not re-proven by this rerun. The deployed
+  host-side WinSW service was verified in place through health, HTTP,
+  WebSocket, and live quote checks, but the deployment workflow did not
+  reinstall, remove, replace, or re-checkout `mist-datasource`.
+- `<gateway-hostname>` still depends on Mac-local host resolution, not LAN-wide DNS.
+- Browser UI automation and the full product API contract sweep remained
+  deferred by the runbook default.
+- GitHub API log retrieval for the deploy run returned one transient
+  `unexpected EOF`; retrying the same run succeeded.
 - GitHub Actions emitted Node 20 deprecation warnings for `actions/checkout@v4`
   running under Node 24 compatibility behavior; the workflows completed
   successfully.
@@ -228,9 +256,10 @@ LAN-wide DNS.
 
 This latest rerun is known-good:
 
-- Latest backend and frontend images were built and pushed with pinned commit
+- Current backend and frontend images were built and pushed with pinned commit
   tags.
-- Windows runner deployment completed with inline GHCR login, image pulls,
+- Local backend gates passed.
+- Windows runner deployment completed with inline GHCR login, image pull,
   backup, migrations, service recreation, gateway recreation, health checks,
   and diagnostics capture.
 - MySQL restore rehearsal passed against the deployment backup in a temporary
@@ -246,7 +275,3 @@ Residual notes:
 
 - `<gateway-hostname>` is Mac-local host resolution, not LAN-wide DNS.
 - Browser UI automation and full product API contract sweeps remain deferred.
-- This evidence file was added after deploying
-  `2301b826e8eb1aa3d9b37e36f59ecc3f4b84cb3c`; committing it will create a new
-  docs-only `mist` SHA that should not be treated as a new application baseline
-  unless a further rerun is explicitly requested.
