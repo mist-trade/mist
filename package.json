@@ -116,10 +116,17 @@
       "^.+\\.(t|j)s$": "ts-jest"
     },
     "collectCoverageFrom": [
-      "**/*.(t|j)s"
+      "**/*.(t|j)s",
+      "!**/*.spec.ts",
+      "!**/main.ts",
+      "!**/*.config.*",
+      "!**/.eslintrc.js"
     ],
     "coverageDirectory": "./coverage",
     "testEnvironment": "node",
+    "testPathIgnorePatterns": [
+      "<rootDir>/apps/mist/src/chan/test/archive/"
+    ],
     "roots": [
       "<rootDir>/apps/",
       "<rootDir>/libs/"
