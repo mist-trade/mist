@@ -12,7 +12,7 @@
 - [x] 2.1 Create `harden-release-ci` for CI/release safety, Node version alignment, tracked env cleanup, and release gating.
 - [x] 2.2 Create `fix-datasource-runtime-safety` for blocking SDK calls, QMT callback loop capture, dirty-symbol thread safety, and datasource protocol tests.
 - [x] 2.3 Create `disable-typeorm-auto-sync` for explicit TypeORM synchronize shutdown and high-risk DB schema fixes.
-- [ ] 2.4 Create `harden-docker-deploy-path` for backend Dockerfile, compose command, image tag, rollback, and deployment-script verification.
+- [x] 2.4 Create `harden-docker-deploy-path` for backend Dockerfile, compose command, image tag, rollback, and deployment-script verification.
 - [ ] 2.5 Create `align-datasource-ws-contract` for WebSocket envelope, error, pong, snapshot, and old-route migration planning.
 - [ ] 2.6 Create `fix-mcp-skills-contracts` for MCP stub handling, unknown-error normalization, skills response parsing, and shared script runner tests.
 - [ ] 2.7 Create `fix-frontend-runtime-quality` for duplicate API layer removal, mock data bundle isolation, chart resize, request race protection, and large-data utilities.

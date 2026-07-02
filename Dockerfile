@@ -3,14 +3,17 @@
 FROM node:24-alpine AS builder
 WORKDIR /app
 
-# Install pnpm and configure Taobao registry
-RUN --mount=type=cache,target=/root/.npm \
-    npm install -g pnpm
+ARG NPM_REGISTRY=https://registry.npmjs.org
+ARG PNPM_VERSION=11.7.0
+ENV PNPM_HOME=/pnpm
+ENV PATH=$PNPM_HOME:$PATH
+
+RUN corepack enable && corepack prepare pnpm@${PNPM_VERSION} --activate
 
 # Copy dependency files
 COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,target=/root/.npm \
-    pnpm config set registry https://registry.npmmirror.com && \
+RUN --mount=type=cache,target=/root/.local/share/pnpm/store \
+    pnpm config set registry ${NPM_REGISTRY} && \
     pnpm install --frozen-lockfile
 
 # Copy source and build
@@ -20,26 +23,19 @@ RUN pnpm run build:docker
 # Stage 2: Production - Run with Node.js
 FROM node:24-alpine
 
-# Install curl for health checks
+# Install curl for health checks and create non-root runtime user.
 RUN apk add --no-cache \
-    curl
-
-# Install pnpm and configure Taobao registry
-RUN npm install -g pnpm
+    curl && \
+    addgroup -S app && \
+    adduser -S app -G app
 
 WORKDIR /app
 
-# Install Node.js production dependencies (using Taobao registry)
-COPY package*.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN --mount=type=cache,target=/root/.npm \
-    pnpm config set registry https://registry.npmmirror.com && \
-    pnpm install --prod --frozen-lockfile --ignore-scripts
-
-# Copy build output from builder stage
-COPY --from=builder /app/dist ./dist
-COPY --from=builder /app/tools ./tools
-COPY --from=builder /app/deploy/database ./deploy/database
-COPY --from=builder /app/node_modules/.pnpm ./node_modules/.pnpm
+# Copy runtime dependencies and build output from builder stage.
+COPY --from=builder --chown=app:app /app/node_modules ./node_modules
+COPY --from=builder --chown=app:app /app/dist ./dist
+COPY --from=builder --chown=app:app /app/tools/run-migrations.mjs ./tools/run-migrations.mjs
+COPY --from=builder --chown=app:app /app/deploy/database ./deploy/database
 
 # Expose ports
 # 8001: Main mist app
@@ -51,11 +47,10 @@ EXPOSE 8001 8008 8009
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:8001/app/hello || exit 1
 
-# Copy and prepare startup scripts
-COPY docker-entrypoint.sh ./
+# Copy and prepare startup script.
+COPY --chown=app:app docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
-COPY docker-start.sh ./
-RUN chmod +x docker-start.sh
 
+USER app
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/apps/mist/main.js"]

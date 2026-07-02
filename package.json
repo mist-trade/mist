@@ -14,7 +14,7 @@
   },
   "scripts": {
     "build": "nest build",
-    "build:docker": "nest build mist && nest build chan",
+    "build:docker": "nest build mist && nest build chan && nest build mcp-server",
     "db:migrate": "node tools/run-migrations.mjs",
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "start": "nest start",
