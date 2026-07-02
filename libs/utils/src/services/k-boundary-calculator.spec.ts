@@ -132,12 +132,8 @@ describe('KBoundaryCalculator', () => {
         Period.DAY,
         triggerTime,
       );
-      expect(result.startTime.getFullYear()).toBe(2026);
-      expect(result.startTime.getMonth()).toBe(2); // March = 2
-      expect(result.startTime.getDate()).toBe(30);
-      expect(result.startTime.getHours()).toBe(0);
-      expect(result.endTime.getFullYear()).toBe(2026);
-      expect(result.endTime.getDate()).toBe(31);
+      expect(result.startTime).toEqual(new Date('2026-03-30T00:00:00+08:00'));
+      expect(result.endTime).toEqual(new Date('2026-03-31T00:00:00+08:00'));
     });
 
     it('should return Monday - next Monday for weekly (triggered on Friday)', () => {
@@ -147,8 +143,8 @@ describe('KBoundaryCalculator', () => {
         Period.WEEK,
         triggerTime,
       );
-      expect(result.startTime.getDay()).toBe(1); // Monday
-      expect(result.endTime.getDay()).toBe(1); // Next Monday
+      expect(result.startTime).toEqual(new Date('2026-03-23T00:00:00+08:00'));
+      expect(result.endTime).toEqual(new Date('2026-03-30T00:00:00+08:00'));
       expect(result.endTime.getTime() - result.startTime.getTime()).toBe(
         7 * 24 * 60 * 60 * 1000,
       );
@@ -160,10 +156,8 @@ describe('KBoundaryCalculator', () => {
         Period.MONTH,
         triggerTime,
       );
-      expect(result.startTime.getMonth()).toBe(2); // March
-      expect(result.startTime.getDate()).toBe(1);
-      expect(result.endTime.getMonth()).toBe(3); // April
-      expect(result.endTime.getDate()).toBe(1);
+      expect(result.startTime).toEqual(new Date('2026-03-01T00:00:00+08:00'));
+      expect(result.endTime).toEqual(new Date('2026-04-01T00:00:00+08:00'));
     });
 
     it('should return quarter start - next quarter start for quarterly', () => {
@@ -173,10 +167,8 @@ describe('KBoundaryCalculator', () => {
         Period.QUARTER,
         triggerTime,
       );
-      expect(result.startTime.getMonth()).toBe(0); // January
-      expect(result.startTime.getDate()).toBe(1);
-      expect(result.endTime.getMonth()).toBe(3); // April
-      expect(result.endTime.getDate()).toBe(1);
+      expect(result.startTime).toEqual(new Date('2026-01-01T00:00:00+08:00'));
+      expect(result.endTime).toEqual(new Date('2026-04-01T00:00:00+08:00'));
     });
 
     it('should return Jan 1 - next Jan 1 for yearly', () => {
@@ -185,10 +177,8 @@ describe('KBoundaryCalculator', () => {
         Period.YEAR,
         triggerTime,
       );
-      expect(result.startTime.getFullYear()).toBe(2026);
-      expect(result.startTime.getMonth()).toBe(0);
-      expect(result.startTime.getDate()).toBe(1);
-      expect(result.endTime.getFullYear()).toBe(2027);
+      expect(result.startTime).toEqual(new Date('2026-01-01T00:00:00+08:00'));
+      expect(result.endTime).toEqual(new Date('2027-01-01T00:00:00+08:00'));
     });
   });
 
@@ -205,8 +195,7 @@ describe('KBoundaryCalculator', () => {
       const triggerTime = new Date('2026-03-30T18:00:00+08:00');
       const result = calculator.calculate(Period.DAY, triggerTime);
       expect(result).not.toBeNull();
-      expect(result!.startTime.getDate()).toBe(30);
-      expect(result!.startTime.getHours()).toBe(0);
+      expect(result!.startTime).toEqual(new Date('2026-03-30T00:00:00+08:00'));
     });
 
     it('should return null for minute period outside trading hours', () => {

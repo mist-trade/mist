@@ -8,7 +8,7 @@ describe('ScheduleMcpService', () => {
 
   const mockCronJob = {
     running: false,
-    lastDate: () => new Date('2024-01-01 10:00:00'),
+    lastDate: () => new Date('2024-01-01T10:00:00+08:00'),
   } as any;
 
   beforeEach(async () => {

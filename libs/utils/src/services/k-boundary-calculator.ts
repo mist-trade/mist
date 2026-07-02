@@ -1,21 +1,19 @@
-import {
-  set,
-  startOfDay,
-  addDays,
-  startOfWeek,
-  startOfMonth,
-  addMonths,
-  startOfQuarter,
-  addQuarters,
-  startOfYear,
-  addYears,
-} from 'date-fns';
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import { Period } from '@app/shared-data';
 
 export interface KCandleBoundary {
   startTime: Date;
   endTime: Date;
 }
+
+interface MarketDateParts {
+  year: number;
+  month: number;
+  date: number;
+  dayOfWeek: number;
+}
+
+const MARKET_TIME_ZONE = 'Asia/Shanghai';
 
 /**
  * Pure utility for calculating the previous completed K candle's time boundaries.
@@ -46,29 +44,28 @@ export class KBoundaryCalculator {
     period: Period,
     triggerTime: Date,
   ): KCandleBoundary | null {
-    const sessionStart = this.getSessionStart(triggerTime);
-    if (!sessionStart) {
+    const marketTime = toZonedTime(triggerTime, MARKET_TIME_ZONE);
+    const sessionStartMinutes = this.getSessionStartMinutes(marketTime);
+    if (sessionStartMinutes === null) {
       return null;
     }
 
-    const triggerMinutes =
-      triggerTime.getHours() * 60 + triggerTime.getMinutes();
-    const sessionStartMinutes =
-      sessionStart.getHours() * 60 + sessionStart.getMinutes();
+    const triggerMinutes = marketTime.getHours() * 60 + marketTime.getMinutes();
     const periodMinutes = period as number;
 
     const minutesSinceSessionStart = triggerMinutes - sessionStartMinutes;
     const candleEndOffset =
       Math.floor(minutesSinceSessionStart / periodMinutes) * periodMinutes;
 
-    const endTime = set(sessionStart, {
-      minutes: sessionStart.getMinutes() + candleEndOffset,
-      seconds: 0,
-      milliseconds: 0,
-    });
-    const startTime = set(endTime, {
-      minutes: endTime.getMinutes() - periodMinutes,
-    });
+    const marketDate = this.toMarketDateParts(triggerTime);
+    const endTime = this.toMarketDateTime(
+      marketDate,
+      sessionStartMinutes + candleEndOffset,
+    );
+    const startTime = this.toMarketDateTime(
+      marketDate,
+      sessionStartMinutes + candleEndOffset - periodMinutes,
+    );
 
     return { startTime, endTime };
   }
@@ -77,32 +74,63 @@ export class KBoundaryCalculator {
    * Calculate daily+ K candle boundaries using natural time boundaries.
    */
   calculateDailyPlusCandle(period: Period, triggerTime: Date): KCandleBoundary {
+    const marketDate = this.toMarketDateParts(triggerTime);
+
     switch (period) {
       case Period.DAY: {
-        const startTime = startOfDay(triggerTime);
-        const endTime = startOfDay(addDays(triggerTime, 1));
+        const startTime = this.toMarketDateTime(marketDate, 0);
+        const endTime = this.toMarketDateTime(
+          this.addMarketDays(marketDate, 1),
+          0,
+        );
         return { startTime, endTime };
       }
       case Period.WEEK: {
-        const startTime = startOfWeek(triggerTime, { weekStartsOn: 1 });
-        const endTime = startOfWeek(addDays(triggerTime, 7), {
-          weekStartsOn: 1,
-        });
+        const daysSinceMonday = (marketDate.dayOfWeek + 6) % 7;
+        const startDate = this.addMarketDays(marketDate, -daysSinceMonday);
+        const startTime = this.toMarketDateTime(startDate, 0);
+        const endTime = this.toMarketDateTime(
+          this.addMarketDays(startDate, 7),
+          0,
+        );
         return { startTime, endTime };
       }
       case Period.MONTH: {
-        const startTime = startOfMonth(triggerTime);
-        const endTime = startOfMonth(addMonths(triggerTime, 1));
+        const startDate = this.normalizeMarketDate(
+          marketDate.year,
+          marketDate.month,
+          1,
+        );
+        const endDate = this.normalizeMarketDate(
+          marketDate.year,
+          marketDate.month + 1,
+          1,
+        );
+        const startTime = this.toMarketDateTime(startDate, 0);
+        const endTime = this.toMarketDateTime(endDate, 0);
         return { startTime, endTime };
       }
       case Period.QUARTER: {
-        const startTime = startOfQuarter(triggerTime);
-        const endTime = startOfQuarter(addQuarters(triggerTime, 1));
+        const startMonth = Math.floor(marketDate.month / 3) * 3;
+        const startDate = this.normalizeMarketDate(
+          marketDate.year,
+          startMonth,
+          1,
+        );
+        const endDate = this.normalizeMarketDate(
+          marketDate.year,
+          startMonth + 3,
+          1,
+        );
+        const startTime = this.toMarketDateTime(startDate, 0);
+        const endTime = this.toMarketDateTime(endDate, 0);
         return { startTime, endTime };
       }
       case Period.YEAR: {
-        const startTime = startOfYear(triggerTime);
-        const endTime = startOfYear(addYears(triggerTime, 1));
+        const startDate = this.normalizeMarketDate(marketDate.year, 0, 1);
+        const endDate = this.normalizeMarketDate(marketDate.year + 1, 0, 1);
+        const startTime = this.toMarketDateTime(startDate, 0);
+        const endTime = this.toMarketDateTime(endDate, 0);
         return { startTime, endTime };
       }
       default:
@@ -114,7 +142,7 @@ export class KBoundaryCalculator {
    * Determine which market session the trigger time falls into.
    * Returns the session start time, or null if outside trading sessions.
    */
-  private getSessionStart(triggerTime: Date): Date | null {
+  private getSessionStartMinutes(triggerTime: Date): number | null {
     const hours = triggerTime.getHours();
     const minutes = triggerTime.getMinutes();
     const totalMinutes = hours * 60 + minutes;
@@ -123,26 +151,78 @@ export class KBoundaryCalculator {
     const morningStart = 9 * 60 + 30; // 570
     const morningEnd = 11 * 60 + 31; // 691
     if (totalMinutes >= morningStart && totalMinutes <= morningEnd) {
-      return set(triggerTime, {
-        hours: 9,
-        minutes: 30,
-        seconds: 0,
-        milliseconds: 0,
-      });
+      return morningStart;
     }
 
     // Afternoon session: 13:00 - 15:00 (+ 1min grace for post-session trigger)
     const afternoonStart = 13 * 60; // 780
     const afternoonEnd = 15 * 60 + 1; // 901
     if (totalMinutes >= afternoonStart && totalMinutes <= afternoonEnd) {
-      return set(triggerTime, {
-        hours: 13,
-        minutes: 0,
-        seconds: 0,
-        milliseconds: 0,
-      });
+      return afternoonStart;
     }
 
     return null;
+  }
+
+  private toMarketDateParts(date: Date): MarketDateParts {
+    const marketTime = toZonedTime(date, MARKET_TIME_ZONE);
+    return {
+      year: marketTime.getFullYear(),
+      month: marketTime.getMonth(),
+      date: marketTime.getDate(),
+      dayOfWeek: marketTime.getDay(),
+    };
+  }
+
+  private addMarketDays(
+    dateParts: MarketDateParts,
+    days: number,
+  ): MarketDateParts {
+    return this.normalizeMarketDate(
+      dateParts.year,
+      dateParts.month,
+      dateParts.date + days,
+    );
+  }
+
+  private normalizeMarketDate(
+    year: number,
+    month: number,
+    date: number,
+  ): MarketDateParts {
+    const normalized = new Date(Date.UTC(year, month, date));
+    return {
+      year: normalized.getUTCFullYear(),
+      month: normalized.getUTCMonth(),
+      date: normalized.getUTCDate(),
+      dayOfWeek: normalized.getUTCDay(),
+    };
+  }
+
+  private toMarketDateTime(
+    dateParts: MarketDateParts,
+    totalMinutes: number,
+  ): Date {
+    const normalizedDate = this.normalizeMarketDate(
+      dateParts.year,
+      dateParts.month,
+      dateParts.date,
+    );
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    const wallTime = [
+      normalizedDate.year.toString().padStart(4, '0'),
+      '-',
+      (normalizedDate.month + 1).toString().padStart(2, '0'),
+      '-',
+      normalizedDate.date.toString().padStart(2, '0'),
+      'T',
+      hours.toString().padStart(2, '0'),
+      ':',
+      minutes.toString().padStart(2, '0'),
+      ':00.000',
+    ].join('');
+
+    return fromZonedTime(wallTime, MARKET_TIME_ZONE);
   }
 }
