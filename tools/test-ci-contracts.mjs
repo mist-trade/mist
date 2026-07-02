@@ -69,6 +69,15 @@ function assertEnvFilesUntracked() {
   }
 }
 
+function assertOptionalRepoContracts(repoName, assertContracts) {
+  const repoPath = repos[repoName];
+  if (!existsSync(repoPath)) {
+    console.log(`Skipping ${repoName} CI contracts; repo not found at ${repoPath}`);
+    return;
+  }
+  assertContracts();
+}
+
 function assertMistBackendContracts() {
   const packageJson = readJson(join(repos.mist, 'package.json'));
   assertNode24Nvm(repos.mist, 'mist');
@@ -158,9 +167,9 @@ function assertSkillsContracts() {
 }
 
 assertMistBackendContracts();
-assertFrontendContracts();
-assertDatasourceContracts();
-assertMonitoringContracts();
-assertSkillsContracts();
+assertOptionalRepoContracts('frontend', assertFrontendContracts);
+assertOptionalRepoContracts('datasource', assertDatasourceContracts);
+assertOptionalRepoContracts('monitoring', assertMonitoringContracts);
+assertOptionalRepoContracts('skills', assertSkillsContracts);
 
 console.log('CI release contract checks passed.');
