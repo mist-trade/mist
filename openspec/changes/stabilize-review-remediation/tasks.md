@@ -15,7 +15,7 @@
 - [x] 2.4 Create `harden-docker-deploy-path` for backend Dockerfile, compose command, image tag, rollback, and deployment-script verification.
 - [x] 2.5 Create `align-datasource-ws-contract` for WebSocket envelope, error, pong, snapshot, and old-route migration planning.
 - [x] 2.6 Create `fix-mcp-skills-contracts` for MCP stub handling, unknown-error normalization, skills response parsing, and shared script runner tests.
-- [ ] 2.7 Create `fix-frontend-runtime-quality` for duplicate API layer removal, mock data bundle isolation, chart resize, request race protection, and large-data utilities.
+- [x] 2.7 Create `fix-frontend-runtime-quality` for duplicate API layer removal, mock data bundle isolation, chart resize, request race protection, and large-data utilities.
 - [ ] 2.8 Create `repair-monitoring-health-alerts` for Mac datasource health parsing, probe/notifier error visibility, and Prometheus metric rendering.
 
 ## 3. Enforce test-backed completion
