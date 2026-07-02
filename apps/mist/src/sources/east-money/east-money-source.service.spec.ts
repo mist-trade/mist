@@ -12,6 +12,7 @@ import {
 } from '@app/shared-data';
 import { UtilsService, PeriodMappingService } from '@app/utils';
 import { DataSource as TypeOrmDataSource } from 'typeorm';
+import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
 
 const createInsertBuilderMock = () => ({
   insert: jest.fn().mockReturnThis(),
@@ -100,7 +101,7 @@ describe('EastMoneySource', () => {
 
       expect(createAxiosInstance).toHaveBeenCalledWith({
         baseURL: 'http://aktools.internal:18080',
-        timeout: 30000,
+        timeout: DATASOURCE_HTTP_TIMEOUT_MS,
       });
     });
 
@@ -109,7 +110,7 @@ describe('EastMoneySource', () => {
 
       expect(createAxiosInstance).toHaveBeenCalledWith({
         baseURL: 'http://127.0.0.1:8080',
-        timeout: 30000,
+        timeout: DATASOURCE_HTTP_TIMEOUT_MS,
       });
     });
   });

@@ -1,0 +1,1 @@
+export const DATASOURCE_HTTP_TIMEOUT_MS = 30000;

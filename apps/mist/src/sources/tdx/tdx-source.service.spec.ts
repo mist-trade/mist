@@ -13,6 +13,7 @@ import {
 } from '@app/shared-data';
 import { UtilsService, PeriodMappingService } from '@app/utils';
 import { TdxResponse } from './types';
+import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
 
 const createInsertBuilderMock = () => ({
   insert: jest.fn().mockReturnThis(),
@@ -28,6 +29,7 @@ describe('TdxSource', () => {
   let mockAxiosGet: jest.Mock;
   let mockAxiosPost: jest.Mock;
   let mockTypeOrmDataSource: jest.Mocked<DataSource>;
+  let createAxiosInstance: jest.Mock;
 
   beforeEach(async () => {
     mockAxiosGet = jest.fn();
@@ -41,6 +43,7 @@ describe('TdxSource', () => {
     mockTypeOrmDataSource = {
       transaction: jest.fn(),
     } as unknown as jest.Mocked<DataSource>;
+    createAxiosInstance = jest.fn(() => mockAxiosInstance);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -57,7 +60,7 @@ describe('TdxSource', () => {
         {
           provide: UtilsService,
           useFactory: () => ({
-            createAxiosInstance: jest.fn(() => mockAxiosInstance),
+            createAxiosInstance,
           }),
         },
         {
@@ -119,6 +122,15 @@ describe('TdxSource', () => {
       get: mockAxiosGet,
       post: mockAxiosPost,
     };
+  });
+
+  describe('configuration', () => {
+    it('uses TDX_BASE_URL with the shared datasource HTTP timeout', () => {
+      expect(createAxiosInstance).toHaveBeenCalledWith({
+        baseURL: 'http://127.0.0.1:9001',
+        timeout: DATASOURCE_HTTP_TIMEOUT_MS,
+      });
+    });
   });
 
   describe('isSupportedPeriod', () => {

@@ -18,6 +18,7 @@ import {
 import { DataSource as TypeOrmDataSource, In } from 'typeorm';
 import { parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
+import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
 
 const K_UPSERT_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'amount'];
 const MARKET_TIME_ZONE = 'Asia/Shanghai';
@@ -50,7 +51,7 @@ export class EastMoneySource implements ISourceFetcher {
       baseURL:
         this.configService.get<string>('AKTOOLS_BASE_URL') ||
         'http://127.0.0.1:8080',
-      timeout: 30000,
+      timeout: DATASOURCE_HTTP_TIMEOUT_MS,
     });
   }
 

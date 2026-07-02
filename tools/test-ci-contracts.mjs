@@ -181,6 +181,54 @@ function assertNoSelectedBackendProductionConsoleCalls() {
   }
 }
 
+function assertBackendHttpConfigHygiene() {
+  const utilsService = read(
+    join(repos.mist, 'libs/utils/src/utils.service.ts'),
+  );
+  if (
+    !/import\s+axios,\s*\{\s*AxiosInstance\s*\}\s+from\s+['"]axios['"]/.test(
+      utilsService,
+    )
+  ) {
+    fail('UtilsService must import AxiosInstance from axios');
+  }
+  if (
+    !/createAxiosInstance\s*\([^)]*\)\s*:\s*AxiosInstance\s*\{/.test(
+      utilsService,
+    )
+  ) {
+    fail('UtilsService.createAxiosInstance must return AxiosInstance');
+  }
+  if (/createAxiosInstance\s*\([^)]*\)\s*:\s*any\s*\{/.test(utilsService)) {
+    fail('UtilsService.createAxiosInstance must not return any');
+  }
+
+  const sourcesConstant = read(
+    join(repos.mist, 'apps/mist/src/sources/constants.ts'),
+  );
+  assertIncludes(
+    sourcesConstant,
+    'DATASOURCE_HTTP_TIMEOUT_MS = 30000',
+    'mist datasource HTTP timeout constants',
+  );
+
+  for (const relativePath of [
+    'apps/mist/src/sources/east-money/east-money-source.service.ts',
+    'apps/mist/src/sources/tdx/tdx-source.service.ts',
+  ]) {
+    const content = read(join(repos.mist, relativePath));
+    assertIncludes(
+      content,
+      'DATASOURCE_HTTP_TIMEOUT_MS',
+      `${relativePath} datasource timeout`,
+    );
+    const literalTimeoutPattern = /timeout:\s*30000\b/;
+    if (literalTimeoutPattern.test(content)) {
+      fail(`${relativePath} must use DATASOURCE_HTTP_TIMEOUT_MS for timeout`);
+    }
+  }
+}
+
 function assertEnvFilesUntracked() {
   const tracked = execFileSync(
     'git',
@@ -235,6 +283,7 @@ function assertMistBackendContracts() {
   assertBackendToolingHygiene(packageJson);
   assertBackendJestHygiene(packageJson);
   assertNoSelectedBackendProductionConsoleCalls();
+  assertBackendHttpConfigHygiene();
 
   const gitignore = read(join(repos.mist, '.gitignore'));
   assertIncludes(gitignore, '.env.*', 'mist .gitignore');
