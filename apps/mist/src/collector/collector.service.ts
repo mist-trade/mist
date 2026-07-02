@@ -8,6 +8,7 @@ import { DataSourceSelectionService } from '@app/utils';
 import {
   BadRequestException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
@@ -22,6 +23,7 @@ import { TdxSource } from '../sources/tdx/tdx-source.service';
 
 @Injectable()
 export class CollectorService {
+  private readonly logger = new Logger(CollectorService.name);
   private sources: Map<DataSource, ISourceFetcher<any>> = new Map();
 
   constructor(
@@ -111,7 +113,7 @@ export class CollectorService {
       const kLineData = await sourceFetcher.fetchK(fetchParams);
 
       if (kLineData.length === 0) {
-        console.warn(
+        this.logger.warn(
           `No data returned for security ${stockCode}, period ${period}, from ${startDate} to ${endDate}`,
         );
         return 0;
@@ -125,12 +127,12 @@ export class CollectorService {
         await postProcess(kLineData, dataSource);
       }
 
-      console.log(
+      this.logger.log(
         `Successfully collected ${kLineData.length} K-line records for ${stockCode}, period ${period} from ${dataSource}`,
       );
       return kLineData.length;
     } catch (error) {
-      console.error(
+      this.logger.error(
         `Failed to collect K-line data for ${stockCode} from ${dataSource}:`,
         error,
       );
@@ -224,7 +226,7 @@ export class CollectorService {
       const kLineData = await sourceFetcher.fetchK(fetchParams);
 
       if (kLineData.length === 0) {
-        console.warn(
+        this.logger.warn(
           `No data returned for security ${stockCode}, period ${period}, from ${startDate} to ${endDate}`,
         );
         return;
@@ -233,11 +235,14 @@ export class CollectorService {
       // Save data to database
       await sourceFetcher.saveK(kLineData, security, period);
 
-      console.log(
+      this.logger.log(
         `Successfully collected ${kLineData.length} K-line records for ${stockCode}, period ${period}`,
       );
     } catch (error) {
-      console.error(`Failed to collect K-line data for ${stockCode}:`, error);
+      this.logger.error(
+        `Failed to collect K-line data for ${stockCode}:`,
+        error,
+      );
       throw error;
     }
   }
