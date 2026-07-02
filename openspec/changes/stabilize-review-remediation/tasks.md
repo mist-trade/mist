@@ -20,22 +20,22 @@
 
 ## 3. Enforce test-backed completion
 
-- [ ] 3.1 For each child change, copy selected review IDs into its tasks before code edits begin.
-- [ ] 3.2 For each code behavior fix, add or update targeted unit tests that cover the reviewed risk.
-- [ ] 3.3 For each workflow, Docker, script, or deployment-only fix, add substitute verification such as config tests, script self-tests, compose checks, image smoke, or runner smoke.
-- [ ] 3.4 Record test or verification commands in the child change completion summary.
-- [ ] 3.5 Leave any item incomplete if its required verification cannot run and no substitute proof has been accepted.
+- [x] 3.1 For each child change, copy selected review IDs into its tasks before code edits begin.
+- [x] 3.2 For each code behavior fix, add or update targeted unit tests that cover the reviewed risk.
+- [x] 3.3 For each workflow, Docker, script, or deployment-only fix, add substitute verification such as config tests, script self-tests, compose checks, image smoke, or runner smoke.
+- [x] 3.4 Record test or verification commands in the child change completion summary.
+- [x] 3.5 Leave any item incomplete if its required verification cannot run and no substitute proof has been accepted.
 
 ## 4. Preserve production boundaries
 
-- [ ] 4.1 Ensure deployment child changes preserve Docker-stack app deployment plus host-side WinSW datasource boundaries.
-- [ ] 4.2 Ensure datasource child changes keep normalized Python product routes as the upstream contract and raw provider access debug-only.
-- [ ] 4.3 Ensure Docker mirror changes distinguish Docker Hub image pulls from GitHub Actions archive download failures.
-- [ ] 4.4 Ensure TDX terminal recovery remains separate from ordinary datasource update/restart work.
+- [x] 4.1 Ensure deployment child changes preserve Docker-stack app deployment plus host-side WinSW datasource boundaries.
+- [x] 4.2 Ensure datasource child changes keep normalized Python product routes as the upstream contract and raw provider access debug-only.
+- [x] 4.3 Ensure Docker mirror changes distinguish Docker Hub image pulls from GitHub Actions archive download failures.
+- [x] 4.4 Ensure TDX terminal recovery remains separate from ordinary datasource update/restart work.
 
 ## 5. Validate this governance change
 
 - [x] 5.1 Run `openspec validate stabilize-review-remediation --strict`.
 - [x] 5.2 Run `openspec status --change stabilize-review-remediation` and confirm the change is apply-ready.
 - [x] 5.3 Review `proposal.md`, `design.md`, `specs/review-remediation-governance/spec.md`, and `tasks.md` for placeholders or contradictions.
-- [ ] 5.4 Confirm git status contains only intentional OpenSpec and review-document changes.
+- [x] 5.4 Confirm git status contains only intentional OpenSpec and review-document changes.
