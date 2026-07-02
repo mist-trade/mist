@@ -667,7 +667,7 @@ export class BiService {
    */
   private removeBiByIndex<T>(bis: T[], index: number) {
     if (index >= 0 && index < bis.length) {
-      bis.splice(index);
+      bis.splice(index, 1);
     }
   }
 

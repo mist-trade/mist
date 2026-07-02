@@ -1,4 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { ConfigService } from '@nestjs/config';
 import { EastMoneySource } from './east-money-source.service';
 import { AxiosInstance } from 'axios';
 import { KFetchParams, KData, EfExtension } from '../source-fetcher.interface';
@@ -24,11 +25,15 @@ const createInsertBuilderMock = () => ({
 describe('EastMoneySource', () => {
   let service: EastMoneySource;
   let axiosInstance: jest.Mocked<AxiosInstance>;
+  let createAxiosInstance: jest.Mock;
 
-  beforeEach(async () => {
+  const createService = async (
+    configValues: Record<string, string | undefined> = {},
+  ) => {
     const mockAxiosInstance = {
       get: jest.fn(),
     } as unknown as jest.Mocked<AxiosInstance>;
+    createAxiosInstance = jest.fn(() => mockAxiosInstance);
 
     const module: TestingModule = await Test.createTestingModule({
       providers: [
@@ -36,8 +41,14 @@ describe('EastMoneySource', () => {
         {
           provide: UtilsService,
           useFactory: () => ({
-            createAxiosInstance: jest.fn(() => mockAxiosInstance),
+            createAxiosInstance,
           }),
+        },
+        {
+          provide: ConfigService,
+          useValue: {
+            get: jest.fn((key: string) => configValues[key]),
+          },
         },
         {
           provide: PeriodMappingService,
@@ -75,6 +86,32 @@ describe('EastMoneySource', () => {
 
     service = module.get<EastMoneySource>(EastMoneySource);
     axiosInstance = mockAxiosInstance;
+  };
+
+  beforeEach(async () => {
+    await createService();
+  });
+
+  describe('configuration', () => {
+    it('uses AKTOOLS_BASE_URL when configured', async () => {
+      await createService({
+        AKTOOLS_BASE_URL: 'http://aktools.internal:18080',
+      });
+
+      expect(createAxiosInstance).toHaveBeenCalledWith({
+        baseURL: 'http://aktools.internal:18080',
+        timeout: 30000,
+      });
+    });
+
+    it('uses the local AKTools default when config is absent', async () => {
+      await createService();
+
+      expect(createAxiosInstance).toHaveBeenCalledWith({
+        baseURL: 'http://127.0.0.1:8080',
+        timeout: 30000,
+      });
+    });
   });
 
   describe('fetchK - period (minute-level)', () => {
