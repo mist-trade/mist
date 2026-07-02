@@ -22,9 +22,46 @@ on:
         default: false
 
 jobs:
+  validate:
+    name: Validate release inputs
+    runs-on: ubuntu-latest
+    env:
+      PNPM_VERSION: 9.15.3
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24.x
+
+      - name: Install pnpm
+        run: npm install -g pnpm@${{ env.PNPM_VERSION }}
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile --ignore-scripts
+
+      - name: Lint
+        run: pnpm run lint:check
+
+      - name: Typecheck
+        run: pnpm run typecheck
+
+      - name: Test
+        run: pnpm run test:ci
+
+      - name: Verify CI contracts
+        run: pnpm run ci:contracts
+
   release:
     name: Create Release, Packages, and Docker Images
     runs-on: ubuntu-latest
+    needs: validate
+    environment: production-release
     permissions:
       contents: write
       packages: write
@@ -109,7 +146,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22.x
+          node-version: 24.x
 
       - name: Install pnpm
         run: npm install -g pnpm@${{ env.PNPM_VERSION }}
