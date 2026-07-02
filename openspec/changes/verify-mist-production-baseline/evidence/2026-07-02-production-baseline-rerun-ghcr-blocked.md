@@ -41,8 +41,8 @@ Common inputs:
 - `frontend_image_tag=c9bb33588b55d8509526cf71b38ae4b26e52b790`
 - `previous_frontend_image_tag=23b483388a9f40d9ad9b22529729e1f75f369726`
 - `web_gateway_image=docker.m.daocloud.io/library/nginx:1.27-alpine`
-- `docker_root=E:\quant\MistDocker`
-- `datasource_root=F:\quant\MistAPI\datasource`
+- `docker_root=<docker-root>`
+- `datasource_root=<datasource-root>`
 - `skip_pull=false`
 - `skip_backup=false`
 - `skip_migration=false`
@@ -50,9 +50,9 @@ Common inputs:
 
 | Run | Result | Evidence |
 | --- | --- | --- |
-| `28577024870` | Failed in `Deploy Mist stack` | `docker compose pull` failed while resolving frontend GHCR manifest: `Head "https://ghcr.io/v2/mist-trade/mist-fe/manifests/c9bb33588b55d8509526cf71b38ae4b26e52b790": EOF`. Backend pull was interrupted. The deploy script captured diagnostics at `E:\quant\MistDocker\diagnostics\20260702-164216` and rolled containers back to backend `3aa23e3558da87899337d215cf52aa8663a755ba` and frontend `23b483388a9f40d9ad9b22529729e1f75f369726`. |
+| `28577024870` | Failed in `Deploy Mist stack` | `docker compose pull` failed while resolving frontend GHCR manifest: `Head "https://ghcr.io/v2/mist-trade/mist-fe/manifests/c9bb33588b55d8509526cf71b38ae4b26e52b790": EOF`. Backend pull was interrupted. The deploy script captured diagnostics at `<docker-root>\diagnostics\<timestamp>` and rolled containers back to backend `3aa23e3558da87899337d215cf52aa8663a755ba` and frontend `23b483388a9f40d9ad9b22529729e1f75f369726`. |
 | `28577310629` | Failed in `Login to GHCR` | `docker login ghcr.io` failed with `Get "https://ghcr.io/v2/": net/http: TLS handshake timeout`. `Deploy Mist stack` was skipped. |
-| `28577819141` | Cancelled | Run remained queued for several minutes while runner `mist-api-windows-01` was reported online and not busy. It was cancelled before any step executed to avoid leaving a hanging deployment run. |
+| `28577819141` | Cancelled | Run remained queued for several minutes while runner `<windows-runner-name>` was reported online and not busy. It was cancelled before any step executed to avoid leaving a hanging deployment run. |
 | `28578333117` | Failed in `Login to GHCR` | `docker login ghcr.io` failed with `Get "https://ghcr.io/v2/": net/http: TLS handshake timeout`. `Deploy Mist stack` was skipped. |
 
 Conclusion: this rerun did not validate the target production baseline. The
@@ -70,19 +70,19 @@ after the failures showed the stack remained reachable in the rollback state.
 Host resolution from the Mac:
 
 ```text
-name: www.moyui.mist
-ip_address: 192.168.31.182
+name: <gateway-hostname>
+ip_address: <windows-lan-ip>
 ```
 
 Gateway and datasource probes after the failures:
 
 | Probe | Result |
 | --- | --- |
-| `http://www.moyui.mist/` | HTTP `307`, remote IP `192.168.31.182`, redirects to `/k` |
-| `http://www.moyui.mist/k` | HTTP `200`, remote IP `192.168.31.182` |
-| `http://www.moyui.mist/api/mist/app/hello` | HTTP `200`, JSON `success=true`, `data="Hello World!"`, remote IP `192.168.31.182` |
-| `http://www.moyui.mist/api/chan/app/hello` | HTTP `200`, body `Hello World!`, remote IP `192.168.31.182` |
-| `http://192.168.31.182:9001/health` | HTTP `200`, `status="ok"`, `tdxHttpReachable=true`, `tqInitialized=true`, `wsConnected=true`, `subscribedCount=0`, `activeSubscriptions=[]`, `quoteCallbackRejectedCount=0`, `lastQuoteCallbackAccepted=true`, `eventQueueDepth=0`, `collectorState="running"` |
+| `http://<gateway-hostname>/` | HTTP `307`, remote IP `<windows-lan-ip>`, redirects to `/k` |
+| `http://<gateway-hostname>/k` | HTTP `200`, remote IP `<windows-lan-ip>` |
+| `http://<gateway-hostname>/api/mist/app/hello` | HTTP `200`, JSON `success=true`, `data="Hello World!"`, remote IP `<windows-lan-ip>` |
+| `http://<gateway-hostname>/api/chan/app/hello` | HTTP `200`, body `Hello World!`, remote IP `<windows-lan-ip>` |
+| `http://<windows-lan-ip>:9001/health` | HTTP `200`, `status="ok"`, `tdxHttpReachable=true`, `tqInitialized=true`, `wsConnected=true`, `subscribedCount=0`, `activeSubscriptions=[]`, `quoteCallbackRejectedCount=0`, `lastQuoteCallbackAccepted=true`, `eventQueueDepth=0`, `collectorState="running"` |
 
 Frontend note: the failed `28577024870` run rolled frontend back to
 `23b483388a9f40d9ad9b22529729e1f75f369726`. The `/k` page still responds, but

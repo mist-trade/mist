@@ -1,7 +1,7 @@
 # Mist Production Baseline Evidence - 2026-07-01
 
 Status: known-good for the verified production baseline from the Mac
-verification host. `www.moyui.mist` resolves to `192.168.31.182` through
+verification host. `<gateway-hostname>` resolves to `<windows-lan-ip>` through
 Mac-local host resolution; no LAN-wide DNS record is configured.
 
 This ledger started as a non-mutating verification pass from the Mac workspace.
@@ -16,12 +16,12 @@ triggered during this pass.
 | Field | Value |
 | --- | --- |
 | Baseline timestamp | 2026-07-01 20:38:01 CST +0800 |
-| Operator | moyui |
-| Verification host | Mac workspace `/Users/moyui/sean/mist` |
-| Windows API machine identity | GitHub runner `mist-api-windows-01`, machine `DESKTOP-T3B1O2J` |
-| Windows LAN IP | `192.168.31.182` candidate from existing deployment baseline |
-| Gateway hostname | `www.moyui.mist` |
-| Docker root | `E:\quant\MistDocker` expected from deploy baseline |
+| Operator | <operator> |
+| Verification host | Mac workspace `<mac-workspace-root>` |
+| Windows API machine identity | GitHub runner `<windows-runner-name>`, machine `<windows-machine-name>` |
+| Windows LAN IP | `<windows-lan-ip>` candidate from existing deployment baseline |
+| Gateway hostname | `<gateway-hostname>` |
+| Docker root | `<docker-root>` expected from deploy baseline |
 | Datasource root | Not verified in this pass; host-side WinSW datasource expected |
 | Monitoring scope | Optional; local `127.0.0.1:8787/metrics` probe failed |
 
@@ -63,7 +63,7 @@ Pinned images selected for this baseline:
 | `MIST_FE_IMAGE` | `ghcr.io/mist-trade/mist-fe` |
 | `MIST_FE_IMAGE_TAG` | `latest` |
 | `WEB_GATEWAY_IMAGE` | `docker.m.daocloud.io/library/nginx:1.27-alpine` |
-| `MYSQL_DATA_DIR` | `E:\quant\MistDocker\mysql-data` |
+| `MYSQL_DATA_DIR` | `<docker-root>\mysql-data` |
 | `MIST_BACKEND_PORT` | `8001` |
 | `CHAN_API_PORT` | `8008` |
 | `WEB_GATEWAY_PORT` | `80` |
@@ -116,8 +116,8 @@ Workflow: `Deploy Windows Mist Stack` in `mist-trade/mist-deploy`.
 | URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28519061612` |
 | Final status | Failed |
 | Job | `84538151814` |
-| Root cause | Mac shell dispatch passed Windows paths without preserving backslashes, so `E:\quant\MistDocker` became `E:quantMistDocker` |
-| Diagnostics path | `E:quantMistDocker\diagnostics\20260701-205640` |
+| Root cause | Mac shell dispatch passed Windows paths without preserving backslashes, so `<docker-root>` became `E:quantMistDocker` |
+| Diagnostics path | `E:quantMistDocker\diagnostics\<timestamp>` |
 
 This attempt is not treated as production runtime evidence because the dispatch
 inputs were malformed before the workflow reached the intended Docker root.
@@ -134,8 +134,8 @@ inputs were malformed before the workflow reached the intended Docker root.
 | Backend image | `ghcr.io/mist-trade/mist:32364ecad2199a8ea011c5423541692834fab710` |
 | Frontend image | `ghcr.io/mist-trade/mist-fe:23b483388a9f40d9ad9b22529729e1f75f369726` |
 | Web gateway image | `docker.m.daocloud.io/library/nginx:1.27-alpine` |
-| Docker root | `E:\quant\MistDocker` |
-| Datasource root | `F:\quant\MistAPI\datasource` |
+| Docker root | `<docker-root>` |
+| Datasource root | `<datasource-root>` |
 | Previous backend/frontend tags | Not provided; rollback skipped |
 | `skip_pull` | `false` |
 | `skip_backup` | `false` |
@@ -146,11 +146,11 @@ Runner evidence from run `28519192627`:
 
 - GHCR login completed.
 - Backend, frontend, and gateway images pulled successfully.
-- `DockerRoot=E:\quant\MistDocker` and
-  `DatasourceRoot=F:\quant\MistAPI\datasource` were accepted by the script.
+- `DockerRoot=<docker-root>` and
+  `DatasourceRoot=<datasource-root>` were accepted by the script.
 - MySQL was running and healthy.
 - Pre-migration backup was created:
-  `E:\quant\MistDocker\backups\mist-20260701-205857.sql`.
+  `<docker-root>\backups\mist-<timestamp>.sql`.
 - Backup retention cleanup removed `0` items.
 - Database migrations ran; migrations `001_init_core_tables.sql`,
   `002_add_tdx_vol_in_stock.sql`, and `003_security_code_identity.sql` were
@@ -168,7 +168,7 @@ Runner evidence from run `28519192627`:
 - Workflow failed during gateway health:
   `http://127.0.0.1:80/api/mist/app/hello` returned HTTP `502`.
 - Diagnostics were captured at:
-  `E:\quant\MistDocker\diagnostics\20260701-210109`.
+  `<docker-root>\diagnostics\<timestamp>`.
 
 Suspected root cause for the gateway HTTP `502`:
 
@@ -193,7 +193,7 @@ Suspected root cause for the gateway HTTP `502`:
   logs for `mysql`, `mist-backend`, and `chan-api`; it does not collect
   `web-gateway` or `mist-fe` logs.
 - The diagnostics directory on the Windows host is
-  `E:\quant\MistDocker\diagnostics\20260701-210109`, but it is not retrievable
+  `<docker-root>\diagnostics\<timestamp>`, but it is not retrievable
   from GitHub without an artifact upload or direct Windows host access.
 
 ### Diagnostics artifact follow-up
@@ -245,7 +245,7 @@ Runner evidence from run `28529821620`:
 - Backend, frontend, and web-gateway images pulled successfully, including
   `docker.m.daocloud.io/library/nginx:1.27-alpine`.
 - Pre-migration backup was created:
-  `E:\quant\MistDocker\backups\mist-20260701-234604.sql`.
+  `<docker-root>\backups\mist-<timestamp>.sql`.
 - Database migrations ran; migrations `001_init_core_tables.sql`,
   `002_add_tdx_vol_in_stock.sql`, and `003_security_code_identity.sql` were
   already applied.
@@ -258,7 +258,7 @@ Runner evidence from run `28529821620`:
 - Workflow failed during gateway Mist API health:
   `http://127.0.0.1:80/api/mist/app/hello` returned HTTP `502`.
 - Diagnostics were captured on the Windows host at:
-  `E:\quant\MistDocker\diagnostics\20260701-234812`.
+  `<docker-root>\diagnostics\<timestamp>`.
 - The failure-only stdout diagnostics step ran successfully and printed compose
   status, `web-gateway` logs, `mist-fe` logs, and the applied nginx
   configuration.
@@ -318,7 +318,7 @@ Runner evidence from run `28531193330`:
 - Backend, frontend, and web-gateway images pulled successfully, including
   `docker.m.daocloud.io/library/nginx:1.27-alpine`.
 - Pre-migration backup was created:
-  `E:\quant\MistDocker\backups\mist-20260702-000824.sql`.
+  `<docker-root>\backups\mist-<timestamp>.sql`.
 - Database migrations ran; migrations `001_init_core_tables.sql`,
   `002_add_tdx_vol_in_stock.sql`, and `003_security_code_identity.sql` were
   already applied.
@@ -338,7 +338,7 @@ Runner evidence from run `28531193330`:
 - Backend-container-to-host datasource health passed from `mist-backend`:
   `http://host.docker.internal:9001/health`.
 - Diagnostics were captured on the Windows host at:
-  `E:\quant\MistDocker\diagnostics\20260702-000834`.
+  `<docker-root>\diagnostics\<timestamp>`.
 - Deployment completed successfully.
 
 Gateway `502` fix conclusion:
@@ -372,40 +372,40 @@ Deployment script review for datasource preservation:
 
 ## Mac-Side Gateway Evidence
 
-Probe mode: raw Windows LAN IP and `www.moyui.mist`.
+Probe mode: raw Windows LAN IP and `<gateway-hostname>`.
 
 Initial name resolution from the Mac before local host resolution was fixed:
 
 | Check | Result |
 | --- | --- |
-| `/etc/hosts` entry for `www.moyui.mist` or `192.168.31.182` | No matching entry found |
-| `dscacheutil -q host -a name www.moyui.mist` | No record returned |
-| `dig +short www.moyui.mist` | `198.18.0.30` |
-| `http://www.moyui.mist/api/mist/app/hello` | Connected to `198.18.0.30:80`, then `curl: (52) Empty reply from server` |
-| `--resolve www.moyui.mist:80:192.168.31.182` for `/api/mist/app/hello` | HTTP `200 OK`; backend JSON success |
+| `/etc/hosts` entry for `<gateway-hostname>` or `<windows-lan-ip>` | No matching entry found |
+| `dscacheutil -q host -a name <gateway-hostname>` | No record returned |
+| `dig +short <gateway-hostname>` | `198.18.0.30` |
+| `http://<gateway-hostname>/api/mist/app/hello` | Connected to `198.18.0.30:80`, then `curl: (52) Empty reply from server` |
+| `--resolve <gateway-hostname>:80:<windows-lan-ip>` for `/api/mist/app/hello` | HTTP `200 OK`; backend JSON success |
 
 Follow-up after Mac-local host resolution was fixed on 2026-07-02:
 
 | Check | Result |
 | --- | --- |
-| `dscacheutil -q host -a name www.moyui.mist` | `ip_address: 192.168.31.182` |
-| `curl --noproxy '*' http://www.moyui.mist/api/mist/app/hello` | HTTP `200 OK`; `remote_ip=192.168.31.182`; JSON `success=true`, `data="Hello World!"`, path `/app/hello` |
-| `curl --noproxy '*' http://www.moyui.mist/api/chan/app/hello` | HTTP `200 OK`; `remote_ip=192.168.31.182`; body `Hello World!` |
-| `curl --noproxy '*' http://192.168.31.182/api/mist/app/hello` | HTTP `200 OK`; `remote_ip=192.168.31.182`; JSON `success=true`, `data="Hello World!"`, path `/app/hello` |
+| `dscacheutil -q host -a name <gateway-hostname>` | `ip_address: <windows-lan-ip>` |
+| `curl --noproxy '*' http://<gateway-hostname>/api/mist/app/hello` | HTTP `200 OK`; `remote_ip=<windows-lan-ip>`; JSON `success=true`, `data="Hello World!"`, path `/app/hello` |
+| `curl --noproxy '*' http://<gateway-hostname>/api/chan/app/hello` | HTTP `200 OK`; `remote_ip=<windows-lan-ip>`; body `Hello World!` |
+| `curl --noproxy '*' http://<windows-lan-ip>/api/mist/app/hello` | HTTP `200 OK`; `remote_ip=<windows-lan-ip>`; JSON `success=true`, `data="Hello World!"`, path `/app/hello` |
 
 Gateway and direct service probes from the Mac:
 
 | URL | Result |
 | --- | --- |
-| `http://192.168.31.182/` | HTTP `307 Temporary Redirect`; `Server: nginx/1.27.5`; `Location: /k`; Next.js HTML body returned |
-| `http://192.168.31.182/api/mist/app/hello` | HTTP `200 OK`; JSON `success=true`, `data="Hello World!"`, path `/app/hello` |
-| `http://192.168.31.182/api/chan/app/hello` | HTTP `200 OK`; body `Hello World!` |
+| `http://<windows-lan-ip>/` | HTTP `307 Temporary Redirect`; `Server: nginx/1.27.5`; `Location: /k`; Next.js HTML body returned |
+| `http://<windows-lan-ip>/api/mist/app/hello` | HTTP `200 OK`; JSON `success=true`, `data="Hello World!"`, path `/app/hello` |
+| `http://<windows-lan-ip>/api/chan/app/hello` | HTTP `200 OK`; body `Hello World!` |
 
 Mac-side gateway conclusion:
 
-- Raw Windows LAN IP `192.168.31.182` is reachable from the Mac for the gateway
+- Raw Windows LAN IP `<windows-lan-ip>` is reachable from the Mac for the gateway
   frontend path, Mist API proxy, and Chan API proxy.
-- `www.moyui.mist` now resolves to `192.168.31.182` from the Mac verification
+- `<gateway-hostname>` now resolves to `<windows-lan-ip>` from the Mac verification
   host and gateway Mist/Chan API probes pass without a per-command `--resolve`
   override.
 - The remaining DNS scope limitation is intentional: the mapping is Mac-local,
@@ -422,9 +422,9 @@ Workflow: `Test Windows MySQL Restore` in `mist-trade/mist-deploy`.
 | Final status | Success |
 | Branch | `work/restart-web-gateway-after-app-recreate` |
 | Commit | `f1a823a17bb50c5afb3d5b9e9146f1f8da3f9bda` |
-| Docker root | `E:\quant\MistDocker` |
-| Backup path | `E:\quant\MistDocker\backups\mist-20260702-000824.sql` |
-| Temporary container | `mist-mysql-restore-check-20260702-002018` |
+| Docker root | `<docker-root>` |
+| Backup path | `<docker-root>\backups\mist-<timestamp>.sql` |
+| Temporary container | `mist-mysql-restore-check-<timestamp>` |
 | Database | `mist` |
 
 Runner evidence from run `28531904790`:
@@ -435,9 +435,9 @@ Runner evidence from run `28531904790`:
 - Restore validation passed, including schema validation against the restored
   `mist` database.
 - The workflow reported
-  `RestoreBackupPath=E:\quant\MistDocker\backups\mist-20260702-000824.sql`.
+  `RestoreBackupPath=<docker-root>\backups\mist-<timestamp>.sql`.
 - Cleanup removed the temporary container
-  `mist-mysql-restore-check-20260702-002018`.
+  `mist-mysql-restore-check-<timestamp>`.
 
 ## TDX Runtime Smoke Evidence
 
@@ -451,10 +451,10 @@ Workflow: `Run Windows TDX Runtime Smoke` in `mist-trade/mist-deploy`.
 | Final status | Success |
 | Branch | `master` |
 | Commit | `0ceba9cf31e3e348449ce600f40c2de3186f8a7f` |
-| Runner | `mist-api-windows-01` |
-| Machine | `DESKTOP-T3B1O2J` |
-| Datasource root | `F:\quant\MistAPI\datasource` |
-| Appliance root | `F:\quant\MistAPI` |
+| Runner | `<windows-runner-name>` |
+| Machine | `<windows-machine-name>` |
+| Datasource root | `<datasource-root>` |
+| Appliance root | `<appliance-root>` |
 | Base URL | `http://127.0.0.1:9001` |
 | WebSocket URL | Derived as `ws://127.0.0.1:9001/ws/quote/deploy-runtime-smoke` |
 | Symbol | `600519.SH` |
@@ -470,11 +470,11 @@ Workflow: `Run Windows TDX Runtime Smoke` in `mist-trade/mist-deploy`.
 Runner evidence from run `28533769291`:
 
 - The deploy wrapper invoked
-  `F:\quant\MistAPI\datasource\scripts\run-runtime-checks.ps1` with
+  `<datasource-root>\scripts\run-runtime-checks.ps1` with
   `-SkipScriptSelfTest`, keeping production runtime smoke separate from
   datasource source-tree static tests.
 - Datasource SDK preflight passed:
-  - `.env` was found at `F:\quant\MistAPI\datasource\.env`.
+  - `.env` was found at `<datasource-root>\.env`.
   - `TDX_SDK_PATH` existed at `F:/quant/tdx/PYPlugins/user`.
   - `tqcenter.py` was found.
   - `TPythClient.dll` was found in the parent directory.
@@ -485,7 +485,7 @@ Runner evidence from run `28533769291`:
   - Normalized bars query endpoint passed.
   - WebSocket bridge ping/pong passed.
 - Appliance health check was skipped because
-  `F:\quant\MistAPI\health-check.ps1` was not present; the runtime smoke
+  `<appliance-root>\health-check.ps1` was not present; the runtime smoke
   continued because this script is optional for the host datasource root.
 - TDX basic HTTP smoke passed, covering providers, bars, snapshots, sector
   query, sector list, trading dates, securities, security info, and
@@ -514,7 +514,7 @@ Datasource health snapshot after smoke from the Mac:
 
 | Field | Value |
 | --- | --- |
-| URL | `http://192.168.31.182:9001/health` |
+| URL | `http://<windows-lan-ip>:9001/health` |
 | HTTP status | `200 OK` |
 | `status` | `ok` |
 | `instance` | `tdx` |
@@ -550,12 +550,12 @@ Passed or recorded:
   backend-container-to-host datasource health passed in run `28531193330`.
 - Mac-side raw LAN gateway probes passed for frontend, Mist API, and Chan API.
 - Mac-side canonical hostname probes passed for Mist API and Chan API after
-  `www.moyui.mist` resolved to `192.168.31.182` without `--resolve`.
+  `<gateway-hostname>` resolved to `<windows-lan-ip>` without `--resolve`.
 - MySQL restore rehearsal run `28531904790` imported and validated backup
-  `E:\quant\MistDocker\backups\mist-20260702-000824.sql`, then removed the
+  `<docker-root>\backups\mist-<timestamp>.sql`, then removed the
   temporary restore container.
 - TDX runtime smoke run `28533769291` completed successfully on
-  `mist-api-windows-01` at deploy commit
+  `<windows-runner-name>` at deploy commit
   `0ceba9cf31e3e348449ce600f40c2de3186f8a7f`, covering SDK preflight, TDX
   WinSW runtime probe, basic HTTP smoke, and WebSocket smoke.
 - Datasource `/health` after smoke returned `200 OK` from the Mac with
@@ -575,11 +575,11 @@ Failed or blocked:
 - The gateway HTTP `502` from runs `28519192627` and `28529821620` was resolved
   by run `28531193330`.
 - Local monitoring metrics at `127.0.0.1:8787` were not available.
-- LAN-wide DNS for `www.moyui.mist` is not configured; canonical hostname
+- LAN-wide DNS for `<gateway-hostname>` is not configured; canonical hostname
   verification currently depends on this Mac's local host resolution.
 
 Exact follow-up commands for future drift checks:
 
-- Recheck `dscacheutil -q host -a name www.moyui.mist`.
-- Recheck `curl --noproxy '*' http://www.moyui.mist/api/mist/app/hello`.
-- Recheck `curl --noproxy '*' http://www.moyui.mist/api/chan/app/hello`.
+- Recheck `dscacheutil -q host -a name <gateway-hostname>`.
+- Recheck `curl --noproxy '*' http://<gateway-hostname>/api/mist/app/hello`.
+- Recheck `curl --noproxy '*' http://<gateway-hostname>/api/chan/app/hello`.
