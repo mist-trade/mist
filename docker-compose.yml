@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mist:
     container_name: mist-backend
@@ -34,7 +32,7 @@ services:
     networks:
       - mist-network
     restart: unless-stopped
-    command: ["pnpm", "run", "start:dev:mcp-server"]
+    command: ["node", "dist/apps/mcp-server/main.js"]
 
 networks:
   mist-network:

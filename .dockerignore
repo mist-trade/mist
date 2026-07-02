@@ -22,7 +22,23 @@ build/
 coverage/
 .nyc_output/
 test-results/
+test-data/
 *.log
+
+# Build output and local workflow state
+dist/
+openspec/
+.claude/
+.codex/
+docs/
+
+# Deployment/tooling context. Keep only migration runner inputs needed by the
+# production image.
+tools/**
+!tools/run-migrations.mjs
+deploy/**
+!deploy/database/
+!deploy/database/**
 
 # Environment
 .env
