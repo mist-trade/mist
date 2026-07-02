@@ -50,6 +50,17 @@ export class DataMcpService extends BaseMcpToolService {
     return McpErrorCode.INVALID_PARAMETER;
   }
 
+  private sanitizeRequiredSymbol(symbol: string): string {
+    const sanitizedSymbol = ValidationHelper.sanitizeString(symbol);
+    if (!sanitizedSymbol) {
+      throw new McpError(
+        'Symbol cannot be empty or contain only whitespace.',
+        McpErrorCode.INVALID_SYMBOL,
+      );
+    }
+    return sanitizedSymbol;
+  }
+
   @Tool({
     name: 'get_index_info',
     description: `Get detailed metadata for a specific index.
@@ -77,7 +88,7 @@ RETURNS: Index object with id, symbol, name, and type.`,
         );
       }
 
-      const sanitizedSymbol = ValidationHelper.sanitizeString(symbol)!;
+      const sanitizedSymbol = this.sanitizeRequiredSymbol(symbol);
 
       const security = await this.securityRepository.findOne({
         where: { code: sanitizedSymbol },
@@ -150,7 +161,7 @@ RETURNS: K-line array with time, OHLC, volume.`,
         );
       }
 
-      const sanitizedSymbol = ValidationHelper.sanitizeString(symbol)!;
+      const sanitizedSymbol = this.sanitizeRequiredSymbol(symbol);
 
       const security = await this.securityRepository.findOne({
         where: { code: sanitizedSymbol },
@@ -246,7 +257,7 @@ RETURNS: Array of daily K-line objects with OHLC, volume, amount.`,
         );
       }
 
-      const sanitizedSymbol = ValidationHelper.sanitizeString(symbol)!;
+      const sanitizedSymbol = this.sanitizeRequiredSymbol(symbol);
 
       const security = await this.securityRepository.findOne({
         where: { code: sanitizedSymbol },

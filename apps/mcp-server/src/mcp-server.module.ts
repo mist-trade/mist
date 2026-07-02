@@ -10,7 +10,6 @@ import { ChanMcpService } from './services/chan-mcp.service';
 import { IndicatorMcpService } from './services/indicator-mcp.service';
 import { DataMcpService } from './services/data-mcp.service';
 import { ScheduleMcpService } from './services/schedule-mcp.service';
-import { SegmentMcpService } from './services/segment-mcp.service';
 import { mcpEnvSchema } from '@app/config';
 import * as path from 'path';
 
@@ -73,7 +72,6 @@ import * as path from 'path';
     IndicatorMcpService,
     DataMcpService,
     ScheduleMcpService,
-    SegmentMcpService,
   ],
   exports: [],
 })

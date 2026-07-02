@@ -7,7 +7,7 @@ class TestMcpToolService extends BaseMcpToolService {
   }
 
   // Expose protected methods for testing
-  public testSuccess<T>(data: T, meta?: Record<string, any>) {
+  public testSuccess<T>(data: T, meta?: Record<string, unknown>) {
     return this.success(data, meta);
   }
 
@@ -122,6 +122,25 @@ describe('BaseMcpToolService', () => {
       expect(result.error.suggestions).toEqual([]);
       expect(result.error.next_tool).toBeUndefined();
     });
+
+    it.each([
+      ['string', 'plain failure', 'plain failure'],
+      ['object', { reason: 'object failure' }, '{"reason":"object failure"}'],
+      ['null', null, 'null'],
+      ['undefined', undefined, 'undefined'],
+    ])(
+      'should convert thrown %s values into readable error responses',
+      async (_label, thrownValue, expectedMessage) => {
+        const result = (await service.testExecuteTool('test_tool', async () => {
+          throw thrownValue;
+        })) as any;
+
+        expect(result.success).toBe(false);
+        expect(result.error.message).toBe(expectedMessage);
+        expect(result.error.code).toBeUndefined();
+        expect(result.error.suggestions).toEqual([]);
+      },
+    );
   });
 });
 
@@ -187,6 +206,7 @@ describe('BaseMcpToolService - Error Recovery', () => {
       expect(result.success).toBe(false);
       expect(result.error.code).toBe(McpErrorCode.INSUFFICIENT_DATA);
       expect(result.error.suggestions).toBeDefined();
+      expect(result.error.next_tool?.name).toBe('get_kline_data');
     });
 
     it('should not extract code from generic Error', async () => {
