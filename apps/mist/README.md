@@ -107,8 +107,8 @@ Data is stored for multiple timeframes:
 
 ### TypeORM Synchronize Disabled
 
-In production, `synchronize: false` is set for safety. Use the repository SQL
-migration runner:
+TypeORM `synchronize: false` is set in every environment for safety. Use the
+repository SQL migration runner:
 
 ```bash
 pnpm run db:migrate

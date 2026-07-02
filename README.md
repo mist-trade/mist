@@ -464,8 +464,8 @@ docker-compose up mcp-server
 
 ### TypeORM 配置
 
-- 开发环境：自动同步（synchronize: true）
-- 生产环境：需要使用迁移
+- 所有环境：自动同步关闭（`synchronize: false`）
+- Schema 变更：使用 `pnpm run db:migrate` 执行仓库 SQL 迁移
 
 ### 时间周期
 

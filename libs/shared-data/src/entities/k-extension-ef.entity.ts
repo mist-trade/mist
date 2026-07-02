@@ -92,7 +92,7 @@ export class KExtensionEf {
     nullable: true,
     comment: '外盘量',
   })
-  outerVolume: bigint = 0n;
+  outerVolume: number = 0;
 
   @Column({
     type: 'decimal',

@@ -42,7 +42,7 @@ import * as path from 'path';
         username: configService.get('mysql_server_username', 'root'),
         password: configService.get('mysql_server_password', ''),
         database: configService.get('mysql_server_database', 'mist'),
-        synchronize: configService.get('NODE_ENV') !== 'production',
+        synchronize: false,
         logging: configService.get('NODE_ENV') !== 'production',
         entities: [Security, K],
         poolSize: 10,
