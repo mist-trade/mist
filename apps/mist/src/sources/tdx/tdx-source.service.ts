@@ -28,6 +28,7 @@ import {
   TdxDividendFactorsResponseData,
   TdxDividendFactorItem,
 } from './types';
+import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
 
 const TDX_BAR_FIELDS = [
   'Open',
@@ -88,7 +89,7 @@ export class TdxSource implements ITdxSourceFetcher {
       this.configService.get<string>('TDX_BASE_URL') || 'http://127.0.0.1:9001';
     this.axios = this.utilsService.createAxiosInstance({
       baseURL: this.baseUrl,
-      timeout: 30000,
+      timeout: DATASOURCE_HTTP_TIMEOUT_MS,
     });
   }
 
