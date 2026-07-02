@@ -16,18 +16,12 @@
     "strictNullChecks": true,
     "noImplicitAny": true,
     "strictBindCallApply": true,
-    "forceConsistentCasingInFileNames": false,
+    "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": false,
     "esModuleInterop": true,
     "resolveJsonModule": true,
     "types": ["jest", "node"],
     "paths": {
-      "@app/prompts": [
-        "libs/prompts/src"
-      ],
-      "@app/prompts/*": [
-        "libs/prompts/src/*"
-      ],
       "@app/config": [
         "libs/config/src"
       ],
@@ -41,11 +35,9 @@
         "libs/utils/src/*"
       ],
       "@app/shared-data": [
-        "libs/shared-data/src",
         "libs/shared-data/src"
       ],
       "@app/shared-data/*": [
-        "libs/shared-data/src/*",
         "libs/shared-data/src/*"
       ],
       "@app/timezone": [

@@ -3,7 +3,9 @@ import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
-const workspaceRoot = resolve(process.env.MIST_WORKSPACE_ROOT ?? join(process.cwd(), '..'));
+const workspaceRoot = resolve(
+  process.env.MIST_WORKSPACE_ROOT ?? join(process.cwd(), '..'),
+);
 
 const repos = {
   mist: join(workspaceRoot, 'mist'),
@@ -53,7 +55,9 @@ function assertPackageScript(packageJson, scriptName, expectedPart, label) {
     fail(`${label} package.json must define scripts.${scriptName}`);
   }
   if (expectedPart && !script.includes(expectedPart)) {
-    fail(`${label} scripts.${scriptName} must include ${JSON.stringify(expectedPart)}`);
+    fail(
+      `${label} scripts.${scriptName} must include ${JSON.stringify(expectedPart)}`,
+    );
   }
   return script;
 }
@@ -75,11 +79,45 @@ function assertPackageScriptConfigTargetsExist(packageJson, scriptName, label) {
   }
 }
 
+function assertBackendToolingHygiene(packageJson) {
+  const lintStaged = packageJson['lint-staged'] ?? {};
+  const lintStagedKeys = Object.keys(lintStaged);
+  const coversMjs = lintStagedKeys.some((key) => key.includes('mjs'));
+  if (!coversMjs) {
+    fail('mist lint-staged must cover .mjs tool scripts');
+  }
+
+  const tsconfig = readJson(join(repos.mist, 'tsconfig.json'));
+  if (tsconfig.compilerOptions?.forceConsistentCasingInFileNames !== true) {
+    fail('mist tsconfig must enable forceConsistentCasingInFileNames');
+  }
+
+  const paths = tsconfig.compilerOptions?.paths ?? {};
+  for (const pathKey of Object.keys(paths)) {
+    if (pathKey.startsWith('@app/prompts')) {
+      fail('mist tsconfig must not contain stale @app/prompts aliases');
+    }
+  }
+
+  for (const [pathKey, targets] of Object.entries(paths)) {
+    if (!Array.isArray(targets)) {
+      continue;
+    }
+    if (new Set(targets).size !== targets.length) {
+      fail(`mist tsconfig path ${pathKey} must not contain duplicate targets`);
+    }
+  }
+}
+
 function assertEnvFilesUntracked() {
-  const tracked = execFileSync('git', ['ls-files', '.env.development', '.env.production'], {
-    cwd: repos.mist,
-    encoding: 'utf8',
-  }).trim();
+  const tracked = execFileSync(
+    'git',
+    ['ls-files', '.env.development', '.env.production'],
+    {
+      cwd: repos.mist,
+      encoding: 'utf8',
+    },
+  ).trim();
 
   if (tracked) {
     fail(`mist local env files must not be tracked, still tracked: ${tracked}`);
@@ -89,7 +127,9 @@ function assertEnvFilesUntracked() {
 function assertOptionalRepoContracts(repoName, assertContracts) {
   const repoPath = repos[repoName];
   if (!existsSync(repoPath)) {
-    console.log(`Skipping ${repoName} CI contracts; repo not found at ${repoPath}`);
+    console.log(
+      `Skipping ${repoName} CI contracts; repo not found at ${repoPath}`,
+    );
     return;
   }
   assertContracts();
@@ -103,13 +143,24 @@ function assertMistBackendContracts() {
   }
 
   const lintFix = assertPackageScript(packageJson, 'lint', '--fix', 'mist');
-  const lintCheck = assertPackageScript(packageJson, 'lint:check', undefined, 'mist');
+  const lintCheck = assertPackageScript(
+    packageJson,
+    'lint:check',
+    undefined,
+    'mist',
+  );
   assertNotIncludes(lintCheck, '--fix', 'mist scripts.lint:check');
   assertIncludes(lintFix, 'eslint', 'mist scripts.lint');
   assertPackageScript(packageJson, 'typecheck', 'tsc --noEmit', 'mist');
   assertPackageScript(packageJson, 'test:ci', '--runInBand', 'mist');
-  assertPackageScript(packageJson, 'ci:contracts', 'tools/test-ci-contracts.mjs', 'mist');
+  assertPackageScript(
+    packageJson,
+    'ci:contracts',
+    'tools/test-ci-contracts.mjs',
+    'mist',
+  );
   assertPackageScriptConfigTargetsExist(packageJson, 'test:e2e', 'mist');
+  assertBackendToolingHygiene(packageJson);
 
   const gitignore = read(join(repos.mist, '.gitignore'));
   assertIncludes(gitignore, '.env.*', 'mist .gitignore');
@@ -123,17 +174,43 @@ function assertMistBackendContracts() {
   assertIncludes(dockerWorkflow, 'pnpm run lint:check', 'mist docker workflow');
   assertIncludes(dockerWorkflow, 'pnpm run typecheck', 'mist docker workflow');
   assertIncludes(dockerWorkflow, 'pnpm run test:ci', 'mist docker workflow');
-  assertIncludes(dockerWorkflow, 'pnpm run ci:contracts', 'mist docker workflow');
+  assertIncludes(
+    dockerWorkflow,
+    'pnpm run ci:contracts',
+    'mist docker workflow',
+  );
 
-  const releaseWorkflow = read(join(repos.mist, '.github/workflows/release.yml'));
+  const releaseWorkflow = read(
+    join(repos.mist, '.github/workflows/release.yml'),
+  );
   assertIncludes(releaseWorkflow, 'validate:', 'mist release workflow');
   assertIncludes(releaseWorkflow, 'needs: validate', 'mist release workflow');
-  assertIncludes(releaseWorkflow, 'environment: production-release', 'mist release workflow');
-  assertIncludes(releaseWorkflow, 'node-version: 24.x', 'mist release workflow');
-  assertIncludes(releaseWorkflow, 'pnpm run lint:check', 'mist release workflow');
-  assertIncludes(releaseWorkflow, 'pnpm run typecheck', 'mist release workflow');
+  assertIncludes(
+    releaseWorkflow,
+    'environment: production-release',
+    'mist release workflow',
+  );
+  assertIncludes(
+    releaseWorkflow,
+    'node-version: 24.x',
+    'mist release workflow',
+  );
+  assertIncludes(
+    releaseWorkflow,
+    'pnpm run lint:check',
+    'mist release workflow',
+  );
+  assertIncludes(
+    releaseWorkflow,
+    'pnpm run typecheck',
+    'mist release workflow',
+  );
   assertIncludes(releaseWorkflow, 'pnpm run test:ci', 'mist release workflow');
-  assertIncludes(releaseWorkflow, 'pnpm run ci:contracts', 'mist release workflow');
+  assertIncludes(
+    releaseWorkflow,
+    'pnpm run ci:contracts',
+    'mist release workflow',
+  );
 
   const buildWorkflow = read(join(repos.mist, '.github/workflows/build.yml'));
   assertIncludes(buildWorkflow, 'pnpm run lint:check', 'mist build workflow');
@@ -157,30 +234,62 @@ function assertFrontendContracts() {
   assertIncludes(workflow, 'pnpm lint', 'mist-fe docker workflow');
   assertIncludes(workflow, 'pnpm run typecheck', 'mist-fe docker workflow');
   assertIncludes(workflow, 'pnpm run test:ci', 'mist-fe docker workflow');
-  assertIncludes(workflow, 'default: node:24-alpine', 'mist-fe docker workflow');
+  assertIncludes(
+    workflow,
+    'default: node:24-alpine',
+    'mist-fe docker workflow',
+  );
 }
 
 function assertDatasourceContracts() {
   const workflow = read(join(repos.datasource, '.github/workflows/ci.yml'));
-  assertIncludes(workflow, 'python-version: "3.12"', 'mist-datasource CI workflow');
-  assertIncludes(workflow, 'uv run ruff check .', 'mist-datasource CI workflow');
-  assertIncludes(workflow, 'uv run pytest -m "not live"', 'mist-datasource CI workflow');
+  assertIncludes(
+    workflow,
+    'python-version: "3.12"',
+    'mist-datasource CI workflow',
+  );
+  assertIncludes(
+    workflow,
+    'uv run ruff check .',
+    'mist-datasource CI workflow',
+  );
+  assertIncludes(
+    workflow,
+    'uv run pytest -m "not live"',
+    'mist-datasource CI workflow',
+  );
 }
 
 function assertMonitoringContracts() {
   const workflow = read(join(repos.monitoring, '.github/workflows/ci.yml'));
-  assertIncludes(workflow, 'go-version-file: go.mod', 'mist-monitoring CI workflow');
+  assertIncludes(
+    workflow,
+    'go-version-file: go.mod',
+    'mist-monitoring CI workflow',
+  );
   assertIncludes(workflow, 'gofmt -w', 'mist-monitoring CI workflow');
-  assertIncludes(workflow, 'git diff --exit-code', 'mist-monitoring CI workflow');
+  assertIncludes(
+    workflow,
+    'git diff --exit-code',
+    'mist-monitoring CI workflow',
+  );
   assertIncludes(workflow, 'go vet ./...', 'mist-monitoring CI workflow');
   assertIncludes(workflow, 'go test ./...', 'mist-monitoring CI workflow');
-  assertIncludes(workflow, 'python -m pytest tests', 'mist-monitoring CI workflow');
+  assertIncludes(
+    workflow,
+    'python -m pytest tests',
+    'mist-monitoring CI workflow',
+  );
 }
 
 function assertSkillsContracts() {
   const workflow = read(join(repos.skills, '.github/workflows/ci.yml'));
   assertIncludes(workflow, 'python-version: "3.12"', 'mist-skills CI workflow');
-  assertIncludes(workflow, 'python -m pip install -e ".[dev]"', 'mist-skills CI workflow');
+  assertIncludes(
+    workflow,
+    'python -m pip install -e ".[dev]"',
+    'mist-skills CI workflow',
+  );
   assertIncludes(workflow, 'python -m pytest', 'mist-skills CI workflow');
 }
 
