@@ -180,6 +180,59 @@ Smoke evidence:
 - WebSocket ping/pong smoke passed.
 - All selected runtime checks passed.
 
+## TDX Live Quote Subscription Smoke
+
+Operator approval was given on 2026-07-02 to run the subscription-changing live
+quote smoke. Browser UI automation and full product API contract sweeps remained
+deferred.
+
+First, `Run Windows TDX Runtime Smoke` was dispatched with
+`-RequireLiveQuote` and `-AllowWebSocketSubscriptionChange` using a non-leader
+client id:
+
+| Field | Value |
+| --- | --- |
+| Run | `28568506730` |
+| URL | `https://github.com/mist-trade/mist-deploy/actions/runs/28568506730` |
+| Job | `84700795056` |
+| Final status | Failed as expected for non-leader subscription mutation |
+| Client id | `deploy-live-quote-smoke-20260702` |
+
+Evidence from run `28568506730`:
+
+- Datasource SDK preflight passed.
+- TDX WinSW runtime probe passed.
+- Basic HTTP smoke passed.
+- WebSocket live-quote step failed with
+  `DATASOURCE_WS_NOT_LEADER`.
+- The datasource reported `leaderClientId="mist-backend-tdx"`.
+
+This failure confirmed that the datasource correctly rejects subscription
+mutation from non-leader clients. The live quote subscription was then verified
+through the production backend leader path:
+
+1. `POST http://www.moyui.mist/api/mist/v1/collector/test/tdx-streaming/subscribe`
+   with `{"code":"600519","period":1,"testOnly":true}` returned HTTP `200`,
+   `success=true`, and `count=1`.
+2. A Mac-side read-only WebSocket observer connected to
+   `ws://192.168.31.182:9001/ws/quote/codex-live-quote-observer-20260702`.
+3. The observer received a ready message showing
+   `leaderClientId="mist-backend-tdx"` and `active=["600519.SH"]`.
+4. The observer received a `quote` event with snapshot fields including
+   `Code="600519.SH"`, `Now=1209.94`, `LastClose=1193.01`,
+   and `AsOf="2026-07-02T13:52:16.314824+08:00"`.
+5. `POST http://www.moyui.mist/api/mist/v1/collector/test/tdx-streaming/unsubscribe`
+   with the same body returned HTTP `200`, `success=true`, and `count=1`.
+6. Post-cleanup datasource health returned HTTP `200` with
+   `subscribedCount=0`, `activeSubscriptions=[]`,
+   `quoteCallbackCount=5`, `quoteCallbackRejectedCount=0`,
+   `lastQuoteCallbackSymbol="600519.SH"`,
+   `lastQuoteCallbackAccepted=true`, `eventQueueDepth=0`, and
+   `collectorState="running"`.
+
+Conclusion: subscription-changing live quote smoke passed through the supported
+backend leader path and was cleaned up after verification.
+
 ## Mac-Side LAN And Gateway Probes
 
 Host resolution:
@@ -217,14 +270,15 @@ This rerun is known-good:
   container.
 - TDX runtime smoke passed with basic, reference/instrument, finance/report,
   formula, and WebSocket checks.
+- TDX live quote subscription smoke passed through the backend leader path and
+  was cleaned up after verification.
 - Mac-side DNS, frontend, gateway API, fixed-IP API, and datasource probes all
   passed.
 
 Residual notes:
 
 - `www.moyui.mist` is still Mac-local host resolution, not LAN-wide DNS.
-- TDX live quote smoke was intentionally not used because it changes datasource
-  subscriptions and this rerun only needed non-state-changing smoke.
+- Browser UI automation and full product API contract sweeps remain deferred.
 - GitHub Actions emitted Node 20 deprecation warnings for third-party actions
   running under the Node 24 compatibility behavior; the workflows themselves
   completed successfully.
