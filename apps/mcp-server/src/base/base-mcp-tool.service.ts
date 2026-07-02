@@ -1,6 +1,36 @@
 import { Logger } from '@nestjs/common';
 import { MCP_ERROR_RECOVERY, McpError, McpErrorCode } from '@app/constants';
 
+type McpNextTool = {
+  name: string;
+  reason: string;
+  params?: Record<string, unknown>;
+};
+
+type McpErrorPayload = {
+  message: string;
+  code?: string;
+  suggestions: string[];
+  next_tool?: McpNextTool;
+};
+
+function formatUnknownMcpError(error: unknown): string {
+  if (error instanceof Error) {
+    return error.message || error.name;
+  }
+  if (typeof error === 'string') {
+    return error;
+  }
+  if (error === null || error === undefined) {
+    return String(error);
+  }
+  try {
+    return JSON.stringify(error) ?? String(error);
+  } catch {
+    return String(error);
+  }
+}
+
 /**
  * Base class for MCP tool services
  *
@@ -22,8 +52,8 @@ export abstract class BaseMcpToolService {
    */
   protected success<T>(
     data: T,
-    meta?: Record<string, any>,
-  ): { success: true; data: T } & Record<string, any> {
+    meta?: Record<string, unknown>,
+  ): { success: true; data: T } & Record<string, unknown> {
     return {
       success: true as const,
       data,
@@ -40,19 +70,7 @@ export abstract class BaseMcpToolService {
   protected error(
     message: string,
     code?: string,
-  ): {
-    success: false;
-    error: {
-      message: string;
-      code?: string;
-      suggestions: string[];
-      next_tool?: {
-        name: string;
-        reason: string;
-        params?: Record<string, any>;
-      };
-    };
-  } {
+  ): { success: false; error: McpErrorPayload } {
     // Look up recovery suggestions if code is provided
     const recovery = code
       ? MCP_ERROR_RECOVERY[code as McpErrorCode]
@@ -83,16 +101,7 @@ export abstract class BaseMcpToolService {
     | { success: true; data: T }
     | {
         success: false;
-        error: {
-          message: string;
-          code?: string;
-          suggestions: string[];
-          next_tool?: {
-            name: string;
-            reason: string;
-            params?: Record<string, any>;
-          };
-        };
+        error: McpErrorPayload;
       }
   > {
     this.logger.debug(`Executing tool: ${toolName}`);
@@ -101,12 +110,16 @@ export abstract class BaseMcpToolService {
       this.logger.debug(`Tool ${toolName} completed successfully`);
       return this.success(result);
     } catch (error) {
-      this.logger.error(`Tool ${toolName} failed:`, error.message);
+      const errorMessage = formatUnknownMcpError(error);
+      this.logger.error(
+        `Tool ${toolName} failed: ${errorMessage}`,
+        error instanceof Error ? error.stack : undefined,
+      );
 
       // Extract error code if this is a McpError
       const errorCode = error instanceof McpError ? error.code : undefined;
 
-      return this.error(error.message, errorCode);
+      return this.error(errorMessage, errorCode);
     }
   }
 }

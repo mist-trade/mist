@@ -14,7 +14,7 @@
 - [x] 2.3 Create `disable-typeorm-auto-sync` for explicit TypeORM synchronize shutdown and high-risk DB schema fixes.
 - [x] 2.4 Create `harden-docker-deploy-path` for backend Dockerfile, compose command, image tag, rollback, and deployment-script verification.
 - [x] 2.5 Create `align-datasource-ws-contract` for WebSocket envelope, error, pong, snapshot, and old-route migration planning.
-- [ ] 2.6 Create `fix-mcp-skills-contracts` for MCP stub handling, unknown-error normalization, skills response parsing, and shared script runner tests.
+- [x] 2.6 Create `fix-mcp-skills-contracts` for MCP stub handling, unknown-error normalization, skills response parsing, and shared script runner tests.
 - [ ] 2.7 Create `fix-frontend-runtime-quality` for duplicate API layer removal, mock data bundle isolation, chart resize, request race protection, and large-data utilities.
 - [ ] 2.8 Create `repair-monitoring-health-alerts` for Mac datasource health parsing, probe/notifier error visibility, and Prometheus metric rendering.
 

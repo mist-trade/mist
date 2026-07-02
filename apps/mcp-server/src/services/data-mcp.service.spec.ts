@@ -5,6 +5,7 @@ import { DataMcpService } from './data-mcp.service';
 import { Security, K, Period } from '@app/shared-data';
 import { DataSourceService } from '@app/utils';
 import { DataSource } from '@app/shared-data';
+import { ValidationHelper } from '../utils/validation.helpers';
 
 describe('DataMcpService', () => {
   let service: DataMcpService;
@@ -158,6 +159,25 @@ describe('DataMcpService', () => {
 
       expect(result.success).toBe(false);
       expect(result.error.message).toContain('limit must be at least 1');
+    });
+
+    it('should reject symbols that disappear after sanitization before querying', async () => {
+      const sanitizeSpy = jest
+        .spyOn(ValidationHelper, 'sanitizeString')
+        .mockReturnValueOnce('000001')
+        .mockReturnValueOnce(null);
+
+      const result = (await service.getKlineData(
+        '000001',
+        '1min' as any,
+        10,
+      )) as unknown as { success: boolean; error: { message: string } };
+
+      expect(result.success).toBe(false);
+      expect(result.error.message).toContain('Symbol cannot be empty');
+      expect(securityRepository.findOne).not.toHaveBeenCalled();
+
+      sanitizeSpy.mockRestore();
     });
   });
 });

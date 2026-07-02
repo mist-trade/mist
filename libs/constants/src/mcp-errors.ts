@@ -86,7 +86,7 @@ export interface RecoverySuggestion {
     /** Why this tool might help */
     reason: string;
     /** Optional parameter adjustments */
-    params?: Record<string, any>;
+    params?: Record<string, unknown>;
   };
 }
 
