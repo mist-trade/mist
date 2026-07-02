@@ -262,6 +262,30 @@ describe('TdxWebSocketService normalized bridge', () => {
     );
   });
 
+  it('logs canonical data-based subscription acknowledgements', () => {
+    const { service } = createService();
+    const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+    (service as any).logger = logger;
+
+    handleMessage(service, {
+      type: 'subscribed',
+      provider: 'tdx',
+      timestamp: '2026-07-02T10:00:00+08:00',
+      data: {
+        accepted: ['600519.SH'],
+        rejected: [{ symbol: '000001.SZ', reason: 'not tradable' }],
+        active: ['600519.SH'],
+      },
+    });
+
+    expect(logger.log).toHaveBeenCalledWith(
+      expect.stringContaining('subscribed accepted=600519.SH active=600519.SH'),
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.stringContaining('subscribed rejected=000001.SZ:not tradable'),
+    );
+  });
+
   it('logs datasource error messages without dropping desired subscriptions', () => {
     const { service } = createService();
     const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
@@ -274,6 +298,32 @@ describe('TdxWebSocketService normalized bridge', () => {
       message: 'provider unavailable',
       retryable: true,
       details: { provider: 'tdx' },
+    });
+
+    expect(logger.error).toHaveBeenCalledWith(
+      expect.stringContaining(
+        'TDX datasource error code=TDX_PROVIDER_ERROR message=provider unavailable retryable=true details={"provider":"tdx"}',
+      ),
+    );
+    expect((service as any).subscriptions.has('600519.SH')).toBe(true);
+  });
+
+  it('logs canonical data-based datasource errors without dropping desired subscriptions', () => {
+    const { service } = createService();
+    const logger = { log: jest.fn(), warn: jest.fn(), error: jest.fn() };
+    (service as any).logger = logger;
+    service.subscribe('600519.SH');
+
+    handleMessage(service, {
+      type: 'error',
+      provider: 'tdx',
+      timestamp: '2026-07-02T10:00:00+08:00',
+      data: {
+        code: 'TDX_PROVIDER_ERROR',
+        message: 'provider unavailable',
+        retryable: true,
+        details: { provider: 'tdx' },
+      },
     });
 
     expect(logger.error).toHaveBeenCalledWith(

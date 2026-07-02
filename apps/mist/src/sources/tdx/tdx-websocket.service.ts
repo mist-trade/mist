@@ -380,9 +380,10 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
     type: string,
     message: Record<string, unknown>,
   ): void {
-    const accepted = this.formatSymbolList(message.accepted);
-    const active = this.formatSymbolList(message.active);
-    const rejected = this.formatRejectedSymbols(message.rejected);
+    const payload = this.messageData(message);
+    const accepted = this.formatSymbolList(payload.accepted);
+    const active = this.formatSymbolList(payload.active);
+    const rejected = this.formatRejectedSymbols(payload.rejected);
 
     this.logger.log(
       `TDX datasource ${type} accepted=${accepted} active=${active}`,
@@ -418,10 +419,11 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
   }
 
   private logDatasourceError(message: Record<string, unknown>): void {
+    const payload = this.messageData(message);
     const nested =
-      message.error && typeof message.error === 'object'
-        ? (message.error as Record<string, unknown>)
-        : message;
+      payload.error && typeof payload.error === 'object'
+        ? (payload.error as Record<string, unknown>)
+        : payload;
     const code = String(nested.code ?? 'TDX_DATASOURCE_ERROR');
     const errorMessage = String(nested.message ?? 'unknown datasource error');
     const retryable = Boolean(nested.retryable);
@@ -433,6 +435,14 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
     this.logger.error(
       `TDX datasource error code=${code} message=${errorMessage} retryable=${retryable} details=${JSON.stringify(details)}`,
     );
+  }
+
+  private messageData(
+    message: Record<string, unknown>,
+  ): Record<string, unknown> {
+    return message.data && typeof message.data === 'object'
+      ? (message.data as Record<string, unknown>)
+      : message;
   }
 
   private processSnapshot(snapshot: TdxSnapshot): void {
