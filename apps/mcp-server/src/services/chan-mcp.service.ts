@@ -197,13 +197,9 @@ RETURNS: Object with bis, fenxings, channels arrays, and summary.`,
 
       const createBiDto = { k: kVoData };
 
-      // Step 1: Create Bi (this internally does merge K)
-      const bis = await this.chanService.createBi(createBiDto);
+      const { bis, fenxings } = await this.chanService.analyze(createBiDto);
 
-      // Step 2: Get Fenxings
-      const fenxings = await this.chanService.getFenxings(createBiDto);
-
-      // Step 3: Create Channels from Bi
+      // Create Channels from Bi
       const createChannelDto = { bi: bis };
       const channels =
         await this.channelService.createChannel(createChannelDto);

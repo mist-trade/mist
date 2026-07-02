@@ -14,17 +14,16 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EastMoneySource } from '../sources/east-money/east-money-source.service';
-import {
-  ISourceFetcher,
-  KData,
-  KFetchParams,
-} from '../sources/source-fetcher.interface';
+import { KData, KFetchParams } from '../sources/source-fetcher.interface';
 import { TdxSource } from '../sources/tdx/tdx-source.service';
+import { TdxResponse } from '../sources/tdx/types';
+
+type SourceFetcher = EastMoneySource | TdxSource;
 
 @Injectable()
 export class CollectorService {
   private readonly logger = new Logger(CollectorService.name);
-  private sources: Map<DataSource, ISourceFetcher<any>> = new Map();
+  private sources: Map<DataSource, SourceFetcher> = new Map();
 
   constructor(
     @InjectRepository(Security)
@@ -54,6 +53,29 @@ export class CollectorService {
    */
   private async getSourceForSecurity(security: Security): Promise<DataSource> {
     return this.dataSourceSelectionService.getDataSourceForSecurity(security);
+  }
+
+  private async saveFetchedKData(
+    sourceFetcher: SourceFetcher,
+    kLineData: KData[] | TdxResponse[],
+    security: Security,
+    period: Period,
+  ): Promise<void> {
+    if (sourceFetcher instanceof TdxSource) {
+      await sourceFetcher.saveK(kLineData as TdxResponse[], security, period);
+      return;
+    }
+
+    await sourceFetcher.saveK(kLineData as KData[], security, period);
+  }
+
+  private toPostProcessKData(
+    kLineData: KData[] | TdxResponse[],
+    period: Period,
+  ): KData[] {
+    return kLineData.map((item) =>
+      'period' in item ? item : { ...item, period },
+    );
   }
 
   /**
@@ -120,11 +142,14 @@ export class CollectorService {
       }
 
       // Save data to database
-      await sourceFetcher.saveK(kLineData, security, period);
+      await this.saveFetchedKData(sourceFetcher, kLineData, security, period);
 
       // Call post-process callback if provided
       if (postProcess) {
-        await postProcess(kLineData, dataSource);
+        await postProcess(
+          this.toPostProcessKData(kLineData, period),
+          dataSource,
+        );
       }
 
       this.logger.log(
@@ -163,7 +188,7 @@ export class CollectorService {
         `Data source ${dataSource} is not available`,
       );
     }
-    await sourceFetcher.saveK(kLineData, security, period);
+    await this.saveFetchedKData(sourceFetcher, kLineData, security, period);
   }
 
   /**
@@ -233,7 +258,7 @@ export class CollectorService {
       }
 
       // Save data to database
-      await sourceFetcher.saveK(kLineData, security, period);
+      await this.saveFetchedKData(sourceFetcher, kLineData, security, period);
 
       this.logger.log(
         `Successfully collected ${kLineData.length} K-line records for ${stockCode}, period ${period}`,

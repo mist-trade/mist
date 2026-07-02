@@ -9,10 +9,10 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { WebSocket } from 'ws';
 import { KCandleAggregator, CompletedCandle } from './kcandle-aggregator';
-import { Period } from '@app/shared-data';
+import { DataSource, Period } from '@app/shared-data';
 import { TdxExtension, TdxResponse, TdxSnapshot } from './types';
 import { TimezoneService } from '@app/timezone';
-import { normalizeSecurityCode } from '@app/utils';
+import { PeriodMappingService, normalizeSecurityCode } from '@app/utils';
 
 type SnapshotCallback = (snapshot: TdxSnapshot) => void | Promise<void>;
 export interface TdxRealtimeBar {
@@ -36,6 +36,10 @@ type CandleCompleteCallback = (
 ) => void | Promise<void>;
 
 export const TDX_WEBSOCKET_CTOR = 'TDX_WEBSOCKET_CTOR';
+const DEFAULT_TDX_WS_RECONNECT_DELAY_MS = 5000;
+const DEFAULT_TDX_WS_HEARTBEAT_INTERVAL_MS = 30000;
+const TDX_WS_RECONNECT_DELAY_CONFIG_KEY = 'TDX_WS_RECONNECT_DELAY_MS';
+const TDX_WS_HEARTBEAT_INTERVAL_CONFIG_KEY = 'TDX_WS_HEARTBEAT_INTERVAL_MS';
 
 @Injectable()
 export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
@@ -50,14 +54,15 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
   private candleCallbacks: CandleCompleteCallback[] = [];
   private reconnectTimeout: NodeJS.Timeout | null = null;
   private heartbeatInterval: NodeJS.Timeout | null = null;
-  private readonly reconnectDelay = 5000;
-  private readonly heartbeatIntervalMs = 30000;
+  private readonly reconnectDelayMs: number;
+  private readonly heartbeatIntervalMs: number;
   private isShuttingDown = false;
 
   constructor(
     private readonly configService: ConfigService,
     private readonly aggregator: KCandleAggregator,
     private readonly timezoneService: TimezoneService,
+    private readonly periodMappingService: PeriodMappingService,
     @Optional()
     @Inject(TDX_WEBSOCKET_CTOR)
     private readonly webSocketCtor: typeof WebSocket = WebSocket,
@@ -66,6 +71,14 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       this.configService.get<string>('TDX_BASE_URL') || 'http://127.0.0.1:9001';
     this.clientId =
       this.configService.get<string>('TDX_WS_CLIENT_ID') || 'mist-backend-tdx';
+    this.reconnectDelayMs = this.getPositiveIntegerConfig(
+      TDX_WS_RECONNECT_DELAY_CONFIG_KEY,
+      DEFAULT_TDX_WS_RECONNECT_DELAY_MS,
+    );
+    this.heartbeatIntervalMs = this.getPositiveIntegerConfig(
+      TDX_WS_HEARTBEAT_INTERVAL_CONFIG_KEY,
+      DEFAULT_TDX_WS_HEARTBEAT_INTERVAL_MS,
+    );
 
     // Convert HTTP URL to WS URL and build WebSocket path
     const wsBaseUrl = this.baseUrl
@@ -77,6 +90,12 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
     this.aggregator.on('candle', (candle: CompletedCandle) => {
       this.handleCompletedCandle(candle);
     });
+  }
+
+  private getPositiveIntegerConfig(key: string, defaultValue: number): number {
+    const value = this.configService.get<string | number>(key);
+    const parsed = Number(value);
+    return Number.isInteger(parsed) && parsed > 0 ? parsed : defaultValue;
   }
 
   async onModuleInit(): Promise<void> {
@@ -278,38 +297,14 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
 
   private parsePeriod(value: unknown): Period {
     const period = String(value || '').trim();
-    if (period === '1M') {
-      return Period.MONTH;
-    }
-
-    const aliases: Record<string, Period> = {
-      '1': Period.ONE_MIN,
-      '1m': Period.ONE_MIN,
-      '1min': Period.ONE_MIN,
-      '5': Period.FIVE_MIN,
-      '5m': Period.FIVE_MIN,
-      '5min': Period.FIVE_MIN,
-      '15': Period.FIFTEEN_MIN,
-      '15m': Period.FIFTEEN_MIN,
-      '15min': Period.FIFTEEN_MIN,
-      '30': Period.THIRTY_MIN,
-      '30m': Period.THIRTY_MIN,
-      '30min': Period.THIRTY_MIN,
-      '60': Period.SIXTY_MIN,
-      '60m': Period.SIXTY_MIN,
-      '60min': Period.SIXTY_MIN,
-      '1d': Period.DAY,
-      day: Period.DAY,
-      '1w': Period.WEEK,
-      week: Period.WEEK,
-      month: Period.MONTH,
-    };
-
-    const mapped = aliases[period.toLowerCase()];
-    if (!mapped) {
+    try {
+      return this.periodMappingService.fromSourceFormat(
+        period === '1M' ? period : period.toLowerCase(),
+        DataSource.TDX,
+      );
+    } catch {
       throw new Error(`Unsupported TDX bar period: ${period}`);
     }
-    return mapped;
   }
 
   private readNumber(source: Record<string, unknown>, keys: string[]): number {
@@ -503,7 +498,6 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
     // Clear existing interval if any
     this.clearHeartbeat();
 
-    // Send ping every 30 seconds
     this.heartbeatInterval = setInterval(() => {
       if (this.ws?.readyState === this.webSocketCtor.OPEN) {
         this.ws.send(JSON.stringify({ type: 'ping' }));
@@ -529,7 +523,7 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       this.logger.log('Reconnecting to TDX WebSocket...');
       this.reconnectTimeout = null;
       this.connect();
-    }, this.reconnectDelay);
+    }, this.reconnectDelayMs);
   }
 
   private clearReconnectTimeout(): void {

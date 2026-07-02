@@ -213,7 +213,7 @@ export class IndicatorService {
           code: foundSecurity.code,
         },
         source,
-        period: String(query.period) as unknown as Period,
+        period: query.period,
         timestamp: Between(query.startDate, query.endDate),
       },
       order: {

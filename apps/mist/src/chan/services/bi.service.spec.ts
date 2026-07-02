@@ -1,5 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { BiService } from './bi.service';
+import { TrendDirection } from '../enums/trend-direction.enum';
 
 describe('BiService', () => {
   let service: BiService;
@@ -22,5 +23,17 @@ describe('BiService', () => {
     service['removeBiByIndex'](bis, 1);
 
     expect(bis).toEqual(['first', 'last']);
+  });
+
+  it('throws a clear invariant error when merging incomplete Bi values', () => {
+    const incompleteBi = {
+      trend: TrendDirection.Up,
+      startFenxing: null,
+      endFenxing: null,
+    };
+
+    expect(() =>
+      service['mergeTwoBis'](incompleteBi as any, incompleteBi as any, []),
+    ).toThrow('Bi invariant failed');
   });
 });

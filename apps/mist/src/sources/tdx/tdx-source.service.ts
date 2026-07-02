@@ -59,16 +59,6 @@ const TDX_EXTENSION_UPSERT_COLUMNS = [
   'priceToBookRatio',
 ];
 
-function normalizeTdxPeriodFormat(
-  period: Period,
-  periodFormat: string,
-): string {
-  if (period === Period.SIXTY_MIN) {
-    return '1h';
-  }
-  return periodFormat;
-}
-
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value != null && typeof value === 'object' && !Array.isArray(value);
 }
@@ -102,9 +92,9 @@ export class TdxSource implements ITdxSourceFetcher {
   }): Promise<TdxResponse[]> {
     const { formatCode, period, startDate, endDate } = params;
 
-    const periodFormat = normalizeTdxPeriodFormat(
+    const periodFormat = this.periodMappingService.toSourceFormat(
       period,
-      this.periodMappingService.toSourceFormat(period, DataSource.TDX),
+      DataSource.TDX,
     );
     if (!periodFormat) {
       throw new HttpException(
@@ -250,7 +240,9 @@ export class TdxSource implements ITdxSourceFetcher {
         return mapped ? [mapped] : [];
       });
     } catch (error) {
-      this.logger.error(`TDX fetchDividFactors error: ${error.message}`);
+      this.logger.warn(
+        `Recoverable TDX fetchDividFactors error; continuing without dividend factors: ${error.message}`,
+      );
       return [];
     }
   }

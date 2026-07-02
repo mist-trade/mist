@@ -1,7 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { IndicatorService } from './indicator.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { Security, K } from '@app/shared-data';
+import { DataSource, Period, Security, K } from '@app/shared-data';
 import { DataSourceService } from '@app/utils';
 
 describe('IndicatorService', () => {
@@ -16,6 +16,7 @@ describe('IndicatorService', () => {
 
   const mockSecurityRepository = {
     find: jest.fn(),
+    findOneBy: jest.fn(),
   };
 
   const mockKRepository = {
@@ -24,6 +25,7 @@ describe('IndicatorService', () => {
 
   const mockDataSourceService = {
     select: jest.fn().mockReturnValue('ef'),
+    getDefault: jest.fn().mockReturnValue(DataSource.EAST_MONEY),
   };
 
   beforeEach(async () => {
@@ -136,5 +138,28 @@ describe('IndicatorService', () => {
         Number.isFinite,
       ),
     ).toBe(true);
+  });
+
+  it('queries K rows with the Period enum value without string double-casting', async () => {
+    mockSecurityRepository.findOneBy.mockResolvedValue({
+      id: 1,
+      code: '000001',
+    });
+    mockKRepository.find.mockResolvedValue([]);
+
+    await service.findKData({
+      code: '000001',
+      period: Period.ONE_MIN,
+      startDate: new Date('2026-07-02T09:30:00+08:00'),
+      endDate: new Date('2026-07-02T10:30:00+08:00'),
+    });
+
+    expect(mockKRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          period: Period.ONE_MIN,
+        }),
+      }),
+    );
   });
 });

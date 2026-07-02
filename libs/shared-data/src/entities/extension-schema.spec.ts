@@ -15,6 +15,30 @@ describe('extension entity schema metadata', () => {
     expect(source).not.toMatch(/outerVolume:\s*bigint/);
   });
 
+  it('keeps nullable KExtensionEf fields nullable in TypeScript defaults', () => {
+    const source = readRepoFile(
+      'libs/shared-data/src/entities/k-extension-ef.entity.ts',
+    );
+
+    for (const field of [
+      'fullCode',
+      'amplitude',
+      'changePct',
+      'changeAmt',
+      'turnoverRate',
+      'volumeCount',
+      'innerVolume',
+      'outerVolume',
+      'prevClose',
+      'prevOpen',
+    ]) {
+      expect(source).toMatch(
+        new RegExp(`${field}:\\s*[^=;]+\\|\\s*null\\s*=\\s*null`),
+      );
+    }
+    expect(source).not.toMatch(/=\s*0n?;/);
+  });
+
   it('exposes kId columns for extension one-to-one keys', () => {
     const extensionEntityPaths = [
       'libs/shared-data/src/entities/k-extension-ef.entity.ts',

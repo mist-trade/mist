@@ -35,7 +35,7 @@ export class KExtensionEf {
     nullable: true,
     comment: '完整代号',
   })
-  fullCode: string = '';
+  fullCode: string | null = null;
 
   @Column({
     type: 'decimal',
@@ -44,7 +44,7 @@ export class KExtensionEf {
     nullable: true,
     comment: '振幅（%）',
   })
-  amplitude: number = 0;
+  amplitude: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -53,7 +53,7 @@ export class KExtensionEf {
     nullable: true,
     comment: '涨跌幅（%）',
   })
-  changePct: number = 0;
+  changePct: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -62,7 +62,7 @@ export class KExtensionEf {
     nullable: true,
     comment: '涨跌额（元）',
   })
-  changeAmt: number = 0;
+  changeAmt: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -71,28 +71,28 @@ export class KExtensionEf {
     nullable: true,
     comment: '换手率（%）',
   })
-  turnoverRate: number = 0;
+  turnoverRate: number | null = null;
 
   @Column({
     type: 'bigint',
     nullable: true,
     comment: '成交笔数',
   })
-  volumeCount: bigint = 0n;
+  volumeCount: bigint | null = null;
 
   @Column({
     type: 'bigint',
     nullable: true,
     comment: '内盘量',
   })
-  innerVolume: bigint = 0n;
+  innerVolume: bigint | null = null;
 
   @Column({
     type: 'decimal',
     nullable: true,
     comment: '外盘量',
   })
-  outerVolume: number = 0;
+  outerVolume: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -101,7 +101,7 @@ export class KExtensionEf {
     nullable: true,
     comment: '昨收价',
   })
-  prevClose: number = 0;
+  prevClose: number | null = null;
 
   @Column({
     type: 'decimal',
@@ -110,7 +110,7 @@ export class KExtensionEf {
     nullable: true,
     comment: '今开价',
   })
-  prevOpen: number = 0;
+  prevOpen: number | null = null;
 
   @CreateDateColumn({ name: 'create_time' })
   createTime!: Date;

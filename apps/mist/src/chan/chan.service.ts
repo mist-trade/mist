@@ -25,4 +25,13 @@ export class ChanService {
     // 返回分型数据
     return this.biService.getFenxings(mergedK);
   }
+
+  analyze(createBiDto: CreateBiDto) {
+    const mergedK = this.kMergeService.merge(createBiDto.k);
+
+    return {
+      bis: this.biService.getBi(mergedK),
+      fenxings: this.biService.getFenxings(mergedK),
+    };
+  }
 }

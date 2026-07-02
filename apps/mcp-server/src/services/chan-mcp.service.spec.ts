@@ -74,6 +74,10 @@ describe('ChanMcpService', () => {
         {
           provide: ChanService,
           useValue: {
+            analyze: jest.fn().mockReturnValue({
+              bis: mockBi,
+              fenxings: mockFenxings,
+            }) as any,
             createBi: jest.fn().mockResolvedValue(mockBi) as any,
             getFenxings: jest.fn().mockResolvedValue(mockFenxings) as any,
           },
@@ -133,6 +137,9 @@ describe('ChanMcpService', () => {
       expect(result.data.summary.bisCount).toBe(1);
       expect(result.data.summary.fenxingsCount).toBe(1);
       expect(result.data.summary.channelsCount).toBe(1);
+      expect((chanService as any).analyze).toHaveBeenCalledTimes(1);
+      expect((chanService as any).createBi).not.toHaveBeenCalled();
+      expect((chanService as any).getFenxings).not.toHaveBeenCalled();
     });
   });
 

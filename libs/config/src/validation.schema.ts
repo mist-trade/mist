@@ -60,6 +60,18 @@ export const mistEnvSchema = commonEnvSchema.append({
     .default('mist-backend-tdx')
     .description('WebSocket client ID for TDX data source connection'),
 
+  TDX_WS_RECONNECT_DELAY_MS: Joi.number()
+    .integer()
+    .positive()
+    .default(5000)
+    .description('TDX WebSocket reconnect delay in milliseconds'),
+
+  TDX_WS_HEARTBEAT_INTERVAL_MS: Joi.number()
+    .integer()
+    .positive()
+    .default(30000)
+    .description('TDX WebSocket heartbeat interval in milliseconds'),
+
   QMT_WS_CLIENT_ID: Joi.string()
     .default('mist-backend-qmt')
     .description('WebSocket client ID for miniQMT data source connection'),

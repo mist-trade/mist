@@ -1,12 +1,27 @@
 import { Injectable, Inject } from '@nestjs/common';
 import { Tool } from '@rekog/mcp-nest';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
-import { Security, K, Period } from '@app/shared-data';
+import { Repository, SelectQueryBuilder } from 'typeorm';
+import { Security, K, Period, DataSource } from '@app/shared-data';
 import { BaseMcpToolService } from '../base/base-mcp-tool.service';
 import { ValidationHelper } from '../utils/validation.helpers';
 import { McpErrorCode, McpError } from '@app/constants';
 import { DataSourceService } from '@app/utils';
+
+type KLineSourceInput = 'ef' | 'tdx' | 'mqmt';
+type LatestPeriodKey = 'daily' | '1min' | '5min' | '15min' | '30min' | '60min';
+
+const LATEST_PERIOD_QUERIES: Array<{
+  key: LatestPeriodKey;
+  period: Period;
+}> = [
+  { key: 'daily', period: Period.DAY },
+  { key: '1min', period: Period.ONE_MIN },
+  { key: '5min', period: Period.FIVE_MIN },
+  { key: '15min', period: Period.FIFTEEN_MIN },
+  { key: '30min', period: Period.THIRTY_MIN },
+  { key: '60min', period: Period.SIXTY_MIN },
+];
 
 @Injectable()
 export class DataMcpService extends BaseMcpToolService {
@@ -59,6 +74,50 @@ export class DataMcpService extends BaseMcpToolService {
       );
     }
     return sanitizedSymbol;
+  }
+
+  private buildKLineQuery(params: {
+    securityId: number;
+    period: Period | string;
+    source: DataSource;
+    limit: number;
+    startDate?: string;
+    endDate?: string;
+  }): SelectQueryBuilder<K> {
+    const queryBuilder = this.kRepository
+      .createQueryBuilder('bar')
+      .leftJoin('bar.security', 'security')
+      .where('security.id = :securityId', { securityId: params.securityId })
+      .andWhere('bar.period = :period', { period: params.period })
+      .andWhere('bar.source = :source', { source: params.source })
+      .orderBy('bar.timestamp', 'DESC')
+      .limit(params.limit);
+
+    if (params.startDate) {
+      queryBuilder.andWhere('bar.timestamp >= :startDate', {
+        startDate: params.startDate,
+      });
+    }
+    if (params.endDate) {
+      queryBuilder.andWhere('bar.timestamp <= :endDate', {
+        endDate: params.endDate,
+      });
+    }
+
+    return queryBuilder;
+  }
+
+  private mapKLineRow(item: K, includeAmount: boolean = false) {
+    return {
+      id: item.id,
+      time: item.timestamp,
+      open: item.open,
+      close: item.close,
+      highest: item.high,
+      lowest: item.low,
+      volume: item.volume.toString(),
+      ...(includeAmount ? { amount: item.amount } : {}),
+    };
   }
 
   @Tool({
@@ -131,7 +190,7 @@ RETURNS: K-line array with time, OHLC, volume.`,
     limit: number = 100,
     startDate?: string,
     endDate?: string,
-    source?: 'ef' | 'tdx' | 'mqmt',
+    source?: KLineSourceInput,
   ) {
     return this.executeTool('get_kline_data', async () => {
       // Validate symbol
@@ -176,33 +235,18 @@ RETURNS: K-line array with time, OHLC, volume.`,
       // Select data source
       const selectedSource = this.dataSourceService.select(source);
 
-      const queryBuilder = this.kRepository
-        .createQueryBuilder('bar')
-        .leftJoin('bar.security', 'security')
-        .where('security.id = :securityId', { securityId: security.id })
-        .andWhere('bar.period = :period', { period })
-        .andWhere('bar.source = :source', { source: selectedSource })
-        .orderBy('bar.timestamp', 'DESC')
-        .limit(limit);
-
-      if (startDate) {
-        queryBuilder.andWhere('bar.timestamp >= :startDate', { startDate });
-      }
-      if (endDate) {
-        queryBuilder.andWhere('bar.timestamp <= :endDate', { endDate });
-      }
+      const queryBuilder = this.buildKLineQuery({
+        securityId: security.id,
+        period,
+        source: selectedSource,
+        limit,
+        startDate,
+        endDate,
+      });
 
       const data = await queryBuilder.getMany();
 
-      return data.map((item) => ({
-        id: item.id,
-        time: item.timestamp,
-        open: item.open,
-        close: item.close,
-        highest: item.high,
-        lowest: item.low,
-        volume: item.volume.toString(),
-      }));
+      return data.map((item) => this.mapKLineRow(item));
     });
   }
 
@@ -227,7 +271,7 @@ RETURNS: Array of daily K-line objects with OHLC, volume, amount.`,
     limit: number = 100,
     startDate?: string,
     endDate?: string,
-    source?: 'ef' | 'tdx' | 'mqmt',
+    source?: KLineSourceInput,
   ) {
     return this.executeTool('get_daily_kline', async () => {
       // Validate symbol
@@ -272,34 +316,18 @@ RETURNS: Array of daily K-line objects with OHLC, volume, amount.`,
       // Select data source
       const selectedSource = this.dataSourceService.select(source);
 
-      const queryBuilder = this.kRepository
-        .createQueryBuilder('bar')
-        .leftJoin('bar.security', 'security')
-        .where('security.id = :securityId', { securityId: security.id })
-        .andWhere('bar.period = :period', { period: Period.DAY })
-        .andWhere('bar.source = :source', { source: selectedSource })
-        .orderBy('bar.timestamp', 'DESC')
-        .limit(limit);
-
-      if (startDate) {
-        queryBuilder.andWhere('bar.timestamp >= :startDate', { startDate });
-      }
-      if (endDate) {
-        queryBuilder.andWhere('bar.timestamp <= :endDate', { endDate });
-      }
+      const queryBuilder = this.buildKLineQuery({
+        securityId: security.id,
+        period: Period.DAY,
+        source: selectedSource,
+        limit,
+        startDate,
+        endDate,
+      });
 
       const data = await queryBuilder.getMany();
 
-      return data.map((item) => ({
-        id: item.id,
-        time: item.timestamp,
-        open: item.open,
-        close: item.close,
-        highest: item.high,
-        lowest: item.low,
-        volume: item.volume.toString(),
-        amount: item.amount,
-      }));
+      return data.map((item) => this.mapKLineRow(item, true));
     });
   }
 
@@ -347,7 +375,7 @@ Optional: source (ef/tdx/mqmt).
 RETURNS: Object containing latest data for daily, 1min, 5min,
 15min, 30min, 60min. Each has time, OHLC, volume.`,
   })
-  async getLatestData(symbol: string, source?: 'ef' | 'tdx' | 'mqmt') {
+  async getLatestData(symbol: string, source?: KLineSourceInput) {
     return this.executeTool('get_latest_data', async () => {
       const security = await this.securityRepository.findOne({
         where: { code: symbol },
@@ -362,46 +390,32 @@ RETURNS: Object containing latest data for daily, 1min, 5min,
       // Select data source
       const selectedSource = this.dataSourceService.select(source);
 
-      const periods: Period[] = [
-        Period.ONE_MIN,
-        Period.FIVE_MIN,
-        Period.FIFTEEN_MIN,
-        Period.THIRTY_MIN,
-        Period.SIXTY_MIN,
-      ];
+      const latestEntries = await Promise.all(
+        LATEST_PERIOD_QUERIES.map(async ({ key, period }) => {
+          const value = await this.buildKLineQuery({
+            securityId: security.id,
+            period,
+            source: selectedSource,
+            limit: 1,
+          }).getOne();
+          return [key, value] as const;
+        }),
+      );
 
-      const [dailyData, ...periodData] = await Promise.all([
-        this.kRepository
-          .createQueryBuilder('bar')
-          .leftJoin('bar.security', 'security')
-          .where('security.id = :securityId', { securityId: security.id })
-          .andWhere('bar.period = :period', { period: Period.DAY })
-          .andWhere('bar.source = :source', { source: selectedSource })
-          .orderBy('bar.timestamp', 'DESC')
-          .limit(1)
-          .getOne(),
-        ...periods.map((period) =>
-          this.kRepository
-            .createQueryBuilder('bar')
-            .leftJoin('bar.security', 'security')
-            .where('security.id = :securityId', { securityId: security.id })
-            .andWhere('bar.period = :period', { period })
-            .andWhere('bar.source = :source', { source: selectedSource })
-            .orderBy('bar.timestamp', 'DESC')
-            .limit(1)
-            .getOne(),
-        ),
-      ]);
+      const latestByKey = Object.fromEntries(latestEntries) as Record<
+        LatestPeriodKey,
+        K | null
+      >;
 
       return {
         symbol,
         name: security.name,
-        daily: dailyData,
-        '1min': periodData[0],
-        '5min': periodData[1],
-        '15min': periodData[2],
-        '30min': periodData[3],
-        '60min': periodData[4],
+        daily: latestByKey.daily,
+        '1min': latestByKey['1min'],
+        '5min': latestByKey['5min'],
+        '15min': latestByKey['15min'],
+        '30min': latestByKey['30min'],
+        '60min': latestByKey['60min'],
       };
     });
   }
