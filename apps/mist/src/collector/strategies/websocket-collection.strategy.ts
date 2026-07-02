@@ -9,6 +9,7 @@ import {
 import { TdxWebSocketService } from '../../sources/tdx/tdx-websocket.service';
 import { TdxResponse } from '../../sources/tdx/types';
 import { TdxRealtimeBar } from '../../sources/tdx/tdx-websocket.service';
+import { KData } from '../../sources/source-fetcher.interface';
 import { normalizeSecurityCode } from '@app/utils';
 
 /**
@@ -67,81 +68,58 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
     symbol: string,
     period: Period,
   ): Promise<void> {
-    const code = normalizeSecurityCode(symbol);
-
     try {
-      const security = await this.collectorService.findSecurityByCode(code);
-      if (!security) {
-        this.logger.warn(
-          `Skipping TDX candle for ${symbol}: security ${code} not found`,
-        );
-        return;
-      }
-
-      const kData = {
-        timestamp: candle.timestamp,
-        open: candle.open,
-        high: candle.high,
-        low: candle.low,
-        close: candle.close,
-        volume: candle.volume,
-        amount: candle.amount || 0,
-        period,
-        ...(candle.extensions ? { extensions: candle.extensions } : {}),
-      };
-
-      await this.collectorService.saveRawKData(
-        security,
-        [kData],
-        DataSource.TDX,
-        period,
-      );
-
-      this.logger.debug(
-        `Saved ${period} TDX candle for ${security.code} at ${candle.timestamp}`,
-      );
+      await this.saveTdxKData(symbol, candle, period, 'candle');
     } catch (error) {
       this.logger.error(`Failed to save TDX candle for ${symbol}: ${error}`);
     }
   }
 
   private async handleTdxBar(bar: TdxRealtimeBar): Promise<void> {
-    const code = normalizeSecurityCode(bar.symbol);
-
     try {
-      const security = await this.collectorService.findSecurityByCode(code);
-      if (!security) {
-        this.logger.warn(
-          `Skipping TDX bar for ${bar.symbol}: security ${code} not found`,
-        );
-        return;
-      }
-
-      const kData = {
-        timestamp: bar.timestamp,
-        open: bar.open,
-        high: bar.high,
-        low: bar.low,
-        close: bar.close,
-        volume: bar.volume,
-        amount: bar.amount || 0,
-        period: bar.period,
-        ...(bar.extensions ? { extensions: bar.extensions } : {}),
-      };
-
-      await this.collectorService.saveRawKData(
-        security,
-        [kData],
-        DataSource.TDX,
-        bar.period,
-      );
-
-      this.logger.debug(
-        `Saved ${bar.period} TDX bar for ${security.code} at ${bar.timestamp}`,
-      );
+      await this.saveTdxKData(bar.symbol, bar, bar.period, 'bar');
     } catch (error) {
       this.logger.error(`Failed to save TDX bar for ${bar.symbol}: ${error}`);
     }
+  }
+
+  private async saveTdxKData(
+    symbol: string,
+    sourceData: TdxResponse | TdxRealtimeBar,
+    period: Period,
+    kind: 'bar' | 'candle',
+  ): Promise<void> {
+    const code = normalizeSecurityCode(symbol);
+    const security = await this.collectorService.findSecurityByCode(code);
+    if (!security) {
+      this.logger.warn(
+        `Skipping TDX ${kind} for ${symbol}: security ${code} not found`,
+      );
+      return;
+    }
+
+    const kData: KData = {
+      timestamp: sourceData.timestamp,
+      open: sourceData.open,
+      high: sourceData.high,
+      low: sourceData.low,
+      close: sourceData.close,
+      volume: sourceData.volume,
+      amount: sourceData.amount ?? 0,
+      period,
+      ...(sourceData.extensions ? { extensions: sourceData.extensions } : {}),
+    };
+
+    await this.collectorService.saveRawKData(
+      security,
+      [kData],
+      DataSource.TDX,
+      period,
+    );
+
+    this.logger.debug(
+      `Saved ${period} TDX ${kind} for ${security.code} at ${sourceData.timestamp}`,
+    );
   }
 
   async start(): Promise<void> {

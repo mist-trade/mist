@@ -3,6 +3,7 @@ import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { Period } from '@app/shared-data';
 import { TimezoneService } from '@app/timezone';
+import { PeriodMappingService } from '@app/utils';
 import { KCandleAggregator, CompletedCandle } from './kcandle-aggregator';
 import { TdxWebSocketService } from './tdx-websocket.service';
 
@@ -82,6 +83,7 @@ const configService = (values: Record<string, string | undefined> = {}) =>
 const timezoneService = {
   getCurrentBeijingTime: jest.fn(() => new Date('2026-06-26T09:31:00+08:00')),
 } as unknown as TimezoneService;
+const periodMappingService = new PeriodMappingService();
 
 const flushSocketOpen = () =>
   new Promise<void>((resolve) => setImmediate(resolve));
@@ -89,14 +91,17 @@ const flushSocketOpen = () =>
 const createService = (
   aggregator = new FakeAggregator(),
   webSocketCtor: typeof FakeWebSocket = FakeWebSocket,
+  configValues: Record<string, string | undefined> = {},
 ): { service: TdxWebSocketService; aggregator: FakeAggregator } => ({
   service: new TdxWebSocketService(
     configService({
       TDX_BASE_URL: 'http://127.0.0.1:9001',
       TDX_WS_CLIENT_ID: 'mist-test',
+      ...configValues,
     }),
     aggregator as unknown as KCandleAggregator,
     timezoneService,
+    periodMappingService,
     webSocketCtor as any,
   ),
   aggregator,
@@ -126,6 +131,7 @@ describe('TdxWebSocketService normalized bridge', () => {
         { provide: ConfigService, useValue: configService() },
         { provide: KCandleAggregator, useValue: new FakeAggregator() },
         { provide: TimezoneService, useValue: timezoneService },
+        { provide: PeriodMappingService, useValue: periodMappingService },
       ],
     }).compile();
 
@@ -150,6 +156,16 @@ describe('TdxWebSocketService normalized bridge', () => {
     });
 
     await service.onModuleDestroy();
+  });
+
+  it('uses configured reconnect and heartbeat timing values', () => {
+    const { service } = createService(new FakeAggregator(), FakeWebSocket, {
+      TDX_WS_RECONNECT_DELAY_MS: '17',
+      TDX_WS_HEARTBEAT_INTERVAL_MS: '19',
+    });
+
+    expect((service as any).reconnectDelayMs).toBe(17);
+    expect((service as any).heartbeatIntervalMs).toBe(19);
   });
 
   it('sends sync_subscriptions after connect even when no symbols are subscribed', async () => {
@@ -211,7 +227,7 @@ describe('TdxWebSocketService normalized bridge', () => {
 
   it('creates a new socket and resends subscriptions after reconnect', async () => {
     const { service } = createService();
-    (service as any).reconnectDelay = 1;
+    (service as any).reconnectDelayMs = 1;
     service.subscribe('600519.SH');
 
     await service.onModuleInit();

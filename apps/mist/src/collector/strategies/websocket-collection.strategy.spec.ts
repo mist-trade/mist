@@ -124,6 +124,55 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
     );
   });
 
+  it('persists completed candles through the same normalized KData shape as realtime bars', async () => {
+    const security = createSecurity('600519');
+    const { collectorService, emitBar, emitCandle } = createHarness(security);
+    const bar = createBar('600519.SH', Period.ONE_MIN);
+    const candle = {
+      timestamp: new Date('2026-06-26T09:35:00+08:00'),
+      open: 10.2,
+      high: 10.4,
+      low: 10.1,
+      close: 10.3,
+      volume: 2200,
+      amount: 22345.6,
+      extensions: {
+        forwardFactor: 0.711862,
+      },
+    };
+
+    await emitBar(bar);
+    await emitCandle(candle, '600519.SH', Period.FIVE_MIN);
+
+    expect(collectorService.saveRawKData.mock.calls).toEqual([
+      [
+        security,
+        [
+          expect.objectContaining({
+            timestamp: bar.timestamp,
+            amount: bar.amount,
+            period: Period.ONE_MIN,
+          }),
+        ],
+        DataSource.TDX,
+        Period.ONE_MIN,
+      ],
+      [
+        security,
+        [
+          expect.objectContaining({
+            timestamp: candle.timestamp,
+            amount: candle.amount,
+            period: Period.FIVE_MIN,
+            extensions: candle.extensions,
+          }),
+        ],
+        DataSource.TDX,
+        Period.FIVE_MIN,
+      ],
+    ]);
+  });
+
   it.each([
     ['600519.SH', '600519'],
     ['000001.SZ', '000001'],

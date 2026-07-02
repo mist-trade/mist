@@ -229,6 +229,134 @@ function assertBackendHttpConfigHygiene() {
   }
 }
 
+function assertBackendRuntimeSweep() {
+  const collectorService = read(
+    join(repos.mist, 'apps/mist/src/collector/collector.service.ts'),
+  );
+  assertNotIncludes(
+    collectorService,
+    'ISourceFetcher<any>',
+    'mist CollectorService source fetcher typing',
+  );
+  assertIncludes(
+    collectorService,
+    'SourceFetcher = EastMoneySource | TdxSource',
+    'mist CollectorService source fetcher typing',
+  );
+
+  const indicatorService = read(
+    join(repos.mist, 'apps/mist/src/indicator/indicator.service.ts'),
+  );
+  assertNotIncludes(
+    indicatorService,
+    'String(query.period) as unknown as Period',
+    'mist IndicatorService period query',
+  );
+
+  const tdxSource = read(
+    join(repos.mist, 'apps/mist/src/sources/tdx/tdx-source.service.ts'),
+  );
+  assertNotIncludes(
+    tdxSource,
+    'normalizeTdxPeriodFormat',
+    'mist TdxSource period mapping',
+  );
+
+  const tdxWebSocket = read(
+    join(repos.mist, 'apps/mist/src/sources/tdx/tdx-websocket.service.ts'),
+  );
+  for (const expected of [
+    'TDX_WS_RECONNECT_DELAY_MS',
+    'TDX_WS_HEARTBEAT_INTERVAL_MS',
+    'periodMappingService.fromSourceFormat',
+  ]) {
+    assertIncludes(tdxWebSocket, expected, 'mist TDX WebSocket runtime sweep');
+  }
+  for (const unexpected of [
+    'private readonly reconnectDelay = 5000',
+    'private readonly heartbeatIntervalMs = 30000',
+  ]) {
+    assertNotIncludes(
+      tdxWebSocket,
+      unexpected,
+      'mist TDX WebSocket runtime sweep',
+    );
+  }
+
+  const dataMcpService = read(
+    join(repos.mist, 'apps/mcp-server/src/services/data-mcp.service.ts'),
+  );
+  const queryBuilderCalls = [
+    ...dataMcpService.matchAll(/createQueryBuilder\('bar'\)/g),
+  ];
+  if (queryBuilderCalls.length !== 1) {
+    fail(
+      `DataMcpService must create bar query builders through one shared helper, found ${queryBuilderCalls.length}`,
+    );
+  }
+  assertIncludes(
+    dataMcpService,
+    'LATEST_PERIOD_QUERIES',
+    'mist DataMcpService latest data mapping',
+  );
+  assertNotIncludes(
+    dataMcpService,
+    "'1min': periodData[0]",
+    'mist DataMcpService latest data mapping',
+  );
+
+  const websocketStrategy = read(
+    join(
+      repos.mist,
+      'apps/mist/src/collector/strategies/websocket-collection.strategy.ts',
+    ),
+  );
+  const saveRawCalls = [...websocketStrategy.matchAll(/saveRawKData\(/g)];
+  if (saveRawCalls.length !== 1) {
+    fail(
+      `WebSocketCollectionStrategy must save TDX KData through one helper, found ${saveRawCalls.length}`,
+    );
+  }
+  assertIncludes(
+    websocketStrategy,
+    'saveTdxKData',
+    'mist WebSocketCollectionStrategy shared save helper',
+  );
+
+  const chanService = read(
+    join(repos.mist, 'apps/mist/src/chan/chan.service.ts'),
+  );
+  assertIncludes(chanService, 'analyze(', 'mist ChanService analysis helper');
+
+  const chanMcpService = read(
+    join(repos.mist, 'apps/mcp-server/src/services/chan-mcp.service.ts'),
+  );
+  assertIncludes(
+    chanMcpService,
+    'this.chanService.analyze',
+    'mist Chan MCP analysis helper',
+  );
+
+  const biService = read(
+    join(repos.mist, 'apps/mist/src/chan/services/bi.service.ts'),
+  );
+  if (/(?:startFenxing|endFenxing)!\./.test(biService)) {
+    fail('BiService merge paths must use explicit Fenxing invariant guards');
+  }
+  assertIncludes(
+    biService,
+    'assertCompleteBi',
+    'mist BiService invariant guard',
+  );
+
+  const efExtension = read(
+    join(repos.mist, 'libs/shared-data/src/entities/k-extension-ef.entity.ts'),
+  );
+  if (/=\s*0n?;/.test(efExtension)) {
+    fail('KExtensionEf nullable fields must default to null, not 0 or 0n');
+  }
+}
+
 function assertEnvFilesUntracked() {
   const tracked = execFileSync(
     'git',
@@ -284,6 +412,7 @@ function assertMistBackendContracts() {
   assertBackendJestHygiene(packageJson);
   assertNoSelectedBackendProductionConsoleCalls();
   assertBackendHttpConfigHygiene();
+  assertBackendRuntimeSweep();
 
   const gitignore = read(join(repos.mist, '.gitignore'));
   assertIncludes(gitignore, '.env.*', 'mist .gitignore');

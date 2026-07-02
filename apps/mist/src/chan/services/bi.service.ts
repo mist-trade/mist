@@ -18,6 +18,11 @@ const uniqueById = (arr: KVo[]) => {
   });
 };
 
+type CompleteBiWithFenxings = BiVo & {
+  startFenxing: FenxingVo;
+  endFenxing: FenxingVo;
+};
+
 @Injectable()
 export class BiService {
   /**
@@ -523,20 +528,34 @@ export class BiService {
     }
   }
 
+  private assertCompleteBi(
+    bi: BiVo,
+    label: string,
+  ): asserts bi is CompleteBiWithFenxings {
+    if (!bi.startFenxing || !bi.endFenxing) {
+      throw new Error(
+        `Bi invariant failed: ${label} requires startFenxing and endFenxing`,
+      );
+    }
+  }
+
   private canMergeTwoBis(bi1: BiVo, bi2: BiVo) {
+    this.assertCompleteBi(bi1, 'bi1');
+    this.assertCompleteBi(bi2, 'bi2');
+
     if (
       bi2.trend === TrendDirection.Up &&
       bi1.trend === TrendDirection.Up &&
-      bi1.endFenxing!.highest < bi2.endFenxing!.highest &&
-      bi1.startFenxing!.lowest < bi2.startFenxing!.lowest
+      bi1.endFenxing.highest < bi2.endFenxing.highest &&
+      bi1.startFenxing.lowest < bi2.startFenxing.lowest
     ) {
       return true;
     }
     if (
       bi2.trend === TrendDirection.Down &&
       bi1.trend === TrendDirection.Down &&
-      bi1.startFenxing!.highest > bi2.startFenxing!.highest &&
-      bi1.endFenxing!.lowest > bi2.endFenxing!.lowest
+      bi1.startFenxing.highest > bi2.startFenxing.highest &&
+      bi1.endFenxing.lowest > bi2.endFenxing.lowest
     ) {
       return true;
     }
@@ -544,6 +563,10 @@ export class BiService {
   }
 
   private canMergeThreeBis(bi1: BiVo, bi2: BiVo, bi3: BiVo) {
+    this.assertCompleteBi(bi1, 'bi1');
+    this.assertCompleteBi(bi2, 'bi2');
+    this.assertCompleteBi(bi3, 'bi3');
+
     const pattern = this.getThreePattern(bi1, bi2, bi3);
     if (!pattern) return false;
     const canMergeSameTrend = this.canMergeTwoBis(bi1, bi3);
@@ -551,14 +574,14 @@ export class BiService {
     switch (pattern) {
       case 'up-down-up': {
         return (
-          bi1.startFenxing!.lowest <= bi2.endFenxing!.lowest &&
-          bi2.startFenxing!.highest <= bi3.endFenxing!.highest
+          bi1.startFenxing.lowest <= bi2.endFenxing.lowest &&
+          bi2.startFenxing.highest <= bi3.endFenxing.highest
         );
       }
       case 'down-up-down':
         return (
-          bi1.startFenxing!.highest >= bi2.endFenxing!.highest &&
-          bi2.startFenxing!.lowest >= bi3.endFenxing!.lowest
+          bi1.startFenxing.highest >= bi2.endFenxing.highest &&
+          bi2.startFenxing.lowest >= bi3.endFenxing.lowest
         );
       default:
         return false;
@@ -715,9 +738,12 @@ export class BiService {
    * 合并两笔
    */
   private mergeTwoBis(bi1: BiVo, bi2: BiVo, data: MergedKVo[]): BiVo {
+    this.assertCompleteBi(bi1, 'bi1');
+    this.assertCompleteBi(bi2, 'bi2');
+
     // 合并两笔：bi1的起点 + bi2的终点
-    const startIdx = bi1.startFenxing!.middleIndex;
-    const endIdx = bi2.endFenxing!.middleIndex;
+    const startIdx = bi1.startFenxing.middleIndex;
+    const endIdx = bi2.endFenxing.middleIndex;
 
     const rangeKs = data.slice(startIdx, endIdx + 1);
 
@@ -734,8 +760,8 @@ export class BiService {
     });
 
     // 使用分型的中间K线时间，而不是合并K的开始/结束时间
-    const startK = this.findKByFenxing(data, bi1.startFenxing!);
-    const endK = this.findKByFenxing(data, bi2.endFenxing!);
+    const startK = this.findKByFenxing(data, bi1.startFenxing);
+    const endK = this.findKByFenxing(data, bi2.endFenxing);
 
     return {
       startTime: startK.time,
@@ -760,9 +786,12 @@ export class BiService {
    * 合并三笔
    */
   private mergeThreeBis(bi1: BiVo, bi3: BiVo, data: MergedKVo[]): BiVo {
+    this.assertCompleteBi(bi1, 'bi1');
+    this.assertCompleteBi(bi3, 'bi3');
+
     // 合并三笔：bi1的起点 + bi3的终点
-    const startIdx = bi1.startFenxing!.middleIndex;
-    const endIdx = bi3.endFenxing!.middleIndex;
+    const startIdx = bi1.startFenxing.middleIndex;
+    const endIdx = bi3.endFenxing.middleIndex;
 
     const rangeKs = data.slice(startIdx, endIdx + 1);
 
@@ -779,8 +808,8 @@ export class BiService {
     });
 
     // 使用分型的中间K线时间，而不是合并K的开始/结束时间
-    const startK = this.findKByFenxing(data, bi1.startFenxing!);
-    const endK = this.findKByFenxing(data, bi3.endFenxing!);
+    const startK = this.findKByFenxing(data, bi1.startFenxing);
+    const endK = this.findKByFenxing(data, bi3.endFenxing);
 
     return {
       startTime: startK.time,

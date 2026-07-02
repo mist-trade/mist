@@ -234,6 +234,25 @@ describe('ChanService', () => {
   });
 
   describe('service coordination', () => {
+    it('analyzes Bi and Fenxing from one merged K-line pass', () => {
+      const kData = KLineFixtures.completeBi();
+      const createBiDto = new CreateBiDto();
+      createBiDto.k = kData;
+      const mergeSpy = jest.spyOn(kMergeService, 'merge');
+      const biSpy = jest.spyOn(biService, 'getBi');
+      const fenxingSpy = jest.spyOn(biService, 'getFenxings');
+
+      const result = service.analyze(createBiDto);
+
+      expect(mergeSpy).toHaveBeenCalledTimes(1);
+      expect(biSpy).toHaveBeenCalledTimes(1);
+      expect(fenxingSpy).toHaveBeenCalledTimes(1);
+      expect(result).toEqual({
+        bis: expect.any(Array),
+        fenxings: expect.any(Array),
+      });
+    });
+
     it('should use merged K-lines from kMergeService as input to biService', () => {
       const kData = KLineFixtures.completeBi();
       const createBiDto = new CreateBiDto();

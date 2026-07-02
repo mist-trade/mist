@@ -78,7 +78,7 @@ describe('TdxSource', () => {
                   case Period.THIRTY_MIN:
                     return '30m';
                   case Period.SIXTY_MIN:
-                    return '60m';
+                    return '1h';
                   case Period.DAY:
                     return '1d';
                   case Period.WEEK:
@@ -455,6 +455,27 @@ describe('TdxSource', () => {
           backwardFactor: 0.9876,
         },
       ]);
+    });
+
+    it('treats dividend factor fetch failures as recoverable empty factors', async () => {
+      mockAxiosPost.mockRejectedValueOnce(new Error('tdx timeout'));
+
+      const result = await service.fetchDividFactors(
+        '600519.SH',
+        new Date('2025-01-01T00:00:00+08:00'),
+        new Date('2025-12-31T00:00:00+08:00'),
+      );
+
+      expect(result).toEqual([]);
+      expect(mockAxiosPost).toHaveBeenCalledWith(
+        '/v1/reference/dividend-factors/query',
+        {
+          symbol: '600519.SH',
+          startTime: '20250101',
+          endTime: '20251231',
+        },
+      );
+      expect(mockAxiosGet).not.toHaveBeenCalled();
     });
   });
 

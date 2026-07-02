@@ -85,4 +85,18 @@ describe('PeriodMappingService with unified Period enum', () => {
       service.toSourceFormat(Period.QUARTER, DataSource.TDX),
     ).toThrow();
   });
+
+  it('maps TDX source period tokens back to the unified Period enum', () => {
+    expect(service.fromSourceFormat('1m', DataSource.TDX)).toBe(Period.ONE_MIN);
+    expect(service.fromSourceFormat('1h', DataSource.TDX)).toBe(
+      Period.SIXTY_MIN,
+    );
+    expect(service.fromSourceFormat('1d', DataSource.TDX)).toBe(Period.DAY);
+  });
+
+  it('throws when a source period token is unsupported', () => {
+    expect(() => service.fromSourceFormat('4h', DataSource.TDX)).toThrow(
+      'does not support source period 4h',
+    );
+  });
 });

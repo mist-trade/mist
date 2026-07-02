@@ -180,4 +180,106 @@ describe('DataMcpService', () => {
       sanitizeSpy.mockRestore();
     });
   });
+
+  describe('getDailyKline', () => {
+    it('should return daily k-line data using the shared row shape', async () => {
+      jest.spyOn(securityRepository, 'findOne').mockResolvedValue(mockSecurity);
+
+      const mockQueryBuilder = {
+        leftJoin: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        limit: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue([mockK]),
+      };
+
+      jest
+        .spyOn(kRepository, 'createQueryBuilder')
+        .mockReturnValue(mockQueryBuilder as any);
+
+      const result = (await service.getDailyKline('000001', 10)) as unknown as {
+        success: boolean;
+        data: any[];
+      };
+
+      expect(result.success).toBe(true);
+      expect(result.data[0]).toMatchObject({
+        id: 1,
+        time: mockK.timestamp,
+        open: 3000,
+        close: 3010,
+        highest: 3020,
+        lowest: 2990,
+        volume: '1000000',
+        amount: 100000000,
+      });
+      expect(mockQueryBuilder.andWhere).toHaveBeenCalledWith(
+        'bar.period = :period',
+        { period: Period.DAY },
+      );
+    });
+  });
+
+  describe('getLatestData', () => {
+    it('assigns latest rows by period key rather than by raw array position', async () => {
+      jest.spyOn(securityRepository, 'findOne').mockResolvedValue(mockSecurity);
+
+      const rowsByPeriod = new Map<Period, K>([
+        [Period.DAY, { ...mockK, id: 10, period: Period.DAY } as any],
+        [Period.ONE_MIN, { ...mockK, id: 11, period: Period.ONE_MIN } as any],
+        [Period.FIVE_MIN, { ...mockK, id: 12, period: Period.FIVE_MIN } as any],
+        [
+          Period.FIFTEEN_MIN,
+          { ...mockK, id: 13, period: Period.FIFTEEN_MIN } as any,
+        ],
+        [
+          Period.THIRTY_MIN,
+          { ...mockK, id: 14, period: Period.THIRTY_MIN } as any,
+        ],
+        [
+          Period.SIXTY_MIN,
+          { ...mockK, id: 15, period: Period.SIXTY_MIN } as any,
+        ],
+      ]);
+
+      jest.spyOn(kRepository, 'createQueryBuilder').mockImplementation(() => {
+        let period: Period | undefined;
+        const mockQueryBuilder: Record<string, jest.Mock> = {
+          leftJoin: jest.fn().mockReturnThis(),
+          where: jest.fn().mockReturnThis(),
+          andWhere: jest.fn(
+            (
+              condition: string,
+              params: { period?: Period },
+            ): Record<string, jest.Mock> => {
+              if (condition === 'bar.period = :period') {
+                period = params.period;
+              }
+              return mockQueryBuilder;
+            },
+          ),
+          orderBy: jest.fn().mockReturnThis(),
+          limit: jest.fn().mockReturnThis(),
+          getOne: jest.fn(async () =>
+            period == null ? null : rowsByPeriod.get(period),
+          ),
+        };
+        return mockQueryBuilder as any;
+      });
+
+      const result = (await service.getLatestData('000001')) as unknown as {
+        success: boolean;
+        data: Record<string, any>;
+      };
+
+      expect(result.success).toBe(true);
+      expect(result.data.daily.id).toBe(10);
+      expect(result.data['1min'].id).toBe(11);
+      expect(result.data['5min'].id).toBe(12);
+      expect(result.data['15min'].id).toBe(13);
+      expect(result.data['30min'].id).toBe(14);
+      expect(result.data['60min'].id).toBe(15);
+    });
+  });
 });
