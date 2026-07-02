@@ -76,8 +76,8 @@ Migration SQL files are bundled from:
 deploy/database/migrations
 ```
 
-Production deployments must not rely on TypeORM `synchronize`; `apps/mist`
-already disables synchronize when `NODE_ENV=production`.
+Deployments must not rely on TypeORM `synchronize`; app modules set
+`synchronize: false` in every environment.
 
 ## Datasource Boundary
 

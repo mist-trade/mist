@@ -51,7 +51,7 @@ import { mistEnvSchema } from '@app/config';
           username: configService.get('mysql_server_username'),
           password: configService.get('mysql_server_password'),
           database: configService.get('mysql_server_database'),
-          synchronize: configService.get('NODE_ENV') !== 'production',
+          synchronize: false,
           logging: configService.get('NODE_ENV') !== 'production',
           entities: [
             K,
