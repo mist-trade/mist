@@ -10,7 +10,7 @@
 ## 2. Create first-wave child changes
 
 - [x] 2.1 Create `harden-release-ci` for CI/release safety, Node version alignment, tracked env cleanup, and release gating.
-- [ ] 2.2 Create `fix-datasource-runtime-safety` for blocking SDK calls, QMT callback loop capture, dirty-symbol thread safety, and datasource protocol tests.
+- [x] 2.2 Create `fix-datasource-runtime-safety` for blocking SDK calls, QMT callback loop capture, dirty-symbol thread safety, and datasource protocol tests.
 - [ ] 2.3 Create `disable-typeorm-auto-sync` for explicit TypeORM synchronize shutdown and high-risk DB schema fixes.
 - [ ] 2.4 Create `harden-docker-deploy-path` for backend Dockerfile, compose command, image tag, rollback, and deployment-script verification.
 - [ ] 2.5 Create `align-datasource-ws-contract` for WebSocket envelope, error, pong, snapshot, and old-route migration planning.
