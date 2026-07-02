@@ -161,6 +161,26 @@ function assertBackendJestHygiene(packageJson) {
   }
 }
 
+function assertNoSelectedBackendProductionConsoleCalls() {
+  const selectedProductionFiles = [
+    'apps/mist/src/collector/collector.service.ts',
+    'libs/utils/src/services/data-source.service.ts',
+  ];
+  const consoleCallPattern = /\bconsole\.(?:log|warn|error|info|debug)\s*\(/g;
+
+  for (const relativePath of selectedProductionFiles) {
+    const content = read(join(repos.mist, relativePath));
+    const matches = [...content.matchAll(consoleCallPattern)].map(
+      (match) => match[0],
+    );
+    if (matches.length > 0) {
+      fail(
+        `${relativePath} must use NestJS Logger instead of console.*: ${matches.join(', ')}`,
+      );
+    }
+  }
+}
+
 function assertEnvFilesUntracked() {
   const tracked = execFileSync(
     'git',
@@ -214,6 +234,7 @@ function assertMistBackendContracts() {
   assertPackageScriptConfigTargetsExist(packageJson, 'test:e2e', 'mist');
   assertBackendToolingHygiene(packageJson);
   assertBackendJestHygiene(packageJson);
+  assertNoSelectedBackendProductionConsoleCalls();
 
   const gitignore = read(join(repos.mist, '.gitignore'));
   assertIncludes(gitignore, '.env.*', 'mist .gitignore');

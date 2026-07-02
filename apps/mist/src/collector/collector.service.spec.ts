@@ -9,7 +9,7 @@ import {
   SecurityType,
   Security,
 } from '@app/shared-data';
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSourceSelectionService } from '@app/utils';
 
@@ -40,8 +40,15 @@ const mockDataSourceSelectionService = {
 
 describe('CollectorService', () => {
   let service: CollectorService;
+  let loggerLogSpy: jest.SpyInstance;
+  let loggerWarnSpy: jest.SpyInstance;
+  let loggerErrorSpy: jest.SpyInstance;
 
   beforeEach(async () => {
+    loggerLogSpy = jest.spyOn(Logger.prototype, 'log').mockImplementation();
+    loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+    loggerErrorSpy = jest.spyOn(Logger.prototype, 'error').mockImplementation();
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         CollectorService,
@@ -73,6 +80,7 @@ describe('CollectorService', () => {
 
   afterEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
   });
 
   describe('collectK', () => {
@@ -147,6 +155,9 @@ describe('CollectorService', () => {
         mockStock,
         Period.ONE_MIN,
       );
+      expect(loggerLogSpy).toHaveBeenCalledWith(
+        'Successfully collected 2 K-line records for 000001, period 1',
+      );
     });
 
     it('should throw NotFoundException when stock not found', async () => {
@@ -199,6 +210,28 @@ describe('CollectorService', () => {
           new Date('2024-01-02'),
         ),
       ).resolves.not.toThrow();
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        expect.stringContaining('No data returned for security 000001'),
+      );
+    });
+
+    it('should log and rethrow collection failures', async () => {
+      const error = new Error('source down');
+      mockEastMoneySource.fetchK.mockRejectedValue(error);
+
+      await expect(
+        service.collectK(
+          '000001',
+          Period.ONE_MIN,
+          new Date('2024-01-01'),
+          new Date('2024-01-02'),
+        ),
+      ).rejects.toThrow(error);
+
+      expect(loggerErrorSpy).toHaveBeenCalledWith(
+        'Failed to collect K-line data for 000001:',
+        error,
+      );
     });
   });
 
@@ -270,6 +303,9 @@ describe('CollectorService', () => {
       expect(postProcessCallback).toHaveBeenCalledWith(
         mockKData,
         DataSource.EAST_MONEY,
+      );
+      expect(loggerLogSpy).toHaveBeenCalledWith(
+        'Successfully collected 1 K-line records for 000001, period 1 from ef',
       );
     });
 

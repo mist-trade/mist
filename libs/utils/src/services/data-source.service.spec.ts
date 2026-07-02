@@ -1,10 +1,20 @@
 import { Test, TestingModule } from '@nestjs/testing';
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSourceService } from './data-source.service';
 import { DataSource } from '@app/shared-data';
 
 describe('DataSourceService', () => {
   let service: DataSourceService;
+  let loggerWarnSpy: jest.SpyInstance;
+
+  beforeEach(() => {
+    loggerWarnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation();
+  });
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   const createService = async (envValue?: string) => {
     const module: TestingModule = await Test.createTestingModule({
@@ -90,6 +100,19 @@ describe('DataSourceService', () => {
 
     it('should use env default when valid (enum key)', () => {
       expect(service.getDefault()).toBe(DataSource.TDX);
+    });
+  });
+
+  describe('with env var set to invalid source', () => {
+    beforeEach(async () => {
+      await createService('INVALID');
+    });
+
+    it('should log invalid default through NestJS Logger and fall back to EAST_MONEY', () => {
+      expect(service.getDefault()).toBe(DataSource.EAST_MONEY);
+      expect(loggerWarnSpy).toHaveBeenCalledWith(
+        'Invalid DEFAULT_DATA_SOURCE "INVALID", falling back to EAST_MONEY',
+      );
     });
   });
 });

@@ -1,9 +1,10 @@
-import { Injectable, Inject } from '@nestjs/common';
+import { Injectable, Inject, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from '@app/shared-data';
 
 @Injectable()
 export class DataSourceService {
+  private readonly logger = new Logger(DataSourceService.name);
   private readonly defaultSource: DataSource;
 
   constructor(@Inject(ConfigService) private configService: ConfigService) {
@@ -16,7 +17,7 @@ export class DataSourceService {
         const normalized = this.normalize(envDefault);
         this.defaultSource = this.selectOrFail(normalized);
       } catch {
-        console.warn(
+        this.logger.warn(
           `Invalid DEFAULT_DATA_SOURCE "${envDefault}", falling back to EAST_MONEY`,
         );
         this.defaultSource = DataSource.EAST_MONEY;
