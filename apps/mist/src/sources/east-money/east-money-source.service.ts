@@ -15,9 +15,11 @@ import {
   Security,
 } from '@app/shared-data';
 import { DataSource as TypeOrmDataSource, In } from 'typeorm';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 
 const K_UPSERT_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'amount'];
+const MARKET_TIME_ZONE = 'Asia/Shanghai';
 
 const EF_EXTENSION_UPSERT_COLUMNS = [
   'fullCode',
@@ -78,8 +80,16 @@ export class EastMoneySource implements ISourceFetcher {
         params: {
           symbol: code,
           period: periodFormat,
-          start_date: format(startDate, 'yyyy-MM-dd HH:mm:ss'),
-          end_date: format(endDate, 'yyyy-MM-dd HH:mm:ss'),
+          start_date: formatInTimeZone(
+            startDate,
+            MARKET_TIME_ZONE,
+            'yyyy-MM-dd HH:mm:ss',
+          ),
+          end_date: formatInTimeZone(
+            endDate,
+            MARKET_TIME_ZONE,
+            'yyyy-MM-dd HH:mm:ss',
+          ),
         },
       },
     );
@@ -149,8 +159,8 @@ export class EastMoneySource implements ISourceFetcher {
       {
         params: {
           symbol: code,
-          start_date: format(startDate, 'yyyyMMdd'),
-          end_date: format(endDate, 'yyyyMMdd'),
+          start_date: formatInTimeZone(startDate, MARKET_TIME_ZONE, 'yyyyMMdd'),
+          end_date: formatInTimeZone(endDate, MARKET_TIME_ZONE, 'yyyyMMdd'),
         },
       },
     );

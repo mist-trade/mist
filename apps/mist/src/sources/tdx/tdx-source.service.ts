@@ -14,7 +14,8 @@ import {
   Security,
 } from '@app/shared-data';
 import { DataSource as TypeOrmDataSource, In } from 'typeorm';
-import { format, parseISO } from 'date-fns';
+import { parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
 import { ITdxSourceFetcher } from './tdx-source.interface';
 import {
   TdxResponse,
@@ -40,6 +41,7 @@ const TDX_BAR_FIELDS = [
 ];
 
 const K_UPSERT_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'amount'];
+const MARKET_TIME_ZONE = 'Asia/Shanghai';
 
 const TDX_EXTENSION_UPSERT_COLUMNS = [
   'fullCode',
@@ -233,8 +235,8 @@ export class TdxSource implements ITdxSourceFetcher {
         TdxEnvelope<TdxDividendFactorsResponseData>
       >('/v1/reference/dividend-factors/query', {
         symbol: formatCode,
-        startTime: format(startDate, 'yyyyMMdd'),
-        endTime: format(endDate, 'yyyyMMdd'),
+        startTime: formatInTimeZone(startDate, MARKET_TIME_ZONE, 'yyyyMMdd'),
+        endTime: formatInTimeZone(endDate, MARKET_TIME_ZONE, 'yyyyMMdd'),
       });
       const envelope = response.data;
 
@@ -264,10 +266,18 @@ export class TdxSource implements ITdxSourceFetcher {
     }
 
     return {
-      timestamp: parseISO(this.normalizeDividendDate(item.date)),
+      timestamp: this.parseDividendDate(item.date),
       forwardFactor: item.forwardFactor,
       backwardFactor: item.backwardFactor,
     };
+  }
+
+  private parseDividendDate(date: string): Date {
+    const normalizedDate = this.normalizeDividendDate(date);
+    if (/^\d{4}-\d{2}-\d{2}$/.test(normalizedDate)) {
+      return parseISO(`${normalizedDate}T00:00:00+08:00`);
+    }
+    return parseISO(normalizedDate);
   }
 
   private normalizeDividendDate(date: string): string {
