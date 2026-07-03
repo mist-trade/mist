@@ -357,6 +357,238 @@ function assertBackendRuntimeSweep() {
   }
 }
 
+function assertBackendP3QuickWins() {
+  const judgeTrendVo = join(
+    repos.mist,
+    'apps/mist/src/chan/vo/judge-trend.vo.ts',
+  );
+  if (existsSync(judgeTrendVo)) {
+    fail('CODE_SMELL D1.1: JudgeTrendVo active source file must be removed');
+  }
+
+  const errorMessages = read(join(repos.mist, 'libs/constants/src/errors.ts'));
+  assertNotIncludes(
+    errorMessages,
+    'BI_INVALID_DIRECTION',
+    'CODE_SMELL D1.3 error constants',
+  );
+
+  const utilsService = read(
+    join(repos.mist, 'libs/utils/src/utils.service.ts'),
+  );
+  for (const helperName of [
+    'getLocalUrl',
+    'formatLocalResult',
+    'getLatestValidValue',
+    'findLastIndex',
+    'addZeroToNumber',
+    'roundDownToNearestInterval',
+  ]) {
+    assertNotIncludes(
+      utilsService,
+      `${helperName}(`,
+      `CODE_SMELL D1.2 UtilsService unused helper ${helperName}`,
+    );
+  }
+
+  const debugCommentFiles = ['apps/mist/src/sources/tdx/kcandle-aggregator.ts'];
+  for (const relativePath of debugCommentFiles) {
+    const content = read(join(repos.mist, relativePath));
+    if (/\/\/\s*DEBUG\b/.test(content)) {
+      fail(`CODE_SMELL D1.6 stale DEBUG comment remains in ${relativePath}`);
+    }
+  }
+
+  const channelService = read(
+    join(repos.mist, 'apps/mist/src/chan/services/channel.service.ts'),
+  );
+  if (/return\s*\{\s*channels\s*,\s*offsetIndex\b/.test(channelService)) {
+    fail(
+      'CODE_SMELL R1.2: ChannelService.getChannel must not return offsetIndex',
+    );
+  }
+
+  const mcpFiles = [
+    'apps/mcp-server/src/services/chan-mcp.service.ts',
+    'apps/mcp-server/src/services/indicator-mcp.service.ts',
+    'apps/mcp-server/src/services/schedule-mcp.service.ts',
+  ];
+  for (const relativePath of mcpFiles) {
+    const content = read(join(repos.mist, relativePath));
+    if (
+      content.includes(
+        'eslint-disable-next-line @typescript-eslint/no-unused-vars',
+      )
+    ) {
+      fail(
+        `CODE_REVIEW L1 stale no-unused-vars disable remains in ${relativePath}`,
+      );
+    }
+  }
+
+  const baseMcpToolService = read(
+    join(repos.mist, 'apps/mcp-server/src/base/base-mcp-tool.service.ts'),
+  );
+  assertNotIncludes(
+    baseMcpToolService,
+    'Record<string, any>',
+    'CODE_SMELL T1.4 BaseMcpToolService payload typing',
+  );
+
+  const dockerWorkflow = read(join(repos.mist, '.github/workflows/docker.yml'));
+  assertNotIncludes(
+    dockerWorkflow,
+    'docker/setup-qemu-action',
+    'INFRA_REVIEW I9 backend Docker workflow',
+  );
+  assertNotIncludes(
+    dockerWorkflow,
+    'matrix.platform',
+    'INFRA_REVIEW I9 backend Docker workflow',
+  );
+
+  const releaseWorkflow = read(
+    join(repos.mist, '.github/workflows/release.yml'),
+  );
+  assertNotIncludes(
+    releaseWorkflow,
+    'docker/setup-qemu-action',
+    'INFRA_REVIEW I9 backend release workflow',
+  );
+}
+
+function assertBackendP3ServiceCleanups() {
+  const indicatorService = read(
+    join(repos.mist, 'apps/mist/src/indicator/indicator.service.ts'),
+  );
+  assertNotIncludes(
+    indicatorService,
+    'interface RunADXDto',
+    'CODE_SMELL O1.5 indicator OHLC DTO reuse',
+  );
+  assertNotIncludes(
+    indicatorService,
+    'interface RunATRDto',
+    'CODE_SMELL O1.5 indicator OHLC DTO reuse',
+  );
+  assertNotIncludes(
+    indicatorService,
+    ' as number',
+    'CODE_SMELL R1.4 indicator redundant numeric assertions',
+  );
+
+  const efExtensionEntity = read(
+    join(repos.mist, 'libs/shared-data/src/entities/k-extension-ef.entity.ts'),
+  );
+  assertNotIncludes(
+    efExtensionEntity,
+    "comment: '今开价'",
+    'CODE_SMELL B1.2 prevOpen column comment',
+  );
+
+  const tdxWebSocketService = read(
+    join(repos.mist, 'apps/mist/src/sources/tdx/tdx-websocket.service.ts'),
+  );
+  assertNotIncludes(
+    tdxWebSocketService,
+    'const periods = [',
+    'CODE_SMELL M1.2 TDX subscription periods',
+  );
+
+  const eastMoneyTypes = read(
+    join(repos.mist, 'apps/mist/src/sources/east-money/types.ts'),
+  );
+  assertNotIncludes(
+    eastMoneyTypes,
+    'export interface EfExtension',
+    'CODE_SMELL P1.3 East Money extension type reuse',
+  );
+
+  const tdxTypes = read(join(repos.mist, 'apps/mist/src/sources/tdx/types.ts'));
+  assertNotIncludes(
+    tdxTypes,
+    'export interface TdxExtension',
+    'CODE_SMELL P1.3 TDX extension type reuse',
+  );
+
+  for (const relativePath of [
+    'apps/mist/src/collector/collector.service.ts',
+    'apps/mist/src/collector/strategies/websocket-collection.strategy.ts',
+  ]) {
+    const content = read(join(repos.mist, relativePath));
+    assertNotIncludes(
+      content,
+      'private getFormatCode',
+      `CODE_SMELL P1.2 duplicated getFormatCode in ${relativePath}`,
+    );
+  }
+
+  for (const relativePath of [
+    'apps/mcp-server/src/services/chan-mcp.service.ts',
+    'apps/mcp-server/src/services/data-mcp.service.ts',
+    'apps/mcp-server/src/services/indicator-mcp.service.ts',
+  ]) {
+    const content = read(join(repos.mist, relativePath));
+    assertNotIncludes(
+      content,
+      'private getValidationErrorCode',
+      `CODE_SMELL P1.5 duplicated getValidationErrorCode in ${relativePath}`,
+    );
+  }
+
+  const biService = read(
+    join(repos.mist, 'apps/mist/src/chan/services/bi.service.ts'),
+  );
+  assertNotIncludes(
+    biService,
+    'getThreePattern(bi1: BiVo, bi2: BiVo, bi3: BiVo): string | null',
+    'CODE_SMELL N1.2 getThreePattern typed return',
+  );
+  assertNotIncludes(
+    biService,
+    'lastFrom: string',
+    'CODE_SMELL O1.2 getLastBi source tag typing',
+  );
+  assertNotIncludes(
+    biService,
+    'private removeBiByIndex<T>',
+    'CODE_SMELL N1.4 removeBiByIndex generic',
+  );
+  assertNotIncludes(
+    biService,
+    '// 这个不应该存在',
+    'CODE_SMELL C1.4 orphan Chan comment',
+  );
+  assertNotIncludes(
+    biService,
+    '此参数保留用于兼容性，但不再使用',
+    'CODE_SMELL R1.6 stale isBiWideEnough JSDoc',
+  );
+
+  const trendService = read(
+    join(repos.mist, 'apps/mist/src/chan/services/trend.service.ts'),
+  );
+  assertNotIncludes(
+    trendService,
+    'judgeBiTrend',
+    'CODE_SMELL N1.5 boolean Bi trend method naming',
+  );
+
+  const chanController = read(
+    join(repos.mist, 'apps/mist/src/chan/chan.controller.ts'),
+  );
+  const directDateParseCount = [
+    ...chanController.matchAll(
+      /this\.timezoneService\.parseDateString\(queryDto\./g,
+    ),
+  ].length;
+  if (directDateParseCount > 2) {
+    fail(
+      `CODE_SMELL U1.3 ChanController date parsing should be centralized, found ${directDateParseCount} direct calls`,
+    );
+  }
+}
+
 function assertEnvFilesUntracked() {
   const tracked = execFileSync(
     'git',
@@ -413,6 +645,8 @@ function assertMistBackendContracts() {
   assertNoSelectedBackendProductionConsoleCalls();
   assertBackendHttpConfigHygiene();
   assertBackendRuntimeSweep();
+  assertBackendP3QuickWins();
+  assertBackendP3ServiceCleanups();
 
   const gitignore = read(join(repos.mist, '.gitignore'));
   assertIncludes(gitignore, '.env.*', 'mist .gitignore');

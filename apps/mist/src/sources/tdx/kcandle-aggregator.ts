@@ -57,9 +57,6 @@ export class KCandleAggregator {
 
     const existing = this.candles.get(key);
 
-    // DEBUG
-    // console.log(`[${code}:${period}] snapshot=${snapshot.timestamp.toISOString()}, candleTime=${candleTime.toISOString()}, existing=${existing ? existing.timestamp.toISOString() : 'none'}`);
-
     // Check if period boundary crossed
     if (existing && existing.timestamp.getTime() !== candleTime.getTime()) {
       // Emit completed candle

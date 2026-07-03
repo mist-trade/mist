@@ -10,7 +10,7 @@ import { TdxWebSocketService } from '../../sources/tdx/tdx-websocket.service';
 import { TdxResponse } from '../../sources/tdx/types';
 import { TdxRealtimeBar } from '../../sources/tdx/tdx-websocket.service';
 import { KData } from '../../sources/source-fetcher.interface';
-import { normalizeSecurityCode } from '@app/utils';
+import { getSecurityFormatCode, normalizeSecurityCode } from '@app/utils';
 
 /**
  * WebSocket data collection strategy
@@ -159,7 +159,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
   async unsubscribeForSecurity(security: Security): Promise<number> {
     if (this.source === DataSource.TDX && this.tdxWsService) {
       const code = normalizeSecurityCode(security.code);
-      const formatCode = this.getFormatCode(security);
+      const formatCode = getSecurityFormatCode(security, DataSource.TDX);
       const subscribedFormatCode = this.subscriptions.get(code) || formatCode;
       this.tdxWsService.unsubscribe(subscribedFormatCode);
       this.subscriptions.delete(code);
@@ -180,7 +180,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
   async collectForSecurity(
     security: Security,
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    period: Period,
+    _period: Period,
   ): Promise<number> {
     if (this.source === DataSource.TDX) {
       if (!this.tdxWsService) {
@@ -190,7 +190,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
 
       // Subscribe to real-time data for this security
       const code = normalizeSecurityCode(security.code);
-      const formatCode = this.getFormatCode(security);
+      const formatCode = getSecurityFormatCode(security, DataSource.TDX);
       const previousFormatCode = this.subscriptions.get(code);
       if (previousFormatCode && previousFormatCode !== formatCode) {
         this.tdxWsService.unsubscribe(previousFormatCode);
@@ -213,12 +213,5 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
       `WebSocket subscription for ${this.source} is not yet implemented. Security ${security.code} will not receive streaming data.`,
     );
     return 0;
-  }
-
-  private getFormatCode(security: Security): string {
-    const config = security.sourceConfigs?.find(
-      (c) => c.source === DataSource.TDX && c.enabled,
-    );
-    return config?.formatCode || security.code;
   }
 }

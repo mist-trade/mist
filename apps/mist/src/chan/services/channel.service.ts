@@ -9,12 +9,13 @@ import { ChannelVo } from '../vo/channel.vo';
 
 @Injectable()
 export class ChannelService {
+  private static readonly BREAKOUT_THRESHOLD_RATIO = 0.01;
+
   // 画中枢
   createChannel(createChannelDto: CreateChannelDto): ChannelVo[] {
     this.validateInput(createChannelDto);
     this.validateBiIntegrity(createChannelDto.bi);
-    const { channels } = this.getChannel(createChannelDto.bi);
-    return channels;
+    return this.getChannel(createChannelDto.bi);
   }
 
   private validateInput(createChannelDto: CreateChannelDto): void {
@@ -99,8 +100,7 @@ export class ChannelService {
   }
 
   /**
-   * 验证前3笔是否有重叠区域（zg > zd）
-   * @returns { valid: boolean, zg?: number; zd?: number }
+   * 验证候选笔集合是否有中枢重叠区域（zg > zd）
    */
   private validateZgZdOverlap(bis: BiVo[]): {
     valid: boolean;
@@ -124,13 +124,6 @@ export class ChannelService {
   }
 
   /**
-   * 验证笔是否与中枢区间重叠
-   */
-  private validateBiOverlap(bi: BiVo, zg: number, zd: number): boolean {
-    return bi.lowest <= zg && bi.highest >= zd;
-  }
-
-  /**
    * 验证第4、5笔是否与zg-zd重叠
    */
   private validateFiveBiOverlap(
@@ -139,8 +132,7 @@ export class ChannelService {
     zd: number,
   ): boolean {
     return (
-      this.validateBiOverlap(fiveBis[3], zg, zd) &&
-      this.validateBiOverlap(fiveBis[4], zg, zd)
+      this.hasOverlap(fiveBis[3], zg, zd) && this.hasOverlap(fiveBis[4], zg, zd)
     );
   }
 
@@ -177,7 +169,7 @@ export class ChannelService {
       return null;
     }
 
-    // 验证2：从前3笔计算zg-zd
+    // 验证2：从候选笔集合计算zg-zd
     const zgZdResult = this.validateZgZdOverlap(fiveBis);
     if (
       !zgZdResult.valid ||
@@ -211,10 +203,10 @@ export class ChannelService {
     // 创建中枢对象
     return {
       bis: [...initialFiveBis],
-      zg: zg,
-      zd: zd,
-      gg: gg,
-      dd: dd,
+      zg,
+      zd,
+      gg,
+      dd,
       level: ChannelLevel.Bi,
       type: ChannelType.Complete,
       startId: originalBis[startIndex].originIds[0],
@@ -223,8 +215,8 @@ export class ChannelService {
           originalBis[startIndex + 4].originIds.length - 1
         ],
       trend: fiveBis[0].trend,
-      displayStartId: displayStartId,
-      displayEndId: displayEndId,
+      displayStartId,
+      displayEndId,
     };
   }
 
@@ -236,24 +228,19 @@ export class ChannelService {
    * @returns 初始极值
    */
   private calculateInitialExtreme(channel: ChannelVo): number {
-    const channelTrend = channel.trend;
-    let extreme: number;
-
-    if (channelTrend === TrendDirection.Up) {
-      extreme = Math.max(
+    if (channel.trend === TrendDirection.Up) {
+      return Math.max(
         channel.bis[0].highest,
         channel.bis[2].highest,
         channel.bis[4].highest,
       );
-    } else {
-      extreme = Math.min(
-        channel.bis[0].lowest,
-        channel.bis[2].lowest,
-        channel.bis[4].lowest,
-      );
     }
 
-    return extreme;
+    return Math.min(
+      channel.bis[0].lowest,
+      channel.bis[2].lowest,
+      channel.bis[4].lowest,
+    );
   }
 
   /**
@@ -316,8 +303,11 @@ export class ChannelService {
     const confirmedBis: BiVo[] = []; // 确认区：已确认加入中枢的笔
     let currentExtreme = this.calculateInitialExtreme(channel);
 
-    // 计算突破阈值（zg-zd区间大小的1%，至少为1）
-    const breakoutThreshold = Math.max(1, (channel.zg - channel.zd) * 0.01);
+    // Use a small percentage of the channel width, with a one-point floor, to ignore tiny oscillations.
+    const breakoutThreshold = Math.max(
+      1,
+      (channel.zg - channel.zd) * ChannelService.BREAKOUT_THRESHOLD_RATIO,
+    );
 
     for (let i = 0; i < remainingBis.length; i++) {
       const bi = remainingBis[i];
@@ -517,14 +507,14 @@ export class ChannelService {
   /**
    * 获取中枢
    * @param data 笔数组
-   * @returns 中枢数组和偏移索引
+   * @returns 中枢数组
    */
-  private getChannel(data: BiVo[]) {
+  private getChannel(data: BiVo[]): ChannelVo[] {
     const channels: ChannelVo[] = [];
     const biCount = data.length;
 
     if (biCount < 5) {
-      return { channels, offsetIndex: 0 };
+      return channels;
     }
 
     // 使用 while 循环代替滑动窗口
@@ -564,6 +554,6 @@ export class ChannelService {
       i += 5 + usedCount;
     }
 
-    return { channels, offsetIndex: biCount };
+    return channels;
   }
 }

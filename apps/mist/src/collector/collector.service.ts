@@ -1,10 +1,5 @@
-import {
-  DataSource,
-  Period,
-  Security,
-  SecuritySourceConfig,
-} from '@app/shared-data';
-import { DataSourceSelectionService } from '@app/utils';
+import { DataSource, Period, Security } from '@app/shared-data';
+import { DataSourceSelectionService, getSecurityFormatCode } from '@app/utils';
 import {
   BadRequestException,
   Injectable,
@@ -38,13 +33,6 @@ export class CollectorService {
   private registerDataSources(): void {
     this.sources.set(DataSource.EAST_MONEY, this.eastMoneySource);
     this.sources.set(DataSource.TDX, this.tdxSource);
-  }
-
-  private getFormatCode(security: Security, dataSource: DataSource): string {
-    const config = security.sourceConfigs?.find(
-      (c: SecuritySourceConfig) => c.source === dataSource && c.enabled,
-    );
-    return config?.formatCode || security.code;
   }
 
   /**
@@ -126,7 +114,7 @@ export class CollectorService {
       // Fetch data from the source
       const fetchParams: KFetchParams = {
         code: stockCode,
-        formatCode: this.getFormatCode(security, dataSource),
+        formatCode: getSecurityFormatCode(security, dataSource),
         period,
         startDate,
         endDate,
@@ -242,7 +230,7 @@ export class CollectorService {
       // Fetch data from the source
       const fetchParams: KFetchParams = {
         code: stockCode,
-        formatCode: this.getFormatCode(security, dataSource),
+        formatCode: getSecurityFormatCode(security, dataSource),
         period,
         startDate,
         endDate,

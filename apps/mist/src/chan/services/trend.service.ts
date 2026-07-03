@@ -1,4 +1,3 @@
-import { UtilsService } from '@app/utils';
 import { Injectable } from '@nestjs/common';
 import { TrendDirection } from '../enums/trend-direction.enum';
 import { KVo } from '../../indicator/vo/k.vo';
@@ -6,8 +5,6 @@ import { BiVo } from '../vo/bi.vo';
 
 @Injectable()
 export class TrendService {
-  constructor(private readonly utilsService: UtilsService) {}
-
   /**
    * Judges the trend direction based on two consecutive K-line data points
    * @param prev Previous K-line data
@@ -34,12 +31,12 @@ export class TrendService {
   }
 
   /**
-   * Judges if two consecutive Bi (stroke) segments form a consistent trend
+   * Checks if two consecutive Bi (stroke) segments form a consistent trend
    * @param prev Previous Bi segment
    * @param now Current Bi segment
    * @returns true if both Bi segments form a consistent trend pattern
    */
-  judgeBiTrend(prev: BiVo, now: BiVo) {
+  hasConsistentBiTrend(prev: BiVo, now: BiVo) {
     if (prev.trend !== now.trend) return false; // Different trends, cannot form pattern
     if (now.trend === TrendDirection.Up) {
       return prev.highest <= now.highest && prev.lowest <= now.lowest;

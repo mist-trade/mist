@@ -7,48 +7,13 @@ import { BaseMcpToolService } from '../base/base-mcp-tool.service';
 import { ValidationHelper } from '../utils/validation.helpers';
 
 // Zod schemas
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PricesSchema = z.array(z.number());
+void PricesSchema;
 
 @Injectable()
 export class IndicatorMcpService extends BaseMcpToolService {
   constructor(private readonly indicatorService: IndicatorService) {
     super(IndicatorMcpService.name);
-  }
-
-  /**
-   * Map validation error messages to error codes
-   */
-  private getValidationErrorCode(errorMsg: string): McpErrorCode {
-    if (
-      errorMsg.includes('must contain at least') ||
-      errorMsg.includes('elements')
-    ) {
-      return McpErrorCode.INSUFFICIENT_DATA;
-    }
-    if (errorMsg.includes('Array length mismatch')) {
-      return McpErrorCode.ARRAY_LENGTH_MISMATCH;
-    }
-    if (errorMsg.includes('period') && errorMsg.includes('must be at least')) {
-      return McpErrorCode.INVALID_PERIOD;
-    }
-    if (errorMsg.includes('limit') && errorMsg.includes('must be at least')) {
-      return McpErrorCode.INVALID_PARAMETER;
-    }
-    if (errorMsg.includes('symbol') || errorMsg.includes('Symbol cannot')) {
-      return McpErrorCode.INVALID_SYMBOL;
-    }
-    if (
-      errorMsg.includes('date range') ||
-      errorMsg.includes('must be before') ||
-      errorMsg.includes('Invalid date format')
-    ) {
-      return McpErrorCode.INVALID_DATE_RANGE;
-    }
-    if (errorMsg.includes('not a valid number')) {
-      return McpErrorCode.INVALID_DATA_FORMAT;
-    }
-    return McpErrorCode.INVALID_PARAMETER;
   }
 
   @Tool({
@@ -73,7 +38,7 @@ INTERPRETATION: MACD above Signal = bullish, below = bearish.`,
       if (pricesError) {
         throw new McpError(
           pricesError,
-          this.getValidationErrorCode(pricesError),
+          ValidationHelper.getValidationErrorCode(pricesError),
         );
       }
 
@@ -114,7 +79,7 @@ INTERPRETATION: >70 overbought, <30 oversold, ~50 neutral.`,
       if (pricesError) {
         throw new McpError(
           pricesError,
-          this.getValidationErrorCode(pricesError),
+          ValidationHelper.getValidationErrorCode(pricesError),
         );
       }
 
@@ -123,7 +88,7 @@ INTERPRETATION: >70 overbought, <30 oversold, ~50 neutral.`,
       if (periodError) {
         throw new McpError(
           periodError,
-          this.getValidationErrorCode(periodError),
+          ValidationHelper.getValidationErrorCode(periodError),
         );
       }
 
@@ -161,19 +126,25 @@ INTERPRETATION: K/D >80 overbought, <20 oversold.`,
       // Validate prices arrays
       const highsError = ValidationHelper.validatePrices(highs, 'highs');
       if (highsError) {
-        throw new McpError(highsError, this.getValidationErrorCode(highsError));
+        throw new McpError(
+          highsError,
+          ValidationHelper.getValidationErrorCode(highsError),
+        );
       }
 
       const lowsError = ValidationHelper.validatePrices(lows, 'lows');
       if (lowsError) {
-        throw new McpError(lowsError, this.getValidationErrorCode(lowsError));
+        throw new McpError(
+          lowsError,
+          ValidationHelper.getValidationErrorCode(lowsError),
+        );
       }
 
       const closesError = ValidationHelper.validatePrices(closes, 'closes');
       if (closesError) {
         throw new McpError(
           closesError,
-          this.getValidationErrorCode(closesError),
+          ValidationHelper.getValidationErrorCode(closesError),
         );
       }
 
@@ -191,7 +162,7 @@ INTERPRETATION: K/D >80 overbought, <20 oversold.`,
       if (periodError) {
         throw new McpError(
           periodError,
-          this.getValidationErrorCode(periodError),
+          ValidationHelper.getValidationErrorCode(periodError),
         );
       }
 

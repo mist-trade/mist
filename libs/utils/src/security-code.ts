@@ -1,5 +1,14 @@
+import { DataSource, SecuritySourceConfig } from '@app/shared-data';
+
 const MARKET_CODES = ['SH', 'SZ', 'BJ'] as const;
 const MARKET_PATTERN = MARKET_CODES.join('|');
+
+type SecurityFormatCodeSource = {
+  code: string;
+  sourceConfigs?: Array<
+    Pick<SecuritySourceConfig, 'source' | 'enabled' | 'formatCode'>
+  > | null;
+};
 
 export function normalizeSecurityCode(code: string): string {
   const normalized = code.trim().toUpperCase();
@@ -19,4 +28,15 @@ export function normalizeSecurityCode(code: string): string {
   }
 
   return normalized;
+}
+
+export function getSecurityFormatCode(
+  security: SecurityFormatCodeSource,
+  dataSource: DataSource,
+): string {
+  const config = security.sourceConfigs?.find(
+    (sourceConfig) =>
+      sourceConfig.source === dataSource && sourceConfig.enabled,
+  );
+  return config?.formatCode || security.code;
 }

@@ -19,8 +19,6 @@ export const ERROR_MESSAGES = {
     'Invalid bi at index {{index}}: highest must be greater than lowest',
   BI_MISSING_FENXING:
     'Bi at index {{index}} is incomplete: missing fenxing information',
-  BI_INVALID_DIRECTION:
-    'Invalid bi at index {{index}}: invalid direction value',
   INVALID_PERIOD: 'Invalid period specified',
   INVALID_DATE_RANGE: 'Invalid date range provided',
   INVALID_DATA_FORMAT: 'Invalid data format provided',

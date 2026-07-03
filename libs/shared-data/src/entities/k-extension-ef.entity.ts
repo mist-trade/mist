@@ -108,7 +108,7 @@ export class KExtensionEf {
     precision: 12,
     scale: 3,
     nullable: true,
-    comment: '今开价',
+    comment: '昨开价',
   })
   prevOpen: number | null = null;
 

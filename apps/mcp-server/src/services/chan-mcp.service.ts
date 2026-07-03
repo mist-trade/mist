@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { parseISO } from 'date-fns';
 import { ChanService } from '../../../mist/src/chan/chan.service';
 import { ChannelService } from '../../../mist/src/chan/services/channel.service';
-import { McpErrorCode, McpError } from '@app/constants';
+import { McpError } from '@app/constants';
 import { BaseMcpToolService } from '../base/base-mcp-tool.service';
 import { ValidationHelper } from '../utils/validation.helpers';
 
@@ -12,7 +12,6 @@ import { ValidationHelper } from '../utils/validation.helpers';
  * Zod schema for K-line data (matching KVo type)
  * Note: In practice, MCP clients will send dates as ISO strings, which we'll convert to Date objects
  */
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const KLineSchema = z.array(
   z.object({
     id: z.number(),
@@ -25,6 +24,7 @@ const KLineSchema = z.array(
     lowest: z.number(),
   }),
 );
+void KLineSchema;
 
 /**
  * MCP Service for Chan Theory (缠论) Analysis
@@ -43,19 +43,6 @@ export class ChanMcpService extends BaseMcpToolService {
     super(ChanMcpService.name);
   }
 
-  /**
-   * Map validation error messages to error codes
-   */
-  private getValidationErrorCode(errorMsg: string): McpErrorCode {
-    if (
-      errorMsg.includes('must contain at least') ||
-      errorMsg.includes('elements')
-    ) {
-      return McpErrorCode.INSUFFICIENT_DATA;
-    }
-    return McpErrorCode.INVALID_PARAMETER;
-  }
-
   @Tool({
     name: 'merge_k',
     description: `Merge consecutive K-lines based on containment relationships.
@@ -67,8 +54,8 @@ WHEN TO USE: DO NOT use directly. Use analyze_chan_theory instead.
 
 NOTE: Low-level operation. Use 'analyze_chan_theory' for complete analysis.`,
   })
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async mergeK(_k: z.infer<typeof KLineSchema>) {
+    void _k;
     // Note: merge_k is not directly exposed by ChanService
     // Users should use analyze_chan_theory for complete analysis
     // For now, we'll return a not implemented message
@@ -101,7 +88,7 @@ RETURNS: Bi array with times, prices, direction (UP/DOWN), status, and patterns.
         throw new McpError(
           minLengthError +
             ' Bi detection requires at least 3 K-lines to identify patterns.',
-          this.getValidationErrorCode(minLengthError),
+          ValidationHelper.getValidationErrorCode(minLengthError),
         );
       }
 
@@ -142,7 +129,7 @@ RETURNS: Fenxing array with type (TOP/BOTTOM), time, prices, and index.`,
         throw new McpError(
           minLengthError +
             ' Fenxing detection requires at least 3 K-lines to identify patterns.',
-          this.getValidationErrorCode(minLengthError),
+          ValidationHelper.getValidationErrorCode(minLengthError),
         );
       }
 
@@ -185,7 +172,7 @@ RETURNS: Object with bis, fenxings, channels arrays, and summary.`,
         throw new McpError(
           minLengthError +
             ' Chan Theory analysis requires at least 3 K-lines to identify patterns.',
-          this.getValidationErrorCode(minLengthError),
+          ValidationHelper.getValidationErrorCode(minLengthError),
         );
       }
 

@@ -1,3 +1,7 @@
+import type { TdxExtension } from '../source-fetcher.interface';
+
+export type { TdxExtension } from '../source-fetcher.interface';
+
 /**
  * K-line data mapped from mist-datasource TDX /v1/bars/query.
  */
@@ -93,23 +97,4 @@ export interface TdxSnapshot {
   amount: number;
   timestamp: Date;
   raw: Record<string, unknown>;
-}
-
-/**
- * TDX K-line extension fields
- * Maps to KExtensionTdx entity in @app/shared-data
- */
-export interface TdxExtension {
-  fullCode?: string;
-  forwardFactor?: number;
-  volInStock?: number;
-  backwardFactor?: number;
-  volumeRatio?: number;
-  turnoverRate?: number;
-  turnoverAmount?: number;
-  totalMarketValue?: number;
-  floatMarketValue?: number;
-  earningsPerShare?: number;
-  priceEarningsRatio?: number;
-  priceToBookRatio?: number;
 }

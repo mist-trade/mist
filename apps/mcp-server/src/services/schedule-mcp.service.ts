@@ -7,7 +7,6 @@ import { BaseMcpToolService } from '../base/base-mcp-tool.service';
 import { McpErrorCode, McpError } from '@app/constants';
 
 // Zod schemas
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PeriodEnum = z.enum([
   'ONE',
   'FIVE',
@@ -16,8 +15,8 @@ const PeriodEnum = z.enum([
   'SIXTY',
   'DAILY',
 ]);
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const PeriodArrayEnum = z.array(PeriodEnum);
+void PeriodArrayEnum;
 
 /**
  * MCP Service for Scheduled Tasks Management
