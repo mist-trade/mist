@@ -21,7 +21,7 @@ export class KExtensionTdx {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Index()
+  @Index({ unique: true })
   @OneToOne(() => K, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'k_id' })
   k!: K;

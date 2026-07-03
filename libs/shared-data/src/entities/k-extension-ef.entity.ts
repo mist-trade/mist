@@ -21,7 +21,7 @@ export class KExtensionEf {
   @PrimaryGeneratedColumn()
   id!: number;
 
-  @Index()
+  @Index({ unique: true })
   @OneToOne(() => K, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'k_id' })
   k!: K;
@@ -88,11 +88,11 @@ export class KExtensionEf {
   innerVolume: bigint | null = null;
 
   @Column({
-    type: 'decimal',
+    type: 'bigint',
     nullable: true,
     comment: '外盘量',
   })
-  outerVolume: number | null = null;
+  outerVolume: bigint | null = null;
 
   @Column({
     type: 'decimal',
