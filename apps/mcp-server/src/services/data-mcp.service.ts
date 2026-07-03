@@ -36,35 +36,6 @@ export class DataMcpService extends BaseMcpToolService {
     super(DataMcpService.name);
   }
 
-  /**
-   * Map validation error messages to error codes
-   */
-  private getValidationErrorCode(errorMsg: string): McpErrorCode {
-    if (errorMsg.includes('symbol') || errorMsg.includes('Symbol cannot')) {
-      return McpErrorCode.INVALID_SYMBOL;
-    }
-    if (errorMsg.includes('limit') && errorMsg.includes('must be at least')) {
-      return McpErrorCode.INVALID_PARAMETER;
-    }
-    if (
-      errorMsg.includes('date range') ||
-      errorMsg.includes('must be before') ||
-      errorMsg.includes('Invalid date format')
-    ) {
-      return McpErrorCode.INVALID_DATE_RANGE;
-    }
-    if (errorMsg.includes('not found')) {
-      return McpErrorCode.INDEX_NOT_FOUND;
-    }
-    if (
-      errorMsg.includes('must contain at least') ||
-      errorMsg.includes('elements')
-    ) {
-      return McpErrorCode.INSUFFICIENT_DATA;
-    }
-    return McpErrorCode.INVALID_PARAMETER;
-  }
-
   private sanitizeRequiredSymbol(symbol: string): string {
     const sanitizedSymbol = ValidationHelper.sanitizeString(symbol);
     if (!sanitizedSymbol) {
@@ -143,7 +114,7 @@ RETURNS: Index object with id, symbol, name, and type.`,
       if (symbolError) {
         throw new McpError(
           symbolError,
-          this.getValidationErrorCode(symbolError),
+          ValidationHelper.getValidationErrorCode(symbolError),
         );
       }
 
@@ -198,14 +169,17 @@ RETURNS: K-line array with time, OHLC, volume.`,
       if (symbolError) {
         throw new McpError(
           symbolError,
-          this.getValidationErrorCode(symbolError),
+          ValidationHelper.getValidationErrorCode(symbolError),
         );
       }
 
       // Validate limit
       const limitError = ValidationHelper.validateLimit(limit, 10000);
       if (limitError) {
-        throw new McpError(limitError, this.getValidationErrorCode(limitError));
+        throw new McpError(
+          limitError,
+          ValidationHelper.getValidationErrorCode(limitError),
+        );
       }
 
       // Validate date range
@@ -216,7 +190,7 @@ RETURNS: K-line array with time, OHLC, volume.`,
       if (dateRangeError) {
         throw new McpError(
           dateRangeError,
-          this.getValidationErrorCode(dateRangeError),
+          ValidationHelper.getValidationErrorCode(dateRangeError),
         );
       }
 
@@ -279,14 +253,17 @@ RETURNS: Array of daily K-line objects with OHLC, volume, amount.`,
       if (symbolError) {
         throw new McpError(
           symbolError,
-          this.getValidationErrorCode(symbolError),
+          ValidationHelper.getValidationErrorCode(symbolError),
         );
       }
 
       // Validate limit
       const limitError = ValidationHelper.validateLimit(limit, 10000);
       if (limitError) {
-        throw new McpError(limitError, this.getValidationErrorCode(limitError));
+        throw new McpError(
+          limitError,
+          ValidationHelper.getValidationErrorCode(limitError),
+        );
       }
 
       // Validate date range
@@ -297,7 +274,7 @@ RETURNS: Array of daily K-line objects with OHLC, volume, amount.`,
       if (dateRangeError) {
         throw new McpError(
           dateRangeError,
-          this.getValidationErrorCode(dateRangeError),
+          ValidationHelper.getValidationErrorCode(dateRangeError),
         );
       }
 

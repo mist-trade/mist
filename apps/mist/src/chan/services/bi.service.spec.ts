@@ -116,11 +116,26 @@ describe('BiService', () => {
   });
 
   it('removeBiByIndex should remove only the requested item', () => {
-    const bis = ['first', 'middle', 'last'];
+    const first = createCompleteBi(
+      createFenxing(FenxingType.Bottom, 0, 10, 1, 1),
+      createFenxing(FenxingType.Top, 1, 15, 5, 2),
+      TrendDirection.Up,
+    );
+    const middle = createCompleteBi(
+      createFenxing(FenxingType.Top, 1, 15, 5, 2),
+      createFenxing(FenxingType.Bottom, 2, 12, 2, 3),
+      TrendDirection.Down,
+    );
+    const last = createCompleteBi(
+      createFenxing(FenxingType.Bottom, 2, 12, 2, 3),
+      createFenxing(FenxingType.Top, 3, 18, 8, 4),
+      TrendDirection.Up,
+    );
+    const bis = [first, middle, last];
 
     service['removeBiByIndex'](bis, 1);
 
-    expect(bis).toEqual(['first', 'last']);
+    expect(bis).toEqual([first, last]);
   });
 
   it('throws a clear invariant error when merging incomplete Bi values', () => {

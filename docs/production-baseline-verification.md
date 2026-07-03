@@ -6,13 +6,13 @@ flow. It is the operational companion to the OpenSpec evidence under
 
 Latest known-good evidence:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-4.md`
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-5.md`
 - Backend baseline image:
-  `ghcr.io/mist-trade/mist:0ca11bbc3872cc78396a44e047e4e20f23d1a4b2`
+  `ghcr.io/mist-trade/mist:ba4442ec369177f24854c3eed4e30f492d71a2d5`
 - Frontend baseline image:
   `ghcr.io/mist-trade/mist-fe:600b9fce2aedd9fc7d82074f9d7a65bc15a14815`
 - Deploy scripts baseline:
-  `mist-deploy@9c84229770e6a957459268108276be339c7a0e03`
+  `mist-deploy@bf0285d95cc8fe5b98f5525cbb2e113d263c1fcb`
 
 Latest recovered rerun note:
 
@@ -26,6 +26,13 @@ Latest round-4 rerun note:
 - `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-4.md`
   records the current known-good baseline after deploy-side gateway image
   digest pinning and public-host parameterization.
+
+Latest round-5 rerun note:
+
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-5.md`
+  records the current known-good baseline after deploy defaults
+  centralization, monitoring container-name alignment, and backend
+  docs/OpenSpec archive updates.
 
 ## Scope
 

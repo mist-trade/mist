@@ -3,7 +3,7 @@ name: Create Release
 on:
   push:
     tags:
-      - 'v*.*.*'  # 匹配 v1.0.0, v2.1.3 等语义化版本标签
+      - 'v*.*.*' # 匹配 v1.0.0, v2.1.3 等语义化版本标签
   workflow_dispatch:
     inputs:
       version_type:
@@ -72,8 +72,8 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 0  # 获取完整历史，用于生成 changelog
-          token: ${{ secrets.GITHUB_TOKEN }}  # 需要写入权限来创建 tag
+          fetch-depth: 0 # 获取完整历史，用于生成 changelog
+          token: ${{ secrets.GITHUB_TOKEN }} # 需要写入权限来创建 tag
 
       - name: Calculate and create tag (manual trigger only)
         if: github.event_name == 'workflow_dispatch' && github.event.inputs.dry_run != 'true'
@@ -194,10 +194,6 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Set up QEMU
-        if: github.event.inputs.dry_run != 'true'
-        uses: docker/setup-qemu-action@v4
 
       - name: Set up Docker Buildx
         if: github.event.inputs.dry_run != 'true'

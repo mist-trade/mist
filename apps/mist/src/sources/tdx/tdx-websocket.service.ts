@@ -40,6 +40,13 @@ const DEFAULT_TDX_WS_RECONNECT_DELAY_MS = 5000;
 const DEFAULT_TDX_WS_HEARTBEAT_INTERVAL_MS = 30000;
 const TDX_WS_RECONNECT_DELAY_CONFIG_KEY = 'TDX_WS_RECONNECT_DELAY_MS';
 const TDX_WS_HEARTBEAT_INTERVAL_CONFIG_KEY = 'TDX_WS_HEARTBEAT_INTERVAL_MS';
+const TDX_INTRADAY_SUBSCRIPTION_PERIODS = [
+  Period.ONE_MIN,
+  Period.FIVE_MIN,
+  Period.FIFTEEN_MIN,
+  Period.THIRTY_MIN,
+  Period.SIXTY_MIN,
+] as const;
 
 @Injectable()
 export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
@@ -450,16 +457,8 @@ export class TdxWebSocketService implements OnModuleInit, OnModuleDestroy {
       }
     }
 
-    // Aggregate into K-lines for subscribed periods
-    const periods = [
-      Period.ONE_MIN,
-      Period.FIVE_MIN,
-      Period.FIFTEEN_MIN,
-      Period.THIRTY_MIN,
-      Period.SIXTY_MIN,
-    ];
-
-    for (const period of periods) {
+    // Aggregate into K-lines for subscribed intraday periods.
+    for (const period of TDX_INTRADAY_SUBSCRIPTION_PERIODS) {
       try {
         this.aggregator.process(period, snapshot);
       } catch (error) {

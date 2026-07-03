@@ -12,6 +12,8 @@ type CompleteBiWithFenxings = BiVo & {
   startFenxing: FenxingVo;
   endFenxing: FenxingVo;
 };
+type ThreeBiPattern = 'up-down-up' | 'down-up-down';
+type BiSourceTag = 'pending' | 'confirmed' | 'none';
 
 @Injectable()
 export class BiService {
@@ -434,7 +436,11 @@ export class BiService {
   /**
    * 获取三笔的模式
    */
-  private getThreePattern(bi1: BiVo, bi2: BiVo, bi3: BiVo): string | null {
+  private getThreePattern(
+    bi1: BiVo,
+    bi2: BiVo,
+    bi3: BiVo,
+  ): ThreeBiPattern | null {
     const isUpDownUp =
       bi1.trend === TrendDirection.Up &&
       bi2.trend === TrendDirection.Down &&
@@ -449,7 +455,10 @@ export class BiService {
     return null;
   }
 
-  private getLastBi(pending: BiVo[], confirmed: BiVo[]) {
+  private getLastBi(
+    pending: BiVo[],
+    confirmed: BiVo[],
+  ): { bi: BiVo | null; from: BiSourceTag } {
     if (pending[pending.length - 1]) {
       return {
         bi: pending[pending.length - 1],
@@ -468,7 +477,11 @@ export class BiService {
     };
   }
 
-  private getLastLastBi(pending: BiVo[], confirmed: BiVo[], lastFrom: string) {
+  private getLastLastBi(
+    pending: BiVo[],
+    confirmed: BiVo[],
+    lastFrom: BiSourceTag,
+  ): { bi: BiVo | null; from: BiSourceTag } {
     if (lastFrom === 'pending') {
       // 那么现在pending的倒数第二笔找
       if (pending[pending.length - 2]) {
@@ -667,7 +680,7 @@ export class BiService {
    * @param pending
    * @param index
    */
-  private removeBiByIndex<T>(bis: T[], index: number) {
+  private removeBiByIndex(bis: BiVo[], index: number) {
     if (index >= 0 && index < bis.length) {
       bis.splice(index, 1);
     }
@@ -693,7 +706,6 @@ export class BiService {
 
       pending.pop();
       pending.pop();
-      // 这个不应该存在
     } else if (bi1From === 'confirmed' && bi2From === 'pending') {
       if (pending.length < 1 || confirmed.length < 1) {
         throw new Error(
@@ -920,7 +932,6 @@ export class BiService {
    * 2. 顶分型的最高K线和底分型的最低K线之间（不包括这两根），至少有3根K线
    *
    * @param bi 待检查的笔
-   * @param data 合并K线数据（此参数保留用于兼容性，但不再使用）
    * @returns 是否满足宽笔要求
    */
   private isBiWideEnough(bi: BiVo): boolean {

@@ -1,12 +1,46 @@
 import { parseISO } from 'date-fns';
 import { BEIJING_DATE_REGEX } from '@app/timezone';
-
-// Error codes moved to @app/constants
+import { McpErrorCode } from '@app/constants';
 
 /**
  * Validation helper functions for MCP tools
  */
 export class ValidationHelper {
+  static getValidationErrorCode(errorMsg: string): McpErrorCode {
+    if (errorMsg.includes('symbol') || errorMsg.includes('Symbol cannot')) {
+      return McpErrorCode.INVALID_SYMBOL;
+    }
+    if (
+      errorMsg.includes('date range') ||
+      errorMsg.includes('must be before') ||
+      errorMsg.includes('Invalid date format')
+    ) {
+      return McpErrorCode.INVALID_DATE_RANGE;
+    }
+    if (
+      errorMsg.includes('must contain at least') ||
+      errorMsg.includes('elements')
+    ) {
+      return McpErrorCode.INSUFFICIENT_DATA;
+    }
+    if (errorMsg.includes('Array length mismatch')) {
+      return McpErrorCode.ARRAY_LENGTH_MISMATCH;
+    }
+    if (errorMsg.includes('period') && errorMsg.includes('must be at least')) {
+      return McpErrorCode.INVALID_PERIOD;
+    }
+    if (errorMsg.includes('limit') && errorMsg.includes('must be at least')) {
+      return McpErrorCode.INVALID_PARAMETER;
+    }
+    if (errorMsg.includes('not found')) {
+      return McpErrorCode.INDEX_NOT_FOUND;
+    }
+    if (errorMsg.includes('not a valid number')) {
+      return McpErrorCode.INVALID_DATA_FORMAT;
+    }
+    return McpErrorCode.INVALID_PARAMETER;
+  }
+
   /**
    * Validate date range (start < end)
    *

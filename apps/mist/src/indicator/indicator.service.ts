@@ -16,14 +16,7 @@ interface RunKDJDto {
   dSmoothing?: number;
 }
 
-interface RunADXDto {
-  high: number[];
-  low: number[];
-  close: number[];
-  period?: number;
-}
-
-interface RunATRDto {
+interface RunOhlcIndicatorDto {
   high: number[];
   low: number[];
   close: number[];
@@ -44,6 +37,12 @@ interface FindKDataQuery {
   source?: DataSource;
 }
 
+type CompleteMacdValue = {
+  MACD: number;
+  signal: number;
+  histogram: number;
+};
+
 @Injectable()
 export class IndicatorService {
   constructor(
@@ -62,6 +61,18 @@ export class IndicatorService {
     return typeof value === 'number' && Number.isFinite(value);
   }
 
+  private isCompleteMacdValue(value: {
+    MACD?: number;
+    signal?: number;
+    histogram?: number;
+  }): value is CompleteMacdValue {
+    return (
+      this.isFiniteNumber(value.MACD) &&
+      this.isFiniteNumber(value.signal) &&
+      this.isFiniteNumber(value.histogram)
+    );
+  }
+
   async runMACD(prices: number[]): Promise<{
     begIndex: number;
     nbElement: number;
@@ -77,15 +88,12 @@ export class IndicatorService {
       signalPeriod: 9,
       SimpleMAOscillator: false,
       SimpleMASignal: false,
-    }).filter(
-      (value) =>
-        this.isFiniteNumber(value.MACD) &&
-        this.isFiniteNumber(value.signal) &&
-        this.isFiniteNumber(value.histogram),
+    }).filter((value): value is CompleteMacdValue =>
+      this.isCompleteMacdValue(value),
     );
-    const macd = values.map((value) => value.MACD as number);
-    const signal = values.map((value) => value.signal as number);
-    const histogram = values.map((value) => value.histogram as number);
+    const macd = values.map((value) => value.MACD);
+    const signal = values.map((value) => value.signal);
+    const histogram = values.map((value) => value.histogram);
 
     return {
       begIndex: this.begIndex(numericPrices.length, macd.length),
@@ -149,7 +157,7 @@ export class IndicatorService {
     };
   }
 
-  async runADX(data: RunADXDto): Promise<number[]> {
+  async runADX(data: RunOhlcIndicatorDto): Promise<number[]> {
     return ADX.calculate({
       high: data.high,
       low: data.low,
@@ -173,7 +181,7 @@ export class IndicatorService {
     };
   }
 
-  async runATR(data: RunATRDto): Promise<number[]> {
+  async runATR(data: RunOhlcIndicatorDto): Promise<number[]> {
     return ATR.calculate({
       high: data.high,
       low: data.low,

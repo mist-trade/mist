@@ -1,18 +1,4 @@
-/**
- * East Money K-line extension fields (from index_zh_a_hist_min_em API)
- */
-export interface EfExtension {
-  fullCode?: string;
-  amplitude?: number;
-  changePct?: number;
-  changeAmt?: number;
-  turnoverRate?: number;
-  volumeCount?: number;
-  innerVolume?: number;
-  outerVolume?: number;
-  prevClose?: number;
-  prevOpen?: number;
-}
+export type { EfExtension } from '../source-fetcher.interface';
 
 /**
  * East Money minute-level K-line API response
