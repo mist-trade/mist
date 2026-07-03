@@ -69,6 +69,7 @@ Workflow: `Recover Windows TDX Datasource` in `mist-trade/mist-deploy`.
 | `28638049610` | Failed | Same failure after a same-input retry: `TDX login window could not be activated`. |
 | `28638117957` | Failed | With `skip_runtime_login=true`, TDX stop/start proceeded, but datasource restart did not pass health within the timeout. Logs showed the TDX native HTTP port was not reachable and the datasource exited during TDX adapter initialization. |
 | `28638397662` | Failed | After pushing `mist-deploy@da3e07e6b48280833d6b3118c054cf63b5509ebf`, the workflow used longer wait inputs and an AHK helper that restores/retries the window by hwnd. It still failed to activate the TDX login window. |
+| `28639171132` | Failed | Retried after checking the Windows machine. The workflow checked out `mist-deploy@da3e07e6b48280833d6b3118c054cf63b5509ebf`, stopped and started TDX, then failed again in `MistRuntimeLogin`: `TDX login window could not be activated`. |
 
 Root-cause evidence:
 
@@ -89,6 +90,9 @@ Mac-side probes after the failed recovery attempts:
 | `http://<gateway-hostname>/api/mist/app/hello` | HTTP `200`, JSON `success=true`, `data="Hello World!"` |
 | `http://<windows-lan-ip>:9001/health` | Failed to connect within timeout |
 
+The Mac-side probes were repeated after retry `28639171132`; the gateway/backend
+probe still returned HTTP `200`, and the datasource health probe still timed out.
+
 Conclusion: the Docker stack and gateway/backend path remained reachable, but
 the host datasource was not healthy after the failed TDX recovery attempts.
 
@@ -103,4 +107,3 @@ This baseline remains incomplete. To finish it:
    verification through the backend leader path.
 4. Record a new evidence file only if recovery, datasource smoke, live quote,
    restore, gateway probes, and Mac-side probes all pass.
-
