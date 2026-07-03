@@ -14,6 +14,14 @@ Latest known-good evidence:
 - Deploy scripts baseline:
   `mist-deploy@61e631e095f88bc7a51092b6ea909b2da868a981`
 
+Latest incomplete rerun:
+
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-3-blocked.md`
+- Result: Docker deployment and MySQL restore rehearsal passed, but TDX
+  recovery failed because the Windows interactive session could not activate
+  the TDX login window. Do not promote this rerun to known-good until TDX
+  recovery, datasource smoke, live quote verification, and Mac-side probes pass.
+
 ## Scope
 
 The baseline covers:

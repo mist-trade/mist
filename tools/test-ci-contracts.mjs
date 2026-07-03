@@ -519,12 +519,8 @@ function assertMonitoringContracts() {
     'go-version-file: go.mod',
     'mist-monitoring CI workflow',
   );
-  assertIncludes(workflow, 'gofmt -w', 'mist-monitoring CI workflow');
-  assertIncludes(
-    workflow,
-    'git diff --exit-code',
-    'mist-monitoring CI workflow',
-  );
+  assertIncludes(workflow, 'gofmt -l .', 'mist-monitoring CI workflow');
+  assertIncludes(workflow, 'exit 1', 'mist-monitoring CI workflow');
   assertIncludes(workflow, 'go vet ./...', 'mist-monitoring CI workflow');
   assertIncludes(workflow, 'go test ./...', 'mist-monitoring CI workflow');
   assertIncludes(
