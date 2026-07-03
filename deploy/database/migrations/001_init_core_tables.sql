@@ -60,7 +60,7 @@ CREATE TABLE IF NOT EXISTS `k_extensions_ef` (
   `turnoverRate` decimal(10,2) NULL,
   `volumeCount` bigint NULL,
   `innerVolume` bigint NULL,
-  `outerVolume` decimal(20,0) NULL,
+  `outerVolume` bigint NULL,
   `prevClose` decimal(12,3) NULL,
   `prevOpen` decimal(12,3) NULL,
   `create_time` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),

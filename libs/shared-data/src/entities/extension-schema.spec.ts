@@ -6,13 +6,27 @@ function readRepoFile(relativePath: string): string {
 }
 
 describe('extension entity schema metadata', () => {
-  it('keeps KExtensionEf.outerVolume number-compatible with decimal schema', () => {
+  it('keeps KExtensionEf.outerVolume aligned with integer volume schema', () => {
     const source = readRepoFile(
       'libs/shared-data/src/entities/k-extension-ef.entity.ts',
     );
+    const migration = readRepoFile(
+      'deploy/database/migrations/001_init_core_tables.sql',
+    );
 
-    expect(source).toMatch(/outerVolume:\s*number\s*(?:\|\s*null)?\s*=/);
-    expect(source).not.toMatch(/outerVolume:\s*bigint/);
+    expect(source).toContain("type: 'bigint'");
+    expect(source).toMatch(/outerVolume:\s*bigint\s*(?:\|\s*null)?\s*=/);
+    expect(migration).toContain('`outerVolume` bigint NULL');
+    expect(migration).not.toContain('`outerVolume` decimal(20,0) NULL');
+  });
+
+  it('provides a forward migration for existing KExtensionEf outerVolume columns', () => {
+    const migration = readRepoFile(
+      'deploy/database/migrations/004_k_extension_ef_outer_volume_bigint.sql',
+    );
+
+    expect(migration).toContain('ALTER TABLE `k_extensions_ef`');
+    expect(migration).toContain('MODIFY COLUMN `outerVolume` bigint NULL');
   });
 
   it('keeps nullable KExtensionEf fields nullable in TypeScript defaults', () => {
@@ -65,6 +79,20 @@ describe('extension entity schema metadata', () => {
       'k_extensions_mqmt',
     ]) {
       expect(migration).toContain(`UNIQUE KEY \`uq_${table}_k_id\` (\`k_id\`)`);
+    }
+  });
+
+  it('keeps unique k_id indexes in extension TypeORM metadata', () => {
+    const extensionEntityPaths = [
+      'libs/shared-data/src/entities/k-extension-ef.entity.ts',
+      'libs/shared-data/src/entities/k-extension-tdx.entity.ts',
+      'libs/shared-data/src/entities/k-extension-mqmt.entity.ts',
+    ];
+
+    for (const entityPath of extensionEntityPaths) {
+      const source = readRepoFile(entityPath);
+
+      expect(source).toContain('@Index({ unique: true })');
     }
   });
 });

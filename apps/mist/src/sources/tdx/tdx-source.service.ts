@@ -13,7 +13,7 @@ import {
   KExtensionTdx,
   Security,
 } from '@app/shared-data';
-import { DataSource as TypeOrmDataSource, In } from 'typeorm';
+import { DataSource as TypeOrmDataSource } from 'typeorm';
 import { parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { ITdxSourceFetcher } from './tdx-source.interface';
@@ -29,6 +29,7 @@ import {
   TdxDividendFactorItem,
 } from './types';
 import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
+import { saveBaseK } from '../k-save.helper';
 
 const TDX_BAR_FIELDS = [
   'Open',
@@ -41,7 +42,6 @@ const TDX_BAR_FIELDS = [
   'VolInStock',
 ];
 
-const K_UPSERT_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'amount'];
 const MARKET_TIME_ZONE = 'Asia/Shanghai';
 
 const TDX_EXTENSION_UPSERT_COLUMNS = [
@@ -293,59 +293,12 @@ export class TdxSource implements ITdxSourceFetcher {
       );
       const formatCode = sourceConfig?.formatCode || security.code;
 
-      const kEntities = data.map((d) =>
-        manager.create(K, {
-          security,
-          securityId: security.id,
-          source: DataSource.TDX,
-          period,
-          timestamp: d.timestamp,
-          open: d.open,
-          high: d.high,
-          low: d.low,
-          close: d.close,
-          volume: BigInt(Math.round(d.volume)),
-          amount: d.amount || 0,
-        }),
-      );
-
-      const kValues = kEntities.map((k) => ({
-        securityId: k.securityId,
-        source: k.source,
-        period: k.period,
-        timestamp: k.timestamp,
-        open: k.open,
-        high: k.high,
-        low: k.low,
-        close: k.close,
-        volume: k.volume,
-        amount: k.amount,
-      }));
-
-      await manager
-        .createQueryBuilder()
-        .insert()
-        .into(K)
-        .values(kValues)
-        .orUpdate(K_UPSERT_COLUMNS, [
-          'securityId',
-          'source',
-          'period',
-          'timestamp',
-        ])
-        .updateEntity(false)
-        .execute();
-
-      const savedKs = await manager.find(K, {
-        where: {
-          security: { id: security.id },
-          source: DataSource.TDX,
-          period,
-          timestamp: In(data.map((d) => d.timestamp)),
-        },
-      });
-      const savedKByTimestamp = new Map(
-        savedKs.map((k) => [k.timestamp.getTime(), k]),
+      const savedKByTimestamp = await saveBaseK(
+        manager,
+        data,
+        security,
+        DataSource.TDX,
+        period,
       );
 
       const extensions = data

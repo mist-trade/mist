@@ -15,12 +15,12 @@ import {
   KExtensionEf,
   Security,
 } from '@app/shared-data';
-import { DataSource as TypeOrmDataSource, In } from 'typeorm';
+import { DataSource as TypeOrmDataSource } from 'typeorm';
 import { parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
+import { saveBaseK } from '../k-save.helper';
 
-const K_UPSERT_COLUMNS = ['open', 'high', 'low', 'close', 'volume', 'amount'];
 const MARKET_TIME_ZONE = 'Asia/Shanghai';
 
 const EF_EXTENSION_UPSERT_COLUMNS = [
@@ -201,58 +201,12 @@ export class EastMoneySource implements ISourceFetcher {
     if (data.length === 0) return;
 
     await this.typeOrmDataSource.transaction(async (manager) => {
-      const kEntities = data.map((d) =>
-        manager.create(K, {
-          security,
-          securityId: security.id,
-          source: DataSource.EAST_MONEY,
-          period,
-          timestamp: d.timestamp,
-          open: d.open,
-          high: d.high,
-          low: d.low,
-          close: d.close,
-          volume: BigInt(Math.round(d.volume)),
-          amount: d.amount || 0,
-        }),
-      );
-      const kValues = kEntities.map((k) => ({
-        securityId: k.securityId,
-        source: k.source,
-        period: k.period,
-        timestamp: k.timestamp,
-        open: k.open,
-        high: k.high,
-        low: k.low,
-        close: k.close,
-        volume: k.volume,
-        amount: k.amount,
-      }));
-
-      await manager
-        .createQueryBuilder()
-        .insert()
-        .into(K)
-        .values(kValues)
-        .orUpdate(K_UPSERT_COLUMNS, [
-          'securityId',
-          'source',
-          'period',
-          'timestamp',
-        ])
-        .updateEntity(false)
-        .execute();
-
-      const savedKs = await manager.find(K, {
-        where: {
-          security: { id: security.id },
-          source: DataSource.EAST_MONEY,
-          period,
-          timestamp: In(data.map((d) => d.timestamp)),
-        },
-      });
-      const savedKByTimestamp = new Map(
-        savedKs.map((k) => [k.timestamp.getTime(), k]),
+      const savedKByTimestamp = await saveBaseK(
+        manager,
+        data,
+        security,
+        DataSource.EAST_MONEY,
+        period,
       );
 
       // Only save extensions for items that have them (minute-level data)
@@ -274,6 +228,9 @@ export class EastMoneySource implements ISourceFetcher {
             changePct: ext.changePct ?? 0,
             changeAmt: ext.changeAmt ?? 0,
             turnoverRate: ext.turnoverRate ?? 0,
+            volumeCount: this.toNullableBigInt(ext.volumeCount),
+            innerVolume: this.toNullableBigInt(ext.innerVolume),
+            outerVolume: this.toNullableBigInt(ext.outerVolume),
           }),
         );
 
@@ -306,5 +263,9 @@ export class EastMoneySource implements ISourceFetcher {
 
   isSupportedPeriod(period: Period): boolean {
     return this.periodMappingService.isSupported(period, DataSource.EAST_MONEY);
+  }
+
+  private toNullableBigInt(value: number | undefined): bigint | null {
+    return value == null ? null : BigInt(Math.round(value));
   }
 }
