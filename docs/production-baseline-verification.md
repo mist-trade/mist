@@ -6,21 +6,20 @@ flow. It is the operational companion to the OpenSpec evidence under
 
 Latest known-good evidence:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-2.md`
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-3-recovered.md`
 - Backend baseline image:
-  `ghcr.io/mist-trade/mist:0c209d41a20e280a4b440dc38b344ebef2c584e8`
+  `ghcr.io/mist-trade/mist:a8eb29c089477456b980da83ce885e07e8fab14a`
 - Frontend baseline image:
-  `ghcr.io/mist-trade/mist-fe:c9bb33588b55d8509526cf71b38ae4b26e52b790`
+  `ghcr.io/mist-trade/mist-fe:600b9fce2aedd9fc7d82074f9d7a65bc15a14815`
 - Deploy scripts baseline:
-  `mist-deploy@61e631e095f88bc7a51092b6ea909b2da868a981`
+  `mist-deploy@da3e07e6b48280833d6b3118c054cf63b5509ebf`
 
-Latest incomplete rerun:
+Latest recovered rerun note:
 
 - `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-3-blocked.md`
-- Result: Docker deployment and MySQL restore rehearsal passed, but TDX
-  recovery failed because the Windows interactive session could not activate
-  the TDX login window. Do not promote this rerun to known-good until TDX
-  recovery, datasource smoke, live quote verification, and Mac-side probes pass.
+  records the intermediate TDX recovery blocker. The blocker was cleared after
+  validating `MistRuntimeLogin` from the real Windows console session and
+  rerunning recovery workflow `28641880518`.
 
 ## Scope
 
