@@ -6,15 +6,15 @@ flow. It is the operational companion to the OpenSpec evidence under
 
 Latest known-good evidence:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-6.md`
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-7.md`
 - Backend baseline image:
-  `ghcr.io/mist-trade/mist:13f328409777b4d4c769b89acbb524ac91cefa5d`
+  `ghcr.io/mist-trade/mist:0844d4860b5243bf727399a3678fb7668fe21b11`
 - Frontend baseline image:
   `ghcr.io/mist-trade/mist-fe:100cf5d72fa6be83bbb1badbcccd7fdd20ec159f`
 - Deploy scripts baseline:
-  `mist-deploy@614be72a92082ca8c119891099f3f5ce904813f2`
+  `mist-deploy@e25ebaf2bd8ef61acc5bcede6149f9c988083a6d`
 - Monitoring baseline:
-  `mist-monitoring@dc4c63534905f74b1f7e59b0db736f5c577abd42`
+  `mist-monitoring@3372534000ecb4e01deae53fb00799f851298e7f`
 
 Latest recovered rerun note:
 
@@ -39,11 +39,20 @@ Latest round-5 rerun note:
 Latest round-6 rerun note:
 
 - `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-6.md`
-  records the current known-good baseline after backend/frontend/deploy/
+  records the previous known-good baseline after backend/frontend/deploy/
   monitoring P3 follow-up commits, Windows monitoring redeploy, a Windows
   PowerShell diagnostics compatibility fix in `mist-deploy`, Docker stack
   redeploy, restore rehearsal, TDX runtime smoke, Mac LAN probes, monitoring
   metrics scrape, and backend-leader live quote verification.
+
+Latest round-7 rerun note:
+
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-7.md`
+  records the current known-good baseline after backend K extension fixes,
+  deploy CI gate/rollback guard follow-ups, monitoring CI toolchain correction,
+  Windows monitoring redeploy, Docker stack redeploy, restore rehearsal, TDX
+  runtime smoke, Mac LAN probes, monitoring metrics scrape, and backend-leader
+  live quote verification.
 
 ## Scope
 
