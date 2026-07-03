@@ -6,9 +6,9 @@ flow. It is the operational companion to the OpenSpec evidence under
 
 Latest known-good evidence:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun.md`
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-2.md`
 - Backend baseline image:
-  `ghcr.io/mist-trade/mist:9f1d239950bc94304887dbb49ae7f38042a73e13`
+  `ghcr.io/mist-trade/mist:0c209d41a20e280a4b440dc38b344ebef2c584e8`
 - Frontend baseline image:
   `ghcr.io/mist-trade/mist-fe:c9bb33588b55d8509526cf71b38ae4b26e52b790`
 - Deploy scripts baseline:
