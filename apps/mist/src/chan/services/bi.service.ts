@@ -6,17 +6,7 @@ import { TrendDirection } from '../enums/trend-direction.enum';
 import { BiVo } from '../vo/bi.vo';
 import { FenxingVo } from '../vo/fenxing.vo';
 import { MergedKVo } from '../vo/merged-k.vo';
-
-const uniqueById = (arr: KVo[]) => {
-  const seen = new Set<number>();
-  return arr.filter((item) => {
-    if (seen.has(item.id)) {
-      return false;
-    }
-    seen.add(item.id);
-    return true;
-  });
-};
+import { collectMergedKRange, uniqueKById } from './bi-range.helper';
 
 type CompleteBiWithFenxings = BiVo & {
   startFenxing: FenxingVo;
@@ -220,22 +210,9 @@ export class BiService {
   ): { isSequence: boolean; bi: BiVo } {
     const start = data[startIndex];
     const end = data[endIndex];
-    const rangeKs = data.slice(startIndex, endIndex + 1);
+    const rangeStats = collectMergedKRange(data, startIndex, endIndex);
     const trend =
       start.lowest <= end.highest ? TrendDirection.Up : TrendDirection.Down;
-
-    // 计算笔的属性
-    let highest = -Infinity;
-    let lowest = Infinity;
-    const allOriginIds: number[] = [];
-    const allOriginData: KVo[] = [];
-
-    rangeKs.forEach((k) => {
-      highest = Math.max(highest, k.highest);
-      lowest = Math.min(lowest, k.lowest);
-      allOriginIds.push(...k.mergedIds);
-      allOriginData.push(...k.mergedData);
-    });
 
     // 计算开始时间：优先使用上一笔的结束分型时间
     let startTime: Date;
@@ -248,24 +225,29 @@ export class BiService {
     // 判断和上一条趋势，如果趋势相同，则需要拼接，如果趋势相反，则不需要拼接
     if (prevBi && prevBi.trend === trend) {
       // Calculate new original K count (exclude first merged K to avoid double counting)
-      const newOriginKCount = rangeKs
-        .slice(1)
-        .reduce((sum, k) => sum + k.mergedData.length, 0);
+      const newOriginKCount = collectMergedKRange(
+        data,
+        startIndex + 1,
+        endIndex,
+      ).independentCount;
 
       return {
         isSequence: true,
         bi: {
           startTime: prevBi.startTime,
           endTime: end.endTime,
-          highest: Math.max(prevBi.highest, highest),
-          lowest: Math.min(prevBi.lowest, lowest),
+          highest: Math.max(prevBi.highest, rangeStats.highest),
+          lowest: Math.min(prevBi.lowest, rangeStats.lowest),
           trend,
           type: BiType.UnComplete,
           status: BiStatus.Unknown, // 未完成笔初始化为未知状态
           originIds: Array.from(
-            new Set([...prevBi.originIds, ...allOriginIds]),
+            new Set([...prevBi.originIds, ...rangeStats.originIds]),
           ),
-          originData: uniqueById([...prevBi.originData, ...allOriginData]),
+          originData: uniqueKById([
+            ...prevBi.originData,
+            ...rangeStats.originData,
+          ]),
           independentCount: prevBi.independentCount + newOriginKCount,
           startFenxing: prevBi.startFenxing,
           endFenxing: null,
@@ -278,17 +260,14 @@ export class BiService {
       bi: {
         startTime: startTime,
         endTime: end.endTime,
-        highest,
-        lowest,
+        highest: rangeStats.highest,
+        lowest: rangeStats.lowest,
         trend,
         type: BiType.UnComplete,
         status: BiStatus.Unknown, // 未完成笔初始化为未知状态
-        originIds: Array.from(new Set(allOriginIds)),
-        originData: uniqueById(allOriginData),
-        independentCount: rangeKs.reduce(
-          (sum, k) => sum + k.mergedData.length,
-          0,
-        ),
+        originIds: rangeStats.originIds,
+        originData: rangeStats.originData,
+        independentCount: rangeStats.independentCount,
         startFenxing: prevBi ? prevBi.endFenxing : null,
         endFenxing: null,
       },
@@ -744,20 +723,7 @@ export class BiService {
     // 合并两笔：bi1的起点 + bi2的终点
     const startIdx = bi1.startFenxing.middleIndex;
     const endIdx = bi2.endFenxing.middleIndex;
-
-    const rangeKs = data.slice(startIdx, endIdx + 1);
-
-    let highest = -Infinity;
-    let lowest = Infinity;
-    const allOriginIds: number[] = [];
-    const allOriginData: KVo[] = [];
-
-    rangeKs.forEach((k) => {
-      highest = Math.max(highest, k.highest);
-      lowest = Math.min(lowest, k.lowest);
-      allOriginIds.push(...k.mergedIds);
-      allOriginData.push(...k.mergedData);
-    });
+    const rangeStats = collectMergedKRange(data, startIdx, endIdx);
 
     // 使用分型的中间K线时间，而不是合并K的开始/结束时间
     const startK = this.findKByFenxing(data, bi1.startFenxing);
@@ -766,17 +732,14 @@ export class BiService {
     return {
       startTime: startK.time,
       endTime: endK.time,
-      highest,
-      lowest,
+      highest: rangeStats.highest,
+      lowest: rangeStats.lowest,
       trend: bi1.trend,
       type: BiType.Complete,
       status: BiStatus.Unknown, // 合并后的笔初始化为未知状态，将在pushBi中重新验证
-      originIds: Array.from(new Set(allOriginIds)),
-      originData: uniqueById(allOriginData),
-      independentCount: rangeKs.reduce(
-        (sum, k) => sum + k.mergedData.length,
-        0,
-      ),
+      originIds: rangeStats.originIds,
+      originData: rangeStats.originData,
+      independentCount: rangeStats.independentCount,
       startFenxing: bi1.startFenxing,
       endFenxing: bi2.endFenxing,
     };
@@ -792,20 +755,7 @@ export class BiService {
     // 合并三笔：bi1的起点 + bi3的终点
     const startIdx = bi1.startFenxing.middleIndex;
     const endIdx = bi3.endFenxing.middleIndex;
-
-    const rangeKs = data.slice(startIdx, endIdx + 1);
-
-    let highest = -Infinity;
-    let lowest = Infinity;
-    const allOriginIds: number[] = [];
-    const allOriginData: KVo[] = [];
-
-    rangeKs.forEach((k) => {
-      highest = Math.max(highest, k.highest);
-      lowest = Math.min(lowest, k.lowest);
-      allOriginIds.push(...k.mergedIds);
-      allOriginData.push(...k.mergedData);
-    });
+    const rangeStats = collectMergedKRange(data, startIdx, endIdx);
 
     // 使用分型的中间K线时间，而不是合并K的开始/结束时间
     const startK = this.findKByFenxing(data, bi1.startFenxing);
@@ -814,17 +764,14 @@ export class BiService {
     return {
       startTime: startK.time,
       endTime: endK.time,
-      highest,
-      lowest,
+      highest: rangeStats.highest,
+      lowest: rangeStats.lowest,
       trend: bi1.trend,
       type: BiType.Complete,
       status: BiStatus.Unknown, // 合并后的笔初始化为未知状态，将在pushBi中重新验证
-      originIds: Array.from(new Set(allOriginIds)),
-      originData: uniqueById(allOriginData),
-      independentCount: rangeKs.reduce(
-        (sum, k) => sum + k.mergedData.length,
-        0,
-      ),
+      originIds: rangeStats.originIds,
+      originData: rangeStats.originData,
+      independentCount: rangeStats.independentCount,
       startFenxing: bi1.startFenxing,
       endFenxing: bi3.endFenxing,
     };
@@ -891,20 +838,7 @@ export class BiService {
   ): BiVo {
     const startIdx = start.middleIndex;
     const endIdx = end.middleIndex;
-
-    const rangeKs = data.slice(startIdx, endIdx + 1);
-
-    let highest = -Infinity;
-    let lowest = Infinity;
-    const allOriginIds: number[] = [];
-    const allOriginData: KVo[] = [];
-
-    rangeKs.forEach((k) => {
-      highest = Math.max(highest, k.highest);
-      lowest = Math.min(lowest, k.lowest);
-      allOriginIds.push(...k.mergedIds);
-      allOriginData.push(...k.mergedData);
-    });
+    const rangeStats = collectMergedKRange(data, startIdx, endIdx);
 
     const trend =
       start.type === FenxingType.Bottom
@@ -918,17 +852,14 @@ export class BiService {
     return {
       startTime: startK.time,
       endTime: endK.time,
-      highest,
-      lowest,
+      highest: rangeStats.highest,
+      lowest: rangeStats.lowest,
       trend,
       type,
       status: BiStatus.Unknown, // 初始化为未知状态
-      originIds: Array.from(new Set(allOriginIds)),
-      originData: uniqueById(allOriginData),
-      independentCount: rangeKs.reduce(
-        (sum, k) => sum + k.mergedData.length,
-        0,
-      ),
+      originIds: rangeStats.originIds,
+      originData: rangeStats.originData,
+      independentCount: rangeStats.independentCount,
       startFenxing: start,
       endFenxing: end,
     };
