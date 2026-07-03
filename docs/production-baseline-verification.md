@@ -6,13 +6,15 @@ flow. It is the operational companion to the OpenSpec evidence under
 
 Latest known-good evidence:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-5.md`
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-6.md`
 - Backend baseline image:
-  `ghcr.io/mist-trade/mist:ba4442ec369177f24854c3eed4e30f492d71a2d5`
+  `ghcr.io/mist-trade/mist:13f328409777b4d4c769b89acbb524ac91cefa5d`
 - Frontend baseline image:
-  `ghcr.io/mist-trade/mist-fe:600b9fce2aedd9fc7d82074f9d7a65bc15a14815`
+  `ghcr.io/mist-trade/mist-fe:100cf5d72fa6be83bbb1badbcccd7fdd20ec159f`
 - Deploy scripts baseline:
-  `mist-deploy@bf0285d95cc8fe5b98f5525cbb2e113d263c1fcb`
+  `mist-deploy@614be72a92082ca8c119891099f3f5ce904813f2`
+- Monitoring baseline:
+  `mist-monitoring@dc4c63534905f74b1f7e59b0db736f5c577abd42`
 
 Latest recovered rerun note:
 
@@ -30,9 +32,18 @@ Latest round-4 rerun note:
 Latest round-5 rerun note:
 
 - `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-5.md`
-  records the current known-good baseline after deploy defaults
+  records the previous known-good baseline after deploy defaults
   centralization, monitoring container-name alignment, and backend
   docs/OpenSpec archive updates.
+
+Latest round-6 rerun note:
+
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-6.md`
+  records the current known-good baseline after backend/frontend/deploy/
+  monitoring P3 follow-up commits, Windows monitoring redeploy, a Windows
+  PowerShell diagnostics compatibility fix in `mist-deploy`, Docker stack
+  redeploy, restore rehearsal, TDX runtime smoke, Mac LAN probes, monitoring
+  metrics scrape, and backend-leader live quote verification.
 
 ## Scope
 
