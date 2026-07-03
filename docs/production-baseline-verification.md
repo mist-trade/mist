@@ -6,13 +6,13 @@ flow. It is the operational companion to the OpenSpec evidence under
 
 Latest known-good evidence:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-3-recovered.md`
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-4.md`
 - Backend baseline image:
-  `ghcr.io/mist-trade/mist:a8eb29c089477456b980da83ce885e07e8fab14a`
+  `ghcr.io/mist-trade/mist:0ca11bbc3872cc78396a44e047e4e20f23d1a4b2`
 - Frontend baseline image:
   `ghcr.io/mist-trade/mist-fe:600b9fce2aedd9fc7d82074f9d7a65bc15a14815`
 - Deploy scripts baseline:
-  `mist-deploy@da3e07e6b48280833d6b3118c054cf63b5509ebf`
+  `mist-deploy@9c84229770e6a957459268108276be339c7a0e03`
 
 Latest recovered rerun note:
 
@@ -20,6 +20,12 @@ Latest recovered rerun note:
   records the intermediate TDX recovery blocker. The blocker was cleared after
   validating `MistRuntimeLogin` from the real Windows console session and
   rerunning recovery workflow `28641880518`.
+
+Latest round-4 rerun note:
+
+- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-4.md`
+  records the current known-good baseline after deploy-side gateway image
+  digest pinning and public-host parameterization.
 
 ## Scope
 
