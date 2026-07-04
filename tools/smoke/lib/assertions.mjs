@@ -23,10 +23,15 @@ export function assertResponse(status, body, expect) {
   const results = [];
 
   // 1. status
+  // 形状级 smoke 不区分 200/201/202/204 —— 任何 2xx 都算成功。
+  // （NestJS POST 创建返回 201，PUT/DELETE 可能返回 204，smoke 不该卡这个。）
   const wantStatus = expect.status || 200;
+  const statusOk =
+    status === wantStatus ||
+    (wantStatus === 200 && status >= 200 && status < 300);
   results.push({
-    passed: status === wantStatus,
-    message: `status: got ${status}, want ${wantStatus}`,
+    passed: statusOk,
+    message: `status: got ${status}, want ${wantStatus} (any 2xx accepted)`,
   });
 
   // envelope 字段（只校验指定的子集，如 {success: true}）
