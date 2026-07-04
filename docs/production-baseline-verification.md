@@ -2,43 +2,45 @@
 
 This runbook records the current end-to-end Mist production baseline verification
 flow. It is the operational companion to the OpenSpec evidence under
-`openspec/changes/verify-mist-production-baseline/evidence/`.
+`openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/`.
 
 Latest known-good evidence:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-7.md`
+- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-8.md`
 - Backend baseline image:
-  `ghcr.io/mist-trade/mist:0844d4860b5243bf727399a3678fb7668fe21b11`
+  `ghcr.io/mist-trade/mist:7c3efc9af7455b61712284805c94c2d9e6d42156`
 - Frontend baseline image:
   `ghcr.io/mist-trade/mist-fe:100cf5d72fa6be83bbb1badbcccd7fdd20ec159f`
 - Deploy scripts baseline:
   `mist-deploy@e25ebaf2bd8ef61acc5bcede6149f9c988083a6d`
 - Monitoring baseline:
-  `mist-monitoring@3372534000ecb4e01deae53fb00799f851298e7f`
+  `mist-monitoring@3a953771bcda26df412d622db989b226b17c8ea0`
+- Datasource baseline:
+  `mist-datasource@6fddd74c8247efaebfa570116734f0838b767f8c`
 
 Latest recovered rerun note:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-3-blocked.md`
+- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-3-blocked.md`
   records the intermediate TDX recovery blocker. The blocker was cleared after
   validating `MistRuntimeLogin` from the real Windows console session and
   rerunning recovery workflow `28641880518`.
 
 Latest round-4 rerun note:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-4.md`
+- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-4.md`
   records the current known-good baseline after deploy-side gateway image
   digest pinning and public-host parameterization.
 
 Latest round-5 rerun note:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-5.md`
+- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-5.md`
   records the previous known-good baseline after deploy defaults
   centralization, monitoring container-name alignment, and backend
   docs/OpenSpec archive updates.
 
 Latest round-6 rerun note:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-6.md`
+- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-6.md`
   records the previous known-good baseline after backend/frontend/deploy/
   monitoring P3 follow-up commits, Windows monitoring redeploy, a Windows
   PowerShell diagnostics compatibility fix in `mist-deploy`, Docker stack
@@ -47,12 +49,21 @@ Latest round-6 rerun note:
 
 Latest round-7 rerun note:
 
-- `openspec/changes/verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-7.md`
-  records the current known-good baseline after backend K extension fixes,
+- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-7.md`
+  records the previous known-good baseline after backend K extension fixes,
   deploy CI gate/rollback guard follow-ups, monitoring CI toolchain correction,
   Windows monitoring redeploy, Docker stack redeploy, restore rehearsal, TDX
   runtime smoke, Mac LAN probes, monitoring metrics scrape, and backend-leader
   live quote verification.
+
+Latest round-8 rerun note:
+
+- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-8.md`
+  records the current known-good baseline after `mcp-server` decommission,
+  Windows reboot recovery, datasource update/restart, Windows monitoring
+  redeploy, Docker stack redeploy, restore rehearsal, TDX runtime smoke, Mac
+  LAN probes, monitoring metrics scrape, and backend-leader live quote
+  verification.
 
 ## Scope
 
