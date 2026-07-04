@@ -6,8 +6,9 @@ Mist backend for pull-based market data, technical indicator, and Chan Theory
 queries.
 ## Requirements
 ### Requirement: AstrBot shall use mist-skills as the Mist integration layer
-The system SHALL integrate the deployed NapCat-AstrBot runtime with Mist through
-`mist-skills`, not through Saya.
+The system SHALL integrate the deployed NapCat-AstrBot runtime and supported
+agent-facing tool use with Mist through `mist-skills`, not through MCP Server or
+Saya.
 
 #### Scenario: User requests market analysis from QQ
 - **GIVEN** a QQ user sends a supported market-analysis request
@@ -15,6 +16,13 @@ The system SHALL integrate the deployed NapCat-AstrBot runtime with Mist through
 - **WHEN** AstrBot executes the Skill script
 - **THEN** the script SHALL call the Mist REST API
 - **AND** AstrBot SHALL return the result through NapCat
+
+#### Scenario: Agent tool integration is inspected
+
+- **WHEN** a user inspects the supported agent-facing Mist tool path
+- **THEN** documentation SHALL point to `mist-skills`
+- **AND** the repository SHALL NOT advertise `apps/mcp-server` or `mist-mcp`
+  as a supported runtime
 
 ### Requirement: AstrBot container shall reach the Mist backend by configuration
 The AstrBot runtime SHALL receive the Mist backend base URL from environment

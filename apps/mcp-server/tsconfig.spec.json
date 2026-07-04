@@ -1,9 +1,0 @@
-{
-  "extends": "../../tsconfig.json",
-  "compilerOptions": {
-    "outDir": "../../dist/apps/mcp-server",
-    "types": ["node", "jest"]
-  },
-  "include": ["src/**/*", "test/**/*"],
-  "exclude": ["node_modules", "dist"]
-}

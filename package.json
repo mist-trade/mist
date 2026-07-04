@@ -9,22 +9,19 @@
     "node": ">=24.0.0"
   },
   "bin": {
-    "mist": "dist/apps/mist/main.js",
-    "mist-mcp": "dist/apps/mcp-server/main.js"
+    "mist": "dist/apps/mist/main.js"
   },
   "scripts": {
     "build": "nest build",
-    "build:docker": "nest build mist && nest build chan && nest build mcp-server",
+    "build:docker": "nest build mist && nest build chan",
     "db:migrate": "node tools/run-migrations.mjs",
     "format": "prettier --write \"apps/**/*.ts\" \"libs/**/*.ts\"",
     "start": "nest start",
     "start:dev": "nest start --watch",
     "start:dev:mist": "nest start mist",
     "start:dev:chan": "nest start chan",
-    "start:dev:mcp-server": "nest start mcp-server",
     "start:debug": "nest start --debug --watch",
     "start:debug:chan": "nest start chan --debug --watch",
-    "start:debug:mcp-server": "nest start mcp-server --debug --watch",
     "start:prod": "node dist/apps/mist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
@@ -48,7 +45,6 @@
     ]
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.0.4",
     "@nestjs/axios": "^4.0.0",
     "@nestjs/common": "^10.0.0",
     "@nestjs/config": "^4.0.0",
@@ -59,7 +55,6 @@
     "@nestjs/swagger": "^11.2.6",
     "@nestjs/throttler": "^6.5.0",
     "@nestjs/typeorm": "^11.0.0",
-    "@rekog/mcp-nest": "^1.9.7",
     "@types/ws": "^8.18.1",
     "axios": "^1.7.9",
     "body-parser": "^2.2.2",
@@ -75,8 +70,7 @@
     "rxjs": "^7.8.1",
     "technicalindicators": "3.1.0",
     "typeorm": "^0.3.20",
-    "ws": "^8.20.0",
-    "zod": "^4.1.0"
+    "ws": "^8.20.0"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -143,8 +137,7 @@
   },
   "pkg": {
     "scripts": [
-      "dist/apps/mist/main.js",
-      "dist/apps/mcp-server/main.js"
+      "dist/apps/mist/main.js"
     ],
     "assets": [
       "node_modules/**/*"

@@ -83,22 +83,20 @@ describe('backend Docker runtime config', () => {
     expect(existsSync(join(process.cwd(), 'docker-start.sh'))).toBe(false);
   });
 
-  it('runs local mcp-server compose from compiled output', () => {
+  it('does not run the retired mcp-server in local compose or Docker builds', () => {
     const compose = readRepoFile('docker-compose.yml');
-    const packageJson = readRepoFile('package.json');
-    const mcpTsConfig = readRepoFile('apps/mcp-server/tsconfig.app.json');
-    const mcpEslintConfig = readRepoFile('apps/mcp-server/.eslintrc.js');
+    const packageJson = JSON.parse(readRepoFile('package.json')) as {
+      scripts?: Record<string, string>;
+    };
 
-    expect(compose).toContain(
-      'command: ["node", "dist/apps/mcp-server/main.js"]',
-    );
+    expect(compose).not.toContain('mcp-server');
+    expect(compose).not.toContain('dist/apps/mcp-server/main.js');
+    expect(compose).not.toContain('8009');
     expect(compose).not.toContain('start:dev:mcp-server');
-    expect(packageJson).toContain(
-      '"build:docker": "nest build mist && nest build chan && nest build mcp-server"',
+
+    expect(packageJson.scripts?.['build:docker']).toBe(
+      'nest build mist && nest build chan',
     );
-    expect(mcpTsConfig).toContain('"**/*spec.ts"');
-    expect(mcpEslintConfig).toContain(
-      "project: ['tsconfig.app.json', 'tsconfig.spec.json']",
-    );
+    expect(packageJson.scripts?.['build:docker']).not.toContain('mcp-server');
   });
 });
