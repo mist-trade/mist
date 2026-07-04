@@ -8,14 +8,13 @@
 
 ## 📖 项目简介
 
-Mist 是一个功能完整的股票市场分析系统，支持 A 股全市场（沪深两市）的技术分析与智能决策支持。采用 Monorepo 架构，集成了传统技术分析、缠论分析、MCP Server 以及面向 AstrBot 的 `mist-skills` 集成路径。
+Mist 是一个功能完整的股票市场分析系统，支持 A 股全市场（沪深两市）的技术分析与智能决策支持。采用 Monorepo 架构，集成了传统技术分析、缠论分析，以及面向 AI/机器人调用的 `mist-skills` 集成路径。
 
 ### ✨ 核心功能
 
 - **技术指标计算**：MACD、RSI、KDJ、ADX、ATR 等 164+ 种技术指标
 - **缠论分析**：笔（Bi）、分型（Fenxing）、中枢（Channel）自动识别与计算
-- **AI/机器人集成**：通过 MCP Server 和 `mist-skills` 为外部 AI 工具与 AstrBot 提供结构化分析能力
-- **MCP Server**：基于 Model Context Protocol 的 AI 集成接口，提供 17+ 工具
+- **AI/机器人集成**：通过 `mist-skills` 为外部 AI 工具与 AstrBot 提供结构化分析能力
 - **多数据源管理**：支持东方财富（ef）、通达信（tdx）、迈吉马克特（mqmt）等多个数据源
 - **多周期数据**：支持 1min、5min、15min、30min、60min、daily 等多种时间周期
 - **定时任务**：自动数据采集与指标计算
@@ -32,8 +31,7 @@ mist/
 ├── apps/                  # 应用程序
 │   ├── mist/              # 主应用 - 技术分析与缠论 (Port 8001)
 │   ├── schedule/          # 定时任务 (Port 8003)
-│   ├── chan/              # 缠论测试入口 (Port 8008)
-│   └── mcp-server/        # MCP Server (Port 8009)
+│   └── chan/              # 缠论测试入口 (Port 8008)
 ├── libs/                  # 共享库
 │   ├── config/            # 配置管理
 │   ├── utils/             # 共享工具
@@ -45,12 +43,11 @@ mist/
 
 ### 应用模块
 
-| 应用 | 端口 | 功能描述 |
-|------|------|----------|
-| **mist** | 8001 | 主应用 - 数据采集、技术指标、缠论分析 |
-| **schedule** | 8003 | 定时任务 - 周期性数据采集 |
-| **chan** | 8008 | 缠论测试 - K 线合并、笔计算、中枢识别 |
-| **mcp-server** | 8009 | MCP Server - AI 应用集成接口 |
+| 应用         | 端口 | 功能描述                              |
+| ------------ | ---- | ------------------------------------- |
+| **mist**     | 8001 | 主应用 - 数据采集、技术指标、缠论分析 |
+| **schedule** | 8003 | 定时任务 - 周期性数据采集             |
+| **chan**     | 8008 | 缠论测试 - K 线合并、笔计算、中枢识别 |
 
 ---
 
@@ -91,12 +88,12 @@ docker-compose ps
 │  │  (8001)    │                                     │
 │  │  主应用    │                                     │
 │  └────────────┘                                     │
-│       │                                              │
-│  ┌────────────┐      ┌────────────┐                 │
-│  │ mcp-server │      │   chan     │                 │
-│  │  (8009)    │──────│   (8008)   │                 │
-│  │ MCP服务    │      │  缠论测试  │                 │
-│  └────────────┘      └────────────┘                 │
+│                                                      │
+│  ┌────────────┐                                      │
+│  │   chan     │                                      │
+│  │   (8008)   │                                      │
+│  │  缠论测试  │                                      │
+│  └────────────┘                                      │
 └──────────────────────┼───────────────────────────────┘
                        │
                        ▼
@@ -122,11 +119,10 @@ NODE_ENV=production              # 运行环境
 
 #### 服务端口
 
-| 服务 | 端口 | 说明 |
-|------|------|------|
-| **mist** | 8001 | 主应用 API |
+| 服务     | 端口 | 说明                 |
+| -------- | ---- | -------------------- |
+| **mist** | 8001 | 主应用 API           |
 | **mist** | 8008 | Chan Theory 测试入口 |
-| **mcp-server** | 8009 | MCP Server |
 
 #### 版本管理
 
@@ -205,11 +201,9 @@ CREATE DATABASE mist DEFAULT CHARACTER SET utf8mb4;
 pnpm run start:dev:mist       # 主应用 (port 8001)
 pnpm run start:dev:schedule   # 定时任务 (port 8003)
 pnpm run start:dev:chan       # 缠论测试入口 (port 8008)
-pnpm run start:dev:mcp-server # MCP Server (port 8009)
 
 # 调试模式
 pnpm run start:debug:chan       # 调试缠论
-pnpm run start:debug:mcp-server # 调试 MCP Server
 
 # 生产模式
 pnpm run build
@@ -223,6 +217,7 @@ pnpm run start:prod
 ### 主应用 (mist)
 
 **技术指标**：
+
 - MACD - 指数平滑移动平均线
 - RSI - 相对强弱指标
 - KDJ - 随机指标
@@ -230,18 +225,21 @@ pnpm run start:prod
 - ATR - 真实波幅
 
 **缠论分析**：
+
 - 合并 K（Merge K）- 基于包含关系的 K 线合并
 - 分型（Fenxing）- 顶分型和底分型识别
 - 笔（Bi）- 显著价格变动识别
 - 中枢（Channel）- 整理区间识别
 
 **多数据源管理**：
+
 - 支持多个数据源（东方财富 ef、通达信 tdx、mimiQmt）
 - 统一的股票管理接口
 - 灵活的数据采集配置
 - 自动数据源切换和故障转移
 
 **WebSocket 实时行情**：
+
 - 通过 `ws` 库作为客户端连接 mist-datasource WebSocket 服务
 - 支持实时行情快照推送和 K 线数据流聚合
 - 自动重连和心跳保活机制
@@ -250,30 +248,16 @@ pnpm run start:prod
 
 ### AI/机器人集成
 
-当前支持路径是外部 AI 工具通过 MCP Server 调用 Mist 能力，AstrBot 通过
-`mist-skills` 调用 Mist REST API。策略信号和主动告警由后续后端模块承载，
-不再通过独立后端模型编排服务。
+当前支持路径是外部 AI 工具和 AstrBot 通过 `mist-skills` 调用 Mist REST
+API。策略信号和主动告警由后续后端模块承载，不再通过独立后端模型编排服务。
 
-### MCP Server (mcp-server)
+### mist-skills
 
-基于 Model Context Protocol 的 AI 集成接口，提供 17+ 工具：
-
-| 分类 | 工具 | 功能 |
-|------|------|------|
-| **缠论工具** | merge_k | K 线合并 |
-| | create_bi | 计算笔 |
-| | get_fenxing | 分型识别 |
-| | analyze_chan_theory | 完整缠论分析 |
-| **技术指标工具** | MACD / RSI / KDJ / ADX / ATR | 单项指标计算 |
-| | analyze_indicators | 综合指标分析 |
-| **数据查询工具** | get_index_info | 获取指数信息 |
-| | get_kline_data | 获取 K 线数据 |
-| | get_daily_kline | 获取日线数据 |
-| | list_indices | 列出所有指数 |
-| | get_latest_data | 获取最新数据 |
-| **定时任务工具** | trigger_data_collection | 触发数据采集 |
-| | trigger_batch_collection | 批量数据采集 |
-| | list_scheduled_jobs | 列出定时任务 |
+| 分类             | 工具                                                             | 功能         |
+| ---------------- | ---------------------------------------------------------------- | ------------ |
+| **缠论工具**     | merge_k / create_bi / get_fenxing / analyze_chan                 | 缠论分析     |
+| **技术指标工具** | MACD / RSI / KDJ / ADX / ATR                                     | 单项指标计算 |
+| **数据查询工具** | list_indices / get_index_info / get_kline_data / get_daily_kline | 市场数据查询 |
 
 ### 定时任务 (schedule)
 
@@ -284,6 +268,7 @@ pnpm run start:prod
 ### 缠论测试 (chan)
 
 专门的测试入口，用于：
+
 - 测试缠论算法
 - 调试 K 线合并逻辑
 - 验证笔识别算法
@@ -360,26 +345,27 @@ pnpm run build
 
 ### 主要端点
 
-| 端点 | 方法 | 描述 |
-|------|------|------|
-| `/app/hello` | GET | 健康检查 |
-| `/indicator/k` | POST | K 线数据获取 |
-| `/indicator/macd` | POST | MACD 计算 |
-| `/indicator/rsi` | POST | RSI 计算 |
-| `/indicator/kdj` | POST | KDJ 计算 |
-| `/indicator/adx` | POST | ADX 计算 |
-| `/indicator/atr` | POST | ATR 计算 |
-| `/indicator/dualma` | POST | 双均线计算 |
-| `/chan/merge-k` | POST | K 线合并 |
-| `/chan/bi` | POST | 笔识别 |
-| `/chan/channel` | POST | 中枢识别 |
-| `/chan/fenxing` | POST | 分型识别 |
+| 端点                | 方法 | 描述         |
+| ------------------- | ---- | ------------ |
+| `/app/hello`        | GET  | 健康检查     |
+| `/indicator/k`      | POST | K 线数据获取 |
+| `/indicator/macd`   | POST | MACD 计算    |
+| `/indicator/rsi`    | POST | RSI 计算     |
+| `/indicator/kdj`    | POST | KDJ 计算     |
+| `/indicator/adx`    | POST | ADX 计算     |
+| `/indicator/atr`    | POST | ATR 计算     |
+| `/indicator/dualma` | POST | 双均线计算   |
+| `/chan/merge-k`     | POST | K 线合并     |
+| `/chan/bi`          | POST | 笔识别       |
+| `/chan/channel`     | POST | 中枢识别     |
+| `/chan/fenxing`     | POST | 分型识别     |
 
 ### 统一响应格式
 
 所有 HTTP 端点返回统一格式的响应：
 
 **成功响应：**
+
 ```json
 {
   "success": true,
@@ -392,6 +378,7 @@ pnpm run build
 ```
 
 **错误响应：**
+
 ```json
 {
   "success": false,
@@ -403,6 +390,7 @@ pnpm run build
 ```
 
 **错误码范围：**
+
 - `200`：成功
 - `1xxx`：客户端错误（参数验证、格式错误）
 - `2xxx`：业务错误（数据未找到、数据不足）
@@ -410,53 +398,40 @@ pnpm run build
 
 ### 多数据源管理 API
 
-| 端点 | 方法 | 描述 |
-|------|------|------|
-| `/v1/security/init` | POST | 初始化股票 |
-| `/v1/security/add-source` | POST | 添加/更新数据源 |
-| `/v1/security/deactivate` | POST | 停用股票 |
-| `/v1/security/activate` | POST | 启用股票 |
-| `/v1/security/:code` | GET | 获取股票信息 |
-| `/v1/collector/collect` | POST | 采集 K 线数据 |
-| `/v1/collector/status/:code/:period` | GET | 获取采集状态 |
+| 端点                                 | 方法 | 描述            |
+| ------------------------------------ | ---- | --------------- |
+| `/v1/security/init`                  | POST | 初始化股票      |
+| `/v1/security/add-source`            | POST | 添加/更新数据源 |
+| `/v1/security/deactivate`            | POST | 停用股票        |
+| `/v1/security/activate`              | POST | 启用股票        |
+| `/v1/security/:code`                 | GET  | 获取股票信息    |
+| `/v1/collector/collect`              | POST | 采集 K 线数据   |
+| `/v1/collector/status/:code/:period` | GET  | 获取采集状态    |
 
 ---
 
-## 🔌 MCP Server
+## 🔌 AI/机器人集成
 
-Mist 提供 Model Context Protocol (MCP) Server，用于与 AI 应用集成。
+Mist 的当前 AI/机器人集成路径是独立 `mist-skills` 仓库。Skills 通过
+`MIST_API_BASE_URL` 调用 Mist REST API，不再启动独立工具服务。
 
-### 启动 MCP Server
+### 可用 Skills
 
-```bash
-# 开发模式
-pnpm run start:dev:mcp-server  # Port 8009
+| 分类             | 工具                         | 功能             |
+| ---------------- | ---------------------------- | ---------------- |
+| **缠论工具**     | `merge_k`                    | K 线合并（缠论） |
+|                  | `create_bi`                  | 计算笔（缠论）   |
+|                  | `get_fenxing`                | 分型识别（缠论） |
+|                  | `analyze_chan_theory`        | 完整缠论分析     |
+| **技术指标工具** | MACD / RSI / KDJ / ADX / ATR | 单项指标计算     |
+|                  | `analyze_indicators`         | 综合指标分析     |
+| **数据查询工具** | `get_index_info`             | 获取指数信息     |
+|                  | `get_kline_data`             | 获取 K 线数据    |
+|                  | `get_daily_kline`            | 获取日线数据     |
+|                  | `list_indices`               | 列出所有指数     |
 
-# 调试模式
-pnpm run start:debug:mcp-server
-
-# Docker 模式
-docker-compose up mcp-server
-```
-
-### 可用工具（17+）
-
-| 分类 | 工具 | 功能 |
-|------|------|------|
-| **缠论工具** | `merge_k` | K 线合并（缠论） |
-| | `create_bi` | 计算笔（缠论） |
-| | `get_fenxing` | 分型识别（缠论） |
-| | `analyze_chan_theory` | 完整缠论分析 |
-| **技术指标工具** | MACD / RSI / KDJ / ADX / ATR | 单项指标计算 |
-| | `analyze_indicators` | 综合指标分析 |
-| **数据查询工具** | `get_index_info` | 获取指数信息 |
-| | `get_kline_data` | 获取 K 线数据 |
-| | `get_daily_kline` | 获取日线数据 |
-| | `list_indices` | 列出所有指数 |
-| | `get_latest_data` | 获取最新数据 |
-| **定时任务工具** | `trigger_data_collection` | 触发数据采集 |
-| | `trigger_batch_collection` | 批量数据采集 |
-| | `list_scheduled_jobs` | 列出定时任务 |
+`mist-skills` 的安装、环境变量和 AstrBot 部署方式见相邻仓库
+`../mist-skills/README.md`。
 
 ---
 
@@ -470,6 +445,7 @@ docker-compose up mcp-server
 ### 时间周期
 
 支持的时间周期：
+
 - **1min** - 1 分钟
 - **5min** - 5 分钟
 - **15min** - 15 分钟
@@ -503,18 +479,17 @@ docker build -t mist:latest .
 
 ## 🛠️ 技术栈
 
-| 组件 | 技术 |
-|------|------|
-| 应用框架 | NestJS 10 |
-| AI/机器人集成 | MCP Server, mist-skills/AstrBot |
-| 技术分析 | node-talib (164+ 函数) |
-| 数据库 | MySQL with TypeORM |
+| 组件             | 技术                               |
+| ---------------- | ---------------------------------- |
+| 应用框架         | NestJS 10                          |
+| AI/机器人集成    | mist-skills/AstrBot                |
+| 技术分析         | node-talib (164+ 函数)             |
+| 数据库           | MySQL with TypeORM                 |
 | WebSocket 客户端 | ws (连接 mist-datasource 实时行情) |
-| MCP Server | @modelcontextprotocol/sdk, @rekog/mcp-nest |
-| 调度器 | @nestjs/schedule |
-| 时区 | date-fns-tz |
-| 数据验证 | zod, class-validator |
-| 前端 | Next.js 16, React 19, ECharts 6 |
+| 调度器           | @nestjs/schedule                   |
+| 时区             | date-fns-tz                        |
+| 数据验证         | class-validator                    |
+| 前端             | Next.js 16, React 19, ECharts 6    |
 
 ---
 
@@ -523,6 +498,7 @@ docker build -t mist:latest .
 ### Docker 部署问题
 
 **MySQL 连接失败**
+
 ```bash
 # 检查 host.docker.internal 配置
 docker exec mist-backend ping -c 3 host.docker.internal
@@ -534,17 +510,18 @@ docker exec mist-backend nc -zv host.docker.internal 3306
 ### 本地开发问题
 
 **端口被占用**
+
 ```bash
 # 查看占用端口的进程
 lsof -i :8001
 lsof -i :8008
-lsof -i :8009
 
 # 停止进程
 kill -9 <PID>
 ```
 
 **MySQL 连接失败**
+
 ```bash
 # 测试 MySQL 连接
 mysql -h localhost -u root -p
@@ -564,11 +541,9 @@ docker-compose images
 
 # 只重启单个服务
 docker-compose restart mist
-docker-compose restart mcp-server
 
 # 进入容器调试
 docker exec -it mist-backend sh
-docker exec -it mist-mcp-server sh
 
 # 查看日志
 docker-compose logs -f --tail=100

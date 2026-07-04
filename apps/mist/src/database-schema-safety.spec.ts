@@ -5,7 +5,6 @@ const appModulePaths = [
   'apps/mist/src/app.module.ts',
   'apps/chan/src/chan-app.module.ts',
   'apps/schedule/src/schedule.module.ts',
-  'apps/mcp-server/src/mcp-server.module.ts',
 ];
 
 function readRepoFile(relativePath: string): string {

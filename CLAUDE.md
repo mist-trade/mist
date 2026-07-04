@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-**Mist** is a stock market analysis system for A-shares (沪深两市). NestJS monorepo with 4 apps and 5 shared libs using pnpm workspaces. Uses MySQL + TypeORM, TDX for data, MCP Server for AI-tool integration, and `mist-skills` for AstrBot integration.
+**Mist** is a stock market analysis system for A-shares (沪深两市). NestJS monorepo with 3 apps and 5 shared libs using pnpm workspaces. Uses MySQL + TypeORM and TDX for data. Agent and bot integrations use the separate `mist-skills` repository.
 
 ## Commands
 
@@ -15,11 +15,9 @@ pnpm install                        # Install dependencies
 pnpm run start:dev:mist             # Main app - port 8001
 pnpm run start:dev:schedule         # Scheduled tasks - port 8003
 pnpm run start:dev:chan             # Chan Theory test entry - port 8008
-pnpm run start:dev:mcp-server       # MCP server - port 8009
 
 # Debug mode
 pnpm run start:debug:chan
-pnpm run start:debug:mcp-server
 
 # Build
 pnpm run build
@@ -47,47 +45,49 @@ pnpm run migration:revert
 
 ### Apps
 
-| App | Port | Purpose | Key Modules |
-|-----|------|---------|-------------|
-| **mist** | 8001 | Main stock analysis | chan, collector, indicator, security, sources |
-| **schedule** | 8003 | Periodic data collection | Reuses CollectorModule from mist |
-| **chan** | 8008 | Chan Theory test/debug | Imports ChanModule from mist |
-| **mcp-server** | 8009 | MCP server for AI integration | 5 MCP services (Chan, Indicator, Data, Schedule, Segment) |
+| App          | Port | Purpose                  | Key Modules                                   |
+| ------------ | ---- | ------------------------ | --------------------------------------------- |
+| **mist**     | 8001 | Main stock analysis      | chan, collector, indicator, security, sources |
+| **schedule** | 8003 | Periodic data collection | Reuses CollectorModule from mist              |
+| **chan**     | 8008 | Chan Theory test/debug   | Imports ChanModule from mist                  |
 
 ### Cross-App Module Sharing
 
 Apps reuse modules from `apps/mist/src/` via direct imports:
+
 - **chan app** imports `ChanModule` from `../../mist/src/chan/chan.module`
 - **schedule app** imports `CollectorModule` from mist
-- **mcp-server** imports `ChanModule`, `IndicatorModule`, and `UtilsModule`
 
 ### Key Architectural Patterns
 
 **Strategy Pattern for Data Collection** (`apps/mist/src/collector/strategies/`):
+
 - `IDataCollectionStrategy` interface with `source` property
 - `CollectionStrategyRegistry` resolves strategies by `DataSource` enum
 - Each source (East Money, etc.) implements the interface
 - Registry injected via `COLLECTION_STRATEGIES` Symbol token
 
 **Data Source Adapters** (`apps/mist/src/sources/`):
+
 - `source-fetcher.interface.ts` defines the fetcher contract
 - Separate implementations per source: `east-money.source.ts`, `tdx.source.ts`
 - `DataSourceService` (in `@app/utils`) manages source selection and validation
 
 **Entity Extension Pattern** (`libs/shared-data/src/entities/`):
+
 - Base `K` entity for common K-line fields
 - Source-specific extension entities: `KExtensionEf`, `KExtensionTdx`, `KExtensionMqmt`
 - All entities registered in app.module.ts TypeORM config
 
 ### Libraries (`libs/`)
 
-| Library | Import | Purpose |
-|---------|--------|---------|
-| **config** | `@app/config` | Joi validation schemas per app (e.g. `mistEnvSchema`, `chanEnvSchema`) |
-| **utils** | `@app/utils` | `DataSourceService`, `PeriodMappingService` |
-| **timezone** | `@app/timezone` | Timezone service (date-fns-tz) |
+| Library         | Import             | Purpose                                                                                                                                    |
+| --------------- | ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| **config**      | `@app/config`      | Joi validation schemas per app (e.g. `mistEnvSchema`, `chanEnvSchema`)                                                                     |
+| **utils**       | `@app/utils`       | `DataSourceService`, `PeriodMappingService`                                                                                                |
+| **timezone**    | `@app/timezone`    | Timezone service (date-fns-tz)                                                                                                             |
 | **shared-data** | `@app/shared-data` | Entities (`K`, `Security`, `SecuritySourceConfig`, source extensions) and enums (`DataSource`, `Period`, `SecurityStatus`, `SecurityType`) |
-| **constants** | `@app/constants` | Error codes (1xxx client, 2xxx business, 5xxx server) |
+| **constants**   | `@app/constants`   | Error codes (1xxx client, 2xxx business, 5xxx server)                                                                                      |
 
 ### Path Mappings
 
@@ -125,6 +125,7 @@ Ports are hardcoded as defaults in each app's `main.ts`. Override via `PORT` env
 ## Unified Response Format
 
 All HTTP endpoints wrap responses in:
+
 ```json
 { "success": true/false, "code": 200, "message": "...", "data": {}, "timestamp": "...", "requestId": "..." }
 ```

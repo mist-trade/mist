@@ -40,8 +40,7 @@ COPY --from=builder --chown=app:app /app/deploy/database ./deploy/database
 # Expose ports
 # 8001: Main mist app
 # 8008: Chan test entry
-# 8009: MCP server
-EXPOSE 8001 8008 8009
+EXPOSE 8001 8008
 
 # Health check - verify main app is responding
 HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \

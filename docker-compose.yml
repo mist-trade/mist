@@ -17,23 +17,6 @@ services:
       - ./logs:/app/logs
     restart: unless-stopped
 
-  mcp-server:
-    container_name: mist-mcp-server
-    image: ghcr.io/${REPO_OWNER:-mist-trade}/mist:${VERSION:-latest}
-    env_file:
-      - .env
-    ports:
-      - "8009:8009"  # MCP server
-    environment:
-      - PORT=8009
-      - mysql_server_host=host.docker.internal
-    extra_hosts:
-      - "host.docker.internal:host-gateway"
-    networks:
-      - mist-network
-    restart: unless-stopped
-    command: ["node", "dist/apps/mcp-server/main.js"]
-
 networks:
   mist-network:
     driver: bridge

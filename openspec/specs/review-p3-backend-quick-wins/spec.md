@@ -48,21 +48,6 @@ or focused tests supporting a current contract.
 - **AND** `UtilsService.createAxiosInstance` MUST remain covered by focused
   unit tests
 
-### Requirement: MCP and backend style cleanup remains scoped
-
-Selected P3 backend style cleanup SHALL remove stale unused-variable ESLint
-disable comments and narrow obvious `any` typing only where this can be done
-without changing MCP tool behavior.
-
-#### Scenario: MCP cleanup contract runs
-- **WHEN** `node tools/test-ci-contracts.mjs` runs
-- **THEN** it MUST fail if selected MCP service files still contain stale
-  `eslint-disable-next-line @typescript-eslint/no-unused-vars` comments for
-  imports or parameters that can be named with an underscore
-- **AND** it MUST fail if `BaseMcpToolService` retains selected
-  `Record<string, any>` payload boundaries that can be represented as
-  `Record<string, unknown>`
-
 ### Requirement: Deferred and already-closed P3 findings are documented
 
 P3 findings SHALL be documented in this change when they are already addressed

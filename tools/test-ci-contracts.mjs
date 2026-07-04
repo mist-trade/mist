@@ -283,28 +283,6 @@ function assertBackendRuntimeSweep() {
     );
   }
 
-  const dataMcpService = read(
-    join(repos.mist, 'apps/mcp-server/src/services/data-mcp.service.ts'),
-  );
-  const queryBuilderCalls = [
-    ...dataMcpService.matchAll(/createQueryBuilder\('bar'\)/g),
-  ];
-  if (queryBuilderCalls.length !== 1) {
-    fail(
-      `DataMcpService must create bar query builders through one shared helper, found ${queryBuilderCalls.length}`,
-    );
-  }
-  assertIncludes(
-    dataMcpService,
-    'LATEST_PERIOD_QUERIES',
-    'mist DataMcpService latest data mapping',
-  );
-  assertNotIncludes(
-    dataMcpService,
-    "'1min': periodData[0]",
-    'mist DataMcpService latest data mapping',
-  );
-
   const websocketStrategy = read(
     join(
       repos.mist,
@@ -328,15 +306,6 @@ function assertBackendRuntimeSweep() {
   );
   assertIncludes(chanService, 'analyze(', 'mist ChanService analysis helper');
 
-  const chanMcpService = read(
-    join(repos.mist, 'apps/mcp-server/src/services/chan-mcp.service.ts'),
-  );
-  assertIncludes(
-    chanMcpService,
-    'this.chanService.analyze',
-    'mist Chan MCP analysis helper',
-  );
-
   const biService = read(
     join(repos.mist, 'apps/mist/src/chan/services/bi.service.ts'),
   );
@@ -355,6 +324,62 @@ function assertBackendRuntimeSweep() {
   if (/=\s*0n?;/.test(efExtension)) {
     fail('KExtensionEf nullable fields must default to null, not 0 or 0n');
   }
+}
+
+function assertMcpServerDecommissioned(packageJson) {
+  const forbiddenPaths = [
+    'apps/mcp-server',
+    'libs/constants/src/mcp-errors.ts',
+    'libs/constants/src/mcp-errors.spec.ts',
+  ];
+  for (const relativePath of forbiddenPaths) {
+    if (existsSync(join(repos.mist, relativePath))) {
+      fail(`retired MCP server artifact must not exist: ${relativePath}`);
+    }
+  }
+
+  if (packageJson.bin?.['mist-mcp']) {
+    fail('mist package.json must not expose the retired mist-mcp binary');
+  }
+  for (const dependencyName of [
+    '@modelcontextprotocol/sdk',
+    '@rekog/mcp-nest',
+    'zod',
+  ]) {
+    if (packageJson.dependencies?.[dependencyName]) {
+      fail(
+        `mist package.json must not keep retired MCP dependency ${dependencyName}`,
+      );
+    }
+  }
+  for (const [scriptName, command] of Object.entries(
+    packageJson.scripts ?? {},
+  )) {
+    if (scriptName.includes('mcp') || command.includes('mcp-server')) {
+      fail(`mist package.json scripts must not reference MCP: ${scriptName}`);
+    }
+  }
+  for (const scriptPath of packageJson.pkg?.scripts ?? []) {
+    if (scriptPath.includes('mcp-server')) {
+      fail(`mist package pkg.scripts must not reference MCP: ${scriptPath}`);
+    }
+  }
+
+  const nestCli = read(join(repos.mist, 'nest-cli.json'));
+  assertNotIncludes(nestCli, '"mcp-server"', 'mist nest-cli projects');
+
+  const compose = read(join(repos.mist, 'docker-compose.yml'));
+  for (const unexpected of [
+    'mcp-server',
+    'mist-mcp-server',
+    'dist/apps/mcp-server/main.js',
+    '8009',
+  ]) {
+    assertNotIncludes(compose, unexpected, 'mist docker-compose retired MCP');
+  }
+
+  const dockerfile = read(join(repos.mist, 'Dockerfile'));
+  assertNotIncludes(dockerfile, '8009', 'mist Dockerfile retired MCP port');
 }
 
 function assertBackendP3QuickWins() {
@@ -407,33 +432,6 @@ function assertBackendP3QuickWins() {
       'CODE_SMELL R1.2: ChannelService.getChannel must not return offsetIndex',
     );
   }
-
-  const mcpFiles = [
-    'apps/mcp-server/src/services/chan-mcp.service.ts',
-    'apps/mcp-server/src/services/indicator-mcp.service.ts',
-    'apps/mcp-server/src/services/schedule-mcp.service.ts',
-  ];
-  for (const relativePath of mcpFiles) {
-    const content = read(join(repos.mist, relativePath));
-    if (
-      content.includes(
-        'eslint-disable-next-line @typescript-eslint/no-unused-vars',
-      )
-    ) {
-      fail(
-        `CODE_REVIEW L1 stale no-unused-vars disable remains in ${relativePath}`,
-      );
-    }
-  }
-
-  const baseMcpToolService = read(
-    join(repos.mist, 'apps/mcp-server/src/base/base-mcp-tool.service.ts'),
-  );
-  assertNotIncludes(
-    baseMcpToolService,
-    'Record<string, any>',
-    'CODE_SMELL T1.4 BaseMcpToolService payload typing',
-  );
 
   const dockerWorkflow = read(join(repos.mist, '.github/workflows/docker.yml'));
   assertNotIncludes(
@@ -520,19 +518,6 @@ function assertBackendP3ServiceCleanups() {
       content,
       'private getFormatCode',
       `CODE_SMELL P1.2 duplicated getFormatCode in ${relativePath}`,
-    );
-  }
-
-  for (const relativePath of [
-    'apps/mcp-server/src/services/chan-mcp.service.ts',
-    'apps/mcp-server/src/services/data-mcp.service.ts',
-    'apps/mcp-server/src/services/indicator-mcp.service.ts',
-  ]) {
-    const content = read(join(repos.mist, relativePath));
-    assertNotIncludes(
-      content,
-      'private getValidationErrorCode',
-      `CODE_SMELL P1.5 duplicated getValidationErrorCode in ${relativePath}`,
     );
   }
 
@@ -644,6 +629,7 @@ function assertMistBackendContracts() {
   assertBackendJestHygiene(packageJson);
   assertNoSelectedBackendProductionConsoleCalls();
   assertBackendHttpConfigHygiene();
+  assertMcpServerDecommissioned(packageJson);
   assertBackendRuntimeSweep();
   assertBackendP3QuickWins();
   assertBackendP3ServiceCleanups();

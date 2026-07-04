@@ -59,13 +59,8 @@ with ConfigService overrides.
 ### Requirement: Backend query and save paths avoid duplicated builders
 
 Selected backend query and WebSocket persistence paths SHALL route through
-small local helpers instead of duplicating the same query/save chain.
-
-#### Scenario: MCP K-line queries are built
-
-- **WHEN** daily, intraday, or latest K-line MCP methods query K rows
-- **THEN** they MUST use a shared helper for common security/source/period
-  filtering, ordering, limit, and optional date conditions
+small local helpers instead of duplicating the same query/save chain. MCP query
+builder cleanup is retired because the MCP server app is deleted.
 
 #### Scenario: Latest data is returned
 
@@ -82,7 +77,8 @@ small local helpers instead of duplicating the same query/save chain.
 ### Requirement: Chan and EF invariants are explicit
 
 Selected Chan merge and EF extension invariants SHALL fail clearly and keep
-nullable semantics aligned with database metadata.
+nullable semantics aligned with database metadata. MCP-specific Chan analysis
+cleanup is retired because the MCP server app is deleted.
 
 #### Scenario: Chan merge input is incomplete
 
@@ -90,15 +86,8 @@ nullable semantics aligned with database metadata.
 - **THEN** they MUST throw a clear invariant error instead of dereferencing a
   non-null assertion
 
-#### Scenario: Chan analysis runs once
-
-- **WHEN** MCP `analyze_chan_theory` runs
-- **THEN** it MUST reuse one Chan analysis result for Bi and Fenxing output
-  rather than invoking separate merge-dependent service calls
-
 #### Scenario: EF extension metadata is inspected
 
 - **WHEN** extension schema tests run
 - **THEN** nullable `KExtensionEf` fields MUST use `null` TypeScript defaults
   instead of `0` or `0n` defaults that imply non-null values
-

@@ -32,7 +32,7 @@ if [ -z "$previous_tag" ]; then
 - 缠论（Chan Theory）自动化分析
 - 多智能体 AI 系统用于交易决策
 - RESTful API with Swagger 文档
-- MCP Server for AI 应用集成
+- mist-skills/AstrBot integration for AI and bot workflows
 EOF
 else
   total_changes=$(git rev-list --count "${previous_tag}..${current_ref}")
