@@ -30,6 +30,9 @@ This change updates the design to the current decision:
 - Keep only HTTP polling bridge endpoints:
   `/qmt/bridge/owner`, `/qmt/bridge/poll`, `/qmt/bridge/result`, and
   `/qmt/bridge/health`.
+- Add an independent Windows WinSW/deploy workflow for the QMT datasource
+  service on `:9002`; it manages only the service process and leaves full-QMT
+  strategy script load/register/delete as manual QMT client actions.
 - Keep account, position, order, deal, cancel, and placement APIs out of this
   market datasource.
 

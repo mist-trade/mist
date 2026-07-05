@@ -114,6 +114,16 @@ TDX request models no longer contain `provider`, and TDX v1 rejects unknown
 fields. TDX `/providers` returns only TDX. A caller that wants QMT history bars
 must call QMT `:9002/v1/bars/query`.
 
+### QMT datasource deployment
+
+The QMT datasource service is deployed as an independent Windows WinSW service
+(`mist-qmt-datasource`) that starts `qmt.main:app` on `:9002`. The deployment
+workflow may install, start, restart, stop, and smoke-test this service.
+
+The workflow must not automate full-QMT strategy script load, registration, or
+deletion. Those actions remain manual in the QMT client UI because they depend
+on the running full-QMT client environment and operator-selected strategy model.
+
 ## Risks
 
 - Local DAT minute layout may differ on real Windows samples. Mitigation:

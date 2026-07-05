@@ -13,6 +13,20 @@ HTTP polling bridge endpoints required by the full-QMT built-in Python script.
   `GET /qmt/bridge/health`
 - **AND** it MUST NOT expose legacy QMT route groups and adapter-backed realtime quote routes, or `/qmt/bridge/ws` routes
 
+### Requirement: QMT datasource service has independent Windows deployment
+The QMT datasource SHALL be deployable as its own Windows WinSW service,
+separate from the TDX datasource service and separate from full-QMT strategy
+script lifecycle actions.
+
+#### Scenario: QMT datasource service is managed by deployment automation
+- **WHEN** the QMT datasource deployment workflow runs
+- **THEN** it MUST manage the `mist-qmt-datasource` WinSW service on `:9002`
+- **AND** it MUST start `qmt.main:app`
+- **AND** it MUST check `/health` and `/qmt/bridge/health`
+- **AND** it MUST NOT validate or write TDX SDK settings
+- **AND** it MUST NOT create, load, register, or delete full-QMT strategy
+  scripts
+
 ### Requirement: QMT bars query uses official snake_case market-data parameters
 The QMT bars endpoint SHALL accept QMT native request fields shaped after
 `ContextInfo.get_market_data_ex`.
