@@ -2,7 +2,7 @@ import {
   K,
   KExtensionEf,
   KExtensionTdx,
-  KExtensionMqmt,
+  KExtensionQmt,
   Security,
   SecuritySourceConfig,
 } from '@app/shared-data';
@@ -57,7 +57,7 @@ import { mistEnvSchema } from '@app/config';
             K,
             KExtensionEf,
             KExtensionTdx,
-            KExtensionMqmt,
+            KExtensionQmt,
             Security,
             SecuritySourceConfig,
           ],

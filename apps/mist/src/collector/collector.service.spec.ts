@@ -2,6 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { CollectorService } from './collector.service';
 import { EastMoneySource } from '../sources/east-money/east-money-source.service';
 import { TdxSource } from '../sources/tdx/tdx-source.service';
+import { QmtSource } from '../sources/qmt/qmt-source.service';
 import {
   Period,
   DataSource,
@@ -24,6 +25,12 @@ const mockEastMoneySource = {
 };
 
 const mockTdxSource = {
+  fetchK: jest.fn(),
+  saveK: jest.fn(),
+  isSupportedPeriod: jest.fn(),
+};
+
+const mockQmtSource = {
   fetchK: jest.fn(),
   saveK: jest.fn(),
   isSupportedPeriod: jest.fn(),
@@ -67,6 +74,10 @@ describe('CollectorService', () => {
         {
           provide: TdxSource,
           useValue: mockTdxSource,
+        },
+        {
+          provide: QmtSource,
+          useValue: mockQmtSource,
         },
         {
           provide: DataSourceSelectionService,
@@ -274,6 +285,9 @@ describe('CollectorService', () => {
       mockEastMoneySource.isSupportedPeriod.mockReturnValue(true);
       mockEastMoneySource.fetchK.mockResolvedValue(mockKData);
       mockEastMoneySource.saveK.mockResolvedValue(undefined);
+      mockQmtSource.isSupportedPeriod.mockReturnValue(true);
+      mockQmtSource.fetchK.mockResolvedValue(mockKData);
+      mockQmtSource.saveK.mockResolvedValue(undefined);
     });
 
     it('should collect K-line data for a specific data source with postProcess callback', async () => {
@@ -319,6 +333,66 @@ describe('CollectorService', () => {
           DataSource.EAST_MONEY,
         ),
       ).resolves.not.toThrow();
+    });
+
+    it('collects and saves historical K data from QMT when requested explicitly', async () => {
+      const qmtStock = {
+        ...mockStock,
+        sourceConfigs: [
+          {
+            source: DataSource.QMT,
+            formatCode: '600519.SH',
+            enabled: true,
+          },
+        ],
+      };
+      mockSecurityRepository.findOne.mockResolvedValue(qmtStock);
+      mockQmtSource.fetchK.mockResolvedValue([
+        {
+          timestamp: new Date('2026-07-03T14:30:00+08:00'),
+          open: 11.1,
+          high: 11.5,
+          low: 10.9,
+          close: 11.3,
+          volume: 1200,
+          amount: 13560,
+          period: Period.THREE_MIN,
+          extensions: {
+            fullCode: '600519.SH',
+            effectiveDividendType: 'front_ratio',
+            nativePeriod: '3m',
+          },
+        },
+      ]);
+
+      const count = await service.collectKForSource(
+        '600519',
+        Period.THREE_MIN,
+        new Date('2026-07-03T09:30:00+08:00'),
+        new Date('2026-07-03T15:00:00+08:00'),
+        DataSource.QMT,
+      );
+
+      expect(count).toBe(1);
+      expect(mockQmtSource.fetchK).toHaveBeenCalledWith({
+        code: '600519',
+        formatCode: '600519.SH',
+        period: Period.THREE_MIN,
+        startDate: new Date('2026-07-03T09:30:00+08:00'),
+        endDate: new Date('2026-07-03T15:00:00+08:00'),
+      });
+      expect(mockQmtSource.saveK).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          expect.objectContaining({
+            period: Period.THREE_MIN,
+            extensions: expect.objectContaining({
+              effectiveDividendType: 'front_ratio',
+            }),
+          }),
+        ]),
+        qmtStock,
+        Period.THREE_MIN,
+      );
     });
   });
 

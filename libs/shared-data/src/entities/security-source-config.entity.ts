@@ -31,7 +31,7 @@ export class SecuritySourceConfig {
   @Column({
     type: 'enum',
     enum: DataSource,
-    comment: '数据源：ef=东方财富，tdx=通达信，mqmt=miniQMT',
+    comment: '数据源：ef=东方财富，tdx=通达信，qmt=大QMT',
   })
   source: DataSource = DataSource.EAST_MONEY;
 

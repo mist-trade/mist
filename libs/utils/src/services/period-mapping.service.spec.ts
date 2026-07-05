@@ -32,13 +32,25 @@ describe('PeriodMappingService', () => {
     expect(service.toSourceFormat(Period.DAY, DataSource.TDX)).toBe('1d');
   });
 
-  it('should fallback to EAST_MONEY for MINI_QMT', () => {
-    expect(service.toSourceFormat(Period.ONE_MIN, DataSource.MINI_QMT)).toBe(
-      '1',
+  it('should convert all QMT native K periods independently from TDX and EastMoney', () => {
+    expect(service.toSourceFormat(Period.ONE_MIN, DataSource.QMT)).toBe('1m');
+    expect(service.toSourceFormat(Period.THREE_MIN, DataSource.QMT)).toBe('3m');
+    expect(service.toSourceFormat(Period.FIVE_MIN, DataSource.QMT)).toBe('5m');
+    expect(service.toSourceFormat(Period.FIFTEEN_MIN, DataSource.QMT)).toBe(
+      '15m',
     );
-    expect(service.toSourceFormat(Period.DAY, DataSource.MINI_QMT)).toBe(
-      'daily',
+    expect(service.toSourceFormat(Period.THIRTY_MIN, DataSource.QMT)).toBe(
+      '30m',
     );
+    expect(service.toSourceFormat(Period.SIXTY_MIN, DataSource.QMT)).toBe('1h');
+    expect(service.toSourceFormat(Period.DAY, DataSource.QMT)).toBe('1d');
+    expect(service.toSourceFormat(Period.WEEK, DataSource.QMT)).toBe('1w');
+    expect(service.toSourceFormat(Period.MONTH, DataSource.QMT)).toBe('1mon');
+    expect(service.toSourceFormat(Period.QUARTER, DataSource.QMT)).toBe('1q');
+    expect(service.toSourceFormat(Period.HALF_YEAR, DataSource.QMT)).toBe(
+      '1hy',
+    );
+    expect(service.toSourceFormat(Period.YEAR, DataSource.QMT)).toBe('1y');
   });
 
   it('should throw for unsupported period', () => {
@@ -53,6 +65,7 @@ describe('PeriodMappingService', () => {
     );
     expect(service.isSupported(Period.FIFTEEN_MIN, DataSource.TDX)).toBe(true);
     expect(service.isSupported(Period.QUARTER, DataSource.TDX)).toBe(false);
+    expect(service.isSupported(Period.HALF_YEAR, DataSource.QMT)).toBe(true);
   });
 });
 
@@ -92,6 +105,17 @@ describe('PeriodMappingService with unified Period enum', () => {
       Period.SIXTY_MIN,
     );
     expect(service.fromSourceFormat('1d', DataSource.TDX)).toBe(Period.DAY);
+  });
+
+  it('maps QMT source period aliases back to the unified Period enum', () => {
+    expect(service.fromSourceFormat('3min', DataSource.QMT)).toBe(
+      Period.THREE_MIN,
+    );
+    expect(service.fromSourceFormat('1mon', DataSource.QMT)).toBe(Period.MONTH);
+    expect(service.fromSourceFormat('halfyear', DataSource.QMT)).toBe(
+      Period.HALF_YEAR,
+    );
+    expect(service.fromSourceFormat('1y', DataSource.QMT)).toBe(Period.YEAR);
   });
 
   it('throws when a source period token is unsupported', () => {

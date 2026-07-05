@@ -81,15 +81,16 @@ Deployments must not rely on TypeORM `synchronize`; app modules set
 
 ## Datasource Boundary
 
-The datasource remains outside Docker as the WinSW-managed Windows service
-`mist-tdx-datasource`. Containers reach it through:
+The datasources remain outside Docker as WinSW-managed Windows services.
+Containers reach them through:
 
 ```text
 TDX_BASE_URL=http://host.docker.internal:9001
+QMT_BASE_URL=http://host.docker.internal:9002
 ```
 
 If container-to-host health checks fail, first verify the datasource bind
-address and Windows firewall. Do not add a datasource container to the
+address and Windows firewall. Do not add datasource containers to the
 production stack.
 
 ## Deployment Owner

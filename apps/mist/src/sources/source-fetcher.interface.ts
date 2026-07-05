@@ -28,8 +28,14 @@ export interface TdxExtension {
   priceToBookRatio?: number;
 }
 
-export interface MqmtExtension {
+export interface QmtExtension {
   fullCode?: string;
+  preClose?: number;
+  suspendFlag?: number;
+  openInterest?: number;
+  settle?: number;
+  effectiveDividendType?: string;
+  nativePeriod?: string;
 }
 
 export interface ISourceFetcher<TRaw = KData> {
@@ -41,7 +47,7 @@ export interface ISourceFetcher<TRaw = KData> {
 export interface KFetchParams {
   code: string;
   formatCode: string;
-  period: number;
+  period: Period;
   startDate: Date;
   endDate: Date;
 }
@@ -55,5 +61,5 @@ export interface KData {
   volume: number;
   amount?: number;
   period: number;
-  extensions?: EfExtension | TdxExtension | MqmtExtension;
+  extensions?: EfExtension | TdxExtension | QmtExtension;
 }

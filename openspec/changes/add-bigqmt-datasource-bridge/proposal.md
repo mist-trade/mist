@@ -10,17 +10,22 @@ This change updates the design to the current decision:
 - TDX service `:9001` is TDX-only.
 - QMT service `:9002` is QMT-native.
 - QMT historical bars return `marketData`, not the TDX bar row model.
+- QMT historical bars use native `get_market_data_ex(..., subscribe=False)` as
+  the product path; local DAT is fallback/debug evidence only.
+- The existing backend QMT realtime strategy path remains in scope as
+  unverified realtime work; historical bars do not validate or delete it.
 - The full-QMT bridge uses stdlib HTTP polling only.
 
 ## What Changes
 
-- Remove legacy QMT service surfaces: old QMT route groups, adapter-backed QMT
-  realtime quote route, QMT mock adapter, and bridge realtime-duplex spike
-  endpoints.
+- Remove legacy QMT historical/mock surfaces that conflict with the native QMT
+  datasource boundary. Do not treat historical bars completion as QMT realtime
+  validation.
 - Remove QMT from the TDX service: no `provider` request field, no
   `a QMT provider selector` branch, no QMT provider state, and no QMT capability manifest
   from TDX `/providers`.
-- Add QMT native `POST :9002/v1/bars/query` for historical local DAT bars.
+- Add QMT native `POST :9002/v1/bars/query` for historical bars through
+  `get_market_data_ex` first, with local DAT retained only as fallback/debug.
 - Use official full-QMT `get_market_data_ex`-style request parameters:
   `fields`, `stock_list`, `period`, `start_time`, `end_time`, `count`,
   `dividend_type`, and `fill_data`; HTTP API does not expose `subscribe` and
@@ -40,9 +45,10 @@ This change updates the design to the current decision:
 
 ### New Capabilities
 
-- `bigqmt-datasource-bridge`: QMT native service boundary, QMT local DAT bars,
-  stdlib HTTP polling bridge, single-owner command gateway, and Windows
-  evidence requirements.
+- `bigqmt-datasource-bridge`: QMT native service boundary, native
+  `get_market_data_ex` bars, local DAT fallback/debug evidence, stdlib HTTP
+  polling bridge, single-owner command gateway, and Windows evidence
+  requirements.
 
 ### Modified Capabilities
 
@@ -53,13 +59,13 @@ This change updates the design to the current decision:
   threads, subprocesses, separate worker processes, and unverified third-party
   dependencies.
 - `backend-datasource-integration`: backend callers use TDX `:9001` for TDX
-  and QMT `:9002` for QMT; cross-provider shape unification belongs above the
-  datasource layer.
+  and QMT `:9002` for QMT historical bars; QMT realtime remains a separate,
+  unverified chain.
 
 ## Impact
 
-- `mist-datasource` QMT app routes, QMT local DAT reader/provider, command
-  gateway tests, QMT built-in bridge scripts, TDX v1 schemas/routes, adapter
-  factory cleanup, documentation, and guardrail tests.
+- `mist-datasource` QMT app routes, QMT native bars, local DAT fallback,
+  command gateway tests, QMT built-in bridge scripts, TDX v1 schemas/routes,
+  adapter factory cleanup, documentation, and guardrail tests.
 - Mist backend callers that previously expected TDX `a QMT provider selector` must use
   the QMT service `:9002/v1/bars/query`.

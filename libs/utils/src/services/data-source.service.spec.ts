@@ -55,6 +55,11 @@ describe('DataSourceService', () => {
       expect(result).toBe(DataSource.TDX);
     });
 
+    it('should select QMT value and enum key', () => {
+      expect(service.select('qmt')).toBe(DataSource.QMT);
+      expect(service.select('QMT')).toBe(DataSource.QMT);
+    });
+
     it('should select user-friendly format', () => {
       const result = service.select('east-money');
       expect(result).toBe(DataSource.EAST_MONEY);
@@ -79,6 +84,10 @@ describe('DataSourceService', () => {
       expect(service.isValid('ef')).toBe(true);
       expect(service.isValid('EAST_MONEY')).toBe(true);
       expect(service.isValid('east-money')).toBe(true);
+      expect(service.isValid('qmt')).toBe(true);
+      expect(service.isValid('QMT')).toBe(true);
+      expect(service.isValid('mqmt')).toBe(false);
+      expect(service.isValid('MINI_QMT')).toBe(false);
       expect(service.isValid('invalid')).toBe(false);
     });
   });
@@ -100,6 +109,16 @@ describe('DataSourceService', () => {
 
     it('should use env default when valid (enum key)', () => {
       expect(service.getDefault()).toBe(DataSource.TDX);
+    });
+  });
+
+  describe('with env var set to QMT', () => {
+    beforeEach(async () => {
+      await createService('qmt');
+    });
+
+    it('should use QMT as default when valid', () => {
+      expect(service.getDefault()).toBe(DataSource.QMT);
     });
   });
 

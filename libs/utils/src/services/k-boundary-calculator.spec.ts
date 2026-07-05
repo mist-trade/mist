@@ -31,6 +31,17 @@ describe('KBoundaryCalculator', () => {
       expect(result!.endTime).toEqual(new Date('2026-03-30T09:35:00+08:00'));
     });
 
+    it('should return 9:30-9:33 for 3min at 9:34', () => {
+      const triggerTime = new Date('2026-03-30T09:34:00+08:00');
+      const result = calculator.calculateMinuteCandle(
+        Period.THREE_MIN,
+        triggerTime,
+      );
+      expect(result).not.toBeNull();
+      expect(result!.startTime).toEqual(new Date('2026-03-30T09:30:00+08:00'));
+      expect(result!.endTime).toEqual(new Date('2026-03-30T09:33:00+08:00'));
+    });
+
     it('should return 9:30-9:45 for 15min at 9:46', () => {
       const triggerTime = new Date('2026-03-30T09:46:00+08:00');
       const result = calculator.calculateMinuteCandle(
@@ -178,6 +189,26 @@ describe('KBoundaryCalculator', () => {
         triggerTime,
       );
       expect(result.startTime).toEqual(new Date('2026-01-01T00:00:00+08:00'));
+      expect(result.endTime).toEqual(new Date('2027-01-01T00:00:00+08:00'));
+    });
+
+    it('should return Jan 1 - Jul 1 for first-half yearly candles', () => {
+      const triggerTime = new Date('2026-03-30T18:00:00+08:00');
+      const result = calculator.calculateDailyPlusCandle(
+        Period.HALF_YEAR,
+        triggerTime,
+      );
+      expect(result.startTime).toEqual(new Date('2026-01-01T00:00:00+08:00'));
+      expect(result.endTime).toEqual(new Date('2026-07-01T00:00:00+08:00'));
+    });
+
+    it('should return Jul 1 - next Jan 1 for second-half yearly candles', () => {
+      const triggerTime = new Date('2026-09-30T18:00:00+08:00');
+      const result = calculator.calculateDailyPlusCandle(
+        Period.HALF_YEAR,
+        triggerTime,
+      );
+      expect(result.startTime).toEqual(new Date('2026-07-01T00:00:00+08:00'));
       expect(result.endTime).toEqual(new Date('2027-01-01T00:00:00+08:00'));
     });
   });

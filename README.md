@@ -15,8 +15,8 @@ Mist 是一个功能完整的股票市场分析系统，支持 A 股全市场（
 - **技术指标计算**：MACD、RSI、KDJ、ADX、ATR 等 164+ 种技术指标
 - **缠论分析**：笔（Bi）、分型（Fenxing）、中枢（Channel）自动识别与计算
 - **AI/机器人集成**：通过 `mist-skills` 为外部 AI 工具与 AstrBot 提供结构化分析能力
-- **多数据源管理**：支持东方财富（ef）、通达信（tdx）、迈吉马克特（mqmt）等多个数据源
-- **多周期数据**：支持 1min、5min、15min、30min、60min、daily 等多种时间周期
+- **多数据源管理**：支持东方财富（ef）、通达信（tdx）、大 QMT（qmt）等多个数据源
+- **多周期数据**：支持 1min、3min、5min、15min、30min、60min、daily、weekly、monthly 等多种时间周期
 - **定时任务**：自动数据采集与指标计算
 - **数据源桥接**：mist-datasource 模块支持 TDX/QMT SDK 的跨平台 HTTP/WebSocket 服务
 

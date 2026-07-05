@@ -308,4 +308,35 @@ describe('WebSocketCollectionStrategy TDX normalized bars', () => {
     expect(tdxWsService.subscribe).toHaveBeenCalledWith('600519.SH');
     expect(tdxWsService.unsubscribe).toHaveBeenCalledWith('600519.SH');
   });
+
+  it('keeps the legacy QMT realtime strategy path as an unverified stub', async () => {
+    const collectorService = {
+      findSecurityByCode: jest.fn(),
+      saveRawKData: jest.fn(),
+    };
+    const logger = {
+      log: jest.fn(),
+      warn: jest.fn(),
+      debug: jest.fn(),
+      error: jest.fn(),
+    } as unknown as Logger;
+    const strategy = new WebSocketCollectionStrategy(
+      DataSource.QMT,
+      collectorService as any,
+      {} as any,
+      logger,
+    );
+
+    await expect(strategy.start()).resolves.toBeUndefined();
+    await expect(
+      strategy.collectForSecurity(createSecurity('600519'), Period.ONE_MIN),
+    ).resolves.toBe(0);
+
+    expect(logger.warn).toHaveBeenCalledWith(
+      'WebSocket strategy for qmt is not yet implemented. Streaming mode is disabled.',
+    );
+    expect(logger.warn).toHaveBeenCalledWith(
+      'WebSocket subscription for qmt is not yet implemented. Security 600519 will not receive streaming data.',
+    );
+  });
 });

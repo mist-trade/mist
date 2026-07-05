@@ -17,7 +17,7 @@ import { getSecurityFormatCode, normalizeSecurityCode } from '@app/utils';
  *
  * - Mode: streaming (real-time push)
  * - For: TDX (delegates to TdxWebSocketService)
- * - For: MINI_QMT (stub, not yet implemented)
+ * - For: QMT (existing realtime stub, not yet verified)
  */
 @Injectable()
 export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
@@ -34,9 +34,9 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
     private readonly logger: Logger,
     @Inject(TdxWebSocketService) tdxWsService?: TdxWebSocketService,
   ) {
-    if (source !== DataSource.TDX && source !== DataSource.MINI_QMT) {
+    if (source !== DataSource.TDX && source !== DataSource.QMT) {
       throw new Error(
-        `WebSocket strategy only supports TDX and MINI_QMT, got ${source}`,
+        `WebSocket strategy only supports TDX and QMT, got ${source}`,
       );
     }
     this.source = source;
@@ -139,7 +139,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
       return;
     }
 
-    // MINI_QMT not implemented
+    // QMT realtime streaming is tracked separately from historical bars.
     this.logger.warn(
       `WebSocket strategy for ${this.source} is not yet implemented. Streaming mode is disabled.`,
     );
@@ -208,7 +208,7 @@ export class WebSocketCollectionStrategy implements IDataCollectionStrategy {
       return 1;
     }
 
-    // MINI_QMT not implemented
+    // QMT realtime streaming is tracked separately from historical bars.
     this.logger.warn(
       `WebSocket subscription for ${this.source} is not yet implemented. Security ${security.code} will not receive streaming data.`,
     );

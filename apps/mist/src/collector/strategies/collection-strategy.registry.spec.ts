@@ -7,6 +7,7 @@ describe('CollectionStrategyRegistry', () => {
   let registry: CollectionStrategyRegistry;
   let mockDataSourceService: { getDefault: jest.Mock };
   let mockEastMoneyStrategy: IDataCollectionStrategy;
+  let mockQmtStrategy: IDataCollectionStrategy;
 
   beforeEach(() => {
     mockDataSourceService = {
@@ -18,9 +19,15 @@ describe('CollectionStrategyRegistry', () => {
       mode: 'polling' as const,
       collectForSecurity: jest.fn(),
     };
+    mockQmtStrategy = {
+      source: DataSource.QMT,
+      mode: 'polling' as const,
+      collectForSecurity: jest.fn(),
+    };
 
     registry = new CollectionStrategyRegistry(mockDataSourceService as any, [
       mockEastMoneyStrategy,
+      mockQmtStrategy,
     ]);
   });
 
@@ -28,6 +35,11 @@ describe('CollectionStrategyRegistry', () => {
     it('should return strategy matching the provided source', () => {
       const result = registry.resolve(DataSource.EAST_MONEY);
       expect(result).toBe(mockEastMoneyStrategy);
+    });
+
+    it('should return the QMT strategy when requested', () => {
+      const result = registry.resolve(DataSource.QMT);
+      expect(result).toBe(mockQmtStrategy);
     });
 
     it('should fall back to env default when no source provided', () => {

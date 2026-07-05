@@ -8,7 +8,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   K,
   KExtensionEf,
-  KExtensionMqmt,
+  KExtensionQmt,
   KExtensionTdx,
   Security,
   SecuritySourceConfig,
@@ -46,7 +46,7 @@ import {
             K,
             KExtensionEf,
             KExtensionTdx,
-            KExtensionMqmt,
+            KExtensionQmt,
             Security,
             SecuritySourceConfig,
           ],

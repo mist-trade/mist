@@ -49,7 +49,7 @@ This API supports multiple data sources for K-line data:
 
 - **ef** - East Money (default)
 - **tdx** - TongDaXin
-- **mqmt** - MaQiMaTe
+- **qmt** - 大 QMT
 
 Most endpoints accept an optional \`source\` parameter to specify which data source to use.
 If not provided, the default source for the application will be used.

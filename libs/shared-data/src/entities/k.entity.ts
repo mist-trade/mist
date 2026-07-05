@@ -11,7 +11,7 @@ import {
 import { DataSource } from '../enums/data-source.enum';
 import { Period } from '../enums/period.enum';
 import { KExtensionEf } from './k-extension-ef.entity';
-import { KExtensionMqmt } from './k-extension-mqmt.entity';
+import { KExtensionQmt } from './k-extension-qmt.entity';
 import { KExtensionTdx } from './k-extension-tdx.entity';
 import { Security } from './security.entity';
 
@@ -30,7 +30,7 @@ export class K {
   @Column({
     type: 'enum',
     enum: DataSource,
-    comment: '数据源：ef=东方财富，tdx=通达信，mqmt=miniQMT',
+    comment: '数据源：ef=东方财富，tdx=通达信，qmt=大QMT',
   })
   source: DataSource = DataSource.EAST_MONEY;
 
@@ -101,8 +101,8 @@ export class K {
   @OneToOne(() => KExtensionTdx, { eager: false })
   kExtensionTdx!: KExtensionTdx;
 
-  @OneToOne(() => KExtensionMqmt, { eager: false })
-  kExtensionMqmt!: KExtensionMqmt;
+  @OneToOne(() => KExtensionQmt, { eager: false })
+  kExtensionQmt!: KExtensionQmt;
 
   @CreateDateColumn({ name: 'create_time' })
   createTime!: Date;

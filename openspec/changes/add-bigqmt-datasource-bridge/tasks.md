@@ -4,11 +4,12 @@
 - [x] 1.2 Document that TDX `:9001` no longer accepts QMT provider requests.
 - [x] 1.3 Document QMT `:9002/v1/bars/query` native `marketData` response.
 - [x] 1.4 Remove bridge realtime-duplex spike requirements from this change.
+- [x] 1.5 Document QMT realtime as an existing but unverified backend chain.
 
 ## 2. Legacy QMT Removal
 
 - [x] 2.1 Delete legacy QMT route groups.
-- [x] 2.2 Delete adapter-backed QMT realtime quote route.
+- [x] 2.2 Keep QMT realtime work separate from historical bars validation.
 - [x] 2.3 Delete QMT bridge realtime endpoint and command-loop tests.
 - [x] 2.4 Delete QMT mock adapter, QMT adapter protocol, and QMT adapter factory.
 - [x] 2.5 Add guardrails for removed QMT legacy surfaces.
@@ -17,15 +18,15 @@
 
 - [x] 3.1 Add QMT native `POST :9002/v1/bars/query`.
 - [x] 3.2 Accept only official snake_case request fields:
-  `fields`, `stock_list`, `period`, `start_time`, `end_time`, `count`,
-  `dividend_type`, `fill_data`, and `include_raw`.
+      `fields`, `stock_list`, `period`, `start_time`, `end_time`, `count`,
+      `dividend_type`, `fill_data`, and `include_raw`.
 - [x] 3.3 Keep historical semantics fixed to `subscribe=False`.
-- [x] 3.4 Return `data.marketData` column shape with `source=local_dat`.
-- [x] 3.5 Keep QMT volume in native DAT units.
+- [x] 3.4 Return `data.marketData` column shape with native bridge metadata.
+- [x] 3.5 Keep QMT volume and amount in QMT native units.
 - [x] 3.6 Add `include_raw=true` parse evidence.
 - [x] 3.7 Add unit and integration tests for daily/minute DAT parsing,
-  field filtering, count, time filtering, block window, unstable/missing/error
-  envelopes, and unsupported request shape.
+      field filtering, count, time filtering, block window, unstable/missing/error
+      envelopes, and unsupported request shape.
 
 ## 4. TDX Cleanup
 
@@ -53,5 +54,7 @@
 - [x] 7.1 Run `openspec validate add-bigqmt-datasource-bridge --strict`.
 - [x] 7.2 Run datasource unit/integration regression tests.
 - [x] 7.3 Run guardrail scans for removed QMT legacy strings.
-- [ ] 7.4 Run Windows smoke against real full-QMT `1d`, `1m`, and `5m` DAT
-  files and record minute-format evidence.
+- [ ] 7.4 Run Windows smoke against real full-QMT native
+      `1d/1m/3m/5m/15m/30m/1h/1w/1mon/1q/1hy/1y` requests and record field/unit
+      evidence.
+- [ ] 7.5 Run QMT realtime smoke before enabling realtime collection.
