@@ -1,68 +1,62 @@
 ## Why
 
-QMT collection cannot keep using MiniQMT or `xtquant`: the supported path now
-runs inside the full QMT client's built-in Python runtime, which has library,
-thread, process, and blocking-behavior constraints that must be verified on the
-Windows host before production integration. Mist needs a provider-neutral QMT
-bridge that keeps NestJS on normalized datasource contracts while preventing
-new product dependencies on XtQuant APIs or account/trading surfaces.
+QMT access is moving to the full QMT client's built-in Python runtime. The old
+adapter-backed QMT surface is misleading now: it makes QMT look like another
+TDX provider inside the TDX service, while the real production path is a
+separate Windows QMT client with its own runtime and native data shape.
+
+This change updates the design to the current decision:
+
+- TDX service `:9001` is TDX-only.
+- QMT service `:9002` is QMT-native.
+- QMT historical bars return `marketData`, not the TDX bar row model.
+- The full-QMT bridge uses stdlib HTTP polling only.
 
 ## What Changes
 
-- Add a full-QMT built-in Python bridge plan that requires two Windows spikes
-  before enabling the provider: library/network capability and
-  process/execution-model capability.
-- Add a single-owner QMT bridge model: one controlled QMT strategy script owns
-  native QMT API access, performs no threading/process spawning, and processes
-  commands serially.
-- Add a stdlib-only, QMT-initiated polling protocol between the QMT script and
-  the Mist datasource command gateway; WebSocket is optional only after Windows
-  spike evidence proves single-thread command-loop execution safe.
-- Add a full-QMT local DAT historical-bars fast path for the first supported
-  periods (`1d`, `1m`, `5m`), guarded by explicit configuration,
-  file-stability checks, and a configurable update window that defaults to
-  blocking reads after 18:00 China time.
-- Keep the QMT local DAT implementation aligned with the existing TDX
-  provider style: route code dispatches to provider operations, operations call
-  focused QMT reader/normalizer helpers, and public responses reuse the
-  existing normalized `/v1/bars/query` contract.
-- **BREAKING**: Remove MiniQMT/`xtquant` as an allowed production integration
-  path. Future QMT docs, code, tests, and research references must use full-QMT
-  built-in Python documentation and APIs.
-- Keep QMT account, position, order, deal, cancel, and placement APIs out of
-  this market datasource change; they require a later trading/account design.
-- Add static guardrails and runtime smoke expectations for the bridge, spikes,
-  unsupported account/trading boundaries, and normalized provider contracts.
+- Remove legacy QMT service surfaces: old QMT route groups, adapter-backed QMT
+  realtime quote route, QMT mock adapter, and bridge realtime-duplex spike
+  endpoints.
+- Remove QMT from the TDX service: no `provider` request field, no
+  `a QMT provider selector` branch, no QMT provider state, and no QMT capability manifest
+  from TDX `/providers`.
+- Add QMT native `POST :9002/v1/bars/query` for historical local DAT bars.
+- Use official full-QMT `get_market_data_ex`-style request parameters:
+  `fields`, `stock_list`, `period`, `start_time`, `end_time`, `count`,
+  `dividend_type`, and `fill_data`; HTTP API does not expose `subscribe` and
+  history semantics are fixed to `subscribe=False`.
+- Return QMT native column-oriented `data.marketData` with source metadata
+  instead of normalized TDX rows.
+- Keep only HTTP polling bridge endpoints:
+  `/qmt/bridge/owner`, `/qmt/bridge/poll`, `/qmt/bridge/result`, and
+  `/qmt/bridge/health`.
+- Keep account, position, order, deal, cancel, and placement APIs out of this
+  market datasource.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `bigqmt-datasource-bridge`: Full-QMT built-in Python bridge, Windows spike
-  evidence, command polling protocol, WebSocket command-loop spike,
-  single-owner execution model, local DAT bars fast path, and production
-  enablement gates.
+- `bigqmt-datasource-bridge`: QMT native service boundary, QMT local DAT bars,
+  stdlib HTTP polling bridge, single-owner command gateway, and Windows
+  evidence requirements.
 
 ### Modified Capabilities
 
-- `datasource-provider-contract`: QMT provider requirements must forbid
-  MiniQMT/`xtquant`, require normalized `/v1` responses, and keep account and
-  trading APIs out of the market datasource boundary.
-- `datasource-runtime-safety`: QMT bridge runtime must honor the built-in
-  Python single-thread/process assumptions until Windows evidence proves a
-  broader model safe.
-- `backend-datasource-integration`: Backend consumers must remain on the
-  normalized datasource boundary and must not call QMT built-in APIs, bridge
-  internals, raw command endpoints, or account/trading methods directly.
+- `datasource-provider-contract`: TDX and QMT are separate datasource services;
+  QMT native shapes are not forced into the TDX normalized bar schema.
+- `datasource-runtime-safety`: QMT production bridge forbids realtime-duplex
+  transport,
+  threads, subprocesses, separate worker processes, and unverified third-party
+  dependencies.
+- `backend-datasource-integration`: backend callers use TDX `:9001` for TDX
+  and QMT `:9002` for QMT; cross-provider shape unification belongs above the
+  datasource layer.
 
 ## Impact
 
-- `mist-datasource` QMT adapter/provider code, FastAPI routes, capability
-  manifests, WebSocket bridge, command-gateway scaffolding, Windows smoke
-  scripts, documentation, fixtures, and repository hygiene tests.
-- `mist` backend datasource client and collector tests that enforce normalized
-  provider usage.
-- `mist-deploy` datasource management and runtime smoke workflows when QMT
-  bridge enablement is added after Windows evidence exists.
-- Operator workflows for the Windows QMT terminal, especially spike evidence
-  capture, single bridge ownership, and disabled-account/trading guarantees.
+- `mist-datasource` QMT app routes, QMT local DAT reader/provider, command
+  gateway tests, QMT built-in bridge scripts, TDX v1 schemas/routes, adapter
+  factory cleanup, documentation, and guardrail tests.
+- Mist backend callers that previously expected TDX `a QMT provider selector` must use
+  the QMT service `:9002/v1/bars/query`.

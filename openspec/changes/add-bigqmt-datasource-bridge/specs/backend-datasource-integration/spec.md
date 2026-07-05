@@ -1,30 +1,35 @@
 ## ADDED Requirements
 
-### Requirement: Backend consumes QMT only through normalized datasource APIs
-The Mist backend SHALL consume QMT data only through the configured Python
-datasource normalized `/v1` APIs and datasource WebSocket envelope.
+### Requirement: Backend uses separate TDX and QMT datasource services
+The Mist backend SHALL treat TDX and QMT as separate datasource services.
 
-#### Scenario: Backend product code requests QMT market data
-- **WHEN** backend collection, analysis, or datasource-selection code needs QMT
-  market data
-- **THEN** it MUST use normalized datasource endpoints with `provider: "qmt"`
-  or the canonical datasource WebSocket protocol
-- **AND** it MUST NOT call full-QMT built-in functions, command-gateway
-  internals, QMT bridge polling endpoints, MiniQMT, `xtquant`, or raw QMT
-  payloads directly
+#### Scenario: Backend requests TDX data
+- **WHEN** backend collection or analysis code needs TDX data
+- **THEN** it MUST call the TDX datasource on `:9001`
+- **AND** it MAY use TDX `/v1` routes or the TDX quote WebSocket according to
+  the existing TDX contract
 
-#### Scenario: Backend code attempts account or trading access
-- **WHEN** backend product code attempts to access QMT account, position,
-  order, deal, cancel, or placement operations through the market datasource
-- **THEN** repository checks MUST fail or the datasource MUST return a stable
-  outside-boundary error
+#### Scenario: Backend requests QMT historical bars
+- **WHEN** backend collection or analysis code needs QMT historical bars
+- **THEN** it MUST call QMT `:9002/v1/bars/query`
+- **AND** it MUST send QMT snake_case request fields
+- **AND** it MUST handle QMT native `data.marketData`
 
-### Requirement: Backend handles spike-blocked QMT provider status
-The Mist backend SHALL treat spike-blocked QMT capabilities as unavailable
-provider capability responses rather than runtime crashes.
+### Requirement: Backend does not call QMT bridge internals as product API
+The QMT HTTP polling bridge SHALL remain an internal runtime channel between
+the datasource and the full-QMT built-in Python script.
 
-#### Scenario: QMT provider is spike-blocked
-- **WHEN** backend code queries a QMT capability before Windows spike evidence
-  enables live QMT
-- **THEN** backend handling MUST surface a datasource capability failure and
-  MUST NOT fall back to MiniQMT, XtQuant, raw command endpoints, or fixture data
+#### Scenario: Product code needs QMT data
+- **WHEN** backend product code needs QMT data
+- **THEN** it MUST use QMT product routes such as `:9002/v1/bars/query`
+- **AND** it MUST NOT call `/qmt/bridge/owner`, `/qmt/bridge/poll`,
+  `/qmt/bridge/result`, or `/qmt/bridge/health` as market-data APIs
+
+### Requirement: Account and trading operations stay outside backend market flow
+The backend SHALL NOT route QMT account, position, order, deal, cancel, or
+placement operations through the market datasource.
+
+#### Scenario: Backend feature needs QMT trading behavior
+- **WHEN** a backend feature needs QMT account or trading behavior
+- **THEN** a separate trading/account service design MUST be created before
+  implementation
