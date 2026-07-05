@@ -42,10 +42,16 @@
 - [x] 5.3 Ensure built-in production bridge uses stdlib HTTP polling only.
 - [x] 5.4 Update built-in bridge command payloads to QMT snake_case fields.
 
-## 6. Verification
+## 6. Windows Deployment
 
-- [x] 6.1 Run `openspec validate add-bigqmt-datasource-bridge --strict`.
-- [x] 6.2 Run datasource unit/integration regression tests.
-- [x] 6.3 Run guardrail scans for removed QMT legacy strings.
-- [ ] 6.4 Run Windows smoke against real full-QMT `1d`, `1m`, and `5m` DAT
+- [x] 6.1 Add independent QMT WinSW service installer and smoke script.
+- [x] 6.2 Add independent QMT datasource deployment workflow and manager.
+- [x] 6.3 Keep full-QMT strategy script load/register/delete manual.
+
+## 7. Verification
+
+- [x] 7.1 Run `openspec validate add-bigqmt-datasource-bridge --strict`.
+- [x] 7.2 Run datasource unit/integration regression tests.
+- [x] 7.3 Run guardrail scans for removed QMT legacy strings.
+- [ ] 7.4 Run Windows smoke against real full-QMT `1d`, `1m`, and `5m` DAT
   files and record minute-format evidence.
