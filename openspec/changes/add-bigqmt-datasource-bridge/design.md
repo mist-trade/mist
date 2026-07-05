@@ -1,218 +1,134 @@
 ## Context
 
-Mist currently has a validated TDX datasource boundary: backend services call
-the Python datasource through normalized `/v1` endpoints, while the Windows TDX
-terminal remains a host-side runtime. QMT was previously represented in
-`mist-datasource` as a MiniQMT/`xtquant` adapter with optional startup, legacy
-`/api/qmt/*` routes, and planned provider manifests. That path is no longer
-acceptable: future QMT access must run through full QMT built-in Python.
+TDX and QMT now have different production boundaries:
 
-The full QMT documentation describes a Python 3.6 built-in runtime driven by
-strategy callbacks such as `handlebar`, `subscribe`, and `run_time`. It also
-documents important constraints: third-party libraries must be supplied through
-the QMT client, the client must be restarted after library changes, and built-in
-Python cannot rely on multi-thread or multi-process execution. Because those
-limits affect the transport design directly, production implementation must
-start with Windows evidence rather than assumptions.
+- TDX is a Python service around the TDX terminal and TDX HTTP/native adapter.
+- QMT must run through the full QMT client's built-in Python runtime.
 
-## Goals / Non-Goals
+The two providers also expose different historical data shapes. TDX `/v1`
+returns normalized row arrays such as `data.bars[]`; QMT `get_market_data_ex`
+returns a mapping of stock code to tabular data, whose index is the time series
+and whose columns are fields. The datasource should not pretend these are the
+same schema.
 
-**Goals:**
+## Goals
 
-- Create a new OpenSpec capability for the full-QMT bridge and make the
-  Windows spike evidence a hard enablement gate.
-- Remove MiniQMT/`xtquant` from the production QMT path and from future QMT
-  implementation guidance.
-- Preserve the existing provider-neutral datasource contract for backend and
-  NestJS consumers.
-- Default to one QMT bridge owner, one command queue, and serial execution of
-  native QMT API calls.
-- Allow a configured full-QMT local DAT reader as an optional historical-bars
-  fast path after file-stability and update-window safeguards are defined.
-- Provide local tests and scaffolding for the command-gateway model before
-  live QMT is available.
+- Make QMT a separate native datasource service on `:9002`.
+- Keep QMT bridge code small and safe inside the full-QMT built-in Python
+  runtime.
+- Serve QMT historical `1d`, `1m`, and `5m` bars from configured full-QMT local
+  DAT files as the first production-capable path.
+- Delete legacy QMT adapter/mock/API/realtime-duplex surfaces.
+- Keep TDX `:9001` TDX-only.
 
-**Non-Goals:**
+## Non-Goals
 
-- Completing live QMT enablement without Windows full-QMT evidence.
-- Exposing QMT account, position, order, deal, cancel, or placement APIs.
-- Making backend code call QMT built-in APIs, polling internals, or raw command
-  endpoints directly.
-- Supporting WebSocket as the required internal QMT bridge transport before it
-  is proven safe inside the QMT runtime.
-- Using local DAT files for realtime snapshots, reference, sector, finance, or
-  formula APIs.
+- Normalizing QMT `marketData` into the TDX bar row model inside the QMT datasource.
+- Serving QMT realtime quotes through the old adapter-backed realtime route.
+- Using realtime duplex as the default QMT internal bridge transport.
+- Exposing QMT account or trading APIs.
+- Supporting QMT periods beyond `1d`, `1m`, and `5m` in this change.
 
 ## Decisions
 
-### Require Windows spikes before provider enablement
+### QMT service is native, not provider-neutral
 
-Implementation starts with two evidence-producing spikes. The first validates
-library and network capability: Python version, encoding, stdlib imports,
-third-party imports, outbound `127.0.0.1` HTTP, port listening, and blocking
-behavior. The second validates process and execution model: PID/thread identity,
-thread/process/subprocess attempts, two-strategy interaction, `run_time`
-blocking impact, exception recovery, and repeated startup.
+`POST :9002/v1/bars/query` accepts QMT-style snake_case parameters:
 
-Alternative considered: implement the bridge against the documentation alone.
-That is faster, but the documented library and execution constraints are
-exactly where production risk lives.
+```json
+{
+  "fields": [],
+  "stock_list": ["000001.SZ"],
+  "period": "1d",
+  "start_time": "",
+  "end_time": "",
+  "count": -1,
+  "dividend_type": "none",
+  "fill_data": true,
+  "include_raw": false
+}
+```
 
-### Use one full-QMT bridge owner
+The API does not expose `subscribe`; historical bars are fixed to
+`subscribe=False` semantics.
 
-Only one controlled built-in Python strategy owns QMT API access. It runs as a
-normal QMT built-in script with the editor separate-process option disabled. It
-does not spawn threads, child processes, or workers. It pulls commands,
-executes native QMT calls serially, writes results, and reports health. The
-Mist datasource owns concurrency outside the QMT client and treats QMT as a
-single-lane provider.
+Response data is column-oriented:
 
-Alternative considered: run one QMT strategy per capability or request family.
-That would increase throughput, but it makes shared runtime state, client
-locking, strategy interference, and recovery hard to reason about.
+```json
+{
+  "marketData": {
+    "000001.SZ": {
+      "open": {"20260701": 10.05},
+      "close": {"20260701": 10.16},
+      "volume": {"20260701": 906890.0},
+      "amount": {"20260701": 915838549.0}
+    }
+  },
+  "source": "local_dat"
+}
+```
 
-Alternative rejected: use the QMT editor separate-process path or external
-strategy runner examples. That path changes the runtime boundary and drifts
-back toward the legacy SDK-style execution model that this change explicitly
-excludes.
+`include_raw=true` adds parse evidence under `rawMeta`, including
+`period_code`, `record_size`, `header_size`, `struct_format`, `price_scale`,
+and `source_path`.
 
-### Validate outbound command transport before choosing it
+### Local DAT is only historical bars
 
-The stable boundary is QMT-initiated outbound communication. The Mist datasource
-command gateway runs in the external Python service; the QMT bridge owns a
-single outbound command channel, executes native QMT calls serially, and posts
-results back. The transport is not promoted until Windows evidence validates
-the runtime.
+The local DAT reader resolves only configured full-QMT paths:
 
-Two transports are under test. HTTP polling is simplest and uses only stdlib
-request/response calls. WebSocket duplex is lower-latency and lets the
-datasource push commands after QMT opens the outbound connection, but it needs
-evidence that a normal single-script QMT runtime can connect, exchange messages,
-recover, and avoid blocking.
+- `QMT_LOCAL_DAT_DIR/SZ/86400/000001.DAT`
+- `QMT_LOCAL_DAT_DIR/SZ/60/000001.DAT`
+- `QMT_LOCAL_DAT_DIR/SZ/300/000001.DAT`
+- SH paths follow the same market/period layout.
 
-If either transport needs a periodic pump, `run_time` must be proven outside
-trading hours before production can depend on it. `handlebar` is tied to K-line
-and tick progression, and `subscribe` is tied to quote events; neither is a
-good fit for external datasource command intake because commands must still be
-handled when no market event is firing.
+Daily DAT parsing uses an 8-byte header and 32-byte records. Even record
+indexes are valid; prices are divided by `1000`; volume keeps the native DAT
+unit; missing amount is `0`.
 
-The WebSocket spike must go beyond ping/pong. It must prove a bounded
-single-thread command loop: QMT opens one WebSocket client connection, the
-datasource pushes a health command and a native `get_market_data_ex` command,
-the QMT script executes both synchronously on the same script path, and the
-result returns over the same connection. The evidence must record elapsed time,
-PID, thread counts before and after the loop, command results, disconnect
-handling, and whether the loop blocks other QMT strategies. A blocking loop may
-be acceptable only if it is bounded during the spike; production use still
-requires a separate decision after Windows evidence.
+Minute DAT parsing uses a small set of controlled candidate layouts with
+strict validation for timestamp, OHLC, volume, sorting, and period alignment.
+Unsupported layouts fail with structured details instead of guessed data.
 
-### Add local DAT bars as the first historical fast path
+The reader blocks after `QMT_LOCAL_DAT_BLOCK_AFTER` (default `18:00`) unless
+configuration changes the policy, and it checks file size/mtime stability
+before parsing.
 
-Full-QMT stores downloaded historical bars in local DAT files under its data
-directory. That gives QMT bars a safe optimization path for historical reads:
-when explicitly enabled and configured to a full-QMT data directory, the
-datasource may read stable local DAT files and normalize them into the existing
-`/v1/bars/query` contract. This fast path is limited to historical bars. It
-does not serve snapshots, subscriptions, reference, sector, finance, or formula
-families.
+### Bridge is stdlib HTTP polling only
 
-The first supported local periods are `1d`, `1m`, and `5m`, matching the
-operator's available full-QMT local downloads. Paths are resolved only under
-the configured full-QMT `datadir`: `SH|SZ/86400/{code}.DAT` for daily,
-`SH|SZ/60/{code}.DAT` for one-minute bars, and `SH|SZ/300/{code}.DAT` for
-five-minute bars. The reader must not fall back to `userdata_mini`, MiniQMT, or
-any `xtquant` path.
+The production bridge script inside QMT uses only standard-library HTTP
+requests to:
 
-Daily DAT parsing follows the captured EasyXT-compatible format: an 8-byte
-header followed by 32-byte records, with even record indexes carrying valid
-bars. Prices are stored as integer price times 1000, volume is stored in lots
-and normalized to shares, and amount is not present so it is normalized to `0`.
-Minute DAT parsing may use a small, explicit set of candidate record layouts
-inspired by the EasyXT analyzer, but it must be stricter than the GUI importer:
-the selected format must pass timestamp, OHLC, volume, sorting, and requested
-period checks, and unrecognized formats must fail with a structured retryable
-error rather than returning guessed data.
+1. Register one owner.
+2. Poll for at most one batch of commands.
+3. Execute QMT native calls serially.
+4. Post results.
+5. Report health.
 
-The fast path must avoid colliding with operator data updates. The default
-configuration blocks local DAT reads after 18:00 China time, because the
-operator update job may be writing files then. The block window is configurable
-and defaults to `fallback_bridge` when the bridge is healthy, otherwise a
-retryable datasource error. Before reading, the datasource must verify the
-target file stays stable across a short size/mtime check. Unstable files are
-not parsed.
+No realtime-duplex endpoint, command loop, thread, subprocess,
+worker process, or third-party package dependency is part of the production
+bridge.
 
-The implementation must keep the existing TDX code style. Route code should
-not parse DAT files or branch deeply on QMT internals. QMT exposes a
-provider-facing `get_bars(...)` operation shaped like
-`TdxMarketOperations.get_bars(...)`; the operation delegates binary parsing to
-focused helpers under `src/datasource/qmt`, and those helpers return the
-existing `TdxBar` model with `provider=qmt`. No public QMT-specific bar schema
-is added.
+### TDX is TDX-only
 
-### Keep product contracts normalized
+TDX request models no longer contain `provider`, and TDX v1 rejects unknown
+fields. TDX `/providers` returns only TDX. A caller that wants QMT history bars
+must call QMT `:9002/v1/bars/query`.
 
-QMT native shapes are normalized behind provider operations the same way TDX
-native shapes are hidden today. Public `/v1` endpoints keep the existing
-envelope, symbol, time, numeric, error, and capability-reporting conventions.
-Legacy QMT route surfaces are diagnostic or deprecated migration surfaces, not
-product contracts.
+## Risks
 
-### Exclude account and trading APIs
+- Local DAT minute layout may differ on real Windows samples. Mitigation:
+  keep candidate formats narrow, include raw evidence, and require Windows
+  smoke before declaring minute periods production-ready.
+- QMT bridge polling frequency may affect QMT script responsiveness.
+  Mitigation: keep one serial queue, command timeouts, and runtime health.
+- Backend code may still assume `a QMT provider selector` on TDX. Mitigation: schema
+  rejection and regression tests.
 
-The first QMT bridge covers market data, reference/instrument data,
-finance/report data, formulas, sectors, calendar, snapshots, bars, and
-subscription events. Account, position, order, deal, cancel, and placement
-methods remain excluded even when they are read-only. They require a separate
-trading/account service design with risk controls and audit boundaries.
+## Rollout
 
-## Risks / Trade-offs
-
-- Windows QMT cannot import expected libraries -> Keep the bridge stdlib-only
-  and let spike evidence decide whether optional transports are allowed.
-- `run_time` polling blocks other strategies -> Keep commands short, serial,
-  timeout-bound, and observable; do not enable production QMT until blocking
-  evidence is acceptable.
-- WebSocket single-thread loop blocks QMT script execution -> Keep the spike
-  bounded, record impact on other strategies, and require explicit evidence
-  before promoting WebSocket beyond a spike transport.
-- DAT files are read while the QMT client or an operator update is writing
-  them -> Gate reads with a configurable quiet window, default block after
-  18:00, and size/mtime stability checks before parsing.
-- QMT cannot safely listen on a local port -> Default design does not require
-  QMT to listen; it only makes outbound localhost requests.
-- Full API surface is broad -> Provider manifests may report unsupported or
-  spike-blocked families until native shapes are captured and normalized.
-- Old `xtquant` references return through docs or tests -> Add static guardrail
-  tests that allow only historical migration notes and explicit negative tests.
-
-## Migration Plan
-
-1. Add OpenSpec requirements for full-QMT bridge, provider contract changes,
-   runtime safety, and backend boundary.
-2. Add local static guardrails and command-gateway tests that fail on old QMT
-   assumptions.
-3. Add stdlib-only QMT bridge scaffolding, single-owner lock semantics,
-   command/result queue behavior, and evidence templates.
-4. Run local unit and repository-hygiene tests.
-5. Run Windows spike A and B on the QMT machine; capture evidence before
-   enabling live QMT provider status.
-6. Implement and verify full-QMT DAT historical-bars parsing for `1d`, `1m`,
-   and `5m`, including the default after-18:00 read block, file-stability
-   behavior, normalized `/v1/bars/query` parity, and Windows smoke evidence.
-7. Implement provider families incrementally from captured native shapes while
-   preserving normalized `/v1` responses.
-
-Rollback is additive before live enablement: keep QMT capability status
-disabled/spike-blocked and remove the command-gateway startup path. TDX runtime
-and current production deployment remain unchanged.
-
-## Open Questions
-
-- Which exact normal full-QMT screen/run mode should host the bridge strategy
-  for the least interference with manual QMT use?
-- What command timeout should production use after Windows blocking evidence is
-  captured?
-- Which additional DAT periods beyond `1d`, `1m`, and `5m` should be added in
-  a later change after real Windows samples exist?
-- Which non-account QMT API families have stable native shapes and can be
-  promoted first after the spike?
+1. Remove legacy QMT surfaces and TDX provider selection.
+2. Add native QMT local DAT bars route and contract tests.
+3. Keep HTTP bridge owner/poll/result/health tests.
+4. Run Windows smoke with real `1d`, `1m`, and `5m` DAT samples.
+5. Design any future realtime QMT feature on top of HTTP polling bridge
+   evidence, not the deleted adapter-backed realtime route.
