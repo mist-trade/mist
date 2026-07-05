@@ -16,7 +16,7 @@ CREATE TABLE IF NOT EXISTS `securities` (
 CREATE TABLE IF NOT EXISTS `security_source_configs` (
   `id` int NOT NULL AUTO_INCREMENT,
   `security_id` int NOT NULL,
-  `source` enum('ef', 'tdx', 'mqmt') NOT NULL DEFAULT 'ef',
+  `source` enum('ef', 'tdx', 'qmt') NOT NULL DEFAULT 'ef',
   `formatCode` varchar(50) NOT NULL,
   `priority` int NOT NULL DEFAULT 0,
   `enabled` tinyint(1) NOT NULL DEFAULT 1,
@@ -31,7 +31,7 @@ CREATE TABLE IF NOT EXISTS `security_source_configs` (
 CREATE TABLE IF NOT EXISTS `k` (
   `id` int NOT NULL AUTO_INCREMENT,
   `securityId` int NOT NULL,
-  `source` enum('ef', 'tdx', 'mqmt') NOT NULL DEFAULT 'ef',
+  `source` enum('ef', 'tdx', 'qmt') NOT NULL DEFAULT 'ef',
   `period` int NOT NULL DEFAULT 1440,
   `timestamp` datetime NOT NULL,
   `open` decimal(20,2) NOT NULL,
@@ -93,15 +93,21 @@ CREATE TABLE IF NOT EXISTS `k_extensions_tdx` (
     FOREIGN KEY (`k_id`) REFERENCES `k` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
-CREATE TABLE IF NOT EXISTS `k_extensions_mqmt` (
+CREATE TABLE IF NOT EXISTS `k_extensions_qmt` (
   `id` int NOT NULL AUTO_INCREMENT,
   `k_id` int NOT NULL,
   `fullCode` varchar(20) NULL,
+  `preClose` decimal(20,6) NULL,
+  `suspendFlag` int NULL,
+  `openInterest` decimal(20,4) NULL,
+  `settle` decimal(20,6) NULL,
+  `effectiveDividendType` varchar(32) NULL,
+  `nativePeriod` varchar(16) NULL,
   `create_time` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6),
   `update_time` datetime(6) NOT NULL DEFAULT CURRENT_TIMESTAMP(6) ON UPDATE CURRENT_TIMESTAMP(6),
   PRIMARY KEY (`id`),
-  UNIQUE KEY `uq_k_extensions_mqmt_k_id` (`k_id`),
-  CONSTRAINT `fk_k_extensions_mqmt_k`
+  UNIQUE KEY `uq_k_extensions_qmt_k_id` (`k_id`),
+  CONSTRAINT `fk_k_extensions_qmt_k`
     FOREIGN KEY (`k_id`) REFERENCES `k` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

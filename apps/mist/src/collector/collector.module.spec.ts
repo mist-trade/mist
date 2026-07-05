@@ -6,6 +6,7 @@ import { IDataCollectionStrategy } from './strategies/data-collection.strategy.i
 import { CollectorService } from './collector.service';
 import { EastMoneyCollectionStrategy } from './strategies/east-money-collection.strategy';
 import { TdxCollectionStrategy } from './strategies/tdx-collection.strategy';
+import { QmtCollectionStrategy } from './strategies/qmt-collection.strategy';
 import { WebSocketCollectionStrategy } from './strategies/websocket-collection.strategy';
 import { TdxWebSocketService } from '../sources/tdx/tdx-websocket.service';
 import {
@@ -21,6 +22,10 @@ describe('CollectorModule strategy providers', () => {
     } as IDataCollectionStrategy;
     const tdxManualStrategy = {
       source: DataSource.TDX,
+      mode: 'polling',
+    } as IDataCollectionStrategy;
+    const qmtManualStrategy = {
+      source: DataSource.QMT,
       mode: 'polling',
     } as IDataCollectionStrategy;
     const tdxWsService = {
@@ -46,6 +51,7 @@ describe('CollectorModule strategy providers', () => {
         { provide: TdxWebSocketService, useValue: tdxWsService },
         { provide: EastMoneyCollectionStrategy, useValue: eastMoneyStrategy },
         { provide: TdxCollectionStrategy, useValue: tdxManualStrategy },
+        { provide: QmtCollectionStrategy, useValue: qmtManualStrategy },
       ],
     }).compile();
 
@@ -56,11 +62,18 @@ describe('CollectorModule strategy providers', () => {
 
     expect(streamingStrategy).toBeInstanceOf(WebSocketCollectionStrategy);
     expect(tdxWsService.onBar).toHaveBeenCalledTimes(1);
-    expect(manualStrategies).toEqual([eastMoneyStrategy, tdxManualStrategy]);
+    expect(manualStrategies).toEqual([
+      eastMoneyStrategy,
+      tdxManualStrategy,
+      qmtManualStrategy,
+    ]);
     expect(
       manualStrategies.find((strategy) => strategy.source === DataSource.TDX),
     ).toBe(tdxManualStrategy);
     expect(manualStrategies).not.toContain(streamingStrategy);
+    expect(
+      manualStrategies.find((strategy) => strategy.source === DataSource.QMT),
+    ).toBe(qmtManualStrategy);
 
     await moduleRef.close();
   });

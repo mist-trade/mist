@@ -5,6 +5,7 @@ import {
   DataSource,
   K,
   KExtensionEf,
+  KExtensionQmt,
   KExtensionTdx,
   Security,
   SecuritySourceConfig,
@@ -13,8 +14,10 @@ import { CollectorService } from './collector.service';
 import { CollectorController } from './collector.controller';
 import { EastMoneyCollectionStrategy } from './strategies/east-money-collection.strategy';
 import { TdxCollectionStrategy } from './strategies/tdx-collection.strategy';
+import { QmtCollectionStrategy } from './strategies/qmt-collection.strategy';
 import { WebSocketCollectionStrategy } from './strategies/websocket-collection.strategy';
 import { EastMoneySource } from '../sources/east-money/east-money-source.service';
+import { QmtSource } from '../sources/qmt/qmt-source.service';
 import { TdxSource } from '../sources/tdx/tdx-source.service';
 import { TdxWebSocketService } from '../sources/tdx/tdx-websocket.service';
 import { KCandleAggregator } from '../sources/tdx/kcandle-aggregator';
@@ -49,8 +52,13 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
   useFactory: (
     eastMoney: EastMoneyCollectionStrategy,
     tdx: TdxCollectionStrategy,
-  ) => [eastMoney, tdx],
-  inject: [EastMoneyCollectionStrategy, TdxCollectionStrategy],
+    qmt: QmtCollectionStrategy,
+  ) => [eastMoney, tdx, qmt],
+  inject: [
+    EastMoneyCollectionStrategy,
+    TdxCollectionStrategy,
+    QmtCollectionStrategy,
+  ],
 };
 
 @Module({
@@ -59,6 +67,7 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
       K,
       KExtensionEf,
       KExtensionTdx,
+      KExtensionQmt,
       Security,
       SecuritySourceConfig,
     ]),
@@ -70,8 +79,10 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
     CollectorService,
     EastMoneyCollectionStrategy,
     TdxCollectionStrategy,
+    QmtCollectionStrategy,
     EastMoneySource,
     TdxSource,
+    QmtSource,
     KCandleAggregator,
     TdxWebSocketService,
     TDX_WEBSOCKET_COLLECTION_STRATEGY_PROVIDER,
@@ -83,6 +94,7 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
     CollectorService,
     EastMoneyCollectionStrategy,
     TdxCollectionStrategy,
+    QmtCollectionStrategy,
   ],
 })
 export class CollectorModule {}

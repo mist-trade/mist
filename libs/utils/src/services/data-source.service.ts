@@ -49,13 +49,13 @@ export class DataSourceService {
   private selectOrFail(source: string): DataSource {
     const normalized = this.normalize(source);
 
-    // First try as enum value (e.g., 'ef', 'tdx', 'mqmt')
+    // First try as enum value (e.g., 'ef', 'tdx', 'qmt')
     const enumValues = Object.values(DataSource);
     if (enumValues.includes(source as DataSource)) {
       return source as DataSource;
     }
 
-    // Then try as enum key (e.g., 'EAST_MONEY', 'TDX', 'MINI_QMT')
+    // Then try as enum key (e.g., 'EAST_MONEY', 'TDX', 'QMT')
     const enumKey = normalized.toUpperCase();
     const dataSource = enumKey as keyof typeof DataSource;
     if (DataSource[dataSource]) {
@@ -67,7 +67,7 @@ export class DataSourceService {
       `Invalid data source "${source}". Supported formats:
 - Enum values: ${enumValues.join(', ')}
 - Enum keys: ${Object.keys(DataSource).join(', ')}
-- User-friendly: east-money, mini-qmt`,
+- User-friendly: east-money, qmt`,
     );
   }
 

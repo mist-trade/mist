@@ -10,10 +10,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { EastMoneySource } from '../sources/east-money/east-money-source.service';
 import { KData, KFetchParams } from '../sources/source-fetcher.interface';
+import { QmtSource } from '../sources/qmt/qmt-source.service';
+import { QmtResponse } from '../sources/qmt/types';
 import { TdxSource } from '../sources/tdx/tdx-source.service';
 import { TdxResponse } from '../sources/tdx/types';
 
-type SourceFetcher = EastMoneySource | TdxSource;
+type SourceFetcher = EastMoneySource | TdxSource | QmtSource;
 
 @Injectable()
 export class CollectorService {
@@ -25,6 +27,7 @@ export class CollectorService {
     private readonly securityRepository: Repository<Security>,
     private readonly eastMoneySource: EastMoneySource,
     private readonly tdxSource: TdxSource,
+    private readonly qmtSource: QmtSource,
     private readonly dataSourceSelectionService: DataSourceSelectionService,
   ) {
     this.registerDataSources();
@@ -33,6 +36,7 @@ export class CollectorService {
   private registerDataSources(): void {
     this.sources.set(DataSource.EAST_MONEY, this.eastMoneySource);
     this.sources.set(DataSource.TDX, this.tdxSource);
+    this.sources.set(DataSource.QMT, this.qmtSource);
   }
 
   /**
@@ -45,7 +49,7 @@ export class CollectorService {
 
   private async saveFetchedKData(
     sourceFetcher: SourceFetcher,
-    kLineData: KData[] | TdxResponse[],
+    kLineData: KData[] | TdxResponse[] | QmtResponse[],
     security: Security,
     period: Period,
   ): Promise<void> {
@@ -54,16 +58,21 @@ export class CollectorService {
       return;
     }
 
+    if (sourceFetcher instanceof QmtSource) {
+      await sourceFetcher.saveK(kLineData as QmtResponse[], security, period);
+      return;
+    }
+
     await sourceFetcher.saveK(kLineData as KData[], security, period);
   }
 
   private toPostProcessKData(
-    kLineData: KData[] | TdxResponse[],
+    kLineData: Array<KData | TdxResponse | QmtResponse>,
     period: Period,
   ): KData[] {
     return kLineData.map((item) =>
       'period' in item ? item : { ...item, period },
-    );
+    ) as KData[];
   }
 
   /**

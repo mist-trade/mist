@@ -16,18 +16,21 @@ same schema.
 - Make QMT a separate native datasource service on `:9002`.
 - Keep QMT bridge code small and safe inside the full-QMT built-in Python
   runtime.
-- Serve QMT historical `1d`, `1m`, and `5m` bars from configured full-QMT local
-  DAT files as the first production-capable path.
-- Delete legacy QMT adapter/mock/API/realtime-duplex surfaces.
+- Serve QMT historical bars through full-QMT native
+  `get_market_data_ex(..., subscribe=False)` as the production path.
+- Keep local DAT parsing only as fallback/debug evidence.
+- Preserve the backend QMT realtime strategy path as existing but unverified
+  work; do not count historical bars as realtime validation.
 - Keep TDX `:9001` TDX-only.
 
 ## Non-Goals
 
 - Normalizing QMT `marketData` into the TDX bar row model inside the QMT datasource.
-- Serving QMT realtime quotes through the old adapter-backed realtime route.
+- Claiming QMT realtime quote collection is verified by this historical bars
+  change.
 - Using realtime duplex as the default QMT internal bridge transport.
 - Exposing QMT account or trading APIs.
-- Supporting QMT periods beyond `1d`, `1m`, and `5m` in this change.
+- Mixing multiple QMT adjustment types in the same `k` unique key.
 
 ## Decisions
 
@@ -43,7 +46,7 @@ same schema.
   "start_time": "",
   "end_time": "",
   "count": -1,
-  "dividend_type": "none",
+  "dividend_type": "front_ratio",
   "fill_data": true,
   "include_raw": false
 }
@@ -58,21 +61,33 @@ Response data is column-oriented:
 {
   "marketData": {
     "000001.SZ": {
-      "open": {"20260701": 10.05},
-      "close": {"20260701": 10.16},
-      "volume": {"20260701": 906890.0},
-      "amount": {"20260701": 915838549.0}
+      "open": { "20260701": 10.05 },
+      "close": { "20260701": 10.16 },
+      "volume": { "20260701": 906890.0 },
+      "amount": { "20260701": 915838549.0 }
     }
   },
-  "source": "local_dat"
+  "source": "native_bridge"
 }
 ```
 
-`include_raw=true` adds parse evidence under `rawMeta`, including
+The product path enqueues a bridge command that calls
+`ContextInfo.get_market_data_ex(..., subscribe=False)` in the full-QMT runtime.
+`include_raw=true` may add native/fallback evidence under `rawMeta`, including
 `period_code`, `record_size`, `header_size`, `struct_format`, `price_scale`,
 and `source_path`.
 
-### Local DAT is only historical bars
+### Periods and adjustment are explicit contracts
+
+QMT historical K collection supports `1m`, `3m`, `5m`, `15m`, `30m`, `1h`,
+`1d`, `1w`, `1mon`, `1q`, `1hy`, and `1y`. Tick/L2 data is not written into
+the Mist K table in this change.
+
+The backend fixes QMT `dividend_type` to `front_ratio` in v1. TDX remains fixed
+to `front`. Future support for multiple adjustment口径 requires adding an
+adjustment dimension to the `k` unique key first.
+
+### Local DAT is fallback/debug only
 
 The local DAT reader resolves only configured full-QMT paths:
 
@@ -110,9 +125,14 @@ bridge.
 
 ### TDX is TDX-only
 
-TDX request models no longer contain `provider`, and TDX v1 rejects unknown
-fields. TDX `/providers` returns only TDX. A caller that wants QMT history bars
-must call QMT `:9002/v1/bars/query`.
+TDX request models do not contain a QMT provider selector. A caller that wants
+QMT history bars must call QMT `:9002/v1/bars/query`.
+
+### QMT realtime remains unverified
+
+Mist backend keeps the QMT WebSocket collection strategy path as an existing
+stub. This change does not validate QMT realtime subscriptions or payloads;
+that requires a separate smoke/test pass.
 
 ### QMT datasource deployment
 
@@ -126,9 +146,9 @@ on the running full-QMT client environment and operator-selected strategy model.
 
 ## Risks
 
-- Local DAT minute layout may differ on real Windows samples. Mitigation:
-  keep candidate formats narrow, include raw evidence, and require Windows
-  smoke before declaring minute periods production-ready.
+- Native QMT field names may differ by period/client version. Mitigation:
+  keep response alias handling for `settle`, `settlementPrice`, and
+  `settelementPrice`, and record real smoke columns.
 - QMT bridge polling frequency may affect QMT script responsiveness.
   Mitigation: keep one serial queue, command timeouts, and runtime health.
 - Backend code may still assume `a QMT provider selector` on TDX. Mitigation: schema
@@ -137,8 +157,8 @@ on the running full-QMT client environment and operator-selected strategy model.
 ## Rollout
 
 1. Remove legacy QMT surfaces and TDX provider selection.
-2. Add native QMT local DAT bars route and contract tests.
+2. Add native QMT bars route and backend contract tests.
 3. Keep HTTP bridge owner/poll/result/health tests.
-4. Run Windows smoke with real `1d`, `1m`, and `5m` DAT samples.
-5. Design any future realtime QMT feature on top of HTTP polling bridge
-   evidence, not the deleted adapter-backed realtime route.
+4. Run Windows smoke with real QMT `1d`, `1m`, `3m`, `5m`, `15m`, `30m`,
+   `1h`, `1w`, `1mon`, `1q`, `1hy`, and `1y` requests.
+5. Run a separate QMT realtime smoke before enabling realtime collection.

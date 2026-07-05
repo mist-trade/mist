@@ -5,6 +5,7 @@
 export enum Period {
   // Minute-level periods
   ONE_MIN = 1,
+  THREE_MIN = 3,
   FIVE_MIN = 5,
   FIFTEEN_MIN = 15,
   THIRTY_MIN = 30,
@@ -15,5 +16,6 @@ export enum Period {
   WEEK = 10080, // 1 week = 7 * 24 * 60 minutes
   MONTH = 43200, // 1 month = 30 * 24 * 60 minutes
   QUARTER = 129600, // 1 quarter = 90 * 24 * 60 minutes
+  HALF_YEAR = 259200, // 1 half year = 180 * 24 * 60 minutes
   YEAR = 525600, // 1 year = 365 * 24 * 60 minutes
 }

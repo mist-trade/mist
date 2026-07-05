@@ -126,6 +126,22 @@ export class KBoundaryCalculator {
         const endTime = this.toMarketDateTime(endDate, 0);
         return { startTime, endTime };
       }
+      case Period.HALF_YEAR: {
+        const startMonth = marketDate.month < 6 ? 0 : 6;
+        const startDate = this.normalizeMarketDate(
+          marketDate.year,
+          startMonth,
+          1,
+        );
+        const endDate = this.normalizeMarketDate(
+          marketDate.year,
+          startMonth + 6,
+          1,
+        );
+        const startTime = this.toMarketDateTime(startDate, 0);
+        const endTime = this.toMarketDateTime(endDate, 0);
+        return { startTime, endTime };
+      }
       case Period.YEAR: {
         const startDate = this.normalizeMarketDate(marketDate.year, 0, 1);
         const endDate = this.normalizeMarketDate(marketDate.year + 1, 0, 1);

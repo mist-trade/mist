@@ -2,8 +2,8 @@ import { Security, Period, DataSource } from '@app/shared-data';
 
 /**
  * Data collection mode.
- * - polling: Actively fetch data on schedule (East Money)
- * - streaming: Receive data via WebSocket push (TDX, miniQMT)
+ * - polling: Actively fetch data on schedule (East Money, TDX, QMT historical bars)
+ * - streaming: Receive data via WebSocket push (TDX, QMT realtime path)
  */
 export type CollectionMode = 'polling' | 'streaming';
 
@@ -15,14 +15,14 @@ export type CollectionMode = 'polling' | 'streaming';
  */
 export interface IDataCollectionStrategy {
   /**
-   * Data source type (e.g., EAST_MONEY, TDX, MINI_QMT)
+   * Data source type (e.g., EAST_MONEY, TDX, QMT)
    */
   readonly source: DataSource;
 
   /**
    * Collection mode.
-   * - polling: Actively fetch data on schedule (East Money)
-   * - streaming: Receive data via WebSocket push (TDX, miniQMT)
+   * - polling: Actively fetch data on schedule (East Money, TDX, QMT)
+   * - streaming: Receive data via WebSocket push (TDX, QMT realtime path)
    */
   readonly mode: CollectionMode;
 

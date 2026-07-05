@@ -1,0 +1,419 @@
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { ConfigService } from '@nestjs/config';
+import { AxiosInstance } from 'axios';
+import { parseISO } from 'date-fns';
+import { formatInTimeZone } from 'date-fns-tz';
+import { DataSource as TypeOrmDataSource } from 'typeorm';
+import { PeriodMappingService, UtilsService } from '@app/utils';
+import {
+  DataSource,
+  K,
+  KExtensionQmt,
+  Period,
+  Security,
+} from '@app/shared-data';
+import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
+import {
+  ISourceFetcher,
+  KFetchParams,
+  QmtExtension,
+} from '../source-fetcher.interface';
+import { saveBaseK } from '../k-save.helper';
+import {
+  QmtBarsResponseData,
+  QmtEnvelope,
+  QmtFieldColumn,
+  QmtResponse,
+  QmtSymbolMarketData,
+} from './types';
+
+const MARKET_TIME_ZONE = 'Asia/Shanghai';
+const QMT_CANONICAL_DIVIDEND_TYPE = 'front_ratio';
+
+const QMT_DEFAULT_FIELDS = [
+  'open',
+  'high',
+  'low',
+  'close',
+  'volume',
+  'amount',
+  'time',
+  'stime',
+  'preClose',
+  'openInterest',
+  'suspendFlag',
+  'settle',
+  'settlementPrice',
+  'settelementPrice',
+];
+
+const QMT_EXTENSION_UPSERT_COLUMNS = [
+  'fullCode',
+  'preClose',
+  'suspendFlag',
+  'openInterest',
+  'settle',
+  'effectiveDividendType',
+  'nativePeriod',
+];
+
+@Injectable()
+export class QmtSource implements ISourceFetcher<QmtResponse> {
+  private readonly axios: AxiosInstance;
+  private readonly logger = new Logger(QmtSource.name);
+  private readonly baseUrl: string;
+
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly utilsService: UtilsService,
+    private readonly periodMappingService: PeriodMappingService,
+    private readonly typeOrmDataSource: TypeOrmDataSource,
+  ) {
+    this.baseUrl =
+      this.configService.get<string>('QMT_BASE_URL') || 'http://127.0.0.1:9002';
+    this.axios = this.utilsService.createAxiosInstance({
+      baseURL: this.baseUrl,
+      timeout: DATASOURCE_HTTP_TIMEOUT_MS,
+    });
+  }
+
+  async fetchK(params: KFetchParams): Promise<QmtResponse[]> {
+    const { formatCode, period, startDate, endDate } = params;
+    const nativePeriod = this.periodMappingService.toSourceFormat(
+      period,
+      DataSource.QMT,
+    );
+
+    try {
+      const response = await this.axios.post<QmtEnvelope<QmtBarsResponseData>>(
+        '/v1/bars/query',
+        {
+          fields: QMT_DEFAULT_FIELDS,
+          stock_list: [formatCode],
+          period: nativePeriod,
+          start_time: this.formatRequestTime(startDate, period),
+          end_time: this.formatRequestTime(endDate, period),
+          count: -1,
+          dividend_type: QMT_CANONICAL_DIVIDEND_TYPE,
+          fill_data: true,
+          include_raw: false,
+        },
+      );
+      const envelope = response.data;
+
+      if (!envelope?.ok) {
+        this.throwEnvelopeError(envelope, 'QMT bars query failed');
+      }
+      if (!envelope.data?.marketData) {
+        throw new HttpException(
+          'Invalid normalized QMT bars response',
+          HttpStatus.BAD_GATEWAY,
+        );
+      }
+
+      const symbolData = envelope.data.marketData[formatCode];
+      if (!symbolData) {
+        return [];
+      }
+
+      return this.mapSymbolMarketData(
+        symbolData,
+        formatCode,
+        period,
+        nativePeriod,
+      );
+    } catch (error) {
+      this.logger.error(`QMT fetchK error: ${error.message}`);
+      if (error instanceof HttpException) {
+        throw error;
+      }
+      throw new HttpException(
+        `Failed to fetch QMT data: ${error.message}`,
+        HttpStatus.BAD_GATEWAY,
+      );
+    }
+  }
+
+  async saveK(
+    data: QmtResponse[],
+    security: Security,
+    period: Period,
+  ): Promise<void> {
+    if (data.length === 0) return;
+
+    await this.typeOrmDataSource.transaction(async (manager) => {
+      const sourceConfig = security.sourceConfigs?.find(
+        (sc) => sc.source === DataSource.QMT,
+      );
+      const formatCode = sourceConfig?.formatCode || security.code;
+
+      const savedKByTimestamp = await saveBaseK(
+        manager,
+        data,
+        security,
+        DataSource.QMT,
+        period,
+      );
+
+      const extensions = data
+        .map((d) => {
+          const k = savedKByTimestamp.get(d.timestamp.getTime());
+          if (!k) return null;
+
+          return manager.create(KExtensionQmt, {
+            ...this.buildExtensionPayload(k, d.extensions, formatCode),
+            kId: k.id,
+          });
+        })
+        .filter((extension): extension is KExtensionQmt => extension != null);
+
+      if (extensions.length === 0) {
+        return;
+      }
+
+      const extensionValues = extensions.map((extension) => ({
+        kId: extension.kId,
+        fullCode: extension.fullCode,
+        preClose: extension.preClose,
+        openInterest: extension.openInterest,
+        suspendFlag: extension.suspendFlag,
+        settle: extension.settle,
+        effectiveDividendType: extension.effectiveDividendType,
+        nativePeriod: extension.nativePeriod,
+      }));
+
+      await manager
+        .createQueryBuilder()
+        .insert()
+        .into(KExtensionQmt)
+        .values(extensionValues)
+        .orUpdate(QMT_EXTENSION_UPSERT_COLUMNS, ['k_id'])
+        .updateEntity(false)
+        .execute();
+    });
+  }
+
+  isSupportedPeriod(period: Period): boolean {
+    return this.periodMappingService.isSupported(period, DataSource.QMT);
+  }
+
+  private formatRequestTime(date: Date, period: Period): string {
+    const pattern = period < Period.DAY ? 'yyyyMMddHHmmss' : 'yyyyMMdd';
+    return formatInTimeZone(date, MARKET_TIME_ZONE, pattern);
+  }
+
+  private mapSymbolMarketData(
+    symbolData: QmtSymbolMarketData,
+    formatCode: string,
+    period: Period,
+    nativePeriod: string,
+  ): QmtResponse[] {
+    return this.getRowKeys(symbolData)
+      .map((rowKey) =>
+        this.mapRow(symbolData, rowKey, formatCode, period, nativePeriod),
+      )
+      .filter((row): row is QmtResponse => row != null)
+      .sort(
+        (left, right) => left.timestamp.getTime() - right.timestamp.getTime(),
+      );
+  }
+
+  private mapRow(
+    symbolData: QmtSymbolMarketData,
+    rowKey: string,
+    formatCode: string,
+    period: Period,
+    nativePeriod: string,
+  ): QmtResponse | null {
+    const open = this.readNumber(symbolData, ['open'], rowKey);
+    const high = this.readNumber(symbolData, ['high'], rowKey);
+    const low = this.readNumber(symbolData, ['low'], rowKey);
+    const close = this.readNumber(symbolData, ['close'], rowKey);
+    const volume = this.readNumber(symbolData, ['volume'], rowKey);
+
+    if (
+      open == null ||
+      high == null ||
+      low == null ||
+      close == null ||
+      volume == null
+    ) {
+      return null;
+    }
+
+    const rawTimestamp =
+      this.readValue(symbolData, ['stime', 'time'], rowKey) ?? rowKey;
+    const timestamp = this.parseQmtTimestamp(rawTimestamp);
+    const amount = this.readNumber(symbolData, ['amount'], rowKey) ?? 0;
+    const extensions = this.buildMappedExtension(
+      symbolData,
+      rowKey,
+      formatCode,
+      nativePeriod,
+    );
+
+    return {
+      timestamp,
+      open,
+      high,
+      low,
+      close,
+      volume,
+      amount,
+      period,
+      extensions,
+    };
+  }
+
+  private buildMappedExtension(
+    symbolData: QmtSymbolMarketData,
+    rowKey: string,
+    formatCode: string,
+    nativePeriod: string,
+  ): QmtExtension {
+    const extension: QmtExtension = {
+      fullCode: formatCode,
+      effectiveDividendType: QMT_CANONICAL_DIVIDEND_TYPE,
+      nativePeriod,
+    };
+    this.assignNumber(extension, 'preClose', symbolData, ['preClose'], rowKey);
+    this.assignNumber(
+      extension,
+      'openInterest',
+      symbolData,
+      ['openInterest'],
+      rowKey,
+    );
+    this.assignNumber(
+      extension,
+      'suspendFlag',
+      symbolData,
+      ['suspendFlag'],
+      rowKey,
+    );
+    this.assignNumber(
+      extension,
+      'settle',
+      symbolData,
+      ['settle', 'settlementPrice', 'settelementPrice'],
+      rowKey,
+    );
+    return extension;
+  }
+
+  private assignNumber(
+    extension: QmtExtension,
+    field: keyof Pick<
+      QmtExtension,
+      'preClose' | 'openInterest' | 'suspendFlag' | 'settle'
+    >,
+    symbolData: QmtSymbolMarketData,
+    aliases: string[],
+    rowKey: string,
+  ): void {
+    const value = this.readNumber(symbolData, aliases, rowKey);
+    if (value != null) {
+      extension[field] = value;
+    }
+  }
+
+  private getRowKeys(symbolData: QmtSymbolMarketData): string[] {
+    const keys = new Set<string>();
+    for (const field of ['open', 'high', 'low', 'close', 'volume']) {
+      const column = symbolData[field];
+      if (Array.isArray(column)) {
+        column.forEach((_, index) => keys.add(String(index)));
+      } else if (this.isRecord(column)) {
+        Object.keys(column).forEach((key) => keys.add(key));
+      }
+    }
+    return Array.from(keys);
+  }
+
+  private readNumber(
+    symbolData: QmtSymbolMarketData,
+    aliases: string[],
+    rowKey: string,
+  ): number | null {
+    const value = this.readValue(symbolData, aliases, rowKey);
+    if (value == null || value === '') {
+      return null;
+    }
+    const numeric = Number(value);
+    return Number.isFinite(numeric) ? numeric : null;
+  }
+
+  private readValue(
+    symbolData: QmtSymbolMarketData,
+    aliases: string[],
+    rowKey: string,
+  ): unknown {
+    for (const alias of aliases) {
+      const column = symbolData[alias];
+      const value = this.readColumnValue(column, rowKey);
+      if (value != null) {
+        return value;
+      }
+    }
+    return undefined;
+  }
+
+  private readColumnValue(column: QmtFieldColumn, rowKey: string): unknown {
+    if (Array.isArray(column)) {
+      return column[Number(rowKey)];
+    }
+    if (this.isRecord(column)) {
+      return column[rowKey];
+    }
+    return undefined;
+  }
+
+  private parseQmtTimestamp(value: unknown): Date {
+    const text = String(value ?? '').trim();
+    if (/^\d{8}$/.test(text)) {
+      return parseISO(
+        `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}T00:00:00+08:00`,
+      );
+    }
+    if (/^\d{14}$/.test(text)) {
+      return parseISO(
+        `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}T${text.slice(8, 10)}:${text.slice(10, 12)}:${text.slice(12, 14)}+08:00`,
+      );
+    }
+    if (/^\d{4}-\d{2}-\d{2}\s+\d{2}:\d{2}:\d{2}$/.test(text)) {
+      return parseISO(text.replace(' ', 'T') + '+08:00');
+    }
+    return parseISO(text);
+  }
+
+  private buildExtensionPayload(
+    k: K,
+    ext: QmtExtension | undefined,
+    fallbackFullCode: string,
+  ): Partial<KExtensionQmt> {
+    return {
+      k,
+      fullCode: ext?.fullCode ?? fallbackFullCode,
+      preClose: ext?.preClose ?? null,
+      suspendFlag: ext?.suspendFlag ?? null,
+      openInterest: ext?.openInterest ?? null,
+      settle: ext?.settle ?? null,
+      effectiveDividendType:
+        ext?.effectiveDividendType ?? QMT_CANONICAL_DIVIDEND_TYPE,
+      nativePeriod: ext?.nativePeriod ?? null,
+    };
+  }
+
+  private throwEnvelopeError(
+    envelope: QmtEnvelope<unknown> | undefined,
+    fallbackMessage: string,
+  ): never {
+    const code = envelope?.error?.code || 'QMT_HTTP_ERROR';
+    const message = envelope?.error?.message || fallbackMessage;
+    throw new HttpException(`${code}: ${message}`, HttpStatus.BAD_GATEWAY);
+  }
+
+  private isRecord(value: unknown): value is Record<string, unknown> {
+    return value != null && typeof value === 'object' && !Array.isArray(value);
+  }
+}

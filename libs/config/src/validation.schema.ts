@@ -42,9 +42,9 @@ export const mistEnvSchema = commonEnvSchema.append({
   redis_server_db: Joi.number().default(0),
 
   // Data source configuration
-  // Accepts enum values ('ef', 'tdx', 'mqmt') or enum keys ('EAST_MONEY', 'TDX', 'MINI_QMT')
+  // Accepts enum values ('ef', 'tdx', 'qmt') or enum keys ('EAST_MONEY', 'TDX', 'QMT')
   DEFAULT_DATA_SOURCE: Joi.string()
-    .valid('ef', 'tdx', 'mqmt', 'EAST_MONEY', 'TDX', 'MINI_QMT')
+    .valid('ef', 'tdx', 'qmt', 'EAST_MONEY', 'TDX', 'QMT')
     .default('ef')
     .description('Default data source for queries (enum value or key)'),
 
@@ -72,9 +72,16 @@ export const mistEnvSchema = commonEnvSchema.append({
     .default(30000)
     .description('TDX WebSocket heartbeat interval in milliseconds'),
 
+  // QMT historical bars datasource configuration
+  QMT_BASE_URL: Joi.string()
+    .uri()
+    .optional()
+    .description('QMT data source base URL (mist-qmt-datasource service)'),
+
+  // QMT realtime streaming remains a separate, unverified chain.
   QMT_WS_CLIENT_ID: Joi.string()
     .default('mist-backend-qmt')
-    .description('WebSocket client ID for miniQMT data source connection'),
+    .description('WebSocket client ID for QMT realtime data source connection'),
 });
 
 /**

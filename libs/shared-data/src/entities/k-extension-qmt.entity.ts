@@ -1,0 +1,95 @@
+import {
+  Column,
+  CreateDateColumn,
+  UpdateDateColumn,
+  Entity,
+  JoinColumn,
+  OneToOne,
+  PrimaryGeneratedColumn,
+  Index,
+} from 'typeorm';
+import { K } from './k.entity';
+
+/**
+ * Market data extension entity for QMT data source.
+ * Contains additional fields specific to QMT native market data.
+ */
+@Entity({
+  name: 'k_extensions_qmt',
+})
+export class KExtensionQmt {
+  @PrimaryGeneratedColumn()
+  id!: number;
+
+  @Index({ unique: true })
+  @OneToOne(() => K, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'k_id' })
+  k!: K;
+
+  @Column({ name: 'k_id', select: false })
+  kId!: number;
+
+  @Column({
+    type: 'varchar',
+    length: 20,
+    nullable: true,
+    comment: '完整代号',
+  })
+  fullCode: string = '';
+
+  @Column({
+    type: 'decimal',
+    precision: 20,
+    scale: 6,
+    nullable: true,
+    comment: '昨收价',
+  })
+  preClose: number | null = null;
+
+  @Column({
+    type: 'int',
+    nullable: true,
+    comment: '停牌标记',
+  })
+  suspendFlag: number | null = null;
+
+  @Column({
+    type: 'decimal',
+    precision: 20,
+    scale: 4,
+    nullable: true,
+    comment: '持仓量',
+  })
+  openInterest: number | null = null;
+
+  @Column({
+    type: 'decimal',
+    precision: 20,
+    scale: 6,
+    nullable: true,
+    comment: '结算价',
+  })
+  settle: number | null = null;
+
+  @Column({
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+    comment: '实际复权口径',
+  })
+  effectiveDividendType: string | null = null;
+
+  @Column({
+    type: 'varchar',
+    length: 16,
+    nullable: true,
+    comment: 'QMT 原生周期',
+  })
+  nativePeriod: string | null = null;
+
+  @CreateDateColumn({ name: 'create_time' })
+  createTime!: Date;
+
+  @UpdateDateColumn({ name: 'update_time' })
+  updateTime!: Date;
+}
