@@ -22,7 +22,6 @@ build/
 coverage/
 .nyc_output/
 test-results/
-test-data/
 *.log
 
 # Build output and local workflow state

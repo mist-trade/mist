@@ -1,19 +1,19 @@
 # Chan Application
 
-缠论（Chan Theory）测试与调试入口 - 提供 K 线合并、笔计算、中枢识别的测试接口。
+缠论（Chan Theory）算法与 API 服务 - 提供 K 线合并、笔计算、中枢识别的接口。
 
 ## 功能特性
 
 - **K 线合并（Merge K）**：基于包含关系对连续 K 线进行分组
 - **笔识别（Bi Recognition）**：识别显著价格变动，使用 4 步递归算法
 - **中枢识别（Channel Detection）**：检测 5 笔中枢及延伸逻辑
-- **测试数据管理**：支持多种测试数据集和结果验证
+
+> 注：缠论回归测试已迁移到前端（`mist-fe/__fixtures__/`），后端只保留纯算法单元测试。
 
 ## 前置要求
 
 - Node.js (v18+)
 - MySQL 数据库
-- 测试数据文件（位于 `test-data/` 目录）
 
 ## 安装
 
@@ -58,24 +58,11 @@ pnpm run start:prod:chan
 
 ## 测试
 
-### 运行特定测试
+### 运行算法单元测试
 
 ```bash
-# 上证指数 2024-2025 测试
-pnpm run test:chan:shanghai-2024-2025
-
-# 所有缠论测试
+# 所有缠论单元测试
 pnpm run test -- chan
-```
-
-### 测试数据同步
-
-```bash
-# 运行测试并同步到前端
-pnpm run test:full
-
-# 仅同步（不运行测试）
-pnpm run test:sync
 ```
 
 ## 缠论算法说明
@@ -115,10 +102,6 @@ pnpm run test:sync
 - 中枢识别参数
 
 ## 故障排查
-
-### 测试数据未找到
-
-确保测试数据文件在 `test-data/fixtures/k-line/` 目录下。
 
 ### 中枢识别结果异常
 

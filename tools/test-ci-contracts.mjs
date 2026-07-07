@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { execFileSync } from 'node:child_process';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 
 const workspaceRoot = resolve(
@@ -121,43 +121,6 @@ function assertBackendJestHygiene(packageJson) {
     if (!collectCoverageFrom.includes(expected)) {
       fail(`mist jest.collectCoverageFrom must include ${expected}`);
     }
-  }
-
-  const testPathIgnorePatterns = jestConfig.testPathIgnorePatterns ?? [];
-  const ignoresChanArchive = testPathIgnorePatterns.some((pattern) =>
-    pattern.includes('apps/mist/src/chan/test/archive'),
-  );
-  if (!ignoresChanArchive) {
-    fail('mist jest.testPathIgnorePatterns must ignore Chan test archive');
-  }
-
-  const chanTestDir = join(repos.mist, 'apps/mist/src/chan/test');
-  const julyDiagnosticSpecs = [
-    'july-2025-analysis.spec.ts',
-    'july-2025-bi0-analysis.spec.ts',
-    'july-2025-final-analysis.spec.ts',
-    'july-2025-rollback-analysis.spec.ts',
-    'july-2025-rollback-trace.spec.ts',
-    'july-2025-root-cause.spec.ts',
-    'july-29-aug-01-check.spec.ts',
-    'wide-bi-july-2025.spec.ts',
-  ];
-  const directJulyDiagnostics = readdirSync(chanTestDir).filter((name) =>
-    julyDiagnosticSpecs.includes(name),
-  );
-  if (directJulyDiagnostics.length > 0) {
-    fail(
-      `mist Chan July diagnostic specs must live under test/archive: ${directJulyDiagnostics.join(', ')}`,
-    );
-  }
-
-  const missingArchivedDiagnostics = julyDiagnosticSpecs.filter(
-    (name) => !existsSync(join(chanTestDir, 'archive', `${name}.archive`)),
-  );
-  if (missingArchivedDiagnostics.length > 0) {
-    fail(
-      `mist Chan July diagnostic specs must be preserved with .archive suffix: ${missingArchivedDiagnostics.join(', ')}`,
-    );
   }
 }
 

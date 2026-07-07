@@ -32,10 +32,6 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:chan:shanghai-2024-2025": "jest shanghai-index-2024-2025",
-    "test:sync": "node tools/sync-test-data.mjs",
-    "test:gen-types": "node tools/generate-type-definitions.mjs",
-    "test:full": "pnpm run test && pnpm run test:sync",
     "prepare": "husky"
   },
   "lint-staged": {
@@ -118,9 +114,6 @@
     ],
     "coverageDirectory": "./coverage",
     "testEnvironment": "node",
-    "testPathIgnorePatterns": [
-      "<rootDir>/apps/mist/src/chan/test/archive/"
-    ],
     "roots": [
       "<rootDir>/apps/",
       "<rootDir>/libs/"
@@ -131,8 +124,7 @@
       "^@app/timezone(|/.*)$": "<rootDir>/libs/timezone/src/$1",
       "^@app/shared-data(|/.*)$": "<rootDir>/libs/shared-data/src/$1",
       "^@app/constants(|/.*)$": "<rootDir>/libs/constants/src/$1",
-      "^@app/data-collector(|/.*)$": "<rootDir>/apps/mist/src/data-collector/$1",
-      "^@test-data(|/.*)$": "<rootDir>/test-data/$1"
+      "^@app/data-collector(|/.*)$": "<rootDir>/apps/mist/src/data-collector/$1"
     }
   },
   "pkg": {

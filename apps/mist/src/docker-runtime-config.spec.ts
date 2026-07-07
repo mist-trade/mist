@@ -59,7 +59,6 @@ describe('backend Docker runtime config', () => {
       'openspec/',
       '.claude/',
       '.codex/',
-      'test-data/',
       'docs/',
       'tools/**',
       'deploy/**',
