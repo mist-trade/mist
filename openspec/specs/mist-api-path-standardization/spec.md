@@ -1,0 +1,69 @@
+## Purpose
+
+Define Mist backend API path conventions for version-first product routes,
+legacy compatibility aliases, deployment gateway prefix boundaries, and stable
+collector/datasource route assumptions.
+
+## Requirements
+
+### Requirement: New Preferred Paths Shall Use Version First
+
+Mist backend business APIs SHALL expose preferred paths using the
+`/v1/<resource>` style.
+
+#### Scenario: Preferred security paths are inspected
+
+- **WHEN** the backend route metadata is inspected
+- **THEN** security management MUST expose `/v1/securities`,
+  `/v1/securities/:code`, `/v1/security-sources`, and
+  `/v1/securities/:code/sources` routes
+
+#### Scenario: Preferred analysis paths are inspected
+
+- **WHEN** the backend route metadata is inspected
+- **THEN** indicator routes MUST expose `/v1/indicators/*` paths
+- **AND** Chan routes MUST expose `/v1/chan/*` paths
+
+### Requirement: Legacy Paths Shall Remain Compatible
+
+Existing Mist backend business paths SHALL remain available while clients are
+migrated to preferred `/v1` paths.
+
+#### Scenario: Legacy security paths are inspected
+
+- **WHEN** route compatibility is checked
+- **THEN** existing `/security/v1/*` routes MUST remain registered
+
+#### Scenario: Legacy analysis paths are inspected
+
+- **WHEN** route compatibility is checked
+- **THEN** existing `/indicator/*` and `/chan/*` routes MUST remain registered
+
+### Requirement: Gateway Prefixes Shall Remain Deployment Concerns
+
+Backend controllers SHALL NOT include production gateway prefixes in route
+definitions.
+
+#### Scenario: Preferred backend route is documented
+
+- **WHEN** a preferred backend path is documented or tested
+- **THEN** it MUST use the service-local path such as `/v1/securities`
+- **AND** it MUST NOT include `/api/mist` or `/api/chan` as part of the
+  controller path
+
+### Requirement: Collector And Datasource Routes Shall Remain Stable
+
+This compatibility change SHALL NOT rename collector or datasource normalized
+routes.
+
+#### Scenario: Collector path is inspected
+
+- **WHEN** this change is applied
+- **THEN** `/v1/collector/collect` MUST remain the collection endpoint
+
+#### Scenario: Datasource route assumptions are inspected
+
+- **WHEN** this change is applied
+- **THEN** datasource normalized routes such as `/v1/bars/query` and
+  `/v1/snapshots/query` MUST remain outside the Mist backend controller
+  migration scope
