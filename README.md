@@ -349,20 +349,21 @@ pnpm run build
 
 ### 主要端点
 
-新业务 API 优先使用 `/v1/<resource>` 风格。历史路径继续保留为兼容入口，
-生产网关前缀 `/api/mist`、`/api/chan` 由部署层添加，不写入后端控制器路径。
+业务 API 使用 `/v1/<resource>` 风格；旧的 `/security/v1/*`、`/indicator/*`
+和 `/chan/*` 路径不再注册。生产网关前缀 `/api/mist`、`/api/chan` 由部署层
+添加，不写入后端控制器路径。
 
-| 首选端点              | 方法 | 兼容端点          | 描述         |
-| --------------------- | ---- | ----------------- | ------------ |
-| `/app/hello`          | GET  | -                 | 健康检查     |
-| `/v1/indicators/k`    | POST | `/indicator/k`    | K 线数据获取 |
-| `/v1/indicators/macd` | POST | `/indicator/macd` | MACD 计算    |
-| `/v1/indicators/rsi`  | POST | `/indicator/rsi`  | RSI 计算     |
-| `/v1/indicators/kdj`  | POST | `/indicator/kdj`  | KDJ 计算     |
-| `/v1/chan/merge-k`    | POST | `/chan/merge-k`   | K 线合并     |
-| `/v1/chan/bi`         | POST | `/chan/bi`        | 笔识别       |
-| `/v1/chan/channel`    | POST | `/chan/channel`   | 中枢识别     |
-| `/v1/chan/fenxing`    | POST | `/chan/fenxing`   | 分型识别     |
+| 端点                  | 方法 | 描述         |
+| --------------------- | ---- | ------------ |
+| `/app/hello`          | GET  | 健康检查     |
+| `/v1/indicators/k`    | POST | K 线数据获取 |
+| `/v1/indicators/macd` | POST | MACD 计算    |
+| `/v1/indicators/rsi`  | POST | RSI 计算     |
+| `/v1/indicators/kdj`  | POST | KDJ 计算     |
+| `/v1/chan/merge-k`    | POST | K 线合并     |
+| `/v1/chan/bi`         | POST | 笔识别       |
+| `/v1/chan/channel`    | POST | 中枢识别     |
+| `/v1/chan/fenxing`    | POST | 分型识别     |
 
 ### 统一响应格式
 
@@ -402,17 +403,17 @@ pnpm run build
 
 ### 证券与采集 API
 
-| 首选端点                          | 方法   | 兼容端点                        | 描述               |
-| --------------------------------- | ------ | ------------------------------- | ------------------ |
-| `/v1/securities`                  | POST   | `/security/v1/initialize`       | 初始化股票         |
-| `/v1/securities`                  | GET    | `/security/v1/all`              | 获取全部启用股票   |
-| `/v1/securities/:code`            | GET    | `/security/v1/:code`            | 获取股票信息       |
-| `/v1/security-sources`            | POST   | `/security/v1/sources`          | 添加/更新数据源    |
-| `/v1/security-sources`            | DELETE | `/security/v1/sources`          | 删除数据源配置     |
-| `/v1/securities/:code/sources`    | GET    | `/security/v1/:code/sources`    | 获取股票数据源配置 |
-| `/v1/securities/:code/deactivate` | PUT    | `/security/v1/:code/deactivate` | 停用股票           |
-| `/v1/securities/:code/activate`   | PUT    | `/security/v1/:code/activate`   | 启用股票           |
-| `/v1/collector/collect`           | POST   | -                               | 采集 K 线数据      |
+| 端点                              | 方法   | 描述               |
+| --------------------------------- | ------ | ------------------ |
+| `/v1/securities`                  | POST   | 初始化股票         |
+| `/v1/securities`                  | GET    | 获取全部启用股票   |
+| `/v1/securities/:code`            | GET    | 获取股票信息       |
+| `/v1/security-sources`            | POST   | 添加/更新数据源    |
+| `/v1/security-sources`            | DELETE | 删除数据源配置     |
+| `/v1/securities/:code/sources`    | GET    | 获取股票数据源配置 |
+| `/v1/securities/:code/deactivate` | PUT    | 停用股票           |
+| `/v1/securities/:code/activate`   | PUT    | 启用股票           |
+| `/v1/collector/collect`           | POST   | 采集 K 线数据      |
 
 ### 策略平台 API
 

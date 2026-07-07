@@ -1,7 +1,7 @@
 ## Purpose
 
 Define Mist backend API path conventions for version-first product routes,
-legacy compatibility aliases, deployment gateway prefix boundaries, and stable
+removed legacy aliases, deployment gateway prefix boundaries, and stable
 collector/datasource route assumptions.
 
 ## Requirements
@@ -24,20 +24,21 @@ Mist backend business APIs SHALL expose preferred paths using the
 - **THEN** indicator routes MUST expose `/v1/indicators/*` paths
 - **AND** Chan routes MUST expose `/v1/chan/*` paths
 
-### Requirement: Legacy Paths Shall Remain Compatible
+### Requirement: Legacy Business Paths Shall Not Remain Registered
 
-Existing Mist backend business paths SHALL remain available while clients are
-migrated to preferred `/v1` paths.
+Existing Mist backend business paths SHALL be removed after clients migrate to
+preferred `/v1` paths.
 
 #### Scenario: Legacy security paths are inspected
 
 - **WHEN** route compatibility is checked
-- **THEN** existing `/security/v1/*` routes MUST remain registered
+- **THEN** existing `/security/v1/*` routes MUST NOT remain registered
 
 #### Scenario: Legacy analysis paths are inspected
 
 - **WHEN** route compatibility is checked
-- **THEN** existing `/indicator/*` and `/chan/*` routes MUST remain registered
+- **THEN** existing `/indicator/*` and `/chan/*` routes MUST NOT remain
+  registered
 
 ### Requirement: Gateway Prefixes Shall Remain Deployment Concerns
 

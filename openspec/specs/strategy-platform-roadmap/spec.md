@@ -56,8 +56,9 @@ business API paths by adding `/v1/<resource>` aliases before clients migrate.
 - **WHEN** `standardize-mist-v1-api-paths` or its successor is created
 - **THEN** it MUST define `/v1` aliases for security, indicator, and Chan
   business endpoints
-- **AND** it MUST keep existing `/security/v1/*`, `/indicator/*`, and `/chan/*`
-  paths compatible until frontend, skills, smoke tests, and docs are migrated
+- **AND** after frontend, skills, smoke tests, and docs are migrated it MUST
+  remove existing `/security/v1/*`, `/indicator/*`, and `/chan/*` route
+  registrations
 
 ### Requirement: Strategy Platform Shall Use Mist For Public APIs
 

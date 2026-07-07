@@ -88,15 +88,15 @@ http://localhost:8001/api-docs
 - `GET /app/hello` - Service health check
 
 ### Chan Theory Analysis
-- `POST /chan/merge-k` - Merge K-lines based on containment
-- `POST /chan/bi` - Create Bi (strokes) from K-lines
-- `POST /chan/channel` - Create channels (Zhongshu) from Bi
+- `POST /v1/chan/merge-k` - Merge K-lines based on containment
+- `POST /v1/chan/bi` - Create Bi (strokes) from K-lines
+- `POST /v1/chan/channel` - Create channels (Zhongshu) from Bi
 
 ### Technical Indicators
-- `POST /indicator/macd` - Calculate MACD indicator
-- `POST /indicator/rsi` - Calculate RSI indicator
-- `POST /indicator/kdj` - Calculate KDJ indicator
-- `POST /indicator/k` - Get K-line data
+- `POST /v1/indicators/macd` - Calculate MACD indicator
+- `POST /v1/indicators/rsi` - Calculate RSI indicator
+- `POST /v1/indicators/kdj` - Calculate KDJ indicator
+- `POST /v1/indicators/k` - Get K-line data
 
 ## Time Periods
 

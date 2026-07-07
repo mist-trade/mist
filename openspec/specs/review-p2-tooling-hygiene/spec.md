@@ -46,6 +46,5 @@ backend security endpoint.
 #### Scenario: Index code contains an exchange suffix
 
 - **WHEN** `get_index_info.main(code="000001.SH")` runs
-- **THEN** it MUST call `MistClient.get("/security/v1/000001")`
+- **THEN** it MUST call `MistClient.get("/v1/securities/000001")`
 - **AND** it MUST return the backend response unchanged
-

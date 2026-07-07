@@ -81,7 +81,7 @@ describe('ChanController', () => {
     expect(controller).toBeDefined();
   });
 
-  describe('POST /chan/merge-k', () => {
+  describe('POST /v1/chan/merge-k', () => {
     let chanQueryDto: IndicatorQueryDto;
 
     beforeEach(() => {
@@ -192,7 +192,7 @@ describe('ChanController', () => {
     });
   });
 
-  describe('POST /chan/bi', () => {
+  describe('POST /v1/chan/bi', () => {
     let chanQueryDto: IndicatorQueryDto;
 
     beforeEach(() => {
@@ -317,7 +317,7 @@ describe('ChanController', () => {
     });
   });
 
-  describe('POST /chan/fenxing', () => {
+  describe('POST /v1/chan/fenxing', () => {
     let chanQueryDto: IndicatorQueryDto;
 
     beforeEach(() => {
@@ -352,7 +352,7 @@ describe('ChanController', () => {
     });
   });
 
-  describe('POST /chan/channel', () => {
+  describe('POST /v1/chan/channel', () => {
     let chanQueryDto: IndicatorQueryDto;
 
     beforeEach(() => {
