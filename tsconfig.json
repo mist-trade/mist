@@ -51,18 +51,11 @@
       ],
       "@app/constants/*": [
         "libs/constants/src/*"
-      ],
-      "@test-data": [
-        "test-data"
-      ],
-      "@test-data/*": [
-        "test-data/*"
       ]
     }
   },
   "include": [
     "apps/**/*",
-    "libs/**/*",
-    "test-data/**/*"
+    "libs/**/*"
   ]
 }
