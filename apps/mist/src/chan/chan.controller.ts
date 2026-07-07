@@ -13,7 +13,7 @@ import { IndicatorService } from '../indicator/indicator.service';
 import { AllExceptionsFilter } from '../filters/all-exceptions.filter';
 
 @ApiTags('chan')
-@Controller(['chan', 'v1/chan'])
+@Controller('v1/chan')
 @UseFilters(AllExceptionsFilter)
 export class ChanController {
   constructor(

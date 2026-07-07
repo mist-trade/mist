@@ -45,13 +45,13 @@ pnpm run start:prod:chan
 ## API 端点
 
 ### K 线合并
-- `POST /chan/merge-k` - 合并 K 线
+- `POST /v1/chan/merge-k` - 合并 K 线
 
 ### 笔识别
-- `POST /chan/bi` - 识别笔（4 步算法）
+- `POST /v1/chan/bi` - 识别笔（4 步算法）
 
 ### 中枢识别
-- `POST /chan/channel` - 识别中枢（5 笔最小值）
+- `POST /v1/chan/channel` - 识别中枢（5 笔最小值）
 
 ### 健康检查
 - `GET /app/hello` - 服务健康检查

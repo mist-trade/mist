@@ -57,9 +57,9 @@ If not provided, the default source for the application will be used.
 ## API Endpoints
 
 - **Health**: \`GET /app/hello\` - Health check
-- **Indicators**: \`POST /v1/indicators/*\` preferred, \`POST /indicator/*\` compatible - Technical indicators and K-line data (MACD, RSI, KDJ, K-line)
-- **Chan Theory**: \`POST /v1/chan/*\` preferred, \`POST /chan/*\` compatible - Chan Theory analysis (Merge K, Bi, Fenxing, Channel)
-- **Security**: \`GET|POST|PUT|DELETE /v1/securities*\` and \`/v1/security-sources\` preferred, \`/security/v1/*\` compatible - Security management
+- **Indicators**: \`POST /v1/indicators/*\` - Technical indicators and K-line data (MACD, RSI, KDJ, K-line)
+- **Chan Theory**: \`POST /v1/chan/*\` - Chan Theory analysis (Merge K, Bi, Fenxing, Channel)
+- **Security**: \`GET|POST|PUT|DELETE /v1/securities*\` and \`/v1/security-sources\` - Security management
 
 ## Unified Response Format
 

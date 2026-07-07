@@ -30,7 +30,7 @@ export function formatIndicator(
 }
 
 @ApiTags('indicator')
-@Controller(['indicator', 'v1/indicators'])
+@Controller('v1/indicators')
 @UseFilters(AllExceptionsFilter)
 export class IndicatorController {
   constructor(

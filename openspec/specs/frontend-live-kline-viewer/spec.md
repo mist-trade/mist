@@ -119,7 +119,8 @@ The production deployment SHALL provide a same-origin web entrypoint for the fro
 
 #### Scenario: Frontend calls Chan analysis APIs through the web gateway
 - **WHEN** the frontend requests K-line or Chan analysis data in production
-- **THEN** the request SHALL use a same-origin path such as `/api/chan/...`
+- **THEN** the request SHALL use a same-origin path such as
+  `/api/chan/v1/chan/...`
 - **AND** the web gateway SHALL proxy the request to the configured analysis service
 
 #### Scenario: Datasource remains internal

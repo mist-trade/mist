@@ -55,13 +55,13 @@ analysis queries.
 #### Scenario: User asks for MACD
 - **GIVEN** a user asks for MACD on a supported security and period
 - **WHEN** AstrBot runs the technical indicator Skill
-- **THEN** the Skill SHALL call `POST /indicator/macd`
+- **THEN** the Skill SHALL call `POST /v1/indicators/macd`
 - **AND** the response SHALL include the calculated MACD data or a clear error
 
 #### Scenario: User asks for Chan Theory analysis
 - **GIVEN** a user asks for Chan Theory analysis on a supported security and period
 - **WHEN** AstrBot runs the Chan Theory Skill
-- **THEN** the Skill SHALL call the relevant `/chan/*` endpoint
+- **THEN** the Skill SHALL call the relevant `/v1/chan/*` endpoint
 - **AND** the response SHALL include analysis data or a clear error
 
 ### Requirement: Proactive alerts shall be out of scope for the initial release
