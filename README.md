@@ -37,8 +37,7 @@ mist/
 │   ├── utils/             # 共享工具
 │   ├── shared-data/       # 数据模型
 │   ├── timezone/          # 时区处理
-│   └── constants/         # 常量定义（错误码、趋势方向等）
-└── test-data/             # 测试数据
+└── constants/             # 常量定义（错误码、趋势方向等）
 ```
 
 ### 应用模块
@@ -308,15 +307,6 @@ pnpm run test:cov
 
 # 监听模式
 pnpm run test:watch
-
-# 运行特定测试
-pnpm run test:chan:shanghai-2024-2025
-
-# 运行测试并同步到前端
-pnpm run test:full
-
-# 生成 TypeScript 类型定义
-pnpm run test:gen-types
 ```
 
 ### 数据库迁移

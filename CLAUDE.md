@@ -31,9 +31,6 @@ pnpm run test                       # Unit tests (all apps + libs)
 pnpm run test:watch                 # Watch mode
 pnpm run test:cov                   # Coverage
 pnpm run test:e2e                   # E2E tests (mist app)
-pnpm run test:chan:shanghai-2024-2025  # Specific Chan Theory test
-pnpm run test:full                  # Run tests + sync results to frontend
-pnpm run test:gen-types             # Generate TS types from JSON test results
 
 # Database migrations
 pnpm run migration:generate -- -n MigrationName
@@ -98,7 +95,6 @@ Apps reuse modules from `apps/mist/src/` via direct imports:
 @app/shared-data    → libs/shared-data/src
 @app/constants      → libs/constants/src
 @app/data-collector → apps/mist/src/data-collector
-@test-data          → test-data/
 ```
 
 ## Data Sources
@@ -129,13 +125,6 @@ All HTTP endpoints wrap responses in:
 ```json
 { "success": true/false, "code": 200, "message": "...", "data": {}, "timestamp": "...", "requestId": "..." }
 ```
-
-## Test Data
-
-- Fixtures: `test-data/fixtures/k-line/` (input data)
-- Results: `test-data/test-results/raw/` (JSON output)
-- Types: `test-data/test-results/types/` (auto-generated TS definitions)
-- Import pattern: `import { xxx } from '@test-data/results/types'`
 
 ## Code Conventions
 
