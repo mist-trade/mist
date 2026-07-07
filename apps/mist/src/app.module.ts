@@ -5,6 +5,12 @@ import {
   KExtensionQmt,
   Security,
   SecuritySourceConfig,
+  StrategyDefinition,
+  StrategyVersion,
+  StrategySignal,
+  StrategyAlertEvent,
+  BacktestRun,
+  BacktestSignalResult,
 } from '@app/shared-data';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -18,6 +24,7 @@ import { CollectorModule } from './collector/collector.module';
 import { IndicatorModule } from './indicator/indicator.module';
 import { SecurityModule } from './security/security.module';
 import { mistEnvSchema } from '@app/config';
+import { StrategyModule } from './strategy/strategy.module';
 
 @Module({
   imports: [
@@ -60,6 +67,12 @@ import { mistEnvSchema } from '@app/config';
             KExtensionQmt,
             Security,
             SecuritySourceConfig,
+            StrategyDefinition,
+            StrategyVersion,
+            StrategySignal,
+            StrategyAlertEvent,
+            BacktestRun,
+            BacktestSignalResult,
           ],
           poolSize: 10,
           connectorPackage: 'mysql2',
@@ -74,6 +87,7 @@ import { mistEnvSchema } from '@app/config';
     IndicatorModule,
     SecurityModule,
     ChanModule,
+    StrategyModule,
   ],
   controllers: [AppController],
   providers: [AppService],

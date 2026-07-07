@@ -17,8 +17,10 @@ as a standalone feature.
 - Choose declaration-first strategy rules for the first phase; arbitrary user
   code strategies remain out of scope until a later explicitly scoped change.
 - Split implementation into focused follow-up OpenSpec changes for strategy
-  definition, signal alerts, signal-level backtesting, operator UI, and later
-  portfolio-level backtesting.
+  API style standardization, strategy definition, signal alerts, signal-level
+  backtesting, operator UI, and later portfolio-level backtesting.
+- Standardize new Mist product APIs on `/v1/<resource>` paths and plan
+  compatibility aliases for older business APIs whose current paths are mixed.
 - Require each child change to state repository ownership, API/data-model
   impact, migration requirements, local validation, live-runtime relevance, and
   archive criteria.
@@ -50,6 +52,8 @@ follow-up changes.
     for strategy runners or alert delivery.
 - Future child changes will add MySQL migrations because TypeORM synchronize is
   disabled.
+- Future API changes must keep production gateway prefixes such as `/api/mist`
+  and `/api/chan` stable while normalizing backend controller paths.
 - The roadmap must avoid naming collisions with existing collector
   `DataCollectionStrategy` implementations and datasource-side TDX/QMT strategy
   identity.

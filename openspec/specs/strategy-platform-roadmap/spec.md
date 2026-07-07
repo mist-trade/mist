@@ -1,4 +1,11 @@
-## ADDED Requirements
+## Purpose
+
+Strategy platform roadmap governs Mist product expansion for strategy
+registration, realtime signal alerts, signal-level backtesting, operator UX,
+scheduled scans, and alert delivery boundaries without directly implementing
+runtime code.
+
+## Requirements
 
 ### Requirement: Strategy Platform Roadmap Shall Govern Product Expansion
 
@@ -24,6 +31,61 @@ spec-able, testable, and archivable child changes.
 - **THEN** it MUST state owner repositories, runtime impact, API or data-model
   impact, validation commands, live-runtime relevance, and archive criteria
 
+### Requirement: New Strategy APIs Shall Use Version-First Paths
+
+Strategy platform APIs SHALL use the `/v1/<resource>` backend path style and
+MUST NOT introduce feature-local version paths such as `/strategy/v1/*`.
+
+#### Scenario: Strategy API child change is created
+
+- **WHEN** a child change defines strategy registration, signal, alert, or
+  backtest endpoints
+- **THEN** the endpoints MUST use `/v1/strategies`,
+  `/v1/strategy-signals`, `/v1/strategy-alert-events`, or
+  `/v1/strategy-backtests`
+- **AND** the child change MUST keep production gateway prefixes such as
+  `/api/mist` and `/api/chan` out of controller path definitions
+
+### Requirement: Existing Business APIs Shall Be Standardized Through Aliases
+
+The roadmap SHALL include a child change that standardizes mixed existing Mist
+business API paths by adding `/v1/<resource>` aliases before clients migrate.
+
+#### Scenario: API style standardization child change is created
+
+- **WHEN** `standardize-mist-v1-api-paths` or its successor is created
+- **THEN** it MUST define `/v1` aliases for security, indicator, and Chan
+  business endpoints
+- **AND** it MUST keep existing `/security/v1/*`, `/indicator/*`, and `/chan/*`
+  paths compatible until frontend, skills, smoke tests, and docs are migrated
+
+### Requirement: Strategy Platform Shall Use Mist For Public APIs
+
+The strategy platform SHALL place public REST APIs in `apps/mist` and SHALL NOT
+make `apps/schedule` the public API owner.
+
+#### Scenario: Strategy API implementation is planned
+
+- **WHEN** a child change defines strategy registration, signal query, alert
+  acknowledgement, or backtest request endpoints
+- **THEN** the endpoint controllers MUST belong to the Mist backend API surface
+- **AND** the schedule app MUST NOT expose those public strategy endpoints
+
+### Requirement: Schedule App Shall Only Run Strategy Jobs
+
+The schedule app SHALL only host periodic strategy jobs for the strategy
+platform and SHALL consume shared strategy core services rather than owning
+strategy API or rule semantics.
+
+#### Scenario: Periodic strategy scanning is planned
+
+- **WHEN** a child change adds live strategy scanning
+- **THEN** the scan job MAY be hosted in `apps/schedule`
+- **AND** it MUST call shared strategy core services used by Mist APIs and
+  backtesting
+- **AND** it MUST NOT duplicate strategy rule evaluation logic inside the
+  schedule app
+
 ### Requirement: Shared Strategy Definition Shall Come First
 
 The first implementation child change SHALL define a shared strategy
@@ -36,6 +98,20 @@ historical signal backtesting.
 - **THEN** it MUST either depend on `add-strategy-definition-registry`
 - **OR** explicitly include the shared definition contract needed by both
   realtime and historical execution
+
+### Requirement: Strategy Platform Shall Define A Shared Landing Model
+
+The roadmap SHALL define a shared landing model for strategy definitions,
+evaluation, signals, alert events, and signal-level backtesting.
+
+#### Scenario: Strategy definition child change is created
+
+- **WHEN** `add-strategy-definition-registry` or its successor is created
+- **THEN** it MUST define `StrategyDefinition`, `StrategyVersion`,
+  `StrategyEvaluationContext`, `StrategyEvaluationResult`, `StrategySignal`,
+  `StrategyAlertEvent`, `BacktestRun`, and `BacktestSignalResult` boundaries
+- **AND** it MUST explain which boundaries are implemented immediately and
+  which are reserved for later backtest child changes
 
 ### Requirement: Initial Strategy Expressions Shall Be Declarative
 
@@ -103,6 +179,22 @@ execution simulation.
   statistics
 - **AND** it MUST exclude cash, positions, orders, fees, slippage, and portfolio
   allocation unless a later portfolio-backtesting child change is created
+
+### Requirement: Backtest Interfaces Shall Be Reserved Early
+
+The strategy definition foundation SHALL reserve backtest-facing DTO and
+service boundaries so live strategy semantics can be replayed later without a
+second rule model.
+
+#### Scenario: Strategy registry child change defines API and service shape
+
+- **WHEN** the child change defines strategy registry DTOs or services
+- **THEN** it MUST reserve a backtest request shape containing strategy version,
+  target universe, period, source, start date, and end date
+- **AND** it MUST reserve a signal-level response shape containing run status,
+  signal count, matched security count, timestamps, and signal result access
+- **AND** it MUST keep portfolio-level performance fields out of the reserved
+  first-phase interface
 
 ### Requirement: Frontend Strategy UX Shall Follow Backend Contracts
 
