@@ -6,6 +6,7 @@ import { TrendDirection } from '../enums/trend-direction.enum';
 import { BiVo } from '../vo/bi.vo';
 import { FenxingVo } from '../vo/fenxing.vo';
 import { MergedKVo } from '../vo/merged-k.vo';
+import { mergeBiSegments } from './bi-phase-b-merge.helper';
 import { collectMergedKRange, uniqueKById } from './bi-range.helper';
 
 type CompleteBiWithFenxings = BiVo & {
@@ -60,7 +61,11 @@ export class BiService {
     const phaseA = this.processCandidateBisWithRollback(candidates, data);
 
     // 阶段B: n笔合并后处理（找含invalid段的一头一尾同向笔合并）
-    const phaseB = this.mergeBiSegments(phaseA, data);
+    const phaseB = mergeBiSegments(phaseA, {
+      canMergeTwoBis: (head, tail) => this.canMergeTwoBis(head, tail),
+      mergeTwoBis: (head, tail) => this.mergeTwoBis(head, tail, data),
+      isCandidateBiValid: (bi) => this.isCandidateBiValid(bi),
+    });
 
     return { phaseA, phaseB };
   }
@@ -935,75 +940,5 @@ export class BiService {
     }
 
     return { confirmed: [...confirmed], pending: [...pending] };
-  }
-
-  // ==========================================================================
-  // 阶段B: n笔合并后处理
-  // ==========================================================================
-
-  /**
-   * 阶段B: 在阶段A输出上做 n 笔合并后处理。
-   *
-   * 从 invalid 笔触发合并（作为 head），向后找最近的同向笔作为 tail，
-   * 尝试合并（吸收中间所有笔）。valid 笔不发起合并，直接跳过。
-   * 不动点迭代直到无变化。
-   */
-  private mergeBiSegments(phaseABis: BiVo[], data: MergedKVo[]): BiVo[] {
-    const bis = [...phaseABis];
-    let changed = true;
-    let iterations = 0;
-    const maxIterations = bis.length;
-
-    while (changed && iterations < maxIterations) {
-      changed = false;
-      iterations++;
-
-      for (let headIdx = 0; headIdx < bis.length - 1; headIdx++) {
-        const head = bis[headIdx];
-        // 只从 invalid 笔触发合并
-        if (head.status !== BiStatus.Invalid) continue;
-        if (!head.startFenxing || !head.endFenxing) continue;
-
-        // 向后找同向笔 tail（逐个尝试，不满足就继续找下一个）
-        let merged = false;
-        for (let tailIdx = headIdx + 1; tailIdx < bis.length; tailIdx++) {
-          const tail = bis[tailIdx];
-          if (tail.trend !== head.trend) continue;
-          if (!tail.startFenxing || !tail.endFenxing) continue;
-
-          const middle = bis.slice(headIdx + 1, tailIdx);
-
-          // 条件: canMergeTwoBis（头尾严格嵌套）
-          if (!this.canMergeTwoBis(head, tail)) continue;
-
-          // 条件: 中间所有笔极值被包含在头尾范围内
-          if (!this.allMiddleContained(head, middle, tail)) continue;
-
-          // 合并：吸收中间所有笔
-          const mergedBi = this.mergeTwoBis(head, tail, data);
-          mergedBi.status = this.isCandidateBiValid(mergedBi)
-            ? BiStatus.Valid
-            : BiStatus.Invalid;
-          bis.splice(headIdx, tailIdx - headIdx + 1, mergedBi);
-          changed = true;
-          merged = true;
-          break; // 找到第一个满足的就合并，重新从头扫描
-        }
-        if (merged) break;
-      }
-    }
-
-    return bis;
-  }
-
-  /**
-   * 检查中间所有笔的极值是否被包含在头尾范围内。
-   * 头尾构成的范围 = [min(head底, tail底), max(head顶, tail顶)]。
-   * 每个中间笔的 highest <= rangeHigh 且 lowest >= rangeLow 才算被包含。
-   */
-  private allMiddleContained(head: BiVo, middle: BiVo[], tail: BiVo): boolean {
-    const rangeHigh = Math.max(head.highest, tail.highest);
-    const rangeLow = Math.min(head.lowest, tail.lowest);
-    return middle.every((b) => b.highest <= rangeHigh && b.lowest >= rangeLow);
   }
 }

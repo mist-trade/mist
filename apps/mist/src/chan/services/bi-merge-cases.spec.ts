@@ -208,10 +208,12 @@ describe('BiService phaseB — real data invalid bi merge', () => {
   //   up(INVALID) 07-23→07-29
   //   down(INVALID) 07-29→08-03
   //   up(valid) 08-03→08-13     ← 底3547→顶3704（两端都超过前笔，递进）
+  //   down(INVALID) 08-13→08-14
+  //   up(valid) 08-14→08-25     ← 不动点重扫后继续扩展到顶3888
   //
-  // 期望 phaseB：05-26(up valid) 和 08-13(up valid) 之间的 invalid 笔被吸收。
+  // 期望 phaseB：05-26(up valid) 到 08-25(up valid) 之间的 invalid 笔被吸收。
   //             canMergeTwoBis 成立（#25顶3613 < #29顶3704，#25底3332 < #29底3547）。
-  //             合并后 valid 笔严格交替，无两个连续 up。
+  //             合并并重新验证后继续扫描到不动点，valid 笔严格交替。
   // ==========================================================================
 
   describe('case2: 2025-05~08 oscillation — invalid as middle', () => {
@@ -249,6 +251,20 @@ describe('BiService phaseB — real data invalid bi merge', () => {
           );
         }
       }
+
+      const fixedPointUp = validInRange.find(
+        (b) =>
+          b.trend === TrendDirection.Up &&
+          new Date(b.startTime).toISOString().slice(0, 10) === '2025-05-26',
+      );
+      expect(fixedPointUp).toBeDefined();
+      expect({
+        start: new Date(fixedPointUp!.startTime).toISOString().slice(0, 10),
+        end: new Date(fixedPointUp!.endTime).toISOString().slice(0, 10),
+      }).toEqual({
+        start: '2025-05-26',
+        end: '2025-08-25',
+      });
     });
   });
 });
