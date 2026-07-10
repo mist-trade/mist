@@ -185,7 +185,8 @@ export class ChanController {
     }));
     const createBiDto: CreateBiDto = { k: kData };
     const biData = await this.chanService.createBi(createBiDto);
-    const createChannelDto: CreateChannelDto = { bi: biData };
+    // channel 用 phaseB（消化 invalid 残留后的干净序列）
+    const createChannelDto: CreateChannelDto = { bi: biData.phaseB };
     return this.channelService.createChannel(createChannelDto);
   }
 }

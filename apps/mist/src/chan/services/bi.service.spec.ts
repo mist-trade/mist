@@ -153,7 +153,7 @@ describe('BiService', () => {
   it('characterizes public getBi output for a focused merged-K fixture', () => {
     const result = service.getBi(createMergedFixture());
 
-    expect(result.map(publicBiFields)).toEqual([
+    expect(result.phaseA.map(publicBiFields)).toEqual([
       {
         trend: TrendDirection.Down,
         type: BiType.Complete,
