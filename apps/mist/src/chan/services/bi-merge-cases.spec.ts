@@ -5,7 +5,7 @@ import { BiService } from './bi.service';
 import { ChannelService } from './channel.service';
 import { KMergeService } from './k-merge.service';
 import { TrendService } from './trend.service';
-import { BiStatus } from '../enums/bi.enum';
+import { BiStatus, BiType } from '../enums/bi.enum';
 import { TrendDirection } from '../enums/trend-direction.enum';
 import { UtilsService } from '@app/utils';
 import type { MergedKVo } from '../vo/merged-k.vo';
@@ -165,14 +165,23 @@ describe('BiService phaseB — real data invalid bi merge', () => {
 
     it('phaseB contains long down bi from Oct 2024 peak', () => {
       const result = service.getBi(data);
-      const { phaseB } = result;
-
-      // 找起始于 2024-10 月的 down 笔
-      const longDown = phaseB.find(
+      const leadingInvalid = result.phaseA.find(
         (b) =>
+          b.type === BiType.Complete &&
+          b.status === BiStatus.Invalid &&
           b.trend === TrendDirection.Down &&
-          new Date(b.startTime) >= new Date('2024-10-01') &&
-          new Date(b.startTime) <= new Date('2024-10-15'),
+          new Date(b.startTime).toISOString().slice(0, 10) === '2024-10-07' &&
+          new Date(b.endTime).toISOString().slice(0, 10) === '2024-10-15',
+      );
+
+      expect(leadingInvalid).toBeDefined();
+
+      const longDown = result.phaseB.find(
+        (b) =>
+          b.status === BiStatus.Valid &&
+          b.trend === TrendDirection.Down &&
+          new Date(b.startTime).toISOString().slice(0, 10) === '2024-10-07' &&
+          new Date(b.endTime).toISOString().slice(0, 10) === '2025-01-12',
       );
 
       // 这笔的 highest 应接近 3674（10-07 顶点）
