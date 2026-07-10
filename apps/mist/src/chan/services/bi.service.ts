@@ -928,20 +928,10 @@ export class BiService {
     // 将新计算的状态写入笔中
     bi.status = isValid ? BiStatus.Valid : BiStatus.Invalid;
 
-    // 这里有confirm为0的处理，如果confirm为0的情况下，且新生成的笔是有效笔的情况下，需要把pending的内容区域清空处理
-    if (!isValid) {
+    if (isValid && pending.length === 0) {
+      confirmed.push(bi);
+    } else {
       pending.push(bi);
-    }
-
-    if (isValid) {
-      if (confirmed.length === 0 && pending.length > 0) {
-        pending = [];
-        confirmed.push(bi);
-      } else if (pending.length === 0) {
-        confirmed.push(bi);
-      } else {
-        pending.push(bi);
-      }
     }
 
     return { confirmed: [...confirmed], pending: [...pending] };
