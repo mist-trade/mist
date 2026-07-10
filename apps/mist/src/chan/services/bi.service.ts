@@ -15,6 +15,17 @@ type CompleteBiWithFenxings = BiVo & {
 type ThreeBiPattern = 'up-down-up' | 'down-up-down';
 type BiSourceTag = 'pending' | 'confirmed' | 'none';
 
+/**
+ * 两阶段合并结果：
+ * - phaseA: 三笔合并输出（valid + invalid 残留混合）
+ * - phaseB: n笔合并后处理输出（消化 invalid 残留后的干净序列）
+ * 前端叠加渲染：phaseA 实线，phaseB 淡色线。
+ */
+export interface BiTwoPhaseResult {
+  phaseA: BiVo[];
+  phaseB: BiVo[];
+}
+
 @Injectable()
 export class BiService {
   /**
@@ -35,7 +46,7 @@ export class BiService {
    * @param data 合并K线数据
    * @returns 识别出的笔数组，保证趋势交替
    */
-  getBi(data: MergedKVo[]): BiVo[] {
+  getBi(data: MergedKVo[]): BiTwoPhaseResult {
     // 步骤1: 识别所有顶底分型
     const allFenxings = this.getAllRawFenxings(data);
 
@@ -45,10 +56,13 @@ export class BiService {
     // 步骤3: 生成候选笔
     const candidates = this.generateCandidateBis(alternatingFenxings, data);
 
-    // 步骤4: 递推状态机处理
-    const bis = this.processCandidateBisWithRollback(candidates, data);
+    // 阶段A: 三笔合并状态机（去掉批处理，invalid残留留给阶段B消化）
+    const phaseA = this.processCandidateBisWithRollback(candidates, data);
 
-    return bis;
+    // 阶段B: n笔合并后处理（找含invalid段的一头一尾同向笔合并）
+    const phaseB = this.mergeBiSegments(phaseA, data);
+
+    return { phaseA, phaseB };
   }
 
   /**
@@ -377,24 +391,6 @@ export class BiService {
       bi2From,
     );
 
-    // 检查pending中的笔的数量是否超过了3笔
-    if (pending.length >= 3) {
-      // 说明里面堆积的候选笔很多，这里就要判断是否能够一口气直接合并
-      // 首先判断起点是否能从pending数组开始
-      const pendingResult = this.handleTwoBiInPending(pending, bi3, data);
-      if (pendingResult.status === 'merge') {
-        this.removeBiByIndex(pending, pendingResult.startIndex);
-        return this.pushBi(pending, confirmed, pendingResult.bi);
-      }
-      // 再判断起点是否能从confirm数组开始
-      const confirmedResult = this.handleTwoBiInConfirmed(confirmed, bi3, data);
-      if (confirmedResult.status === 'merge') {
-        this.removeBiByIndex(confirmed, confirmedResult.startIndex);
-        return this.pushBi(pending, confirmed, confirmedResult.bi);
-      }
-      // 如果这里都不满足的话，那么就继续继续向下看
-    }
-
     // 常规情况只做三笔合并判断
     if (bi1 && bi2 && bi3) {
       const bi1Valid = bi1.status === BiStatus.Valid;
@@ -577,90 +573,6 @@ export class BiService {
         );
       default:
         return false;
-    }
-  }
-
-  private findStartBiInPending(pending: BiVo[], bi: BiVo): number {
-    let index = -1;
-    for (let i = 0; i < pending.length; i++) {
-      const candidate = pending[i];
-      if (candidate.trend !== bi.trend) continue;
-      if (this.canMergeTwoBis(candidate, bi)) {
-        index = i;
-        break;
-      }
-    }
-
-    return index;
-  }
-  /**
-   * 处理两笔在pending数组中
-   * @param pending
-   * @param bi
-   * @param data
-   * @returns
-   */
-  private handleTwoBiInPending(
-    pending: BiVo[],
-    bi: BiVo,
-    data: MergedKVo[],
-  ): { status: 'keepAll' | 'merge'; bi: BiVo; startIndex: number } {
-    const startIndex = this.findStartBiInPending(pending, bi);
-    if (startIndex !== -1) {
-      const startBi = pending[startIndex];
-      const result = this.mergeTwoBis(startBi, bi, data);
-      return {
-        status: 'merge',
-        startIndex: startIndex,
-        bi: result,
-      };
-    }
-    // 如果没找到，那么只能保留
-    return { status: 'keepAll', bi: bi, startIndex: -1 };
-  }
-
-  /**
-   * 处理两笔在confirmed数组中
-   * @param candidate
-   * @param bi
-   * @param data
-   * @returns
-   */
-  private handleTwoBiInConfirmed(
-    confirmed: BiVo[],
-    bi: BiVo,
-    data: MergedKVo[],
-  ): { status: 'keepAll' | 'merge'; bi: BiVo; startIndex: number } {
-    // 至少得有一个长度，三笔的情况可能不存在
-    if (confirmed.length < 1) {
-      return { status: 'keepAll', bi: bi, startIndex: -1 };
-    }
-    const bi1 = confirmed[confirmed.length - 2];
-    const bi2 = confirmed[confirmed.length - 1];
-
-    // 判断bi2和bi是否是同方向的，再进行处理
-    if (bi2.trend === bi.trend) {
-      if (this.canMergeTwoBis(bi2, bi)) {
-        const result = this.mergeTwoBis(bi2, bi, data);
-        return {
-          status: 'merge',
-          bi: result,
-          startIndex: confirmed.length - 1,
-        };
-      } else {
-        return { status: 'keepAll', bi: bi, startIndex: -1 };
-      }
-    } else {
-      if (bi1 && bi2 && this.canMergeThreeBis(bi1, bi2, bi)) {
-        const result = this.mergeThreeBis(bi1, bi, data);
-        return {
-          status: 'merge',
-          bi: result,
-          startIndex: confirmed.length - 2,
-        };
-      } else {
-        return { status: 'keepAll', bi: bi, startIndex: -1 };
-      }
     }
   }
 
@@ -885,7 +797,14 @@ export class BiService {
     pending: BiVo[],
     data: MergedKVo[],
   ): BiVo[] {
-    const result = [...confirmed, ...pending];
+    // 合并 confirmed 和 pending，按 startTime 排序
+    // pending 里残留的 invalid 笔可能 startTime 比 confirmed 末尾更早，
+    // 直接追加会导致时间倒序，需按时间排序后合并
+    const result = [...confirmed, ...pending].sort((a, b) => {
+      const ta = new Date(a.startTime).getTime();
+      const tb = new Date(b.startTime).getTime();
+      return ta - tb;
+    });
 
     if (result.length === 0 && data.length > 0) {
       // 没有任何笔，但从头开始创建未完成笔
@@ -1026,5 +945,75 @@ export class BiService {
     }
 
     return { confirmed: [...confirmed], pending: [...pending] };
+  }
+
+  // ==========================================================================
+  // 阶段B: n笔合并后处理
+  // ==========================================================================
+
+  /**
+   * 阶段B: 在阶段A输出上做 n 笔合并后处理。
+   *
+   * 从 invalid 笔触发合并（作为 head），向后找最近的同向笔作为 tail，
+   * 尝试合并（吸收中间所有笔）。valid 笔不发起合并，直接跳过。
+   * 不动点迭代直到无变化。
+   */
+  private mergeBiSegments(phaseABis: BiVo[], data: MergedKVo[]): BiVo[] {
+    const bis = [...phaseABis];
+    let changed = true;
+    let iterations = 0;
+    const maxIterations = bis.length;
+
+    while (changed && iterations < maxIterations) {
+      changed = false;
+      iterations++;
+
+      for (let headIdx = 0; headIdx < bis.length - 1; headIdx++) {
+        const head = bis[headIdx];
+        // 只从 invalid 笔触发合并
+        if (head.status !== BiStatus.Invalid) continue;
+        if (!head.startFenxing || !head.endFenxing) continue;
+
+        // 向后找同向笔 tail（逐个尝试，不满足就继续找下一个）
+        let merged = false;
+        for (let tailIdx = headIdx + 1; tailIdx < bis.length; tailIdx++) {
+          const tail = bis[tailIdx];
+          if (tail.trend !== head.trend) continue;
+          if (!tail.startFenxing || !tail.endFenxing) continue;
+
+          const middle = bis.slice(headIdx + 1, tailIdx);
+
+          // 条件: canMergeTwoBis（头尾严格嵌套）
+          if (!this.canMergeTwoBis(head, tail)) continue;
+
+          // 条件: 中间所有笔极值被包含在头尾范围内
+          if (!this.allMiddleContained(head, middle, tail)) continue;
+
+          // 合并：吸收中间所有笔
+          const mergedBi = this.mergeTwoBis(head, tail, data);
+          mergedBi.status = this.isCandidateBiValid(mergedBi)
+            ? BiStatus.Valid
+            : BiStatus.Invalid;
+          bis.splice(headIdx, tailIdx - headIdx + 1, mergedBi);
+          changed = true;
+          merged = true;
+          break; // 找到第一个满足的就合并，重新从头扫描
+        }
+        if (merged) break;
+      }
+    }
+
+    return bis;
+  }
+
+  /**
+   * 检查中间所有笔的极值是否被包含在头尾范围内。
+   * 头尾构成的范围 = [min(head底, tail底), max(head顶, tail顶)]。
+   * 每个中间笔的 highest <= rangeHigh 且 lowest >= rangeLow 才算被包含。
+   */
+  private allMiddleContained(head: BiVo, middle: BiVo[], tail: BiVo): boolean {
+    const rangeHigh = Math.max(head.highest, tail.highest);
+    const rangeLow = Math.min(head.lowest, tail.lowest);
+    return middle.every((b) => b.highest <= rangeHigh && b.lowest >= rangeLow);
   }
 }
