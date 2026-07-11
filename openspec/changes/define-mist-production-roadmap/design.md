@@ -1,132 +1,233 @@
 ## Context
 
-The Mist workspace is now a multi-repository system:
+Mist is a multi-repository production system:
 
-- `mist` owns the NestJS backend, Chan API, database migrations, backend Docker
-  image, and central OpenSpec specs.
-- `mist-datasource` owns the Python TDX/QMT datasource adapter, `/v1`
-  normalized routes, WebSocket bridge, WinSW assets, and runtime smoke scripts.
-- `mist-deploy` owns the Windows Docker stack deployment, datasource
-  management workflow, TDX recovery workflow, monitoring deployment, and Mac
-  watchdog deployment.
-- `mist-fe` owns the Next.js frontend image and K-line viewer experience.
-- `mist-monitoring` owns Windows exporter, Mac watchdog, metrics, alerts, and
-  controlled action contracts.
-- `mist-skills` owns AstrBot-facing skills that call Mist APIs.
+- `mist` owns the NestJS backend, Chan APIs and algorithms, MySQL migrations,
+  backend image, and the central OpenSpec tree.
+- `mist-datasource` owns the host-side TDX and QMT datasource services and their
+  provider/runtime contracts.
+- `mist-deploy` owns Windows Docker deployment, host service management, TDX
+  recovery, monitoring deployment, and Mac watchdog deployment.
+- `mist-fe` owns the production frontend and operator-facing views.
+- `mist-monitoring` owns exporters, probes, metrics, alerts, and controlled
+  action contracts.
+- `mist-skills` owns AstrBot-facing Mist API skills.
 
-The project has enough implementation to run meaningful tests and deployments,
-but remaining work is split across active OpenSpec changes, repo-specific docs,
-and Windows-only validation steps. The roadmap must preserve this separation
-instead of hiding all follow-up work inside one broad implementation change.
+The first roadmap correctly required a production baseline and independent child
+changes, but its status was not rebased after later work completed. The
+2026-07-11 rebaseline snapshot and current dispositions are:
+
+| Change | Current state | Roadmap treatment |
+| --- | --- | --- |
+| `preview-chan-bi-phases` | completed and archived | G0 prerequisite completed; canonical phase-preview spec is synced |
+| `repair-chan-bi-overlap-rendering` | completed and archived | G1 analysis-correctness prerequisite completed with backend, frontend, and browser evidence |
+| `add-bigqmt-datasource-bridge` | 33/34, in progress | G1 native-history evidence complete; realtime smoke remains |
+| `define-mist-production-roadmap` | gate-driven rebaseline in progress | Parent roadmap for the remaining G1-G4 work |
 
 ## Goals / Non-Goals
 
 **Goals:**
 
-- Define the ordered production stabilization path for the next Mist phase.
-- Make every follow-up item independently spec-able, testable, and archivable.
-- Require each follow-up spec to state owner repositories, runtime impact,
-  verification evidence, and archive criteria.
-- Prioritize live production evidence before expanding product scope.
-- Reconcile existing active changes before starting overlapping new work.
+- Expose a single accurate, ordered production-readiness backlog.
+- Preserve completed and superseded history without presenting it as active
+  engineering work.
+- Make data correctness and live datasource evidence the first executable gate.
+- Reuse completed monitoring, guard, deployment, and AstrBot foundations when
+  defining the remaining operations work.
+- Require concrete local and live evidence before a gate is closed.
+- Keep every implementation or live-validation body of work in a focused child
+  change.
 
 **Non-Goals:**
 
-- Implement backend, datasource, deployment, frontend, monitoring, or skills
-  code in this roadmap change.
-- Replace existing capability specs such as `backend-datasource-integration`,
-  `windows-docker-appliance`, `frontend-live-kline-viewer`, or
-  `astrbot-integration`.
-- Collapse all remaining work into one omnibus implementation change.
-- Treat local unit tests as a substitute for Windows runtime validation when a
-  task depends on TDX, Docker Desktop, WinSW, or the self-hosted runner.
+- Implement any roadmap item in this parent change.
+- Duplicate the strategy-platform roadmap or reopen its completed children.
+- Treat every feature change in the repository as a production-roadmap blocker.
+- Recreate abandoned broad refactors whose remaining work now has a narrower
+  owner.
+- Mark Windows-, QMT-, TDX-, Docker-, monitoring-, or AstrBot-dependent work
+  complete from local tests alone.
 
 ## Decisions
 
-### Decision 1: Store the roadmap in the `mist` OpenSpec tree
+### Decision 1: Use ordered readiness gates
 
-The overall roadmap change lives in `mist/openspec` because `mist` already holds
-the central cross-repo capability specs and the active backend/datasource
-coordination changes.
+The roadmap uses dependency gates rather than priority labels:
 
-Alternative considered: initialize OpenSpec at the workspace root. That would
-create a second planning authority outside the existing repo history and make
-archiving unclear.
+```text
+G0 Current-state reconciliation
+  -> G1 Data and analysis path readiness
+    -> G2 Production operations readiness
+      -> G3 Frontend operator experience readiness
+        -> G4 Engineering repeatability and roadmap closure
+```
 
-Alternative considered: store the roadmap in `mist-deploy`. That would fit
-operations work but would underrepresent backend, datasource, frontend, and
-AstrBot changes.
+A later gate may be designed while an earlier gate is active, but it cannot be
+declared production-ready until the earlier gate is closed or explicitly
+accepted as deferred with its production impact documented.
 
-### Decision 2: Use this change as a parent roadmap, not an implementation plan
+### Decision 2: Keep a disposition ledger separate from executable tasks
 
-This change defines gates, decomposition rules, and evidence requirements. Each
-roadmap item enters its own OpenSpec change before coding or live validation.
+Roadmap items use these states:
 
-This keeps unrelated work from being merged together and lets production
-verification, datasource realtime behavior, guard validation, monitoring,
-frontend UX, and engineering hygiene progress independently.
+- `pending`: accepted future work with no active child change;
+- `in-progress`: owned by an active child change;
+- `blocked`: temporarily unable to proceed because named evidence or access is
+  missing;
+- `completed`: exit criteria and required evidence are satisfied;
+- `superseded`: a newer, named change or accepted runtime contract owns the
+  remaining concern;
+- `deferred`: intentionally postponed with a reason and reopening condition;
+- `dropped`: intentionally removed with a rationale.
 
-### Decision 3: Make production evidence the first gate
+Only `completed`, `superseded`, `deferred`, and `dropped` are final
+dispositions. `pending`, `in-progress`, and `blocked` remain executable backlog.
 
-The first follow-up spec should establish a known-good production evidence
-ledger: pinned backend, frontend, datasource, deploy, and monitoring refs;
-deploy output; health output; runtime smoke output; backup restore rehearsal;
-and Mac-side gateway probes.
+The current historical ledger is:
 
-Without this baseline, later changes can pass local tests while still drifting
-from the Windows API machine runtime.
+| Original roadmap area | Disposition | Evidence or replacement |
+| --- | --- | --- |
+| Production baseline | completed | `verify-mist-production-baseline` archived; refresh remains required after material G1/G2 runtime changes |
+| Broad TDX Python datasource refactor | superseded | `refactor-tdx-python-datasource` archived intentionally incomplete; focused provider and realtime work own the remaining concerns |
+| TDX/QMT provider contract alignment | completed | `align-tdx-qmt-datasource-contracts` archived with Windows baseline evidence |
+| Separate OpenSpec/branch reconciliation child | superseded | Individual archive notes and branch decisions now record the relevant dispositions |
+| Separate Windows TDX guard validation child | superseded | `add-tdx-desktop-guard` archived after the normal-management versus explicit-recovery runner split |
+| Monitoring health repair | completed | `repair-monitoring-health-alerts` archived; broader operations readiness remains G2 work |
+| Initial NapCat/AstrBot skill integration | completed | `integrate-napcat-astrbot-skills` archived; status, diagnosis, and recovery operations remain G2 work |
+| Strategy platform roadmap and children | completed, separate scope | Governed by `strategy-platform-roadmap`; not duplicated here |
+| Chan phase-preview review surface | completed | `preview-chan-bi-phases` archived with canonical phase-preview requirements synced |
+| Chan Bi overlap and zoom repair | completed | `repair-chan-bi-overlap-rendering` archived with backend, frontend, and browser evidence |
+| Frontend operator console | pending | Remains G3 after G2 contracts stabilize |
+| Tooling/build repeatability | pending re-audit | Remains G4 only for failures that still reproduce |
 
-### Decision 4: Reconcile active OpenSpec changes before overlapping work
+### Decision 3: G0 produces the authoritative current-state snapshot
 
-The active changes `add-tdx-desktop-guard`,
-`refactor-tdx-python-datasource`, and
-`align-tdx-qmt-datasource-contracts` contain useful work but no longer map
-perfectly to current code state. Follow-up specs that touch those areas must
-first either update the existing change artifacts or archive completed portions
-with explicit remaining work.
+G0 closes planning ambiguity before more child changes are created. It must:
 
-### Decision 5: Keep verification commands and archive criteria mandatory
+- archive active changes whose tasks and verification are already complete;
+- record every old roadmap item with a final or executable disposition;
+- register newly discovered active work without overwriting its artifacts;
+- keep product feature roadmaps separate from production-readiness gates; and
+- ensure `openspec list --json` reflects only real active work.
 
-Every child spec must name:
+`preview-chan-bi-phases` is archived at
+`openspec/changes/archive/2026-07-10-preview-chan-bi-phases/`.
+Its follow-up `repair-chan-bi-overlap-rendering` is archived at
+`openspec/changes/archive/2026-07-10-repair-chan-bi-overlap-rendering/` with its
+verification evidence preserved in the archive.
 
-- local validation commands;
-- live Windows validation commands when relevant;
-- manual evidence required from the Windows API machine;
-- expected clean git status;
-- exact condition that allows the child change to be archived.
+### Decision 4: G1 covers end-to-end data and analysis correctness
+
+G1 combines datasource availability with the correctness of analysis rendered
+from that data. Its Chan correctness prerequisite is complete through
+`repair-chan-bi-overlap-rendering`, and the real full-QMT native history matrix
+is complete with evidence in `add-bigqmt-datasource-bridge`. The remaining work
+is:
+
+1. Complete QMT realtime smoke before enabling realtime collection, or split and
+   explicitly defer it to a focused change while the realtime path remains
+   disabled and documented as unverified.
+2. Create `settle-tdx-realtime-contract` to choose and verify the accepted TDX
+   product behavior: snapshot fallback, normalized `bar` events, or a documented
+   staged combination.
+3. Refresh the production baseline after material G1 runtime changes so the
+   evidence ledger points to exact deployed refs and leader-path verification.
+
+G1 is closed only when none of these concerns remains implicit. A deferred
+realtime path must remain disabled or constrained exactly as its child change
+states.
+
+### Decision 5: G2 consolidates the remaining operations control plane
+
+G2 creates one focused child change, provisionally named
+`complete-production-operations-readiness`. It reuses, rather than reimplements:
+
+- deployed monitoring and watchdog foundations;
+- completed health and alert-delivery repairs;
+- normal datasource management workflows;
+- explicit TDX recovery workflows and guard contracts; and
+- the initial query-style AstrBot/Mist integration.
+
+The child change owns the remaining status, diagnosis, alert classification,
+notification, and controlled-recovery experience. It must choose the first
+supported recovery backend—runbook-only, GitHub Actions dispatch, or a local
+authenticated endpoint—and must keep read-only diagnosis separate from
+state-changing recovery.
+
+### Decision 6: G3 consumes stable operations contracts
+
+G3 retains the child name `improve-frontend-operator-console`. It starts only
+after G2 defines stable status and error contracts. Its scope is limited to:
+
+- datasource health and provider readiness;
+- last successful collection and freshness information;
+- empty-data and recoverable-error explanations;
+- same-origin backend/gateway calls rather than direct datasource access; and
+- focused tests, production build evidence, and browser verification.
+
+Strategy editing and signal/backtest UX remain owned by the separate strategy
+platform capability.
+
+### Decision 7: G4 re-audits repeatability before creating work
+
+The old roadmap named ruff, pyright, Watchman/Jest, network-fetched fonts, and
+Python dependency resolution. Those observations may have changed. G4 must
+reproduce each issue against current repository refs before creating or
+continuing `tighten-tooling-and-build-repeatability`.
+
+Fixed observations are recorded as completed or dropped. Reproducible issues
+become explicit tasks with exact commands and repository ownership. Independent
+issues may be split into smaller child changes instead of being forced into one
+tooling omnibus.
+
+### Decision 8: Child changes own implementation and evidence
+
+Every child change must state:
+
+- owning repositories and runtime components;
+- entry dependency and gate;
+- exact local validation commands;
+- required Windows, Mac, QMT, TDX, Docker, monitoring, or AstrBot evidence;
+- behavior when an external dependency is unavailable;
+- expected clean-worktree or commit/ref evidence; and
+- the condition that permits archive.
+
+If required live access is unavailable, the child remains `blocked` or is
+explicitly `deferred`; local tests alone do not silently satisfy a live gate.
 
 ## Risks / Trade-offs
 
-- Broad roadmap becomes stale -> keep tasks limited to child spec creation and
-  readiness gates, not detailed implementation steps.
-- Child specs duplicate existing active changes -> require an active-change
-  reconciliation step before creating overlapping child changes.
-- Production validation blocks on Windows access -> allow local work to be
-  proposed, but do not mark Windows-dependent child changes complete without
-  Windows evidence.
-- Monitoring and recovery actions could mutate runtime state -> keep metrics
-  read-only and route recovery through controlled action specs.
-- Frontend scope could expand before data reliability is proven -> keep product
-  UX work behind the production evidence and realtime datasource gates.
+- A parent roadmap can become stale again -> update the disposition ledger when
+  a child is created, split, archived, deferred, or replaced.
+- G1 combines datasource and analysis correctness -> keep implementation in the
+  named independent children; the gate only expresses the production dependency.
+- Operations scope can become an omnibus -> G2 defines one contract change first
+  and permits implementation splits when status, notification, and recovery have
+  independent owners.
+- External Windows/QMT evidence can block closure -> record the exact missing
+  evidence and keep affected runtime paths disabled or explicitly constrained.
+- Tooling observations can become cargo-cult backlog -> require reproduction on
+  current refs before creating tasks.
 
-## Migration Plan
+## Verification
 
-1. Create and validate this roadmap change.
-2. Use its tasks list as the backlog for child OpenSpec changes.
-3. For each child item, create a separate change with proposal, design when
-   needed, specs, and tasks.
-4. Apply, verify, and archive child changes independently.
-5. Archive this roadmap only after every child item has either been completed,
-   explicitly deferred, or replaced by a newer roadmap.
+This roadmap-only rebaseline requires:
 
-## Open Questions
+- `openspec validate define-mist-production-roadmap --strict`;
+- `openspec list --json` to confirm the active change snapshot; and
+- review of the disposition ledger against active and archived change
+  directories.
 
-- Whether the TDX realtime path should remain snapshot-only or publish
-  normalized bar events as the product realtime contract.
-- Whether `mist-datasource` should move back to `master` or keep a dedicated
-  long-lived datasource contract branch.
-- Whether frontend production builds should keep fetching Google Fonts at build
-  time or switch to local fonts for offline repeatability.
-- Which monitoring action backend should be implemented first for
-  `mist恢复tdx`: runbook-only, GitHub Actions dispatch, or a local Windows
-  authenticated endpoint.
+Application tests are not required for the roadmap document itself. Each child
+change owns the commands and live evidence needed for its runtime scope.
+
+## Archive Plan
+
+1. Close G0 and establish the authoritative active backlog.
+2. Complete or record a final disposition for every G1 item, then refresh the
+   production baseline when runtime changes require it.
+3. Complete and archive the G2 operations-readiness child.
+4. Complete, defer, or drop the G3 operator-console child with rationale.
+5. Re-audit and dispose every G4 repeatability observation.
+6. Run strict OpenSpec validation and archive this roadmap only when every item
+   has a final disposition.
