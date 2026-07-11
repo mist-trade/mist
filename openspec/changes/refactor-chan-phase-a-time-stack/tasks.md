@@ -40,6 +40,6 @@
 ## 7. 最终内联收口
 
 - [x] 7.1 重开 OpenSpec，记录“独立 helper 先验证、稳定后内联 `BiService`”的最终设计与零快照变化约束。
-- [ ] 7.2 内联 Phase A 时间栈，迁移 7 个 helper 测试场景为 service-phase 测试并删除 Phase A helper 源文件。
+- [x] 7.2 内联 Phase A 时间栈，迁移 7 个 helper 测试场景为 service-phase 测试并删除 Phase A helper 源文件。
 - [ ] 7.3 内联 Phase B invalid 区间归约，迁移 9 个 helper 测试场景为 service-phase 测试并删除 Phase B helper 源文件。
 - [ ] 7.4 运行后端、前端、OpenSpec 与差异检查，记录最终证据；change 保持未归档。

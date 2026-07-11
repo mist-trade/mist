@@ -1,12 +1,10 @@
+import { Test, TestingModule } from '@nestjs/testing';
 import { BiStatus, BiType } from '../enums/bi.enum';
 import { FenxingType } from '../enums/fenxing.enum';
 import { TrendDirection } from '../enums/trend-direction.enum';
 import type { BiVo } from '../vo/bi.vo';
 import type { FenxingVo } from '../vo/fenxing.vo';
-import {
-  reducePhaseATimeStack,
-  type PhaseATimeStackOperations,
-} from './bi-phase-a-time-stack.helper';
+import { BiService } from './bi.service';
 
 function createFenxing(index: number, type: FenxingType): FenxingVo {
   return {
@@ -53,27 +51,43 @@ function rangeKey(bi: BiVo): string {
   return `${bi.startFenxing?.middleIndex}-${bi.endFenxing?.middleIndex}`;
 }
 
-function createOperations(
-  canMerge: PhaseATimeStackOperations['canMergeThreeBis'],
-  isValid: PhaseATimeStackOperations['isCandidateBiValid'] = () => true,
-): jest.Mocked<PhaseATimeStackOperations> {
+function mockPhaseAPrimitives(
+  service: BiService,
+  canMerge: (first: BiVo, middle: BiVo, third: BiVo) => boolean,
+  isValid: (bi: BiVo) => boolean = () => true,
+) {
   return {
-    canMergeThreeBis: jest.fn(canMerge),
-    mergeThreeBis: jest.fn((first, third) => ({
-      ...first,
-      endTime: third.endTime,
-      highest: Math.max(first.highest, third.highest),
-      lowest: Math.min(first.lowest, third.lowest),
-      status: BiStatus.Unknown,
-      independentCount: first.independentCount + third.independentCount,
-      originIds: [...first.originIds, ...third.originIds],
-      endFenxing: third.endFenxing,
-    })),
-    isCandidateBiValid: jest.fn(isValid),
+    canMergeThreeBis: jest
+      .spyOn(service as any, 'canMergeThreeBis')
+      .mockImplementation(canMerge),
+    mergeThreeBis: jest
+      .spyOn(service as any, 'mergeThreeBis')
+      .mockImplementation((first: BiVo, third: BiVo) => ({
+        ...first,
+        endTime: third.endTime,
+        highest: Math.max(first.highest, third.highest),
+        lowest: Math.min(first.lowest, third.lowest),
+        status: BiStatus.Unknown,
+        independentCount: first.independentCount + third.independentCount,
+        originIds: [...first.originIds, ...third.originIds],
+        endFenxing: third.endFenxing,
+      })),
+    isCandidateBiValid: jest
+      .spyOn(service as any, 'isCandidateBiValid')
+      .mockImplementation(isValid),
   };
 }
 
-describe('reducePhaseATimeStack', () => {
+describe('BiService Phase A time-stack reduction', () => {
+  let service: BiService;
+
+  beforeEach(async () => {
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [BiService],
+    }).compile();
+    service = module.get<BiService>(BiService);
+  });
+
   it('repeats top-three reduction until the new stack top is stable', () => {
     const candidates = [
       createBi(0, 1, TrendDirection.Up, BiStatus.Valid),
@@ -83,7 +97,8 @@ describe('reducePhaseATimeStack', () => {
       createBi(4, 5, TrendDirection.Up, BiStatus.Valid),
     ];
     const allowed = new Set(['2-3|3-4|4-5', '0-1|1-2|2-5']);
-    const operations = createOperations(
+    const primitives = mockPhaseAPrimitives(
+      service,
       (first, middle, third) =>
         allowed.has(
           `${rangeKey(first)}|${rangeKey(middle)}|${rangeKey(third)}`,
@@ -91,13 +106,13 @@ describe('reducePhaseATimeStack', () => {
       (bi) => bi.startFenxing?.middleIndex === 0,
     );
 
-    const result = reducePhaseATimeStack(candidates, operations);
+    const result = service['reducePhaseATimeStack'](candidates, []);
 
     expect(result).toHaveLength(1);
     expect(rangeKey(result[0])).toBe('0-5');
     expect(result[0].status).toBe(BiStatus.Valid);
-    expect(operations.mergeThreeBis).toHaveBeenCalledTimes(2);
-    expect(operations.isCandidateBiValid).toHaveBeenCalledTimes(2);
+    expect(primitives.mergeThreeBis).toHaveBeenCalledTimes(2);
+    expect(primitives.isCandidateBiValid).toHaveBeenCalledTimes(2);
   });
 
   it('stops when the top three are all Valid', () => {
@@ -106,12 +121,12 @@ describe('reducePhaseATimeStack', () => {
       createBi(1, 2, TrendDirection.Down, BiStatus.Valid),
       createBi(2, 3, TrendDirection.Up, BiStatus.Valid),
     ];
-    const operations = createOperations(() => true);
+    const primitives = mockPhaseAPrimitives(service, () => true);
 
-    const result = reducePhaseATimeStack(candidates, operations);
+    const result = service['reducePhaseATimeStack'](candidates, []);
 
     expect(result.map(rangeKey)).toEqual(['0-1', '1-2', '2-3']);
-    expect(operations.canMergeThreeBis).not.toHaveBeenCalled();
+    expect(primitives.canMergeThreeBis).not.toHaveBeenCalled();
   });
 
   it('retains an Invalid top group when it cannot merge', () => {
@@ -120,12 +135,12 @@ describe('reducePhaseATimeStack', () => {
       createBi(1, 2, TrendDirection.Down, BiStatus.Invalid),
       createBi(2, 3, TrendDirection.Up, BiStatus.Valid),
     ];
-    const operations = createOperations(() => false);
+    const primitives = mockPhaseAPrimitives(service, () => false);
 
-    const result = reducePhaseATimeStack(candidates, operations);
+    const result = service['reducePhaseATimeStack'](candidates, []);
 
     expect(result.map(rangeKey)).toEqual(['0-1', '1-2', '2-3']);
-    expect(operations.mergeThreeBis).not.toHaveBeenCalled();
+    expect(primitives.mergeThreeBis).not.toHaveBeenCalled();
   });
 
   it('retains leading Invalid candidates', () => {
@@ -133,10 +148,8 @@ describe('reducePhaseATimeStack', () => {
       createBi(0, 1, TrendDirection.Up, BiStatus.Invalid),
       createBi(1, 2, TrendDirection.Down, BiStatus.Invalid),
     ];
-    const result = reducePhaseATimeStack(
-      candidates,
-      createOperations(() => false),
-    );
+    mockPhaseAPrimitives(service, () => false);
+    const result = service['reducePhaseATimeStack'](candidates, []);
     expect(result.map((bi) => bi.status)).toEqual([
       BiStatus.Invalid,
       BiStatus.Invalid,
@@ -148,12 +161,10 @@ describe('reducePhaseATimeStack', () => {
       createBi(0, 1, TrendDirection.Up, BiStatus.Valid),
       createBi(2, 3, TrendDirection.Down, BiStatus.Invalid),
     ];
-    expect(() =>
-      reducePhaseATimeStack(
-        candidates,
-        createOperations(() => false),
-      ),
-    ).toThrow('non-contiguous Bis 0-1 -> 2-3');
+    mockPhaseAPrimitives(service, () => false);
+    expect(() => service['reducePhaseATimeStack'](candidates, [])).toThrow(
+      'non-contiguous Bis 0-1 -> 2-3',
+    );
   });
 
   it('rejects a merged Bi that changes the outer boundary', () => {
@@ -162,11 +173,11 @@ describe('reducePhaseATimeStack', () => {
       createBi(1, 2, TrendDirection.Down, BiStatus.Invalid),
       createBi(2, 3, TrendDirection.Up, BiStatus.Valid),
     ];
-    const operations = createOperations(() => true);
-    operations.mergeThreeBis.mockImplementation(() =>
+    const primitives = mockPhaseAPrimitives(service, () => true);
+    primitives.mergeThreeBis.mockImplementation(() =>
       createBi(1, 3, TrendDirection.Up, BiStatus.Unknown),
     );
-    expect(() => reducePhaseATimeStack(candidates, operations)).toThrow(
+    expect(() => service['reducePhaseATimeStack'](candidates, [])).toThrow(
       'merged Bi 1-3 does not preserve 0-3',
     );
   });
@@ -180,10 +191,8 @@ describe('reducePhaseATimeStack', () => {
     ) as BiVo;
     const candidates = Object.freeze([first, second]);
 
-    const result = reducePhaseATimeStack(
-      candidates,
-      createOperations(() => false),
-    );
+    mockPhaseAPrimitives(service, () => false);
+    const result = service['reducePhaseATimeStack'](candidates, []);
 
     expect(candidates).toEqual([first, second]);
     expect(result[0]).not.toBe(first);
