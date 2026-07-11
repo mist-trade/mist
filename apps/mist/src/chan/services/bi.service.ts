@@ -6,7 +6,6 @@ import { TrendDirection } from '../enums/trend-direction.enum';
 import { BiVo } from '../vo/bi.vo';
 import { FenxingVo } from '../vo/fenxing.vo';
 import { MergedKVo } from '../vo/merged-k.vo';
-import { reducePhaseATimeStack } from './bi-phase-a-time-stack.helper';
 import { mergeBiSegments } from './bi-phase-b-merge.helper';
 import { collectMergedKRange, uniqueKById } from './bi-range.helper';
 
@@ -58,12 +57,7 @@ export class BiService {
     const candidates = this.generateCandidateBis(alternatingFenxings, data);
 
     // 阶段A: 单时间栈三笔归约，invalid 残留保留给阶段B消化
-    const completePhaseA = reducePhaseATimeStack(candidates, {
-      canMergeThreeBis: (first, middle, third) =>
-        this.canMergeThreeBis(first, middle, third),
-      mergeThreeBis: (first, third) => this.mergeThreeBis(first, third, data),
-      isCandidateBiValid: (bi) => this.isCandidateBiValid(bi),
-    });
+    const completePhaseA = this.reducePhaseATimeStack(candidates, data);
     const phaseA = this.buildFinalUncompleteBi(completePhaseA, data);
 
     // 阶段B: n笔合并后处理（找含invalid段的一头一尾同向笔合并）
@@ -334,6 +328,99 @@ export class BiService {
     }
 
     return candidates;
+  }
+
+  private assertPhaseATimeStackCompleteBi(
+    bi: BiVo,
+    label: string,
+  ): asserts bi is CompleteBiWithFenxings {
+    if (bi.type !== BiType.Complete || !bi.startFenxing || !bi.endFenxing) {
+      throw new Error(
+        `Phase A time stack invariant failed: ${label} must be Complete`,
+      );
+    }
+  }
+
+  private phaseATimeStackRangeOf(bi: CompleteBiWithFenxings): string {
+    return `${bi.startFenxing.middleIndex}-${bi.endFenxing.middleIndex}`;
+  }
+
+  private assertPhaseATimeStackAdjacent(
+    previous: CompleteBiWithFenxings,
+    current: CompleteBiWithFenxings,
+  ): void {
+    if (previous.endFenxing.middleIndex !== current.startFenxing.middleIndex) {
+      throw new Error(
+        `Phase A time stack invariant failed: non-contiguous Bis ${this.phaseATimeStackRangeOf(previous)} -> ${this.phaseATimeStackRangeOf(current)}`,
+      );
+    }
+  }
+
+  private assertPhaseATimeStackOuterBoundary(
+    merged: CompleteBiWithFenxings,
+    first: CompleteBiWithFenxings,
+    third: CompleteBiWithFenxings,
+  ): void {
+    const expectedStart = first.startFenxing.middleIndex;
+    const expectedEnd = third.endFenxing.middleIndex;
+    if (
+      merged.startFenxing.middleIndex !== expectedStart ||
+      merged.endFenxing.middleIndex !== expectedEnd
+    ) {
+      throw new Error(
+        `Phase A time stack invariant failed: merged Bi ${this.phaseATimeStackRangeOf(merged)} does not preserve ${expectedStart}-${expectedEnd}`,
+      );
+    }
+  }
+
+  private reducePhaseATimeStack(
+    candidates: readonly BiVo[],
+    data: MergedKVo[],
+  ): BiVo[] {
+    const stack: BiVo[] = [];
+
+    for (const sourceCandidate of candidates) {
+      const candidate: BiVo = { ...sourceCandidate };
+      this.assertPhaseATimeStackCompleteBi(candidate, 'candidate');
+
+      if (stack.length > 0) {
+        const previous = stack[stack.length - 1];
+        this.assertPhaseATimeStackCompleteBi(previous, 'stack tail');
+        this.assertPhaseATimeStackAdjacent(previous, candidate);
+      }
+      stack.push(candidate);
+
+      while (stack.length >= 3) {
+        const first = stack[stack.length - 3];
+        const middle = stack[stack.length - 2];
+        const third = stack[stack.length - 1];
+        this.assertPhaseATimeStackCompleteBi(first, 'first');
+        this.assertPhaseATimeStackCompleteBi(middle, 'middle');
+        this.assertPhaseATimeStackCompleteBi(third, 'third');
+        this.assertPhaseATimeStackAdjacent(first, middle);
+        this.assertPhaseATimeStackAdjacent(middle, third);
+
+        const allValid =
+          first.status === BiStatus.Valid &&
+          middle.status === BiStatus.Valid &&
+          third.status === BiStatus.Valid;
+        if (allValid) break;
+        if (!this.canMergeThreeBis(first, middle, third)) break;
+
+        const merged = this.mergeThreeBis(first, third, data);
+        this.assertPhaseATimeStackCompleteBi(merged, 'merged Bi');
+        this.assertPhaseATimeStackOuterBoundary(merged, first, third);
+        const replacement: BiVo = {
+          ...merged,
+          status: this.isCandidateBiValid(merged)
+            ? BiStatus.Valid
+            : BiStatus.Invalid,
+        };
+        stack.splice(stack.length - 3, 3, replacement);
+      }
+    }
+
+    return stack;
   }
 
   /**
