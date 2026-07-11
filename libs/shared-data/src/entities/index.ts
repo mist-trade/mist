@@ -9,4 +9,7 @@ export * from './strategy-version.entity';
 export * from './strategy-signal.entity';
 export * from './strategy-alert-event.entity';
 export * from './backtest-run.entity';
-export * from './backtest-signal-result.entity';
+export * from './backtest-signal.entity';
+export * from './backtest-order.entity';
+export * from './backtest-trade.entity';
+export * from './backtest-equity-point.entity';

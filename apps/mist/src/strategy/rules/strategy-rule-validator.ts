@@ -1,10 +1,11 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import {
+  StrategyRuleFieldDefinition,
   StrategyRuleOperator,
   StrategyRuleValidationSummary,
 } from './strategy-rule.types';
+import { getStrategyRuleField } from './strategy-rule-field.catalog';
 
-const ALLOWED_FIELD_ROOTS = ['k', 'indicator', 'chan', 'security'] as const;
 const ALLOWED_OPERATORS: StrategyRuleOperator[] = [
   'gt',
   'gte',
@@ -17,12 +18,21 @@ const ALLOWED_OPERATORS: StrategyRuleOperator[] = [
 ];
 const EXECUTABLE_KEYS = ['code', 'script', 'language', 'sql', 'function'];
 
+type ValidationState = {
+  fieldRoots: Set<string>;
+  operators: Set<StrategyRuleOperator>;
+  requiredLookbackBars: number;
+};
+
 @Injectable()
 export class StrategyRuleValidator {
   validate(rule: unknown): StrategyRuleValidationSummary {
-    const fieldRoots = new Set<string>();
-    const operators = new Set<StrategyRuleOperator>();
-    const conditionCount = this.visit(rule, fieldRoots, operators);
+    const state: ValidationState = {
+      fieldRoots: new Set<string>(),
+      operators: new Set<StrategyRuleOperator>(),
+      requiredLookbackBars: 0,
+    };
+    const conditionCount = this.visit(rule, state);
 
     if (conditionCount === 0) {
       throw new BadRequestException(
@@ -33,16 +43,13 @@ export class StrategyRuleValidator {
     return {
       ruleSchemaVersion: 'v1',
       conditionCount,
-      fieldRoots: [...fieldRoots].sort(),
-      operators: [...operators].sort(),
+      fieldRoots: [...state.fieldRoots].sort(),
+      operators: [...state.operators].sort(),
+      requiredLookbackBars: state.requiredLookbackBars,
     };
   }
 
-  private visit(
-    node: unknown,
-    fieldRoots: Set<string>,
-    operators: Set<StrategyRuleOperator>,
-  ): number {
+  private visit(node: unknown, state: ValidationState): number {
     if (!this.isRecord(node)) {
       throw new BadRequestException('Strategy rule nodes must be objects');
     }
@@ -50,16 +57,15 @@ export class StrategyRuleValidator {
     this.assertNoExecutableKeys(node);
 
     if ('all' in node || 'any' in node) {
-      return this.visitGroup(node, fieldRoots, operators);
+      return this.visitGroup(node, state);
     }
 
-    return this.visitCondition(node, fieldRoots, operators);
+    return this.visitCondition(node, state);
   }
 
   private visitGroup(
     node: Record<string, unknown>,
-    fieldRoots: Set<string>,
-    operators: Set<StrategyRuleOperator>,
+    state: ValidationState,
   ): number {
     const all = node.all;
     const any = node.any;
@@ -78,15 +84,14 @@ export class StrategyRuleValidator {
     }
 
     return children.reduce(
-      (count, child) => count + this.visit(child, fieldRoots, operators),
+      (count, child) => count + this.visit(child, state),
       0,
     );
   }
 
   private visitCondition(
     node: Record<string, unknown>,
-    fieldRoots: Set<string>,
-    operators: Set<StrategyRuleOperator>,
+    state: ValidationState,
   ): number {
     if (typeof node.field !== 'string' || node.field.length === 0) {
       throw new BadRequestException('Strategy condition field is required');
@@ -103,18 +108,54 @@ export class StrategyRuleValidator {
       throw new BadRequestException('Strategy condition value is required');
     }
 
-    const [root] = node.field.split('.');
-    if (
-      !ALLOWED_FIELD_ROOTS.includes(
-        root as (typeof ALLOWED_FIELD_ROOTS)[number],
-      )
-    ) {
-      throw new BadRequestException(`Unsupported strategy field root: ${root}`);
+    const field = getStrategyRuleField(node.field);
+    if (!field) {
+      throw new BadRequestException(
+        `Unsupported strategy field: ${node.field}`,
+      );
     }
 
-    fieldRoots.add(root);
-    operators.add(node.operator as StrategyRuleOperator);
+    this.assertConditionCompatibility(node, field);
+
+    const [root] = field.path.split('.');
+    state.fieldRoots.add(root);
+    state.operators.add(node.operator as StrategyRuleOperator);
+    state.requiredLookbackBars = Math.max(
+      state.requiredLookbackBars,
+      field.requiredLookbackBars,
+    );
     return 1;
+  }
+
+  private assertConditionCompatibility(
+    node: Record<string, unknown>,
+    field: StrategyRuleFieldDefinition,
+  ): void {
+    const operator = node.operator as StrategyRuleOperator;
+    if (
+      field.valueType === 'string' &&
+      operator !== 'eq' &&
+      operator !== 'neq'
+    ) {
+      throw new BadRequestException(
+        `Operator ${operator} is not supported for ${field.path}`,
+      );
+    }
+
+    if (field.valueType === 'number') {
+      if (typeof node.value !== 'number' || !Number.isFinite(node.value)) {
+        throw new BadRequestException(
+          `Strategy field ${field.path} requires a finite numeric value`,
+        );
+      }
+      return;
+    }
+
+    if (typeof node.value !== 'string') {
+      throw new BadRequestException(
+        `Strategy field ${field.path} requires a string value`,
+      );
+    }
   }
 
   private assertNoExecutableKeys(node: Record<string, unknown>): void {

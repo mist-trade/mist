@@ -2,8 +2,12 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   BacktestRun,
-  BacktestSignalResult,
+  BacktestSignal,
+  BacktestOrder,
+  BacktestTrade,
+  BacktestEquityPoint,
   K,
+  SecuritySourceConfig,
   StrategyAlertEvent,
   StrategyDefinition,
   StrategySignal,
@@ -24,8 +28,12 @@ const strategyEntities = [
   StrategySignal,
   StrategyAlertEvent,
   BacktestRun,
-  BacktestSignalResult,
+  BacktestSignal,
+  BacktestOrder,
+  BacktestTrade,
+  BacktestEquityPoint,
   K,
+  SecuritySourceConfig,
 ];
 
 const strategyProviders = [
@@ -42,6 +50,6 @@ const strategyProviders = [
 @Module({
   imports: [TypeOrmModule.forFeature(strategyEntities)],
   providers: strategyProviders,
-  exports: strategyProviders,
+  exports: [TypeOrmModule, ...strategyProviders],
 })
 export class StrategyCoreModule {}

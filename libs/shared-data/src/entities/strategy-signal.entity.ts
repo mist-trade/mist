@@ -6,6 +6,7 @@ import {
 } from 'typeorm';
 import { DataSource } from '../enums/data-source.enum';
 import { Period } from '../enums/period.enum';
+import { StrategySignalKind } from '../enums/strategy-signal-kind.enum';
 import { StrategySignalSource } from '../enums/strategy-signal-source.enum';
 
 @Entity({ name: 'strategy_signals' })
@@ -37,6 +38,14 @@ export class StrategySignal {
     enum: StrategySignalSource,
   })
   signalSource: StrategySignalSource = StrategySignalSource.LIVE;
+
+  @Column({
+    name: 'signal_kind',
+    type: 'enum',
+    enum: StrategySignalKind,
+    default: StrategySignalKind.ENTRY,
+  })
+  signalKind: StrategySignalKind = StrategySignalKind.ENTRY;
 
   @Column({ name: 'context_snapshot', type: 'json', nullable: true })
   contextSnapshot?: Record<string, unknown> | null;

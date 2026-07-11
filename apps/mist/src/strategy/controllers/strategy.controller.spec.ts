@@ -23,10 +23,16 @@ describe('StrategyController', () => {
       targetUniverse: ['600519'],
       periods: [1440],
       sources: ['tdx'],
-      rule: { field: 'k.close', operator: 'gt', value: 10 },
+      entryRule: { field: 'k.close', operator: 'gt', value: 10 },
+      exitRule: { field: 'k.close', operator: 'lt', value: 8 },
+      lookbackBars: 1,
+      backtestEnabled: false,
     } as any;
     const updateDto = {
-      rule: { field: 'k.close', operator: 'lt', value: 20 },
+      entryRule: { field: 'k.close', operator: 'gt', value: 20 },
+      exitRule: { field: 'k.close', operator: 'lt', value: 15 },
+      lookbackBars: 2,
+      backtestEnabled: true,
     } as any;
 
     await controller.create(createDto);

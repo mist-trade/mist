@@ -29,6 +29,9 @@ export class StrategyDefinition {
   })
   status: StrategyStatus = StrategyStatus.DRAFT;
 
+  @Column({ name: 'backtest_enabled', type: 'boolean', default: false })
+  backtestEnabled: boolean = false;
+
   @Column({ name: 'target_universe', type: 'json' })
   targetUniverse: string[] = [];
 

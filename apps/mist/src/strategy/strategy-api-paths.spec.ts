@@ -74,7 +74,7 @@ describe('Strategy API path registry', () => {
     expectRoute(routes, RequestMethod.GET, '/v1/strategies/:id/versions');
   });
 
-  it('registers reserved signal, alert, and backtest routes', () => {
+  it('registers signal, alert, and portfolio backtest routes', () => {
     const routes = [
       ...getRoutes(StrategySignalController),
       ...getRoutes(StrategyAlertEventController),
@@ -89,11 +89,37 @@ describe('Strategy API path registry', () => {
       '/v1/strategy-alert-events/:id/ack',
     );
     expectRoute(routes, RequestMethod.POST, '/v1/strategy-backtests');
+    expectRoute(routes, RequestMethod.GET, '/v1/strategy-backtests');
     expectRoute(routes, RequestMethod.GET, '/v1/strategy-backtests/:runId');
+    expectRoute(
+      routes,
+      RequestMethod.POST,
+      '/v1/strategy-backtests/:runId/cancel',
+    );
+    expectRoute(
+      routes,
+      RequestMethod.GET,
+      '/v1/strategy-backtests/:runId/equity',
+    );
     expectRoute(
       routes,
       RequestMethod.GET,
       '/v1/strategy-backtests/:runId/signals',
+    );
+    expectRoute(
+      routes,
+      RequestMethod.GET,
+      '/v1/strategy-backtests/:runId/orders',
+    );
+    expectRoute(
+      routes,
+      RequestMethod.GET,
+      '/v1/strategy-backtests/:runId/trades',
+    );
+    expectRoute(
+      routes,
+      RequestMethod.GET,
+      '/v1/strategy-backtests/:runId/positions',
     );
   });
 

@@ -10,7 +10,10 @@ import {
   StrategySignal,
   StrategyAlertEvent,
   BacktestRun,
-  BacktestSignalResult,
+  BacktestSignal,
+  BacktestOrder,
+  BacktestTrade,
+  BacktestEquityPoint,
 } from '@app/shared-data';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -72,7 +75,10 @@ import { StrategyModule } from './strategy/strategy.module';
             StrategySignal,
             StrategyAlertEvent,
             BacktestRun,
-            BacktestSignalResult,
+            BacktestSignal,
+            BacktestOrder,
+            BacktestTrade,
+            BacktestEquityPoint,
           ],
           poolSize: 10,
           connectorPackage: 'mysql2',

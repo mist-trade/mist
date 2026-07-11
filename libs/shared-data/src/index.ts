@@ -8,3 +8,8 @@ export * from './enums/strategy-rule-schema-version.enum';
 export * from './enums/strategy-signal-source.enum';
 export * from './enums/strategy-status.enum';
 export * from './enums/backtest-run-status.enum';
+export * from './enums/backtest-run-stage.enum';
+export * from './enums/backtest-order-side.enum';
+export * from './enums/backtest-order-status.enum';
+export * from './enums/backtest-trade-status.enum';
+export * from './enums/strategy-signal-kind.enum';
