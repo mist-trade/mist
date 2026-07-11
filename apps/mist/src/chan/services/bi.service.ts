@@ -6,6 +6,7 @@ import { TrendDirection } from '../enums/trend-direction.enum';
 import { BiVo } from '../vo/bi.vo';
 import { FenxingVo } from '../vo/fenxing.vo';
 import { MergedKVo } from '../vo/merged-k.vo';
+import { reducePhaseATimeStack } from './bi-phase-a-time-stack.helper';
 import { mergeBiSegments } from './bi-phase-b-merge.helper';
 import { collectMergedKRange, uniqueKById } from './bi-range.helper';
 
@@ -14,7 +15,6 @@ type CompleteBiWithFenxings = BiVo & {
   endFenxing: FenxingVo;
 };
 type ThreeBiPattern = 'up-down-up' | 'down-up-down';
-type BiSourceTag = 'pending' | 'confirmed' | 'none';
 
 /**
  * 两阶段合并结果：
@@ -30,13 +30,13 @@ export interface BiTwoPhaseResult {
 @Injectable()
 export class BiService {
   /**
-   * 主函数：识别笔（新算法：递推+回退）
+   * 主函数：识别笔（新算法：Phase A 单时间栈 + Phase B invalid 区间归约）
    *
    * 算法流程：
    * 1. 识别所有顶底分型
    * 2. 生成交错序列（顶底交替）
    * 3. 生成候选笔 + 宽笔过滤（>=3根K线）
-   * 4. 递推状态机处理候选笔
+   * 4. Phase A 单时间栈归约候选笔，再由 Phase B 归约 invalid 区间
    *
    * 核心优势：
    * - 不需要管理分型的复杂状态（leftValid/rightValid/erased）
@@ -57,8 +57,14 @@ export class BiService {
     // 步骤3: 生成候选笔
     const candidates = this.generateCandidateBis(alternatingFenxings, data);
 
-    // 阶段A: 三笔合并状态机（去掉批处理，invalid残留留给阶段B消化）
-    const phaseA = this.processCandidateBisWithRollback(candidates, data);
+    // 阶段A: 单时间栈三笔归约，invalid 残留保留给阶段B消化
+    const completePhaseA = reducePhaseATimeStack(candidates, {
+      canMergeThreeBis: (first, middle, third) =>
+        this.canMergeThreeBis(first, middle, third),
+      mergeThreeBis: (first, third) => this.mergeThreeBis(first, third, data),
+      isCandidateBiValid: (bi) => this.isCandidateBiValid(bi),
+    });
+    const phaseA = this.buildFinalUncompleteBi(completePhaseA, data);
 
     // 阶段B: n笔合并后处理（找含invalid段的一头一尾同向笔合并）
     const phaseB = mergeBiSegments(phaseA, {
@@ -296,12 +302,6 @@ export class BiService {
   }
 
   /**
-   * ============================================================================
-   * 新算法：递推+回退状态机
-   * ============================================================================
-   */
-
-  /**
    * 步骤3: 生成候选笔
    *
    * 处理逻辑：
@@ -337,104 +337,6 @@ export class BiService {
   }
 
   /**
-   * 步骤4: 递推状态机处理候选笔
-   *
-   * 状态定义：
-   * - confirmed: 暂时确认的笔（仍可能回退）
-   * - pending: 正在试探的笔（可能存在多笔）
-   *
-   * @param candidates 候选笔数组
-   * @param data 合并K线数据
-   * @returns 最终的笔数组
-   */
-  private processCandidateBisWithRollback(
-    candidates: BiVo[],
-    data: MergedKVo[],
-  ): BiVo[] {
-    let confirmed: BiVo[] = [];
-    let pending: BiVo[] = [];
-
-    for (let i = 0; i < candidates.length; i++) {
-      const newBi = candidates[i];
-      const result = this.tryAddBi(confirmed, pending, newBi, data);
-      confirmed = result.confirmed;
-      pending = result.pending;
-    }
-
-    // 处理未完成的最后一笔
-    const finalResult = this.buildFinalUncompleteBi(confirmed, pending, data);
-
-    return finalResult;
-  }
-
-  /**
-   * 尝试添加新笔（核心递推逻辑 - 无递归版本）
-   *
-   * 设计思路：
-   * - 合并具有单调性：合并后的笔极值范围更大，更难再次合并
-   * - 笔的方向交替性：上升→下降→上升，阻止了连锁合并
-   * - 因此：一次合并后，不需要立即尝试再次合并，可加入pending等待后续处理
-   *
-   * @param confirmed 已经确认的笔
-   * @param pending 滑动窗口迭代
-   * @param bi3 这次新增的笔
-   * @param data 原始数据队列
-   * @returns 最终的笔数组
-   */
-  private tryAddBi(
-    confirmed: BiVo[], // 已经确认的笔
-    pending: BiVo[], // 滑动窗口迭代
-    bi3: BiVo, // 这次新增的笔
-    data: MergedKVo[], // 原始数据队列
-  ): { confirmed: BiVo[]; pending: BiVo[] } {
-    // 检查候选笔是否有效
-    const bi3Valid = bi3.status === BiStatus.Valid;
-    const { bi: bi2, from: bi2From } = this.getLastBi(pending, confirmed);
-    const { bi: bi1, from: bi1From } = this.getLastLastBi(
-      pending,
-      confirmed,
-      bi2From,
-    );
-
-    // 常规情况只做三笔合并判断
-    if (bi1 && bi2 && bi3) {
-      const bi1Valid = bi1.status === BiStatus.Valid;
-      const bi2Valid = bi2.status === BiStatus.Valid;
-
-      if (bi1Valid && bi2Valid && bi3Valid) {
-        // 如果bi1和bi2都有效，那么直接删除原来位置，加入confirmed即可
-        this.removeBiByFrom(pending, confirmed, bi1From, bi2From);
-        return {
-          confirmed: [...confirmed, bi1, bi2, bi3],
-          pending: [...pending],
-        };
-      } else {
-        // 如果只要bi1,bi2,bi3三笔当中有一笔无效，就进行合并推测
-        const result = this.handleThreeBi(bi1, bi2, bi3, data);
-        if (result.status === 'merge') {
-          // 移除原有的位置
-          this.removeBiByFrom(pending, confirmed, bi1From, bi2From);
-          return this.pushBi(pending, confirmed, result.bi);
-        }
-        if (bi3Valid) {
-          // 在这三笔无法合并成为一笔的情况下，此时bi3却可以独立存在成为一笔
-          // 这里先尝试将bi1，bi2，bi3加入confirm进行确认，然后等待后面还有没有什么bug的情况导致需要回退
-          this.removeBiByFrom(pending, confirmed, bi1From, bi2From);
-          return {
-            confirmed: [...confirmed, bi1, bi2, bi3],
-            pending: [...pending],
-          };
-        }
-      }
-    }
-    // 其他情况
-    return {
-      confirmed: [...confirmed],
-      pending: [...pending, bi3],
-    };
-  }
-
-  /**
    * 获取三笔的模式
    */
   private getThreePattern(
@@ -454,71 +356,6 @@ export class BiService {
     if (isUpDownUp) return 'up-down-up';
     if (isDownUpDown) return 'down-up-down';
     return null;
-  }
-
-  private getLastBi(
-    pending: BiVo[],
-    confirmed: BiVo[],
-  ): { bi: BiVo | null; from: BiSourceTag } {
-    if (pending[pending.length - 1]) {
-      return {
-        bi: pending[pending.length - 1],
-        from: 'pending',
-      };
-    }
-    if (confirmed[confirmed.length - 1]) {
-      return {
-        bi: confirmed[confirmed.length - 1],
-        from: 'confirmed',
-      };
-    }
-    return {
-      bi: null,
-      from: 'none',
-    };
-  }
-
-  private getLastLastBi(
-    pending: BiVo[],
-    confirmed: BiVo[],
-    lastFrom: BiSourceTag,
-  ): { bi: BiVo | null; from: BiSourceTag } {
-    if (lastFrom === 'pending') {
-      // 那么现在pending的倒数第二笔找
-      if (pending[pending.length - 2]) {
-        return {
-          bi: pending[pending.length - 2],
-          from: 'pending',
-        };
-      } else if (confirmed[confirmed.length - 1]) {
-        return {
-          bi: confirmed[confirmed.length - 1],
-          from: 'confirmed',
-        };
-      } else {
-        return {
-          bi: null,
-          from: 'none',
-        };
-      }
-    } else if (lastFrom === 'confirmed') {
-      if (confirmed[confirmed.length - 2]) {
-        return {
-          bi: confirmed[confirmed.length - 2],
-          from: 'confirmed',
-        };
-      } else {
-        return {
-          bi: null,
-          from: 'none',
-        };
-      }
-    } else {
-      return {
-        bi: null,
-        from: 'none',
-      };
-    }
   }
 
   private assertCompleteBi(
@@ -582,67 +419,6 @@ export class BiService {
   }
 
   /**
-   * 处理三笔
-   */
-  private handleThreeBi(bi1: BiVo, bi2: BiVo, bi3: BiVo, data: MergedKVo[]) {
-    if (!this.canMergeThreeBis(bi1, bi2, bi3)) {
-      return { status: 'keepAll', bi: bi3 };
-    } else {
-      return { status: 'merge', bi: this.mergeThreeBis(bi1, bi3, data) };
-    }
-  }
-
-  /**
-   * 移除pending数组中指定索引的笔
-   * @param pending
-   * @param index
-   */
-  private removeBiByIndex(bis: BiVo[], index: number) {
-    if (index >= 0 && index < bis.length) {
-      bis.splice(index, 1);
-    }
-  }
-
-  /**
-   * 移除笔
-   * @param pending
-   * @param confirmed
-   * @param bi1From
-   * @param bi2From
-   */
-  private removeBiByFrom(
-    pending: BiVo[],
-    confirmed: BiVo[],
-    bi1From: string,
-    bi2From: string,
-  ) {
-    if (bi1From === 'pending' && bi2From === 'pending') {
-      if (pending.length < 2) {
-        throw new Error('Invalid state: pending has fewer than 2 items');
-      }
-
-      pending.pop();
-      pending.pop();
-    } else if (bi1From === 'confirmed' && bi2From === 'pending') {
-      if (pending.length < 1 || confirmed.length < 1) {
-        throw new Error(
-          'Invalid state: pending & confirmed has fewer than 2 items',
-        );
-      }
-
-      confirmed.pop();
-      pending.pop();
-    } else if (bi1From === 'confirmed' && bi2From === 'confirmed') {
-      if (confirmed.length < 2) {
-        throw new Error('Invalid state: confirmed has fewer than 2 items');
-      }
-
-      confirmed.pop();
-      confirmed.pop();
-    }
-  }
-
-  /**
    * 合并两笔
    */
   private mergeTwoBis(bi1: BiVo, bi2: BiVo, data: MergedKVo[]): BiVo {
@@ -665,7 +441,7 @@ export class BiService {
       lowest: rangeStats.lowest,
       trend: bi1.trend,
       type: BiType.Complete,
-      status: BiStatus.Unknown, // 合并后的笔初始化为未知状态，将在pushBi中重新验证
+      status: BiStatus.Unknown, // 合并后的笔初始化为未知状态，将由 helper 重新验证
       originIds: rangeStats.originIds,
       originData: rangeStats.originData,
       independentCount: rangeStats.independentCount,
@@ -697,7 +473,7 @@ export class BiService {
       lowest: rangeStats.lowest,
       trend: bi1.trend,
       type: BiType.Complete,
-      status: BiStatus.Unknown, // 合并后的笔初始化为未知状态，将在pushBi中重新验证
+      status: BiStatus.Unknown, // 合并后的笔初始化为未知状态，将由 helper 重新验证
       originIds: rangeStats.originIds,
       originData: rangeStats.originData,
       independentCount: rangeStats.independentCount,
@@ -798,18 +574,10 @@ export class BiService {
    * 构建最终的未完成笔
    */
   private buildFinalUncompleteBi(
-    confirmed: BiVo[],
-    pending: BiVo[],
+    completeStack: readonly BiVo[],
     data: MergedKVo[],
   ): BiVo[] {
-    // 合并 confirmed 和 pending，按 startTime 排序
-    // pending 里残留的 invalid 笔可能 startTime 比 confirmed 末尾更早，
-    // 直接追加会导致时间倒序，需按时间排序后合并
-    const result = [...confirmed, ...pending].sort((a, b) => {
-      const ta = new Date(a.startTime).getTime();
-      const tb = new Date(b.startTime).getTime();
-      return ta - tb;
-    });
+    const result = completeStack.map((bi) => ({ ...bi }));
 
     if (result.length === 0 && data.length > 0) {
       // 没有任何笔，但从头开始创建未完成笔
@@ -918,27 +686,5 @@ export class BiService {
     ).hasContainment;
 
     return differentTypes && wideEnough && noContainment;
-  }
-
-  /**
-   * 将笔加入确认数组或待处理数组
-   * @param pending
-   * @param confirmed
-   * @param bi
-   */
-  private pushBi(pending: BiVo[], confirmed: BiVo[], bi: BiVo) {
-    // 检查新笔是否有效（因为可能有新合并的笔需要重新验证）
-    const isValid = this.isCandidateBiValid(bi);
-
-    // 将新计算的状态写入笔中
-    bi.status = isValid ? BiStatus.Valid : BiStatus.Invalid;
-
-    if (isValid && pending.length === 0) {
-      confirmed.push(bi);
-    } else {
-      pending.push(bi);
-    }
-
-    return { confirmed: [...confirmed], pending: [...pending] };
   }
 }
