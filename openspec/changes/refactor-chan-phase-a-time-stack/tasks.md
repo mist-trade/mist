@@ -20,11 +20,11 @@
 
 ## 4. 验证后端真实数据与既有契约
 
-- [ ] 4.1 运行完整沪深300回归，确认 Complete Bi 连续、valid 无重叠、旧重叠见证消失且不存在仍可三笔归约的相邻结构。
-- [ ] 4.2 运行完整上证指数回归，确认 Phase A 为 35 笔、Phase B 为 25 笔，并命中三个关键索引区间。
-- [ ] 4.3 运行 `npx jest --runInBand --watchman=false --testPathPattern="bi-merge-cases"`，确认原上证指数两个裁剪场景 6/6 通过。
-- [ ] 4.4 运行 `npx jest --runInBand --watchman=false --testPathPattern="bi-phase-a-time-stack|bi-phase-b-merge|bi.service.spec|channel.service.spec"`。
-- [ ] 4.5 在后端运行 `pnpm run typecheck`、`pnpm run lint:check` 和 `pnpm run test:ci`。
+- [x] 4.1 运行完整沪深300回归，确认 Complete Bi 连续、valid 无重叠、旧重叠见证消失且不存在仍可三笔归约的相邻结构。
+- [x] 4.2 运行完整上证指数回归，确认 Phase A 为 35 笔、Phase B 为 25 笔，并命中三个关键索引区间。
+- [x] 4.3 运行 `npx jest --runInBand --watchman=false --testPathPattern="bi-merge-cases"`，确认原上证指数两个裁剪场景 6/6 通过。
+- [x] 4.4 运行 `npx jest --runInBand --watchman=false --testPathPattern="bi-phase-a-time-stack|bi-phase-b-merge|bi.service.spec|channel.service.spec"`。
+- [x] 4.5 在后端运行 `pnpm run typecheck`、`pnpm run lint:check` 和 `pnpm run test:ci`。
 
 ## 5. 刷新并检查前端阶段快照
 
