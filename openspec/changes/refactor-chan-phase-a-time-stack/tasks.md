@@ -13,10 +13,10 @@
 
 ## 3. 在 BiService 中组合 Phase A 与 Phase B
 
-- [ ] 3.1 使用箭头函数 operations 把 `BiService` 的三笔原语与 `data` 闭包传给 `reducePhaseATimeStack`，再沿用现有 unfinished-tail 构建。
-- [ ] 3.2 删除 `BiSourceTag`、confirmed/pending 双数组、跨数组取尾、来源相关删除和最终 Complete Bi 排序逻辑。
-- [ ] 3.3 保持 `bi-phase-a-time-stack.helper.ts` 与 `bi-phase-b-merge.helper.ts` 相互独立，由 `BiService.getBi` 依次组合两个 helper。
-- [ ] 3.4 保持 `{ phaseA, phaseB }`、HTTP 返回、`mergeBiSegments` operations 和 Channel 使用 Phase B 的行为不变。
+- [x] 3.1 使用箭头函数 operations 把 `BiService` 的三笔原语与 `data` 闭包传给 `reducePhaseATimeStack`，再沿用现有 unfinished-tail 构建。
+- [x] 3.2 删除 `BiSourceTag`、confirmed/pending 双数组、跨数组取尾、来源相关删除和最终 Complete Bi 排序逻辑。
+- [x] 3.3 保持 `bi-phase-a-time-stack.helper.ts` 与 `bi-phase-b-merge.helper.ts` 相互独立，由 `BiService.getBi` 依次组合两个 helper。
+- [x] 3.4 保持 `{ phaseA, phaseB }`、HTTP 返回、`mergeBiSegments` operations 和 Channel 使用 Phase B 的行为不变。
 
 ## 4. 验证后端真实数据与既有契约
 
