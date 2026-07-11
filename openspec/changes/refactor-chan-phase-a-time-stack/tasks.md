@@ -1,30 +1,38 @@
-## 1. Establish the TDD regression boundary
+## 1. 建立完整真实数据红灯边界
 
-- [ ] 1.1 Copy the complete 388-entry CSI 300 2024-2025 merged-K input into one repo-local backend fixture and add a shared hydration helper for real snapshot tests.
-- [ ] 1.2 Add a full-snapshot Phase A integrity test that reports overlapping index ranges, asserts the `206 -> 302` / `222 -> 228` witness, and run it against the dual-array implementation to record the expected RED failure before production edits.
-- [ ] 1.3 Add focused RED tests for cascading top-three reduction, all-Valid stop, unmergeable-Invalid stop, replacement revalidation, leading Invalid preservation, discontinuous-push and discontinuous-reduction failures, and trailing UnComplete behavior.
+- [ ] 1.1 将完整沪深300 388 根和完整上证指数 386 根合并 K 保存为后端仓库内的规范 fixture，并为两个数据集复用同一加载与结构断言 helper。
+- [ ] 1.2 新增完整沪深300 Phase A 完整性测试，输出重叠索引范围并锁定 `206 -> 302` / `222 -> 228` 见证；在修改生产代码前运行旧双数组实现，记录符合预期的 RED 失败。
+- [ ] 1.3 新增完整上证指数回测测试，锁定 Phase A/Phase B 数量以及 `142 -> 146`、`142 -> 195`、`266 -> 317` 三个关键区间。
 
-## 2. Replace Phase A with the chronological stack
+## 2. 独立测试和实现 Phase A helper
 
-- [ ] 2.1 Refactor candidate processing to push each candidate onto one chronological stack and repeatedly reduce the adjacent top three until fewer than three remain, all three are Valid, or the existing three-Bi predicate rejects them.
-- [ ] 2.2 Revalidate every merged replacement, enforce shared `middleIndex` boundaries before both candidate push and reduction, and include offending index ranges in any invariant error.
-- [ ] 2.3 Remove `BiSourceTag`, `confirmed`/`pending` tail selection, source-dependent removal, and final Complete-Bi sorting while preserving existing unfinished-tail construction.
-- [ ] 2.4 Keep `mergeBiSegments`, the Phase B operation callbacks, `{ phaseA, phaseB }`, and Channel consumption of Phase B behaviorally unchanged.
+- [ ] 2.1 新增 `bi-phase-a-time-stack.helper.spec.ts` 红灯测试，覆盖连续多次栈顶归约、三笔全 Valid 停止、含 Invalid 但不可合并停止、合并产物重新判定和 leading Invalid 保留。
+- [ ] 2.2 在独立 helper 测试中覆盖输入不可变、候选入栈不连续、栈顶三笔不连续和错误信息包含索引范围。
+- [ ] 2.3 新增 `bi-phase-a-time-stack.helper.ts`，导出 `PhaseATimeStackOperations` 与 `reducePhaseATimeStack`，实现单栈循环归约且不依赖 NestJS。
+- [ ] 2.4 只运行 Phase A helper 测试并确认全部通过；在此步骤完成前不修改 `BiService` 的 Phase A 生产路径。
 
-## 3. Verify backend behavior
+## 3. 在 BiService 中组合 Phase A 与 Phase B
 
-- [ ] 3.1 Run the full CSI 300 regression and confirm Phase A Complete Bis are contiguous, valid ranges do not overlap, and no mergeable adjacent three-Bi group remains.
-- [ ] 3.2 Run `npx jest --runInBand --watchman=false --testPathPattern="bi-merge-cases"` and confirm all six existing real-data Phase B tests pass with their current long-down and long-up endpoints.
-- [ ] 3.3 Run `npx jest --runInBand --watchman=false --testPathPattern="bi-phase-a|bi-phase-b-merge|bi.service.spec|channel.service.spec"` and resolve any focused regression without changing the approved merge predicates.
-- [ ] 3.4 Run `pnpm run typecheck`, `pnpm run lint:check`, and `pnpm run test:ci` in the backend repository.
+- [ ] 3.1 使用箭头函数 operations 把 `BiService` 的三笔原语与 `data` 闭包传给 `reducePhaseATimeStack`，再沿用现有 unfinished-tail 构建。
+- [ ] 3.2 删除 `BiSourceTag`、confirmed/pending 双数组、跨数组取尾、来源相关删除和最终 Complete Bi 排序逻辑。
+- [ ] 3.3 保持 `bi-phase-a-time-stack.helper.ts` 与 `bi-phase-b-merge.helper.ts` 相互独立，由 `BiService.getBi` 依次组合两个 helper。
+- [ ] 3.4 保持 `{ phaseA, phaseB }`、HTTP 返回、`mergeBiSegments` operations 和 Channel 使用 Phase B 的行为不变。
 
-## 4. Refresh and inspect phase-aware frontend fixtures
+## 4. 验证后端真实数据与既有契约
 
-- [ ] 4.1 Run `pnpm run snapshots:generate` in `mist-fe` against the verified backend and review Phase A/Phase B count changes for CSI 300, ChiNext, and Kweichow Moutai before accepting the generated files.
-- [ ] 4.2 Run `pnpm run typecheck`, `pnpm run lint`, and `pnpm run test:ci` in `mist-fe`.
-- [ ] 4.3 Inspect `/chan-tests` for all three reported datasets, confirming the Phase A overlap artifacts are absent and recording any remaining structurally continuous Phase B long span as separate follow-up evidence rather than changing Phase B in this change.
+- [ ] 4.1 运行完整沪深300回归，确认 Complete Bi 连续、valid 无重叠、旧重叠见证消失且不存在仍可三笔归约的相邻结构。
+- [ ] 4.2 运行完整上证指数回归，确认 Phase A 为 35 笔、Phase B 为 25 笔，并命中三个关键索引区间。
+- [ ] 4.3 运行 `npx jest --runInBand --watchman=false --testPathPattern="bi-merge-cases"`，确认原上证指数两个裁剪场景 6/6 通过。
+- [ ] 4.4 运行 `npx jest --runInBand --watchman=false --testPathPattern="bi-phase-a-time-stack|bi-phase-b-merge|bi.service.spec|channel.service.spec"`。
+- [ ] 4.5 在后端运行 `pnpm run typecheck`、`pnpm run lint:check` 和 `pnpm run test:ci`。
 
-## 5. Validate and hand off the change
+## 5. 刷新并检查前端阶段快照
 
-- [ ] 5.1 Run `openspec validate refactor-chan-phase-a-time-stack --strict` and record the backend, frontend, and visual verification evidence in the change artifacts.
-- [ ] 5.2 Review the final diff to ensure unrelated roadmap, BigQMT, and archived preview work remains untouched and that backend logic and regenerated frontend fixtures are separable rollback boundaries.
+- [ ] 5.1 后端验证全部通过后，在 `mist-fe` 运行 `pnpm run snapshots:generate`，审核沪深300、上证指数、创业板和贵州茅台的 Phase A/Phase B 数量变化。
+- [ ] 5.2 在 `mist-fe` 运行 `pnpm run typecheck`、`pnpm run lint` 和 `pnpm run test:ci`。
+- [ ] 5.3 在 `/chan-tests` 检查四个完整数据集，确认 Phase A 重叠消失；如 Phase B 仍存在结构连续但跨度较长的笔，只记录为后续 change，不在本次修改 Phase B。
+
+## 6. 校验与交付
+
+- [ ] 6.1 运行 `openspec validate refactor-chan-phase-a-time-stack --strict`，并记录 helper 独立验证、服务集成、完整真实数据和页面检查证据。
+- [ ] 6.2 审查最终 diff，确认路线图、BigQMT 和已归档预览等无关工作未被修改，并确认 Phase A helper、BiService 集成和前端快照是可独立回退的边界。
