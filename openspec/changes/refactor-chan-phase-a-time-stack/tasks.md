@@ -6,10 +6,10 @@
 
 ## 2. 独立测试和实现 Phase A helper
 
-- [ ] 2.1 新增 `bi-phase-a-time-stack.helper.spec.ts` 红灯测试，覆盖连续多次栈顶归约、三笔全 Valid 停止、含 Invalid 但不可合并停止、合并产物重新判定和 leading Invalid 保留。
-- [ ] 2.2 在独立 helper 测试中覆盖输入不可变、候选入栈不连续、栈顶三笔不连续和错误信息包含索引范围。
-- [ ] 2.3 新增 `bi-phase-a-time-stack.helper.ts`，导出 `PhaseATimeStackOperations` 与 `reducePhaseATimeStack`，实现单栈循环归约且不依赖 NestJS。
-- [ ] 2.4 只运行 Phase A helper 测试并确认全部通过；在此步骤完成前不修改 `BiService` 的 Phase A 生产路径。
+- [x] 2.1 新增 `bi-phase-a-time-stack.helper.spec.ts` 红灯测试，覆盖连续多次栈顶归约、三笔全 Valid 停止、含 Invalid 但不可合并停止、合并产物重新判定和 leading Invalid 保留。
+- [x] 2.2 在独立 helper 测试中覆盖输入不可变、候选入栈不连续、栈顶三笔不连续和错误信息包含索引范围。
+- [x] 2.3 新增 `bi-phase-a-time-stack.helper.ts`，导出 `PhaseATimeStackOperations` 与 `reducePhaseATimeStack`，实现单栈循环归约且不依赖 NestJS。
+- [x] 2.4 只运行 Phase A helper 测试并确认全部通过；在此步骤完成前不修改 `BiService` 的 Phase A 生产路径。
 
 ## 3. 在 BiService 中组合 Phase A 与 Phase B
 
