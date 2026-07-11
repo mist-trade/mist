@@ -6,7 +6,6 @@ import { TrendDirection } from '../enums/trend-direction.enum';
 import { BiVo } from '../vo/bi.vo';
 import { FenxingVo } from '../vo/fenxing.vo';
 import { MergedKVo } from '../vo/merged-k.vo';
-import { mergeBiSegments } from './bi-phase-b-merge.helper';
 import { collectMergedKRange, uniqueKById } from './bi-range.helper';
 
 type CompleteBiWithFenxings = BiVo & {
@@ -61,11 +60,7 @@ export class BiService {
     const phaseA = this.buildFinalUncompleteBi(completePhaseA, data);
 
     // 阶段B: n笔合并后处理（找含invalid段的一头一尾同向笔合并）
-    const phaseB = mergeBiSegments(phaseA, {
-      canMergeTwoBis: (head, tail) => this.canMergeTwoBis(head, tail),
-      mergeTwoBis: (head, tail) => this.mergeTwoBis(head, tail, data),
-      isCandidateBiValid: (bi) => this.isCandidateBiValid(bi),
-    });
+    const phaseB = this.mergeBiSegments(phaseA, data);
 
     return { phaseA, phaseB };
   }
@@ -421,6 +416,89 @@ export class BiService {
     }
 
     return stack;
+  }
+
+  private isPhaseBMergeableSpan(
+    bis: readonly BiVo[],
+    headIndex: number,
+    tailIndex: number,
+  ): boolean {
+    const span = bis.slice(headIndex, tailIndex + 1);
+    if (
+      !span.every(
+        (bi) => bi.type === BiType.Complete && bi.startFenxing && bi.endFenxing,
+      )
+    ) {
+      return false;
+    }
+
+    const head = bis[headIndex];
+    const tail = bis[tailIndex];
+    if (head.trend !== tail.trend) {
+      return false;
+    }
+    if (!span.some((bi) => bi.status === BiStatus.Invalid)) {
+      return false;
+    }
+    if (!this.canMergeTwoBis(head, tail)) {
+      return false;
+    }
+
+    const envelopeHigh = Math.max(head.highest, tail.highest);
+    const envelopeLow = Math.min(head.lowest, tail.lowest);
+    return span
+      .slice(1, -1)
+      .every(
+        (middle) =>
+          middle.highest <= envelopeHigh && middle.lowest >= envelopeLow,
+      );
+  }
+
+  private mergeBiSegments(
+    phaseABis: readonly BiVo[],
+    data: MergedKVo[],
+  ): BiVo[] {
+    const bis = phaseABis.map((bi) => ({ ...bi }));
+
+    while (true) {
+      let merged = false;
+
+      for (let spanLength = 2; spanLength <= bis.length; spanLength++) {
+        for (
+          let headIndex = 0;
+          headIndex + spanLength <= bis.length;
+          headIndex++
+        ) {
+          const tailIndex = headIndex + spanLength - 1;
+          if (!this.isPhaseBMergeableSpan(bis, headIndex, tailIndex)) {
+            continue;
+          }
+
+          const mergedBi = this.mergeTwoBis(
+            bis[headIndex],
+            bis[tailIndex],
+            data,
+          );
+          const replacement: BiVo = {
+            ...mergedBi,
+            status: this.isCandidateBiValid(mergedBi)
+              ? BiStatus.Valid
+              : BiStatus.Invalid,
+          };
+          bis.splice(headIndex, spanLength, replacement);
+          merged = true;
+          break;
+        }
+
+        if (merged) {
+          break;
+        }
+      }
+
+      if (!merged) {
+        return bis;
+      }
+    }
   }
 
   /**
