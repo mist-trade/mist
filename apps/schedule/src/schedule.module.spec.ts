@@ -6,6 +6,7 @@ import { StrategyBacktestController } from '../../mist/src/strategy/controllers/
 import { StrategyScanController } from '../../mist/src/strategy/controllers/strategy-scan.controller';
 import { StrategySignalController } from '../../mist/src/strategy/controllers/strategy-signal.controller';
 import { StrategyController } from '../../mist/src/strategy/controllers/strategy.controller';
+import { StrategyBacktestProcessor } from '../../mist/src/strategy/backtest/strategy-backtest.processor';
 import { StrategyCoreModule } from '../../mist/src/strategy/strategy-core.module';
 import { StrategyModule } from '../../mist/src/strategy/strategy.module';
 
@@ -47,6 +48,18 @@ describe('schedule strategy module wiring', () => {
         StrategyCoreModule,
       ),
     ).toEqual([]);
+    expect(
+      getMetadataList<ModuleType>(
+        MODULE_METADATA.PROVIDERS,
+        StrategyCoreModule,
+      ),
+    ).not.toEqual(expect.arrayContaining([StrategyBacktestProcessor]));
+  });
+
+  it('runs the portfolio processor only with the public Mist strategy module', () => {
+    expect(
+      getMetadataList<ModuleType>(MODULE_METADATA.PROVIDERS, StrategyModule),
+    ).toEqual(expect.arrayContaining([StrategyBacktestProcessor]));
   });
 
   it('keeps public strategy controllers on StrategyModule', () => {

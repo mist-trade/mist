@@ -40,4 +40,33 @@ describe('StrategyRuleEvaluator', () => {
 
     expect(result).toEqual({ matched: false });
   });
+
+  it('matches crossesAbove from the prior completed context', () => {
+    const result = (evaluator as any).evaluate(
+      { field: 'k.close', operator: 'crossesAbove', value: 100 },
+      { k: { close: 101 } },
+      { k: { close: 100 } },
+    );
+
+    expect(result).toEqual({ matched: true });
+  });
+
+  it('matches crossesBelow from the prior completed context', () => {
+    const result = (evaluator as any).evaluate(
+      { field: 'k.close', operator: 'crossesBelow', value: 100 },
+      { k: { close: 99 } },
+      { k: { close: 100 } },
+    );
+
+    expect(result).toEqual({ matched: true });
+  });
+
+  it('does not match a crossover without a prior completed value', () => {
+    const result = evaluator.evaluate(
+      { field: 'k.close', operator: 'crossesAbove', value: 100 },
+      { k: { close: 101 } },
+    );
+
+    expect(result).toEqual({ matched: false });
+  });
 });

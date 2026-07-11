@@ -21,9 +21,19 @@ export type StrategyRuleGroup = {
 
 export type StrategyRuleExpression = StrategyRuleCondition | StrategyRuleGroup;
 
+export type StrategyRuleFieldValueType = 'number' | 'string';
+
+export type StrategyRuleFieldDefinition = {
+  path: string;
+  valueType: StrategyRuleFieldValueType;
+  requiredLookbackBars: number;
+  resolve: (context: Record<string, unknown>) => unknown;
+};
+
 export type StrategyRuleValidationSummary = {
   ruleSchemaVersion: 'v1';
   conditionCount: number;
   fieldRoots: string[];
   operators: StrategyRuleOperator[];
+  requiredLookbackBars: number;
 };

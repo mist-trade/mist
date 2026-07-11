@@ -3,4 +3,5 @@ export enum BacktestRunStatus {
   RUNNING = 'running',
   COMPLETED = 'completed',
   FAILED = 'failed',
+  CANCELLED = 'cancelled',
 }

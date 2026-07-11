@@ -3,12 +3,15 @@ import {
   CreateDateColumn,
   Entity,
   PrimaryGeneratedColumn,
+  Unique,
 } from 'typeorm';
 import { DataSource } from '../enums/data-source.enum';
 import { Period } from '../enums/period.enum';
+import { StrategySignalKind } from '../enums/strategy-signal-kind.enum';
 
-@Entity({ name: 'backtest_signal_results' })
-export class BacktestSignalResult {
+@Entity({ name: 'backtest_signals' })
+@Unique(['backtestRunId', 'securityCode', 'signalTime', 'signalKind'])
+export class BacktestSignal {
   @PrimaryGeneratedColumn()
   id!: number;
 
@@ -29,6 +32,14 @@ export class BacktestSignalResult {
 
   @Column({ type: 'enum', enum: DataSource })
   source: DataSource = DataSource.EAST_MONEY;
+
+  @Column({
+    name: 'signal_kind',
+    type: 'enum',
+    enum: StrategySignalKind,
+    default: StrategySignalKind.ENTRY,
+  })
+  signalKind: StrategySignalKind = StrategySignalKind.ENTRY;
 
   @Column({ name: 'signal_time', type: 'datetime' })
   signalTime: Date = new Date();

@@ -36,8 +36,14 @@ export class StrategyVersion {
   })
   ruleSchemaVersion: StrategyRuleSchemaVersion = StrategyRuleSchemaVersion.V1;
 
-  @Column({ type: 'json' })
-  rule: Record<string, unknown> = {};
+  @Column({ name: 'entry_rule', type: 'json' })
+  entryRule: Record<string, unknown> = {};
+
+  @Column({ name: 'exit_rule', type: 'json', nullable: true })
+  exitRule?: Record<string, unknown> | null = null;
+
+  @Column({ name: 'lookback_bars', type: 'int', default: 1 })
+  lookbackBars: number = 1;
 
   @Column({ name: 'validation_summary', type: 'json' })
   validationSummary: Record<string, unknown> = {};

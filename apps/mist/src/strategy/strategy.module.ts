@@ -4,6 +4,8 @@ import { StrategyBacktestController } from './controllers/strategy-backtest.cont
 import { StrategyScanController } from './controllers/strategy-scan.controller';
 import { StrategySignalController } from './controllers/strategy-signal.controller';
 import { StrategyController } from './controllers/strategy.controller';
+import { StrategyBacktestEngine } from './backtest/strategy-backtest.engine';
+import { StrategyBacktestProcessor } from './backtest/strategy-backtest.processor';
 import { StrategyCoreModule } from './strategy-core.module';
 
 @Module({
@@ -14,6 +16,13 @@ import { StrategyCoreModule } from './strategy-core.module';
     StrategyAlertEventController,
     StrategyBacktestController,
     StrategyScanController,
+  ],
+  providers: [
+    {
+      provide: StrategyBacktestEngine,
+      useFactory: () => new StrategyBacktestEngine(),
+    },
+    StrategyBacktestProcessor,
   ],
   exports: [StrategyCoreModule],
 })

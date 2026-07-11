@@ -1,7 +1,12 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   StrategyDefinition,
+  Period,
   StrategyRuleSchemaVersion,
   StrategyStatus,
   StrategyVersion,
@@ -22,7 +27,21 @@ export class StrategyDefinitionService {
   ) {}
 
   async create(dto: CreateStrategyDefinitionDto): Promise<StrategyDefinition> {
-    const validationSummary = this.ruleValidator.validate(dto.rule);
+    const exitRule = dto.exitRule ?? null;
+    const backtestEnabled = dto.backtestEnabled ?? false;
+    const validationSummary = this.validateVersionRules(
+      dto.entryRule,
+      exitRule,
+      dto.lookbackBars,
+    );
+    this.assertBacktestEligibility(
+      dto.periods,
+      dto.sources,
+      dto.entryRule,
+      exitRule,
+      dto.lookbackBars,
+      backtestEnabled,
+    );
     const definition = await this.definitionRepository.save(
       this.definitionRepository.create({
         name: dto.name,
@@ -31,6 +50,7 @@ export class StrategyDefinitionService {
         targetUniverse: dto.targetUniverse,
         periods: dto.periods,
         sources: dto.sources,
+        backtestEnabled,
       }),
     );
 
@@ -40,7 +60,9 @@ export class StrategyDefinitionService {
         strategyDefinitionId: definition.id,
         versionNumber: 1,
         ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
-        rule: dto.rule,
+        entryRule: dto.entryRule,
+        exitRule,
+        lookbackBars: dto.lookbackBars,
         validationSummary,
       }),
     );
@@ -63,8 +85,46 @@ export class StrategyDefinitionService {
     if (dto.periods !== undefined) definition.periods = dto.periods;
     if (dto.sources !== undefined) definition.sources = dto.sources;
 
-    if (dto.rule !== undefined) {
-      const validationSummary = this.ruleValidator.validate(dto.rule);
+    const changesVersion =
+      dto.entryRule !== undefined ||
+      dto.exitRule !== undefined ||
+      dto.lookbackBars !== undefined;
+    const backtestEnabled = dto.backtestEnabled ?? definition.backtestEnabled;
+    const needsCurrentVersion = changesVersion || backtestEnabled;
+    const currentVersion = needsCurrentVersion
+      ? await this.findCurrentVersion(definition)
+      : undefined;
+    let candidateEntryRule = currentVersion?.entryRule;
+    let candidateExitRule = currentVersion?.exitRule ?? null;
+    let candidateLookbackBars = currentVersion?.lookbackBars;
+
+    let validationSummary: Record<string, unknown> | undefined;
+    if (changesVersion) {
+      candidateEntryRule = dto.entryRule ?? currentVersion?.entryRule;
+      candidateExitRule =
+        dto.exitRule !== undefined
+          ? dto.exitRule
+          : (currentVersion?.exitRule ?? null);
+      candidateLookbackBars = dto.lookbackBars ?? currentVersion?.lookbackBars;
+      validationSummary = this.validateVersionRules(
+        candidateEntryRule,
+        candidateExitRule,
+        candidateLookbackBars,
+      );
+    }
+
+    if (backtestEnabled) {
+      this.assertBacktestEligibility(
+        definition.periods,
+        definition.sources,
+        candidateEntryRule,
+        candidateExitRule,
+        candidateLookbackBars,
+        true,
+      );
+    }
+
+    if (changesVersion) {
       const existingVersionCount = await this.versionRepository.count({
         where: { strategyDefinitionId: definition.id },
       });
@@ -74,11 +134,17 @@ export class StrategyDefinitionService {
           strategyDefinitionId: definition.id,
           versionNumber: existingVersionCount + 1,
           ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
-          rule: dto.rule,
-          validationSummary,
+          entryRule: candidateEntryRule,
+          exitRule: candidateExitRule,
+          lookbackBars: candidateLookbackBars,
+          validationSummary: validationSummary!,
         }),
       );
       definition.currentVersionId = version.id;
+    }
+
+    if (dto.backtestEnabled !== undefined) {
+      definition.backtestEnabled = dto.backtestEnabled;
     }
 
     return await this.definitionRepository.save(definition);
@@ -120,5 +186,90 @@ export class StrategyDefinitionService {
       where: { strategyDefinitionId },
       order: { versionNumber: 'DESC' },
     });
+  }
+
+  private async findCurrentVersion(
+    definition: StrategyDefinition,
+  ): Promise<StrategyVersion> {
+    if (!definition.currentVersionId) {
+      throw new BadRequestException(
+        `Strategy definition ${definition.id} has no current version`,
+      );
+    }
+
+    const version = await this.versionRepository.findOne({
+      where: { id: definition.currentVersionId },
+    });
+
+    if (!version) {
+      throw new BadRequestException(
+        `Strategy version ${definition.currentVersionId} not found`,
+      );
+    }
+
+    return version;
+  }
+
+  private validateVersionRules(
+    entryRule: Record<string, unknown> | undefined,
+    exitRule: Record<string, unknown> | null,
+    lookbackBars: number | undefined,
+  ): Record<string, unknown> {
+    if (!entryRule) {
+      throw new BadRequestException('Strategy entry rule is required');
+    }
+    if (
+      !Number.isInteger(lookbackBars) ||
+      lookbackBars === undefined ||
+      lookbackBars < 1 ||
+      lookbackBars > 250
+    ) {
+      throw new BadRequestException(
+        'lookbackBars must be an integer from 1 to 250',
+      );
+    }
+
+    const entrySummary = this.ruleValidator.validate(entryRule);
+    const exitSummary = exitRule ? this.ruleValidator.validate(exitRule) : null;
+    const requiredLookbackBars = Math.max(
+      entrySummary.requiredLookbackBars,
+      exitSummary?.requiredLookbackBars ?? 0,
+    );
+    if (lookbackBars < requiredLookbackBars) {
+      throw new BadRequestException(
+        `lookbackBars must be at least ${requiredLookbackBars} for the selected rule fields`,
+      );
+    }
+
+    return {
+      entryRule: entrySummary,
+      exitRule: exitSummary,
+      lookbackBars,
+      requiredLookbackBars,
+    };
+  }
+
+  private assertBacktestEligibility(
+    periods: StrategyDefinition['periods'],
+    sources: StrategyDefinition['sources'],
+    entryRule: Record<string, unknown> | undefined,
+    exitRule: Record<string, unknown> | null,
+    lookbackBars: number | undefined,
+    backtestEnabled: boolean,
+  ): void {
+    if (!backtestEnabled) return;
+
+    this.validateVersionRules(entryRule, exitRule, lookbackBars);
+    if (!exitRule) {
+      throw new BadRequestException(
+        'Backtesting requires the current version to define an exit rule',
+      );
+    }
+    if (!periods.includes(Period.DAY)) {
+      throw new BadRequestException('Backtesting requires the daily period');
+    }
+    if (sources.length === 0) {
+      throw new BadRequestException('Backtesting requires at least one source');
+    }
   }
 }
