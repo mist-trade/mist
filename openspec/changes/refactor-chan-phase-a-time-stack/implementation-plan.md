@@ -2,22 +2,22 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** 用独立纯算法 helper 将 Phase A 改为严格连续的单时间栈，并在完整沪深300、完整上证指数和原有 Phase B 场景上完成 TDD 回归。
+**Goal:** 保留已验证的两阶段规则，将 Phase A 单时间栈和 Phase B invalid 区间归约最终内联到 `BiService`，并在完整沪深300、完整上证指数和原有 Phase B 场景上完成零结果变化的 TDD 回归。
 
-**Architecture:** `bi-phase-a-time-stack.helper.ts` 只负责候选笔的连续入栈和栈顶三笔局部固定点归约，通过 operations 回调复用 `BiService` 的三笔原语；`BiService` 在 helper 独立验证通过后依次组合 Phase A helper 与现有 Phase B helper。完整真实数据测试保存在后端仓库内，前端最后使用已提交的 `merge-k.json` 离线刷新阶段快照。
+**Architecture:** helper 文件是已完成的独立验证中间物；最终 `BiService` 直接拥有 `reducePhaseATimeStack`、`isPhaseBMergeableSpan` 和 `mergeBiSegments` 私有方法，并直调既有合并与 valid 原语。完整真实数据测试保存在后端仓库内；本次只验证 `mist-fe` 既有快照，不刷新它们。
 
 **Tech Stack:** TypeScript 5.1、NestJS 10、Jest 29、OpenSpec、pnpm、Next.js、ECharts 快照测试页。
 
 ## Global Constraints
 
-- Phase A helper MUST 位于 `apps/mist/src/chan/services/bi-phase-a-time-stack.helper.ts`，且不得依赖 NestJS 或行情服务。
-- Phase A 与 Phase B helper MUST 相互独立，只能由 `BiService` 组合。
+- Phase A 与 Phase B 的生产算法 MUST 最终位于 `BiService` 私有方法；`bi-phase-a-time-stack.helper.ts`、`bi-phase-b-merge.helper.ts` 和 operations 接口 MUST 删除。
+- 原 helper 的 7 个 Phase A、9 个 Phase B 测试场景 MUST 保留并迁移为 NestJS Test module 的 service-phase specs。
 - Phase A 每次候选入栈后 MUST 反复归约连续栈顶三笔，直到不足三笔、三笔全 Valid 或当前三笔不可合并。
 - Phase A MUST 在候选入栈前和三笔合并前校验共享 `middleIndex` 边界。
 - 每次合并 MUST 重新调用现有 `isCandidateBiValid`；不得修改现有三笔、两笔、分型、宽笔或价格包络规则。
 - 完整沪深300 388 根与完整上证指数 386 根合并 K MUST 成为后端仓库内可独立运行的 fixture。
 - 必须先观察完整沪深300在旧双数组实现下按预期 RED，再修改生产算法。
-- Phase A helper 独立测试全部通过前，不得切换 `BiService` 生产路径。
+- 已完成的 helper 独立测试是行为基线；内联后不得以修改快照或测试期望掩盖差异。
 - `{ phaseA, phaseB }`、HTTP 返回结构、Channel 使用 Phase B 的行为保持不变。
 - 工作区存在其他 OpenSpec/路线图改动；每次提交只暂存本计划列出的文件。
 
@@ -25,28 +25,26 @@
 
 ## File Map
 
-### 后端新增
+### Phase C 后端迁移
 
-- `apps/mist/src/chan/services/__fixtures__/csi300-2024-2025-full.json`：完整沪深300合并 K。
-- `apps/mist/src/chan/services/__fixtures__/shanghai-index-2024-2025-full.json`：完整上证指数合并 K。
-- `apps/mist/src/chan/services/bi-phase-a-real-snapshots.spec.ts`：两个完整数据集的服务级回归。
-- `apps/mist/src/chan/services/bi-phase-a-time-stack.helper.ts`：纯 Phase A 单栈算法。
-- `apps/mist/src/chan/services/bi-phase-a-time-stack.helper.spec.ts`：不构造 NestJS module 的纯算法测试。
+- `apps/mist/src/chan/services/bi.service.ts`：内联 `reducePhaseATimeStack`、
+  `isPhaseBMergeableSpan` 和 `mergeBiSegments`，直接调用既有私有原语。
+- `apps/mist/src/chan/services/bi-phase-a-time-stack.helper.spec.ts` →
+  `apps/mist/src/chan/services/bi.service.phase-a.spec.ts`：迁移 7 个 Phase A 场景。
+- `apps/mist/src/chan/services/bi-phase-b-merge.helper.spec.ts` →
+  `apps/mist/src/chan/services/bi.service.phase-b.spec.ts`：迁移 9 个 Phase B 场景。
+- 删除 `bi-phase-a-time-stack.helper.ts`、`bi-phase-b-merge.helper.ts`；更新
+  `bi.service.spec.ts` 结构断言和 OpenSpec tasks/evidence。
 
-### 后端修改
+### Phase C 前端验证（只读）
 
-- `apps/mist/src/chan/services/bi.service.ts:1-17,50-70,298-435,459-643,680-706,800-848,929-943`：接入 Phase A helper，删除双数组状态机并简化 unfinished-tail 边界。
-- `apps/mist/src/chan/services/bi.service.spec.ts:118-139,240-245`：删除废弃私有方法测试，增加两个 helper 的组合边界断言。
-- `openspec/changes/refactor-chan-phase-a-time-stack/tasks.md`：实施时逐项更新完成状态。
-
-### 前端生成与修改
-
-- `mist-fe/__fixtures__/snapshots/chan/{csi300,shanghai-index,chinext,maotai}-2024-2025/bi.json`：离线重新生成的阶段结果。
-- 上述四个目录的 `meta.json`：更新 Phase A/Phase B 数量和生成时间。
-- `mist-fe/app/chan-tests/lib/__tests__/shanghai-phase-fixture.test.ts`：完整上证关键区间与数量断言。
-- `mist-fe/scripts/generate-snapshots.mjs:124-133,147-190`：仅使用现有 `--bi-from-merge-k`，本 change 不修改脚本。
+- `mist-fe` 的四组阶段快照、`meta.json`、生成脚本和页面源码均不在本次修改范围。
+- 仅运行 typecheck、lint、test:ci 和零 diff 检查；不得生成或刷新快照。
 
 ---
+
+> 以下 Task 1–6 是已完成的独立 helper 验证与接入记录，保留它们作为行为基线和证据；其
+> helper 文件/快照刷新描述不再定义最终生产结构。最终结构与当前执行顺序以文末 Phase C 为准。
 
 ### Task 1: 建立完整真实快照 RED 回归
 
@@ -1059,3 +1057,52 @@ Any deferred Phase B long-span evidence
 ```
 
 Do not archive the OpenSpec change until the user explicitly reviews the `/chan-tests` result and asks to archive it.
+
+---
+
+## Phase C：最终内联迁移（当前执行）
+
+**目标：** 只迁移代码归属。Phase A、Phase B 的归约规则、`{ phaseA, phaseB }` 公共返回、
+HTTP/Channel 消费、完整真实快照和 `mist-fe` 已提交快照均不得变化。
+
+### C1. Phase A 内联（独立提交）
+
+1. 将 `bi-phase-a-time-stack.helper.spec.ts` 改名为 `bi.service.phase-a.spec.ts`，保留全部 7 个
+   场景；通过 NestJS Test module 构造 `BiService`，以 `jest.spyOn(service as any, ...)` 替代
+   operations mock。
+2. 先让测试直接调用尚不存在的 `reducePhaseATimeStack(candidates, data)`，确认 RED；再将 helper
+   的候选浅克隆、Complete/连续性/外边界不变量、栈顶三笔局部固定点和重新 valid 判定原样内联。
+3. 该私有方法 MUST 直接调用 `canMergeThreeBis`、`mergeThreeBis(..., data)`、
+   `isCandidateBiValid`；现有 `assertCompleteBi` 的语义不得改变，时间栈专用不变量使用独立名称。
+4. `getBi` 改用 `this.reducePhaseATimeStack(candidates, data)`；删除 Phase A import、operations
+   接口和 helper 源文件。
+5. 运行 `bi.service.phase-a.spec.ts`、`bi-phase-a-real-snapshots.spec.ts`、`bi.service.spec.ts`，勾选
+   7.2，提交 `refactor(chan): inline phase A time-stack reduction`。
+
+### C2. Phase B 内联（独立提交）
+
+1. 将 `bi-phase-b-merge.helper.spec.ts` 改名为 `bi.service.phase-b.spec.ts`，保留全部 9 个场景；
+   使用 NestJS Test module 和 private-method spies。
+2. 先以缺少 `mergeBiSegments(phaseABis, data)` 的直接调用确认 RED；再原样内联最短跨度、同跨度
+   最左、Complete 边界、含 Invalid、同向端点、价格包络、两笔严格递进、重新判定与固定点重扫。
+3. `isPhaseBMergeableSpan` 与 `mergeBiSegments` MUST 直接调用 `canMergeTwoBis`、
+   `mergeTwoBis(..., data)`、`isCandidateBiValid`，不得保留 `PhaseBMergeOperations`。
+4. 更新 `bi.service.spec.ts` 的结构断言；删除 Phase B import、operations 接口和 helper 源文件。
+5. 运行 `bi.service.phase-b.spec.ts`、`bi-merge-cases.spec.ts`、`bi.service.spec.ts`、
+   `channel.service.spec.ts`，勾选 7.3，提交 `refactor(chan): inline phase B segment merge`。
+
+### C3. 最终验证与证据（独立提交）
+
+```bash
+npx jest --runInBand --watchman=false --testPathPattern="bi.service.phase-a|bi.service.phase-b"
+npx jest --runInBand --watchman=false --testPathPattern="bi-phase-a-real-snapshots|bi-merge-cases|bi.service.spec|channel.service.spec"
+pnpm run typecheck
+pnpm run lint:check
+pnpm run test:ci
+openspec validate refactor-chan-phase-a-time-stack --strict
+git diff --check
+```
+
+在 `mist-fe` 只验证、不得生成快照：`git diff --quiet`、`pnpm run typecheck`、`pnpm run lint`、
+`pnpm run test:ci`。记录后端/前端实际 suite 与 test 数、零快照变化、helper 源文件/接口符号
+均不存在的检查结果；勾选 7.4，提交 `docs(openspec): complete chan bi consolidation evidence`。
