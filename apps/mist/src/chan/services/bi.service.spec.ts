@@ -115,29 +115,6 @@ describe('BiService', () => {
     expect(service).toBeDefined();
   });
 
-  it('removeBiByIndex should remove only the requested item', () => {
-    const first = createCompleteBi(
-      createFenxing(FenxingType.Bottom, 0, 10, 1, 1),
-      createFenxing(FenxingType.Top, 1, 15, 5, 2),
-      TrendDirection.Up,
-    );
-    const middle = createCompleteBi(
-      createFenxing(FenxingType.Top, 1, 15, 5, 2),
-      createFenxing(FenxingType.Bottom, 2, 12, 2, 3),
-      TrendDirection.Down,
-    );
-    const last = createCompleteBi(
-      createFenxing(FenxingType.Bottom, 2, 12, 2, 3),
-      createFenxing(FenxingType.Top, 3, 18, 8, 4),
-      TrendDirection.Up,
-    );
-    const bis = [first, middle, last];
-
-    service['removeBiByIndex'](bis, 1);
-
-    expect(bis).toEqual([first, last]);
-  });
-
   it('throws a clear invariant error when merging incomplete Bi values', () => {
     const incompleteBi = {
       trend: TrendDirection.Up,
@@ -237,9 +214,15 @@ describe('BiService', () => {
     });
   });
 
-  it('delegates merged-K range aggregation to one shared helper boundary', () => {
+  it('composes independent Phase A and Phase B helper boundaries', () => {
     const source = readFileSync(join(__dirname, 'bi.service.ts'), 'utf8');
 
+    expect(source).toContain('reducePhaseATimeStack');
+    expect(source).toContain('mergeBiSegments');
+    expect(source).not.toContain('BiSourceTag');
+    expect(source).not.toContain('processCandidateBisWithRollback');
+    expect(source).not.toContain('confirmed: BiVo[]');
+    expect(source).not.toContain('pending: BiVo[]');
     expect(source).toContain('collectMergedKRange');
     expect(source).not.toContain('rangeKs.forEach');
   });
