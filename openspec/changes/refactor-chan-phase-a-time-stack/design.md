@@ -9,19 +9,21 @@
 完整的 `222 -> 282` 已经进入 confirmed；算法却选择 `206 -> 222`、`282 -> 283`、
 `283 -> 287` 作为三笔，最终扩张成 `206 -> 302 up(valid)`，内部八条 valid 笔仍然保留。
 
-Phase B 已经以独立纯算法文件 `bi-phase-b-merge.helper.ts` 实现变长区间归约。Phase A 采用
-同样的文件与回调边界，可以先独立证明单栈算法正确，再让 `BiService` 只负责组装两个阶段。
+Phase A 与 Phase B 已分别以独立纯算法文件完成规则和边界验证。当前收口不再需要 operations
+回调边界：两个算法将保留相同规则、以 `BiService` 私有方法直接调用既有原语，成为服务自身的
+两个顺序阶段。
 
 ## Goals / Non-Goals（目标与非目标）
 
 **目标：**
 
-- 新增一个无 NestJS 依赖的 Phase A 单文件纯算法。
+- 将已经独立验证的 Phase A 和 Phase B 算法内联到 `BiService`，并保留全部测试覆盖。
 - 使用一个严格连续的时间栈替代 `confirmed`/`pending` 双数组。
 - 每次候选入栈后，把连续栈顶三笔反复归约到局部固定点。
 - 无法合并的 valid、invalid 保持原有时间位置，完整交给 Phase B。
 - 把时间顺序和索引连续性变成构造不变量，而不是最终排序修补。
-- 先完成 helper 独立测试，再接入 `BiService`，最后联合验证 Phase A 与 Phase B。
+- 保留独立测试所覆盖的全部场景，迁移为 NestJS Test module 下的 service-phase 测试，再联合验证
+  Phase A 与 Phase B。
 - 使用完整沪深300和完整上证指数建立真实数据回归。
 
 **非目标：**
@@ -33,40 +35,29 @@ Phase B 已经以独立纯算法文件 `bi-phase-b-merge.helper.ts` 实现变长
 
 ## Decisions（技术决策）
 
-### 1. Phase A 使用独立纯算法单文件
+### 1. Phase A 与 Phase B 最终归属于 BiService
 
-新增文件：
-
-```text
-apps/mist/src/chan/services/bi-phase-a-time-stack.helper.ts
-```
-
-建议导出边界：
+独立 helper 是用于建立可控测试边界的中间验证步骤，稳定后不再是生产代码边界。最终由
+`BiService` 直接拥有以下私有方法：
 
 ```typescript
-export interface PhaseATimeStackOperations {
-  canMergeThreeBis(first: BiVo, middle: BiVo, third: BiVo): boolean;
-  mergeThreeBis(first: BiVo, third: BiVo): BiVo;
-  isCandidateBiValid(bi: BiVo): boolean;
-}
-
-export function reducePhaseATimeStack(
-  candidates: readonly BiVo[],
-  operations: PhaseATimeStackOperations,
-): BiVo[];
+private reducePhaseATimeStack(candidates: readonly BiVo[], data: MergedKVo[]): BiVo[];
+private isPhaseBMergeableSpan(
+  bis: readonly BiVo[],
+  headIndex: number,
+  tailIndex: number,
+): boolean;
+private mergeBiSegments(phaseABis: readonly BiVo[], data: MergedKVo[]): BiVo[];
 ```
 
-helper 只依赖 `BiVo` 与状态枚举，不依赖 `BiService`、NestJS 或合并 K 数据。`BiService` 通过
-箭头函数回调复用现有私有原语，并由闭包把 `data` 传给 `mergeThreeBis`。helper 克隆输入，
-不得修改候选数组或候选对象。
-
-选择 operations 回调而不是把 Phase A 留在 `BiService` 内，是为了与 Phase B 保持相同架构，
-同时允许独立测试时间栈状态转换。把 Phase A 和 Phase B 合并到同一 helper 被否决，因为两者
-归约规则与固定点范围不同。
+它们直接调用已有的 `canMergeThreeBis`、`mergeThreeBis(..., data)`、`canMergeTwoBis`、
+`mergeTwoBis(..., data)` 与 `isCandidateBiValid`。两个阶段仍是不同的私有方法，不能互相嵌套、
+不能改变各自的固定点范围；只是删除 `PhaseATimeStackOperations`、`PhaseBMergeOperations` 和
+仅为传递回调而存在的源文件。两阶段方法继续浅克隆输入，不能修改调用方数组或笔对象。
 
 ### 2. 单时间栈保持严格连续
 
-候选笔按分型时间顺序进入一个 `BiVo[]`。候选入栈前，helper 校验：
+候选笔按分型时间顺序进入一个 `BiVo[]`。候选入栈前，Phase A 私有方法校验：
 
 ```text
 stack.last.endFenxing.middleIndex == candidate.startFenxing.middleIndex
@@ -100,7 +91,7 @@ while 栈内至少有三笔:
 
 ### 4. 连续性在入栈和合并两个边界校验
 
-只在合并前校验还不够：栈不足三笔或栈顶三笔全 valid 时不会进入合并分支。因此 helper 必须：
+只在合并前校验还不够：栈不足三笔或栈顶三笔全 valid 时不会进入合并分支。因此 Phase A 私有方法必须：
 
 1. 候选入栈前校验它与当前栈尾连续；
 2. 三笔合并前再次复核两个共享边界。
@@ -110,38 +101,38 @@ while 栈内至少有三笔:
 
 ### 5. 每次合并都重新判定状态
 
-`mergeThreeBis` 继续返回 Unknown 状态。helper 使用 `isCandidateBiValid` 把合并产物重新标记为
+`mergeThreeBis` 继续返回 Unknown 状态。Phase A 私有方法使用 `isCandidateBiValid` 把合并产物重新标记为
 Valid 或 Invalid，再决定是否继续下一轮栈顶归约。重新产生的 Invalid 可以继续参与归约。
 
-### 6. 先独立验证 Phase A helper，再集成两个阶段
+### 6. 独立验证是中间步骤，最终直接调用服务原语
 
 实施顺序固定为：
 
 ```text
-Phase A helper 红灯单测
+Phase A/B helper 红灯单测
         ↓
-实现并让 Phase A helper 独立测试通过
+实现并让两个 helper 独立测试通过
         ↓
-保持 BiService 旧路径不变，确认 helper 本身稳定
+保留测试场景，迁移为 service-phase 测试
         ↓
-BiService 接入 reducePhaseATimeStack
+BiService 内联 reducePhaseATimeStack
         ↓
-BiService 将 Phase A 输出交给 mergeBiSegments
+BiService 内联 mergeBiSegments
         ↓
-运行完整真实数据与 Channel 联合回归
+删除 helper 源文件，运行完整真实数据与 Channel 联合回归
 ```
 
-最终 `BiService.getBi` 只组合两个独立算法文件：
+最终 `BiService.getBi` 直接顺序调用两个私有阶段方法：
 
 ```typescript
 const phaseA = buildFinalUncompleteBi(
-  reducePhaseATimeStack(candidates, phaseAOperations),
+  this.reducePhaseATimeStack(candidates, data),
   data,
 );
-const phaseB = mergeBiSegments(phaseA, phaseBOperations);
+const phaseB = this.mergeBiSegments(phaseA, data);
 ```
 
-两个 helper 不互相导入，也不合并成一个文件。
+两个方法保留相同的阶段边界，但不再通过 helper 文件或 operations 回调间接调用。
 
 ### 7. 完整沪深300与上证指数作为真实数据边界
 
@@ -165,8 +156,8 @@ const phaseB = mergeBiSegments(phaseA, phaseBOperations);
 
 ## Risks / Trade-offs（风险与权衡）
 
-- **[风险] Phase A 输出数量会明显变化。** → 后端结构测试通过后再刷新前端快照，并逐项审核
-  沪深300、上证指数、创业板和贵州茅台的 Phase A/Phase B 数量。
+- **[风险] 纯迁移意外改变输出。** → 完整真实数据、裁剪场景和前端已提交快照必须零变化；任何
+  数量或端点差异均按迁移失败处理，不刷新快照掩盖差异。
 - **[风险] Phase A 与 Phase B 在部分输入上结果相同。** → 若 Phase A 已清除所有可归约三笔，
   阶段相同是合法结果，不为展示差异增加人为停止条件。
 - **[风险] 两份完整真实快照增加仓库体积。** → 每个数据集只保存一份规范 fixture，并共享加载
@@ -178,13 +169,14 @@ const phaseB = mergeBiSegments(phaseA, phaseBOperations);
 
 ## Migration Plan（实施与回退）
 
-1. 加入完整沪深300和上证指数 fixture，确认沪深300在旧实现下按预期红灯。
-2. 为 Phase A helper 添加纯单元测试并实现 helper，不改 `BiService` 生产路径。
-3. helper 独立验证通过后，接入 `BiService` 并删除双数组逻辑。
-4. 运行完整沪深300、完整上证指数、原上证两个裁剪场景及 Channel 联合回归。
-5. 后端全量验证通过后，重新生成 `mist-fe` 快照并检查 `/chan-tests`。
+1. 保留已经完成的完整沪深300、完整上证指数和 helper 独立验证作为历史证据。
+2. 先迁移并验证 Phase A 时间栈；保留所有 7 个 helper 测试场景，改为 service-phase 测试。
+3. 再迁移并验证 Phase B invalid 区间归约；保留所有 9 个 helper 测试场景，改为 service-phase 测试。
+4. 删除两个 helper 源文件和 operations 接口，运行真实数据、裁剪场景、`BiService`、Channel 与
+   全量回归。
+5. 确认 `mist-fe` 没有 diff，前端测试和既有快照仍全部通过；本次不生成或更新快照。
 
-Phase A helper、`BiService` 集成和前端快照刷新保持可独立回退。Phase B helper 不在本次修改。
+Phase A 内联、Phase B 内联和最终证据保持独立提交，可分别回退；OpenSpec change 保持未归档。
 
 ## Open Questions（待确认问题）
 

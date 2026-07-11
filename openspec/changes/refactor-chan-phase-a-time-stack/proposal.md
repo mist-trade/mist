@@ -6,20 +6,21 @@ Phase A 目前把候选笔拆分到 `confirmed` 与 `pending` 两个数组。较
 其内部八条 valid 笔。
 
 Phase B 已负责消化 Phase A 遗留的多笔 invalid 区间，因此 Phase A 可以改成严格按时间排列
-的单栈，并把自己的“连续三笔”规则反复执行到局部固定点。为了保持算法边界清楚，新的
-Phase A 也应像 Phase B 一样先作为独立纯算法文件验证，再接入 `BiService`。
+的单栈，并把自己的“连续三笔”规则反复执行到局部固定点。两个阶段先以独立纯算法文件完成
+了行为验证；本 change 的最终收口是将已经稳定的规则直接归属到 `BiService`，减少 operations
+回调和跨文件跳转，同时保持原有的阶段边界与输出不变。
 
 ## What Changes
 
-- 新增单文件纯算法 `bi-phase-a-time-stack.helper.ts`，不依赖 NestJS，也不直接依赖行情数据。
-- helper 通过 operations 回调复用现有三笔合并、合并产物构造和 valid 判定原语。
+- 将已验证的 Phase A 时间栈与 Phase B invalid 区间归约内联为 `BiService` 私有方法；删除两个
+  helper 源文件和 operations 回调接口。
 - 候选笔按时间压入一个栈；每次入栈后反复归约栈顶三笔，直到不足三笔、三笔全 valid，或
   当前三笔无法合并。
 - 候选入栈前和三笔合并前都校验共享 `middleIndex` 边界，禁止跨越已经存在的时间区间。
 - 每次合并后重新判定 valid/invalid，并立即重新检查新的栈顶三笔。
 - 无法归约的 valid、invalid 全部原位保留，作为完整有序输入交给 Phase B。
-- 先独立验证 Phase A helper；通过后再由 `BiService` 组合 Phase A helper 与现有 Phase B
-  helper，两个算法文件继续保持分离。
+- 保留原 helper 的完整测试覆盖，迁移为使用 NestJS Test module 的 service-phase 测试；测试通过
+  `jest.spyOn` 验证 `BiService` 直接复用既有私有原语。
 - 增加完整沪深300与完整上证指数真实快照回归，同时保留上证指数现有两个裁剪场景的 6 个
   Phase B 测试。
 - 删除双数组来源标记、跨数组取尾、来源相关弹栈以及最终排序逻辑。
@@ -29,8 +30,8 @@ Phase A 也应像 Phase B 一样先作为独立纯算法文件验证，再接入
 
 ### New Capabilities
 
-- `chan-bi-phase-a-reduction`：定义 Phase A 独立纯算法边界、单时间栈、栈顶三笔循环归约、
-  与 Phase B 的分阶段集成，以及完整沪深300和上证指数回归要求。
+- `chan-bi-phase-a-reduction`：定义 Phase A/B 在 `BiService` 内的阶段边界、单时间栈、栈顶
+  三笔循环归约、invalid 区间固定点归约，以及完整沪深300和上证指数回归要求。
 
 ### Modified Capabilities
 
@@ -38,8 +39,9 @@ Phase A 也应像 Phase B 一样先作为独立纯算法文件验证，再接入
 
 ## Impact
 
-- 后端新增 `apps/mist/src/chan/services/bi-phase-a-time-stack.helper.ts` 及其独立测试。
-- `apps/mist/src/chan/services/bi.service.ts` 在 helper 独立验证后进行集成和双数组代码清理。
+- `apps/mist/src/chan/services/bi.service.ts` 直接拥有两个阶段的私有归约方法和双数组代码清理。
+- 删除 `bi-phase-a-time-stack.helper.ts`、`bi-phase-b-merge.helper.ts`，并把其测试改名为
+  `bi.service.phase-a.spec.ts`、`bi.service.phase-b.spec.ts`。
 - 后端新增完整沪深300（388 根合并 K）与完整上证指数（386 根合并 K）测试数据。
-- 后端通过后需要重新生成 `mist-fe` 的 Phase A/Phase B 快照，但不修改前端 API 或渲染协议。
+- 本次纯归属迁移不得改变 `mist-fe` 的任何阶段快照、前端 API 或渲染协议。
 - 不新增运行时依赖、开关、数据库变更或 HTTP 字段。
