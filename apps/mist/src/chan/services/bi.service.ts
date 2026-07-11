@@ -454,15 +454,23 @@ export class BiService {
       );
   }
 
+  /**
+   * Phase B：归约包含 Invalid 的同向首尾区间。
+   *
+   * 扫描顺序固定为“跨度从短到长、同跨度从左到右”。每轮只处理第一个
+   * 可归约区间，替换后再从最短跨度重新扫描，直到到达固定点。
+   */
   private mergeBiSegments(
     phaseABis: readonly BiVo[],
     data: MergedKVo[],
   ): BiVo[] {
+    // 浅克隆输入，避免 Phase B 修改调用方持有的 Phase A 数组和笔对象。
     const bis = phaseABis.map((bi) => ({ ...bi }));
 
     while (true) {
       let merged = false;
 
+      // 优先归约最短区间；同一跨度内优先选择时间上最靠左的区间。
       for (let spanLength = 2; spanLength <= bis.length; spanLength++) {
         for (
           let headIndex = 0;
@@ -479,6 +487,8 @@ export class BiService {
             bis[tailIndex],
             data,
           );
+          // 合并只保留首笔起点和尾笔终点；整段中间笔由新笔一次替换。
+          // 新笔必须重新判定状态，不能沿用任一端点笔原来的 Valid/Invalid。
           const replacement: BiVo = {
             ...mergedBi,
             status: this.isCandidateBiValid(mergedBi)
@@ -490,11 +500,13 @@ export class BiService {
           break;
         }
 
+        // 本轮命中后停止继续扫描，回到 while 起点重新检查新的最短窗口。
         if (merged) {
           break;
         }
       }
 
+      // 没有任何可归约区间即到达固定点；每次成功归约都会缩短数组，必然终止。
       if (!merged) {
         return bis;
       }
