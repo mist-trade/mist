@@ -214,11 +214,16 @@ describe('BiService', () => {
     });
   });
 
-  it('composes independent Phase A and Phase B helper boundaries', () => {
+  it('owns both Phase A and Phase B reductions inside BiService', () => {
     const source = readFileSync(join(__dirname, 'bi.service.ts'), 'utf8');
 
-    expect(source).toContain('reducePhaseATimeStack');
-    expect(source).toContain('mergeBiSegments');
+    expect(source).toContain('private reducePhaseATimeStack');
+    expect(source).toContain('private mergeBiSegments');
+    expect(source).toContain('private isPhaseBMergeableSpan');
+    expect(source).not.toContain('bi-phase-a-time-stack.helper');
+    expect(source).not.toContain('bi-phase-b-merge.helper');
+    expect(source).not.toContain('PhaseATimeStackOperations');
+    expect(source).not.toContain('PhaseBMergeOperations');
     expect(source).not.toContain('BiSourceTag');
     expect(source).not.toContain('processCandidateBisWithRollback');
     expect(source).not.toContain('confirmed: BiVo[]');
