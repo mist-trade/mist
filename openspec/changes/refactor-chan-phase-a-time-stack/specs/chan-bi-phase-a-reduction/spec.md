@@ -1,139 +1,155 @@
 ## ADDED Requirements
 
-### Requirement: Phase A maintains one chronological Bi stack
+### Requirement: Phase A 使用独立纯算法文件
 
-Phase A SHALL process complete candidate Bis in one time-ordered stack instead
-of splitting them between confirmed and pending collections. Every pair of
-neighboring Complete Bis in the Phase A result MUST share the same boundary
-index, and no final sort SHALL be required to repair their order.
+系统 SHALL 在 `bi-phase-a-time-stack.helper.ts` 中实现 Phase A 单时间栈归约。该文件 MUST
+不依赖 NestJS 或行情数据服务，并 MUST 通过 operations 回调接收三笔合并、合并产物构造与
+valid 判定能力。
 
-#### Scenario: Adjacent candidates remain in time order
+#### Scenario: 独立调用 Phase A helper
 
-- **WHEN** Phase A receives candidate Bis built from an alternating fenxing
-  sequence
-- **THEN** it SHALL push them in ascending fenxing time order
-- **AND** every neighboring Complete Bi pair SHALL satisfy
+- **WHEN** 测试向 Phase A helper 提供候选笔数组和 operations 回调
+- **THEN** helper SHALL 在不构造 `BiService` 或 NestJS Test module 的情况下返回归约结果
+- **AND** helper SHALL NOT 修改输入数组或输入笔对象
+
+#### Scenario: Phase A helper 独立验证后接入服务
+
+- **WHEN** Phase A helper 的纯单元测试尚未全部通过
+- **THEN** `BiService` SHALL NOT 切换到新的 helper 路径
+- **AND** 集成 SHALL 在 helper 独立验证通过后作为单独任务进行
+
+### Requirement: Phase A 维护一个严格连续的时间栈
+
+Phase A SHALL 使用一个按时间排序的栈处理 Complete 候选笔，不再拆分 confirmed 与 pending。
+每一对相邻 Complete Bi MUST 共享同一边界索引，最终结果 MUST NOT 依靠排序修复时间顺序。
+
+#### Scenario: 相邻候选保持时间顺序
+
+- **WHEN** Phase A 接收由交替分型序列生成的候选笔
+- **THEN** helper SHALL 按分型时间升序入栈
+- **AND** 每对相邻 Complete Bi SHALL 满足
   `previous.endFenxing.middleIndex == current.startFenxing.middleIndex`
 
-#### Scenario: Leading Invalid candidates are retained
+#### Scenario: leading Invalid 被保留
 
-- **WHEN** one or more leading Invalid candidate Bis cannot be reduced by the
-  three-Bi rule
-- **THEN** Phase A SHALL retain them at the beginning of the stack
-- **AND** it SHALL pass them to Phase B without clearing or reordering them
+- **WHEN** 一个或多个开头 Invalid 候选无法通过三笔规则归约
+- **THEN** Phase A SHALL 把它们保留在栈首
+- **AND** Phase A SHALL 不清除、不重排地把它们交给 Phase B
 
-#### Scenario: Final unfinished Bi is appended
+#### Scenario: 尾部未完成笔被构建
 
-- **WHEN** source data continues beyond the last Complete Bi fenxing
-- **THEN** Phase A SHALL build or extend only the trailing UnComplete Bi
-- **AND** the preceding Complete Bi stack SHALL remain in chronological order
+- **WHEN** 行情数据在最后一条 Complete Bi 分型之后仍有剩余
+- **THEN** `BiService` SHALL 只在 Phase A Complete 栈尾构建或延长一条 UnComplete Bi
+- **AND** 前面的 Complete Bi 时间栈 SHALL 保持不变
 
-### Requirement: Phase A reduces adjacent top-three Bis to a local fixed point
+### Requirement: Phase A 把相邻栈顶三笔循环归约到局部固定点
 
-After each candidate push, Phase A SHALL repeatedly inspect only the top three
-stack entries. It SHALL reduce those three when at least one is Invalid and the
-existing three-Bi merge predicate succeeds, then immediately reconsider the
-new stack top.
+每次候选入栈后，Phase A SHALL 只检查栈顶三笔。当三笔至少包含一条 Invalid 且现有三笔
+合并条件成立时，Phase A SHALL 合并三笔，并立即重新检查新的栈顶。
 
-#### Scenario: One candidate triggers cascading reductions
+#### Scenario: 一条新候选触发连续多次归约
 
-- **WHEN** a top-three reduction creates a replacement that forms another
-  mergeable top-three group with the preceding two stack entries
-- **THEN** Phase A SHALL perform the next reduction during the same candidate
-  step
-- **AND** it SHALL continue until the top three cannot be reduced
+- **WHEN** 一次栈顶三笔合并产物与前面的两笔重新组成可合并的栈顶三笔
+- **THEN** Phase A SHALL 在同一次候选处理过程中继续下一次合并
+- **AND** Phase A SHALL 继续执行，直到当前栈顶三笔无法再归约
 
-#### Scenario: Top three are all Valid
+#### Scenario: 栈顶三笔全部 Valid
 
-- **WHEN** all three top stack entries are Valid
-- **THEN** Phase A SHALL stop local reduction
-- **AND** it SHALL preserve all three entries
+- **WHEN** 栈顶三笔全部为 Valid
+- **THEN** Phase A SHALL 停止当前局部归约
+- **AND** Phase A SHALL 保留这三笔
 
-#### Scenario: Top three contain Invalid but cannot merge
+#### Scenario: 栈顶包含 Invalid 但无法合并
 
-- **WHEN** at least one top stack entry is Invalid and the existing three-Bi
-  merge predicate returns false
-- **THEN** Phase A SHALL stop local reduction for the current candidate
-- **AND** it SHALL retain all three entries for later candidates and Phase B
+- **WHEN** 栈顶至少一笔为 Invalid 且现有三笔合并条件返回 false
+- **THEN** Phase A SHALL 停止当前候选的局部归约
+- **AND** Phase A SHALL 保留这三笔供后续候选和 Phase B 使用
 
-#### Scenario: Successful reduction is revalidated
+#### Scenario: 合并产物重新判定状态
 
-- **WHEN** Phase A replaces three stack entries with one merged Bi
-- **THEN** it SHALL evaluate the merged Bi with the existing candidate-validity
-  predicate before any further reduction
-- **AND** the resulting Valid or Invalid status SHALL be used by the next
-  top-three decision
+- **WHEN** Phase A 用一条合并笔替换栈顶三笔
+- **THEN** helper SHALL 在下一次归约前使用现有候选有效性规则重新判定该笔
+- **AND** 下一次栈顶判断 SHALL 使用新的 Valid 或 Invalid 状态
 
-### Requirement: Phase A rejects non-contiguous stack input and reduction
+### Requirement: Phase A 拒绝不连续的入栈和三笔合并
 
-Phase A MUST verify index continuity before each candidate push and every
-three-Bi reduction. It MUST NOT accept a gap into the stack or merge across a
-Complete Bi range already present elsewhere in the stack.
+Phase A MUST 在候选入栈前及每次三笔合并前校验索引连续性。它 MUST NOT 把时间缺口压入栈，
+也 MUST NOT 跨越栈内已经存在的 Complete Bi 区间进行合并。
 
-#### Scenario: Incoming candidate does not continue the stack tail
+#### Scenario: 新候选未延续当前栈尾
 
-- **WHEN** a Complete candidate's start `middleIndex` differs from the current
-  Complete stack tail's end `middleIndex`
-- **THEN** Phase A SHALL report an internal invariant failure containing both
-  index ranges
-- **AND** it SHALL NOT push the discontinuous candidate
+- **WHEN** 新 Complete 候选的开始 `middleIndex` 与当前 Complete 栈尾的结束 `middleIndex`
+  不同
+- **THEN** helper SHALL 报告包含两个冲突索引范围的内部不变量错误
+- **AND** helper SHALL NOT 把不连续候选压入栈
 
-#### Scenario: Top-three boundaries are discontinuous
+#### Scenario: 栈顶三笔边界不连续
 
-- **WHEN** either `bi1.endFenxing.middleIndex` differs from
-  `bi2.startFenxing.middleIndex` or `bi2.endFenxing.middleIndex` differs from
-  `bi3.startFenxing.middleIndex`
-- **THEN** Phase A SHALL report an internal invariant failure containing the
-  offending index ranges
-- **AND** it SHALL NOT create a replacement Bi spanning the gap
+- **WHEN** `bi1.endFenxing.middleIndex` 不等于 `bi2.startFenxing.middleIndex`，或
+  `bi2.endFenxing.middleIndex` 不等于 `bi3.startFenxing.middleIndex`
+- **THEN** helper SHALL 报告包含冲突索引范围的内部不变量错误
+- **AND** helper SHALL NOT 创建跨越缺口的合并笔
 
-#### Scenario: Adjacent reduction preserves the outer boundary
+#### Scenario: 连续三笔合并保持外边界
 
-- **WHEN** three contiguous stack entries are successfully reduced
-- **THEN** the replacement SHALL start at the first entry's start fenxing
-- **AND** it SHALL end at the third entry's end fenxing
-- **AND** neighboring entries outside the replacement SHALL remain contiguous
+- **WHEN** 三条连续栈顶笔成功归约
+- **THEN** 合并产物 SHALL 使用第一笔的开始分型
+- **AND** 合并产物 SHALL 使用第三笔的结束分型
+- **AND** 替换项外侧的相邻笔 SHALL 继续保持连续
 
-### Requirement: Phase B receives the complete Phase A fixed point
+### Requirement: BiService 在独立验证后组合两个阶段
 
-Phase B SHALL receive the complete ordered Phase A output, including every
-unmergeable Invalid Bi, and SHALL continue to apply its standalone
-variable-length invalid-span reduction without a public API change.
+`BiService` SHALL 在 Phase A helper 独立测试通过后调用 `reducePhaseATimeStack`，并把完整 Phase A
+结果交给现有 `mergeBiSegments`。两个 helper MUST 保持独立文件，且公共接口 MUST 保持不变。
 
-#### Scenario: Phase A leaves residual Invalid Bis
+#### Scenario: Phase A 留下 residual Invalid
 
-- **WHEN** Phase A reaches a local fixed point with one or more Invalid Bis
-- **THEN** Phase B SHALL receive those Invalid Bis in the same chronological
-  positions
-- **AND** it MAY reduce a longer contiguous span under the existing Phase B
-  rules
+- **WHEN** Phase A 达到局部固定点但仍包含 Invalid
+- **THEN** Phase B SHALL 在相同时间位置接收到这些 Invalid
+- **AND** Phase B MAY 按现有变长区间规则继续归约
 
-#### Scenario: Consumer requests Bi results
+#### Scenario: 调用方请求笔结果
 
-- **WHEN** `BiService.getBi` completes both stages
-- **THEN** it SHALL continue returning `{ phaseA, phaseB }`
-- **AND** Channel processing SHALL continue consuming Phase B
+- **WHEN** `BiService.getBi` 完成两个阶段
+- **THEN** 它 SHALL 继续返回 `{ phaseA, phaseB }`
+- **AND** Channel SHALL 继续使用 Phase B
 
-### Requirement: Real-data regressions protect Phase A stack integrity
+#### Scenario: 两个 helper 保持分离
 
-The backend test suite SHALL include the complete CSI 300 2024-2025 merged-K
-snapshot and SHALL verify Phase A stack integrity before snapshot fixtures are
-regenerated for frontend inspection.
+- **WHEN** Phase A 与 Phase B 完成服务集成
+- **THEN** Phase A helper SHALL NOT 导入 Phase B helper
+- **AND** Phase B helper SHALL NOT 导入 Phase A helper
+- **AND** `BiService` SHALL 作为唯一组合边界
 
-#### Scenario: Refactored CSI 300 Phase A is structurally ordered
+### Requirement: 完整真实数据保护 Phase A 与 Phase B 回归
 
-- **WHEN** the single-stack Phase A implementation processes the full CSI 300
-  snapshot
-- **THEN** every neighboring Complete Bi pair SHALL be contiguous
-- **AND** no valid Complete Bi ranges SHALL overlap
-- **AND** Phase A SHALL contain no remaining mergeable adjacent three-Bi group
-- **AND** the previous `206 -> 302` / `222 -> 228` overlap witness SHALL be
-  absent
+后端测试套件 SHALL 包含完整沪深300 2024-2025 和完整上证指数 2024-2025 合并 K 快照，并在
+刷新前端快照之前验证两个阶段。
 
-#### Scenario: Existing Phase B real-data cases remain stable
+#### Scenario: 完整沪深300 Phase A 结构有序
 
-- **WHEN** the refactored Phase A feeds the existing October 2024 and May 2025
-  Phase B regression fixtures
-- **THEN** all six existing `bi-merge-cases` expectations SHALL pass
-- **AND** the expected long down and long up Phase B endpoints SHALL remain
-  unchanged
+- **WHEN** 单栈 Phase A 处理全部 388 根沪深300合并 K
+- **THEN** 每对相邻 Complete Bi SHALL 连续
+- **AND** valid Complete Bi SHALL 不发生重叠
+- **AND** Phase A SHALL 不存在仍可按三笔规则归约的相邻三笔
+- **AND** 旧的 `206 -> 302` / `222 -> 228` 重叠见证 SHALL 不存在
+
+#### Scenario: 完整上证指数保持关键回归结果
+
+- **WHEN** 单栈 Phase A 与现有 Phase B 处理全部 386 根上证指数合并 K
+- **THEN** Phase A SHALL 输出 35 笔，Phase B SHALL 输出 25 笔
+- **AND** Phase A SHALL 保留 `142 -> 146 down(invalid)`
+- **AND** Phase B SHALL 输出 `142 -> 195 down(valid)`
+- **AND** Phase B SHALL 输出 `266 -> 317 up(valid)`
+
+#### Scenario: 原有上证指数裁剪场景保持稳定
+
+- **WHEN** 新 Phase A 为现有 2024 年 10 月与 2025 年 5–8 月上证指数测试数据提供输入
+- **THEN** `bi-merge-cases` 现有 6 个测试 SHALL 全部通过
+- **AND** 原有长 down 与长 up 的 Phase B 端点 SHALL 保持不变
+
+#### Scenario: 前端快照在后端验证后刷新
+
+- **WHEN** Phase A helper、BiService 集成和完整真实数据测试全部通过
+- **THEN** `mist-fe` SHALL 重新生成 Phase A/Phase B 快照
+- **AND** `/chan-tests` SHALL 用新快照检查沪深300、上证指数、创业板和贵州茅台
