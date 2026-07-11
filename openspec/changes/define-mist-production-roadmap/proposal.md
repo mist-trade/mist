@@ -1,53 +1,66 @@
+# Change: Rebaseline the Mist production roadmap
+
 ## Why
 
-Mist now has working repositories for backend, datasource, deployment,
-frontend, monitoring, and AstrBot skills, but the remaining work is spread
-across multiple active changes and runtime-only verification paths. We need one
-top-level roadmap spec so each follow-up can enter its own focused OpenSpec
-change without losing the production dependency order.
+The original production roadmap was written on 2026-07-01, before the current
+production baseline, TDX provider boundary, Windows recovery split, monitoring
+repairs, API standardization, and strategy-platform work were completed. Its
+unchecked task count now mixes real future work with changes that have already
+been completed, archived, or intentionally superseded.
+
+The current active work is narrower and more concrete:
+
+- `preview-chan-bi-phases` is complete and awaiting archive.
+- `repair-chan-bi-overlap-rendering` is an in-progress correctness repair that
+  follows the phase-preview work.
+- `add-bigqmt-datasource-bridge` is implemented locally but still requires real
+  Windows full-QMT history and realtime evidence.
+- TDX realtime behavior still needs one explicit product contract instead of
+  inheriting stale assumptions from the abandoned broad datasource refactor.
+
+The roadmap therefore needs a current-state reset that preserves historical
+decisions while exposing only the work that can still affect production
+readiness.
 
 ## What Changes
 
-- Add an overall production roadmap contract that defines the sequence for
-  stabilizing Mist after the Docker + host datasource migration.
-- Define how cross-repo work is split into independent follow-up specs for
-  production verification, TDX realtime behavior, OpenSpec cleanup, Windows
-  guard validation, monitoring/AstrBot operations, frontend console work, and
-  engineering hygiene.
-- Require every follow-up spec to name its owning repository, runtime impact,
-  verification commands, Windows-only evidence, and archive condition.
-- Keep this change as planning and governance only; it does not implement
-  runtime code, deployment changes, UI changes, or service recovery behavior.
-- Avoid turning the roadmap into one large implementation change. Each roadmap
-  item must become a separate change before development or live validation.
+- Replace the old P0/P1/P2/P3 bucket list with ordered production readiness
+  gates:
+  - G0 current-state reconciliation;
+  - G1 data and analysis path readiness;
+  - G2 production operations readiness;
+  - G3 frontend operator experience readiness;
+  - G4 engineering repeatability and roadmap closure.
+- Add a disposition ledger that separates `completed`, `superseded`, `deferred`,
+  and `dropped` work from the executable backlog.
+- Register the active Chan overlap repair and BigQMT live validation as G1
+  blockers, and retain a focused TDX realtime-contract child change in G1.
+- Re-scope monitoring, guard, and AstrBot work around the remaining production
+  operations control plane instead of recreating already completed foundations.
+- Keep the strategy-platform roadmap and other product feature roadmaps outside
+  this production-readiness change; reference their disposition without
+  duplicating their tasks.
+- Require every gate and child change to name owners, exact verification,
+  external dependencies, and an exit disposition.
 
 ## Capabilities
 
 ### New Capabilities
 
-- `mist-production-roadmap`: Cross-repository roadmap, decomposition,
-  verification evidence, and readiness-gate requirements for the next Mist
-  production stabilization phase.
+- `mist-production-roadmap`: Gate-driven cross-repository production readiness,
+  current-state disposition, child-change sequencing, evidence requirements,
+  and archive criteria.
 
 ### Modified Capabilities
 
-None. Existing runtime capabilities remain governed by their own specs and
-follow-up changes.
+None. Runtime and product capabilities remain governed by their focused specs.
 
 ## Impact
 
-- Affects planning and verification across:
-  - `mist`
-  - `mist-datasource`
-  - `mist-deploy`
-  - `mist-fe`
-  - `mist-monitoring`
-  - `mist-skills`
-- References existing active changes:
-  - `add-tdx-desktop-guard`
-  - `refactor-tdx-python-datasource`
-  - `align-tdx-qmt-datasource-contracts`
-- Produces no direct code or deployment changes.
-- Follow-up changes may later modify backend datasource behavior, datasource
-  WebSocket behavior, deployment workflows, monitoring deployment, AstrBot
-  operations, frontend UX, and test/tooling configuration.
+- Updates planning artifacts only under
+  `openspec/changes/define-mist-production-roadmap/`.
+- Coordinates future work across `mist`, `mist-datasource`, `mist-deploy`,
+  `mist-fe`, `mist-monitoring`, and `mist-skills`.
+- Does not modify runtime code, database schemas, deployment configuration, or
+  production state.
+- Child changes remain independently implementable, verifiable, and archivable.
