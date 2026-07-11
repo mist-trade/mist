@@ -28,9 +28,9 @@
 
 ## 5. 刷新并检查前端阶段快照
 
-- [ ] 5.1 后端验证全部通过后，在 `mist-fe` 运行 `pnpm run snapshots:generate`，审核沪深300、上证指数、创业板和贵州茅台的 Phase A/Phase B 数量变化。
-- [ ] 5.2 在 `mist-fe` 运行 `pnpm run typecheck`、`pnpm run lint` 和 `pnpm run test:ci`。
-- [ ] 5.3 在 `/chan-tests` 检查四个完整数据集，确认 Phase A 重叠消失；如 Phase B 仍存在结构连续但跨度较长的笔，只记录为后续 change，不在本次修改 Phase B。
+- [x] 5.1 后端验证全部通过后，在 `mist-fe` 运行 `pnpm run snapshots:generate`，审核沪深300、上证指数、创业板和贵州茅台的 Phase A/Phase B 数量变化。
+- [x] 5.2 在 `mist-fe` 运行 `pnpm run typecheck`、`pnpm run lint` 和 `pnpm run test:ci`。
+- [x] 5.3 在 `/chan-tests` 检查四个完整数据集，确认 Phase A 重叠消失；如 Phase B 仍存在结构连续但跨度较长的笔，只记录为后续 change，不在本次修改 Phase B。
 
 ## 6. 校验与交付
 
