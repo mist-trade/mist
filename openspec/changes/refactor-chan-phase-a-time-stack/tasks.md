@@ -34,5 +34,5 @@
 
 ## 6. 校验与交付
 
-- [ ] 6.1 运行 `openspec validate refactor-chan-phase-a-time-stack --strict`，并记录 helper 独立验证、服务集成、完整真实数据和页面检查证据。
-- [ ] 6.2 审查最终 diff，确认路线图、BigQMT 和已归档预览等无关工作未被修改，并确认 Phase A helper、BiService 集成和前端快照是可独立回退的边界。
+- [x] 6.1 运行 `openspec validate refactor-chan-phase-a-time-stack --strict`，并记录 helper 独立验证、服务集成、完整真实数据和页面检查证据。
+- [x] 6.2 审查最终 diff，确认路线图、BigQMT 和已归档预览等无关工作未被修改，并确认 Phase A helper、BiService 集成和前端快照是可独立回退的边界。
