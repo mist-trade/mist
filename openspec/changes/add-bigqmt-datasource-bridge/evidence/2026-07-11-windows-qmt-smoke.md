@@ -93,3 +93,23 @@ Realtime was not exercised:
 
 Therefore task `7.5` remains open and realtime collection remains disabled or
 explicitly unverified until a trading-session smoke is recorded.
+
+## History revalidation — 2026-07-14
+
+Task `7.4` was rerun against the real Windows full-QMT runtime without a
+datasource restart. GitHub Actions run
+[29307560313](https://github.com/mist-trade/mist-deploy/actions/runs/29307560313)
+completed successfully in 46 seconds on `mist-api-windows-01` using
+`mist-deploy@bd6b2b0721c336345bc0396d62541ea41cf4c63d`.
+
+The run requested `000001.SZ`, `count=2`, and covered
+`1d/1m/3m/5m/15m/30m/1h/1w/1mon/1q/1hy/1y`. Every period returned
+`ok=true`, `source=bridge`, 12 native fields, and two rows. Representative
+fresh indexes included `20260713` for `1d`, `20260714130400` for `1m`, and
+`20260714113000` for `5m`.
+
+The official-field probes for `1d`, `1m`, and `tick` also returned successfully.
+Bridge health reported `ownerId=bigqmt-8988`, and the `health`,
+`get_market_data_ex`, and `get_stock_list_in_sector` bridge commands completed.
+`get_full_tick` was explicitly disabled in this history-only revalidation, so
+the separate realtime task `7.5` remains unchanged.
