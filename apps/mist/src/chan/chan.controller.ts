@@ -4,6 +4,8 @@ import { Throttle } from '@nestjs/throttler';
 import { ChanService } from './chan.service';
 import { CreateBiDto } from './dto/create-bi.dto';
 import { CreateChannelDto } from './dto/create-channel.dto';
+import { ChannelTwoPhaseResponseVo } from './vo/channel.vo';
+import { BiTwoPhaseResponseVo } from './vo/bi.vo';
 import { MergeKDto } from './dto/merge-k.dto';
 import { IndicatorQueryDto } from '../indicator/dto/query/indicator-query.dto';
 import { ChannelService } from './services/channel.service';
@@ -81,8 +83,9 @@ export class ChanController {
   })
   @ApiResponse({
     status: 200,
-    description: 'Returns array of Bi data',
-    type: [CreateBiDto],
+    description:
+      'Returns an API envelope whose data contains the two-phase Bi result { phaseA, phaseB }',
+    type: BiTwoPhaseResponseVo,
   })
   async postIndexBi(@Body() queryDto: IndicatorQueryDto) {
     const { startDate, endDate } = this.parseQueryDateRange(queryDto);
@@ -154,12 +157,13 @@ export class ChanController {
   @ApiOperation({
     summary: 'Create Channels (Zhongshu)',
     description:
-      'Identifies and creates channels (central regions) from Bi data',
+      'Identifies and creates channels (central regions) from Bi data. Returns a two-phase result: phaseA (all enumerated base channels) and phaseB (merged final channels).',
   })
   @ApiResponse({
     status: 200,
-    description: 'Returns array of channel data',
-    type: [CreateChannelDto],
+    description:
+      'Returns an API envelope whose data contains the two-phase channel result { phaseA, phaseB }',
+    type: ChannelTwoPhaseResponseVo,
   })
   async postChannel(@Body() queryDto: IndicatorQueryDto) {
     const { startDate, endDate } = this.parseQueryDateRange(queryDto);
@@ -187,6 +191,7 @@ export class ChanController {
     const biData = await this.chanService.createBi(createBiDto);
     // channel 用 phaseB（消化 invalid 残留后的干净序列）
     const createChannelDto: CreateChannelDto = { bi: biData.phaseB };
+    // 返回两阶段中枢结果 { phaseA, phaseB }
     return this.channelService.createChannel(createChannelDto);
   }
 }

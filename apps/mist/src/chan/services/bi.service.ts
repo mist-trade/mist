@@ -7,6 +7,7 @@ import { BiVo } from '../vo/bi.vo';
 import { FenxingVo } from '../vo/fenxing.vo';
 import { MergedKVo } from '../vo/merged-k.vo';
 import { collectMergedKRange, uniqueKById } from './bi-range.helper';
+import { mergeSpans } from './span-merge.helper';
 
 type CompleteBiWithFenxings = BiVo & {
   startFenxing: FenxingVo;
@@ -418,99 +419,46 @@ export class BiService {
     return stack;
   }
 
-  private isPhaseBMergeableSpan(
-    bis: readonly BiVo[],
-    headIndex: number,
-    tailIndex: number,
-  ): boolean {
-    const span = bis.slice(headIndex, tailIndex + 1);
-    if (
-      !span.every(
-        (bi) => bi.type === BiType.Complete && bi.startFenxing && bi.endFenxing,
-      )
-    ) {
-      return false;
-    }
-
-    const head = bis[headIndex];
-    const tail = bis[tailIndex];
-    if (head.trend !== tail.trend) {
-      return false;
-    }
-    if (!span.some((bi) => bi.status === BiStatus.Invalid)) {
-      return false;
-    }
-    if (!this.canMergeTwoBis(head, tail)) {
-      return false;
-    }
-
-    const envelopeHigh = Math.max(head.highest, tail.highest);
-    const envelopeLow = Math.min(head.lowest, tail.lowest);
-    return span
-      .slice(1, -1)
-      .every(
-        (middle) =>
-          middle.highest <= envelopeHigh && middle.lowest >= envelopeLow,
-      );
-  }
-
   /**
    * Phase B：归约包含 Invalid 的同向首尾区间。
    *
    * 扫描顺序固定为“跨度从短到长、同跨度从左到右”。每轮只处理第一个
    * 可归约区间，替换后再从最短跨度重新扫描，直到到达固定点。
+   *
+   * 合并驱动由共享的 {@link mergeSpans} 提供，Bi 领域谓词（完成态/同向/
+   * canMergeTwoBis/envelope/mergeTwoBis/重新判状态）通过 operations 注入。
    */
   private mergeBiSegments(
     phaseABis: readonly BiVo[],
     data: MergedKVo[],
   ): BiVo[] {
-    // 浅克隆输入，避免 Phase B 修改调用方持有的 Phase A 数组和笔对象。
-    const bis = phaseABis.map((bi) => ({ ...bi }));
-
-    while (true) {
-      let merged = false;
-
-      // 优先归约最短区间；同一跨度内优先选择时间上最靠左的区间。
-      for (let spanLength = 2; spanLength <= bis.length; spanLength++) {
-        for (
-          let headIndex = 0;
-          headIndex + spanLength <= bis.length;
-          headIndex++
-        ) {
-          const tailIndex = headIndex + spanLength - 1;
-          if (!this.isPhaseBMergeableSpan(bis, headIndex, tailIndex)) {
-            continue;
-          }
-
-          const mergedBi = this.mergeTwoBis(
-            bis[headIndex],
-            bis[tailIndex],
-            data,
+    return mergeSpans(phaseABis, {
+      isCompleteItem: (bi) =>
+        bi.type === BiType.Complete && !!bi.startFenxing && !!bi.endFenxing,
+      isSameDirection: (head, tail) => head.trend === tail.trend,
+      spanHasInvalid: (span) =>
+        span.some((bi) => bi.status === BiStatus.Invalid),
+      canMergeTwo: (head, tail) => this.canMergeTwoBis(head, tail),
+      middleFitsEnvelope: (span) => {
+        const head = span[0];
+        const tail = span[span.length - 1];
+        const envelopeHigh = Math.max(head.highest, tail.highest);
+        const envelopeLow = Math.min(head.lowest, tail.lowest);
+        return span
+          .slice(1, -1)
+          .every(
+            (middle) =>
+              middle.highest <= envelopeHigh && middle.lowest >= envelopeLow,
           );
-          // 合并只保留首笔起点和尾笔终点；整段中间笔由新笔一次替换。
-          // 新笔必须重新判定状态，不能沿用任一端点笔原来的 Valid/Invalid。
-          const replacement: BiVo = {
-            ...mergedBi,
-            status: this.isCandidateBiValid(mergedBi)
-              ? BiStatus.Valid
-              : BiStatus.Invalid,
-          };
-          bis.splice(headIndex, spanLength, replacement);
-          merged = true;
-          break;
-        }
-
-        // 本轮命中后停止继续扫描，回到 while 起点重新检查新的最短窗口。
-        if (merged) {
-          break;
-        }
-      }
-
-      // 没有任何可归约区间即到达固定点；每次成功归约都会缩短数组，必然终止。
-      if (!merged) {
-        return bis;
-      }
-    }
+      },
+      mergeTwo: (head, tail) => this.mergeTwoBis(head, tail, data),
+      stampStatus: (merged) => ({
+        ...merged,
+        status: this.isCandidateBiValid(merged)
+          ? BiStatus.Valid
+          : BiStatus.Invalid,
+      }),
+    });
   }
 
   /**

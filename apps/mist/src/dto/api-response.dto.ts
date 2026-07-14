@@ -18,6 +18,9 @@ export class ApiResponseDto<T> {
 
   @ApiProperty({ example: 'http-1710819800000-abc123xyz' })
   requestId!: string;
+
+  @ApiProperty({ example: '/v1/chan/channel' })
+  path!: string;
 }
 
 export class ApiErrorDto {
