@@ -219,7 +219,9 @@ describe('BiService', () => {
 
     expect(source).toContain('private reducePhaseATimeStack');
     expect(source).toContain('private mergeBiSegments');
-    expect(source).toContain('private isPhaseBMergeableSpan');
+    // Phase B 驱动已抽离到共享 span-merge.helper.ts，BiService 注入领域谓词。
+    expect(source).toContain('mergeSpans(');
+    expect(source).not.toContain('private isPhaseBMergeableSpan');
     expect(source).not.toContain('bi-phase-a-time-stack.helper');
     expect(source).not.toContain('bi-phase-b-merge.helper');
     expect(source).not.toContain('PhaseATimeStackOperations');

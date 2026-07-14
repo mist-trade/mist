@@ -5,3 +5,4 @@ export * from './services/period-mapping.service';
 export * from './services/data-source-selection.service';
 export * from './services/k-boundary-calculator';
 export * from './security-code';
+export * from './aggregate';
