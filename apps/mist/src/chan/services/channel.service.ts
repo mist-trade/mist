@@ -7,7 +7,6 @@ import {
   ChannelStatus,
   ChannelType,
 } from '../enums/channel.enum';
-import { TrendDirection } from '../enums/trend-direction.enum';
 import { BiVo } from '../vo/bi.vo';
 import { ChannelVo } from '../vo/channel.vo';
 import { mergeSpans } from './span-merge.helper';
@@ -206,48 +205,15 @@ export class ChannelService {
   }
 
   /**
-   * 验证候选中枢是否有效。
+   * 验证候选中枢是否有效（标准缠论定义）。
    *
-   * 候选必须满足基础重叠、内部笔范围与首尾极值关系。Phase A 保留未通过
-   * 后两项的候选并标记 Invalid，供 Phase B 作为跨区间归约的中间状态。
+   * 中枢成立只看 zg > zd（3 段重叠）+ 至少 3 笔，不附加极值/范围强校验。
+   * 极值关系只在延伸(extendChannel)和后续走势判断里用，不影响中枢是否成立。
    * @param channel 候选中枢
    * @returns 是否有效
    */
   private isCandidateChannelValid(channel: ChannelVo): boolean {
-    return (
-      channel.bis.length >= 3 &&
-      channel.zg > channel.zd &&
-      this.validateChannelRange(channel) &&
-      this.validateExtremeCondition(channel)
-    );
-  }
-
-  private validateChannelRange(channel: ChannelVo): boolean {
-    if (channel.bis.length < 3) {
-      return false;
-    }
-
-    const firstBi = channel.bis[0];
-    const lastBi = channel.bis.at(-1)!;
-    return channel.bis.slice(1, -1).every((bi) => {
-      if (channel.trend === TrendDirection.Down) {
-        return bi.highest <= firstBi.highest && bi.lowest >= lastBi.lowest;
-      }
-      return bi.highest <= lastBi.highest && bi.lowest >= firstBi.lowest;
-    });
-  }
-
-  private validateExtremeCondition(channel: ChannelVo): boolean {
-    if (channel.bis.length < 2) {
-      return false;
-    }
-
-    const firstBi = channel.bis[0];
-    const lastBi = channel.bis.at(-1)!;
-    if (channel.trend === TrendDirection.Up) {
-      return lastBi.highest > firstBi.highest && lastBi.lowest > firstBi.lowest;
-    }
-    return lastBi.highest < firstBi.highest && lastBi.lowest < firstBi.lowest;
+    return channel.bis.length >= 3 && channel.zg > channel.zd;
   }
 
   /**

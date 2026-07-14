@@ -157,11 +157,12 @@ describe('ChannelService', () => {
       expect(channel.bis.length).toBeGreaterThanOrEqual(5);
     });
 
-    it('stamps a detected channel that fails the range rule as Invalid', () => {
+    it('stamps each detected base channel as Valid (zg>zd suffices)', () => {
       const result = service.createChannel({ bi: buildOverlappingFiveBis() });
 
-      expect(result.phaseA[0].status).toBe(ChannelStatus.Invalid);
-      expect(result.phaseB).toHaveLength(0);
+      // 标准缠论：zg>zd + ≥3 笔即有效，无过严的极值/范围校验
+      expect(result.phaseA[0].status).toBe(ChannelStatus.Valid);
+      expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
     });
 
     it('stamps a detected channel that passes range and extreme rules as Valid', () => {
