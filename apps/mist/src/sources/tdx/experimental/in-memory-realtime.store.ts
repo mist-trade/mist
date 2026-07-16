@@ -55,6 +55,12 @@ export class InMemoryRealtimeStore {
     this.currentEpoch = null;
   }
 
+  /** Clear all stored state (epoch + snapshots). Used when ready reports null owner. */
+  clearAll(): void {
+    this.currentEpoch = null;
+    this.states.clear();
+  }
+
   /**
    * Apply a snapshot only if epoch matches and sequence is strictly newer.
    * Synchronous CAS — no await between check and set.
@@ -109,7 +115,13 @@ export class InMemoryRealtimeStore {
     const state = this.states.get(key);
     if (!state) return null;
     const age = state.receivedAt ? Date.now() - state.receivedAt : null;
-    const fresh = age !== null && age <= STALE_AFTER_MS && this.connected;
+    // Fresh only if: connected, recent, AND state epoch matches current epoch.
+    const fresh =
+      age !== null &&
+      age <= STALE_AFTER_MS &&
+      this.connected &&
+      this.currentEpoch !== null &&
+      state.currentEpoch === this.currentEpoch;
     return {
       snapshot: state.latestSnapshot,
       epoch: state.currentEpoch,
