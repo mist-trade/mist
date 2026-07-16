@@ -15,7 +15,7 @@ import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { scheduleEnvSchema } from '@app/config';
 import { DataCollectionController } from './data-collection.controller';
-import { CollectorModule } from '../../mist/src/collector/collector.module';
+import { HistoricalCollectorModule } from '../../mist/src/collector/historical-collector.module';
 import { StrategyCoreModule } from '../../mist/src/strategy/strategy-core.module';
 import { TimezoneModule } from '@app/timezone';
 import * as path from 'path';
@@ -69,7 +69,7 @@ import * as path from 'path';
       inject: [ConfigService],
     }),
     NestScheduleModule.forRoot(),
-    CollectorModule,
+    HistoricalCollectorModule,
     StrategyCoreModule,
     TimezoneModule,
   ],

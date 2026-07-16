@@ -20,7 +20,9 @@ import * as path from 'path';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ChanModule } from './chan/chan.module';
-import { CollectorModule } from './collector/collector.module';
+import { HistoricalCollectorModule } from './collector/historical-collector.module';
+import { LegacyTdxRealtimeModule } from './sources/tdx/legacy-tdx-realtime.module';
+import { ExperimentalTdxRealtimeModule } from './sources/tdx/experimental/experimental-tdx-realtime.module';
 import { IndicatorModule } from './indicator/indicator.module';
 import { SecurityModule } from './security/security.module';
 import { mistEnvSchema } from '@app/config';
@@ -83,7 +85,7 @@ import { StrategyModule } from './strategy/strategy.module';
       },
       inject: [ConfigService],
     }),
-    CollectorModule,
+    ...realtimeModulesForMode(process.env.TDX_REALTIME_MODE),
     IndicatorModule,
     SecurityModule,
     ChanModule,
@@ -93,3 +95,21 @@ import { StrategyModule } from './strategy/strategy.module';
   providers: [AppService],
 })
 export class AppModule {}
+
+/**
+ * Returns the realtime modules to import based on TDX_REALTIME_MODE.
+ * - legacy (default): Historical + Legacy realtime
+ * - builtin_experimental: Historical + Experimental realtime
+ * - off: Historical only
+ */
+function realtimeModulesForMode(mode: string | undefined) {
+  const normalized = (mode ?? 'legacy').trim().toLowerCase();
+  if (normalized === 'builtin_experimental') {
+    return [HistoricalCollectorModule, ExperimentalTdxRealtimeModule];
+  }
+  if (normalized === 'off') {
+    return [HistoricalCollectorModule];
+  }
+  // legacy (default)
+  return [HistoricalCollectorModule, LegacyTdxRealtimeModule];
+}
