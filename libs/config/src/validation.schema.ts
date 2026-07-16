@@ -72,6 +72,20 @@ export const mistEnvSchema = commonEnvSchema.append({
     .default(30000)
     .description('TDX WebSocket heartbeat interval in milliseconds'),
 
+  // Experimental TDX realtime pathway mode (mutual-exclusive).
+  TDX_REALTIME_MODE: Joi.string()
+    .valid('legacy', 'builtin_experimental', 'off')
+    .default('legacy')
+    .description(
+      'TDX realtime mode: legacy (default), builtin_experimental, or off',
+    ),
+
+  TDX_EXPERIMENTAL_ALLOWLIST: Joi.string()
+    .default('')
+    .description(
+      'Comma-separated exact formatCodes for experimental realtime (max 5)',
+    ),
+
   // QMT historical bars datasource configuration
   QMT_BASE_URL: Joi.string()
     .uri()

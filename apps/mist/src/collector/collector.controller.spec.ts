@@ -2,7 +2,7 @@ import { BadRequestException } from '@nestjs/common';
 import { DataSource, Period } from '@app/shared-data';
 import { CollectorController } from './collector.controller';
 
-describe('CollectorController test-only TDX streaming endpoint', () => {
+describe('CollectorController collect endpoint (historical only)', () => {
   const createHarness = () => {
     const security = { id: 2, code: '600030' };
     const securityService = {
@@ -15,116 +15,56 @@ describe('CollectorController test-only TDX streaming endpoint', () => {
         },
       ]),
     };
-    const registry = { resolve: jest.fn() };
-    const timezoneService = { parseDateString: jest.fn() };
-    const tdxStreamingStrategy = {
-      collectForSecurity: jest.fn().mockResolvedValue(1),
-      unsubscribeForSecurity: jest.fn().mockResolvedValue(1),
+    const strategy = { collectForSecurity: jest.fn().mockResolvedValue(5) };
+    const registry = { resolve: jest.fn().mockReturnValue(strategy) };
+    const timezoneService = {
+      parseDateString: jest.fn().mockReturnValue(new Date('2026-01-01')),
     };
     const controller = new CollectorController(
       securityService as any,
       registry as any,
       timezoneService as any,
-      tdxStreamingStrategy as any,
-    ) as any;
+    );
 
-    return { controller, security, securityService, tdxStreamingStrategy };
+    return { controller, security, securityService, registry, strategy };
   };
 
-  it('subscribes through the existing backend TDX WebSocket leader for smoke tests', async () => {
-    const { controller, security, securityService, tdxStreamingStrategy } =
-      createHarness();
+  it('collects via the resolved historical strategy', async () => {
+    const { controller, strategy } = createHarness();
 
     await expect(
-      controller.subscribeTdxStreaming({
+      controller.collect({
         code: '600030',
         period: Period.ONE_MIN,
-        testOnly: true,
+        source: DataSource.TDX,
+        startDate: '2026-01-01',
+        endDate: '2026-01-02',
       }),
     ).resolves.toEqual({
       code: '600030',
       period: Period.ONE_MIN,
-      count: 1,
-      testOnly: true,
+      count: 5,
     });
 
-    expect(securityService.findSecurityByCode).toHaveBeenCalledWith('600030');
-    expect(securityService.getSecuritySources).toHaveBeenCalledWith('600030');
-    expect(tdxStreamingStrategy.collectForSecurity).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ...security,
-        sourceConfigs: [
-          expect.objectContaining({
-            source: DataSource.TDX,
-            enabled: true,
-            formatCode: '600030.SH',
-          }),
-        ],
-      }),
+    expect(strategy.collectForSecurity).toHaveBeenCalledWith(
+      expect.objectContaining({ code: '600030' }),
       Period.ONE_MIN,
+      expect.any(Date),
+      expect.any(Date),
     );
   });
 
-  it('rejects smoke subscriptions when the security has no enabled TDX source', async () => {
-    const { controller, securityService, tdxStreamingStrategy } =
-      createHarness();
-    securityService.getSecuritySources.mockResolvedValue([
-      {
-        source: DataSource.EAST_MONEY,
-        enabled: true,
-        formatCode: '600030',
-      },
-    ]);
+  it('rejects collect when no enabled source is configured', async () => {
+    const { controller, securityService } = createHarness();
+    securityService.getSecuritySources.mockResolvedValue([]);
 
     await expect(
-      controller.subscribeTdxStreaming({
+      controller.collect({
         code: '600030',
         period: Period.ONE_MIN,
-        testOnly: true,
+        startDate: '2026-01-01',
+        endDate: '2026-01-02',
       }),
     ).rejects.toThrow(BadRequestException);
-    expect(tdxStreamingStrategy.collectForSecurity).not.toHaveBeenCalled();
-  });
-
-  it('requires an explicit testOnly flag before changing streaming subscriptions', async () => {
-    const { controller, tdxStreamingStrategy } = createHarness();
-
-    await expect(
-      controller.subscribeTdxStreaming({
-        code: '600030',
-        period: Period.ONE_MIN,
-      }),
-    ).rejects.toThrow(BadRequestException);
-    expect(tdxStreamingStrategy.collectForSecurity).not.toHaveBeenCalled();
-  });
-
-  it('unsubscribes a test streaming security through the backend leader', async () => {
-    const { controller, security, tdxStreamingStrategy } = createHarness();
-
-    await expect(
-      controller.unsubscribeTdxStreaming({
-        code: '600030',
-        period: Period.ONE_MIN,
-        testOnly: true,
-      }),
-    ).resolves.toEqual({
-      code: '600030',
-      period: Period.ONE_MIN,
-      count: 1,
-      testOnly: true,
-    });
-
-    expect(tdxStreamingStrategy.unsubscribeForSecurity).toHaveBeenCalledWith(
-      expect.objectContaining({
-        ...security,
-        sourceConfigs: [
-          expect.objectContaining({
-            source: DataSource.TDX,
-            enabled: true,
-            formatCode: '600030.SH',
-          }),
-        ],
-      }),
-    );
   });
 });
