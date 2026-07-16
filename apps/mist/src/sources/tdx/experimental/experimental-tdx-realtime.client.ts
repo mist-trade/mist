@@ -33,6 +33,7 @@ interface ReadyPayload {
   draftRevision?: number;
   acquisitionProfile?: string;
   currentStreamEpoch?: string | null;
+  currentGeneration?: number | null;
   datasourceBuildId?: string;
   bridgeBuildId?: string | null;
 }
@@ -58,6 +59,8 @@ export class ExperimentalTdxRealtimeClient
   private contractRejected = false;
   // Tracks whether a valid ready has been received on this connection.
   private readyReceived = false;
+  // Highest generation seen (monotonicity fence for stream_started).
+  private lastGeneration: number | null = null;
 
   constructor(
     private readonly configService: ConfigService,
@@ -97,6 +100,7 @@ export class ExperimentalTdxRealtimeClient
       // Do NOT markConnected yet — wait for a valid `ready` with matching contract.
       this.contractRejected = false;
       this.readyReceived = false;
+      this.lastGeneration = null;
     });
 
     this.ws.on('message', (data: WebSocket.RawData) => {
@@ -177,6 +181,10 @@ export class ExperimentalTdxRealtimeClient
     // Contract accepted — mark connected (deferred from TCP open).
     this.contractRejected = false;
     this.readyReceived = true;
+    this.lastGeneration =
+      typeof payload.currentGeneration === 'number'
+        ? payload.currentGeneration
+        : null;
     this.store.markConnected();
     if (payload.currentStreamEpoch) {
       this.logger.log(`ready: recovering epoch ${payload.currentStreamEpoch}`);
@@ -193,8 +201,8 @@ export class ExperimentalTdxRealtimeClient
       this.logger.warn('stream_started ignored: contract rejected');
       return;
     }
-    // Validate mode: only accept builtin_experimental stream_started.
-    if (payload.mode && payload.mode !== 'builtin_experimental') {
+    // Strict mode check: must be exactly builtin_experimental.
+    if (payload.mode !== 'builtin_experimental') {
       this.logger.warn(`stream_started ignored: mode=${payload.mode}`);
       return;
     }
@@ -202,8 +210,23 @@ export class ExperimentalTdxRealtimeClient
       this.logger.warn('stream_started ignored: no valid ready received first');
       return;
     }
+    // Generation monotonicity: reject stale (lower) generation broadcasts.
+    const gen = (payload as Record<string, unknown>).generation;
+    if (
+      typeof gen === 'number' &&
+      this.lastGeneration !== null &&
+      gen <= this.lastGeneration
+    ) {
+      this.logger.warn(
+        `stream_started ignored: stale generation ${gen} <= ${this.lastGeneration}`,
+      );
+      return;
+    }
+    if (typeof gen === 'number') this.lastGeneration = gen;
     if (payload.streamEpoch) {
-      this.logger.log(`stream_started: new epoch ${payload.streamEpoch}`);
+      this.logger.log(
+        `stream_started: new epoch ${payload.streamEpoch} gen=${gen}`,
+      );
       this.store.beginEpoch(payload.streamEpoch);
     }
   }
