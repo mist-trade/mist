@@ -56,6 +56,8 @@ export class ExperimentalTdxRealtimeClient
   // Contract rejected flag: set when ready carries a mismatched contract tuple.
   // Once rejected, stream_started and snapshots are ignored until a valid ready.
   private contractRejected = false;
+  // Tracks whether a valid ready has been received on this connection.
+  private readyReceived = false;
 
   constructor(
     private readonly configService: ConfigService,
@@ -94,6 +96,7 @@ export class ExperimentalTdxRealtimeClient
       this.logger.log('experimental WS TCP connected');
       // Do NOT markConnected yet — wait for a valid `ready` with matching contract.
       this.contractRejected = false;
+      this.readyReceived = false;
     });
 
     this.ws.on('message', (data: WebSocket.RawData) => {
@@ -145,6 +148,14 @@ export class ExperimentalTdxRealtimeClient
   }
 
   private handleReady(payload: ReadyPayload): void {
+    // Mode check: must be builtin_experimental.
+    if (payload.mode !== 'builtin_experimental') {
+      this.logger.error(
+        `ready mode mismatch: got ${payload.mode ?? 'undefined'}, expected builtin_experimental`,
+      );
+      this.contractRejected = true;
+      return;
+    }
     // Contract tuple check (exact match, no degradation).
     if (
       payload.payloadType !== ACCEPTED_CONTRACT_TUPLE.payloadType ||
@@ -165,6 +176,7 @@ export class ExperimentalTdxRealtimeClient
     }
     // Contract accepted — mark connected (deferred from TCP open).
     this.contractRejected = false;
+    this.readyReceived = true;
     this.store.markConnected();
     if (payload.currentStreamEpoch) {
       this.logger.log(`ready: recovering epoch ${payload.currentStreamEpoch}`);
@@ -177,6 +189,10 @@ export class ExperimentalTdxRealtimeClient
   private handleStreamStarted(payload: StreamStartedPayload): void {
     if (this.contractRejected) {
       this.logger.warn('stream_started ignored: contract rejected');
+      return;
+    }
+    if (!this.readyReceived) {
+      this.logger.warn('stream_started ignored: no valid ready received first');
       return;
     }
     if (payload.streamEpoch) {
