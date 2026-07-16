@@ -50,7 +50,9 @@ export class InMemoryRealtimeStore {
 
   markDisconnected(): void {
     this.connected = false;
-    // Data retained but marked inactive (lazy stale on read).
+    // Clear epoch so stale snapshots from before disconnect cannot match
+    // after reconnect until a new ready/stream_started establishes epoch.
+    this.currentEpoch = null;
   }
 
   /**

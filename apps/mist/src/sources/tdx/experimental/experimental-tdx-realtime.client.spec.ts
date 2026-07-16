@@ -75,6 +75,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
       JSON.stringify({
         type: 'ready',
         data: {
+          mode: 'builtin_experimental',
           payloadType: 'tdx.realtime.snapshot',
           schemaVersion: 0,
           draftRevision: 1,
@@ -105,6 +106,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
       JSON.stringify({
         type: 'ready',
         data: {
+          mode: 'builtin_experimental',
           payloadType: 'tdx.realtime.snapshot',
           schemaVersion: 0,
           draftRevision: 1,
@@ -125,6 +127,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
       JSON.stringify({
         type: 'ready',
         data: {
+          mode: 'builtin_experimental',
           payloadType: 'tdx.realtime.snapshot',
           schemaVersion: 0,
           draftRevision: 1,
@@ -154,6 +157,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
       JSON.stringify({
         type: 'ready',
         data: {
+          mode: 'builtin_experimental',
           payloadType: 'tdx.realtime.snapshot',
           schemaVersion: 0,
           draftRevision: 1,
@@ -172,6 +176,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
       JSON.stringify({
         type: 'ready',
         data: {
+          mode: 'builtin_experimental',
           payloadType: 'tdx.realtime.snapshot',
           schemaVersion: 0,
           draftRevision: 1,
