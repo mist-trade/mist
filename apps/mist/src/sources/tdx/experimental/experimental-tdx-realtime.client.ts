@@ -182,13 +182,20 @@ export class ExperimentalTdxRealtimeClient
       this.logger.log(`ready: recovering epoch ${payload.currentStreamEpoch}`);
       this.store.beginEpoch(payload.currentStreamEpoch);
     } else {
-      this.logger.log('ready: no active owner/epoch yet');
+      // No active owner — clear old state so stale snapshots don't appear fresh.
+      this.logger.log('ready: no active owner/epoch, clearing store');
+      this.store.clearAll();
     }
   }
 
   private handleStreamStarted(payload: StreamStartedPayload): void {
     if (this.contractRejected) {
       this.logger.warn('stream_started ignored: contract rejected');
+      return;
+    }
+    // Validate mode: only accept builtin_experimental stream_started.
+    if (payload.mode && payload.mode !== 'builtin_experimental') {
+      this.logger.warn(`stream_started ignored: mode=${payload.mode}`);
       return;
     }
     if (!this.readyReceived) {
