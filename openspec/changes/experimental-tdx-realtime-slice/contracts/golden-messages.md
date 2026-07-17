@@ -98,10 +98,15 @@ state, record stable error + metric.
   "type": "stream_started",
   "data": {
     "streamEpoch": "owner-def-generation-4",
+    "generation": 4,
     "mode": "builtin_experimental"
   }
 }
 ```
+
+`generation` is a REQUIRED positive integer (monotonically increasing). The
+Mist client MUST reject `stream_started` with missing, non-integer, or
+non-positive `generation`, and MUST reject any `generation <= lastGeneration`.
 
 Already-connected clients receive this when the terminal owner generation
 changes. The Mist store invalidates the old epoch before accepting new
@@ -119,11 +124,16 @@ snapshots.
     "draftRevision": 1,
     "acquisitionProfile": "tdx.get_market_snapshot",
     "currentStreamEpoch": "owner-def-generation-4",
+    "currentGeneration": 4,
     "datasourceBuildId": "mist-datasource@sha-abc123",
     "bridgeBuildId": "mist-tdx-bridge@sha-def456"
   }
 }
 ```
+
+`currentGeneration` is a REQUIRED positive integer (or `null` when no owner is
+active). When non-null, the client MUST initialize `lastGeneration` to this
+value as the monotonicity baseline.
 
 Late-connecting or reconnecting clients recover the current epoch via `ready`.
 `currentStreamEpoch` may be `null` if no owner is active. Snapshots never

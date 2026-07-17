@@ -210,19 +210,22 @@ export class ExperimentalTdxRealtimeClient
       this.logger.warn('stream_started ignored: no valid ready received first');
       return;
     }
-    // Generation monotonicity: reject stale (lower) generation broadcasts.
+    // Generation is REQUIRED (positive integer). Reject if missing/invalid.
     const gen = (payload as Record<string, unknown>).generation;
-    if (
-      typeof gen === 'number' &&
-      this.lastGeneration !== null &&
-      gen <= this.lastGeneration
-    ) {
+    if (typeof gen !== 'number' || !Number.isInteger(gen) || gen < 1) {
+      this.logger.warn(
+        `stream_started ignored: generation missing or invalid (${gen})`,
+      );
+      return;
+    }
+    // Monotonicity: reject stale (lower or equal) generation.
+    if (this.lastGeneration !== null && gen <= this.lastGeneration) {
       this.logger.warn(
         `stream_started ignored: stale generation ${gen} <= ${this.lastGeneration}`,
       );
       return;
     }
-    if (typeof gen === 'number') this.lastGeneration = gen;
+    this.lastGeneration = gen;
     if (payload.streamEpoch) {
       this.logger.log(
         `stream_started: new epoch ${payload.streamEpoch} gen=${gen}`,
