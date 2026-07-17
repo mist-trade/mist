@@ -83,6 +83,7 @@ export class InMemoryRealtimeStore {
         lastSequence: 0,
         latestSnapshot: null,
         receivedAt: null,
+        capturedAt: null,
       };
       this.states.set(key, state);
     }
@@ -97,6 +98,7 @@ export class InMemoryRealtimeStore {
     state.lastSequence = sequence;
     state.latestSnapshot = snapshot;
     state.receivedAt = Date.now();
+    state.capturedAt = snapshot.capturedAt;
     return true;
   }
 
@@ -109,26 +111,54 @@ export class InMemoryRealtimeStore {
     epoch: string | null;
     lastSequence: number;
     receivedAt: number | null;
+    capturedAt: string | null;
+    captureToReceiveLatencyMs: number | null;
     fresh: boolean;
     stale: boolean;
+    staleReason: string | null;
   } | null {
     const state = this.states.get(key);
     if (!state) return null;
-    const age = state.receivedAt ? Date.now() - state.receivedAt : null;
-    // Fresh only if: connected, recent, AND state epoch matches current epoch.
-    const fresh =
-      age !== null &&
-      age <= STALE_AFTER_MS &&
-      this.connected &&
-      this.currentEpoch !== null &&
-      state.currentEpoch === this.currentEpoch;
+    const now = Date.now();
+    const age = state.receivedAt ? now - state.receivedAt : null;
+
+    // Compute terminal→Mist latency from capturedAt vs receivedAt.
+    let captureToReceiveLatencyMs: number | null = null;
+    if (state.capturedAt && state.receivedAt) {
+      const capturedMs = Date.parse(state.capturedAt);
+      if (!Number.isNaN(capturedMs)) {
+        captureToReceiveLatencyMs = state.receivedAt - capturedMs;
+      }
+    }
+
+    // Determine freshness with all factors.
+    let staleReason: string | null = null;
+    if (!this.connected) staleReason = 'disconnected';
+    else if (this.currentEpoch === null) staleReason = 'noEpoch';
+    else if (state.currentEpoch !== this.currentEpoch)
+      staleReason = 'epochMismatch';
+    else if (age === null || age > STALE_AFTER_MS) staleReason = 'ageStale';
+    // Check frame-level quality.stale (terminal/provider marked it stale).
+    else if (state.latestSnapshot?.quality?.stale === true)
+      staleReason = 'qualityStale';
+    // Check terminal→Mist latency (if > threshold, data is transit-stale).
+    else if (
+      captureToReceiveLatencyMs !== null &&
+      captureToReceiveLatencyMs > STALE_AFTER_MS
+    )
+      staleReason = 'transitStale';
+
+    const fresh = staleReason === null;
     return {
       snapshot: state.latestSnapshot,
       epoch: state.currentEpoch,
       lastSequence: state.lastSequence,
       receivedAt: state.receivedAt,
+      capturedAt: state.capturedAt,
+      captureToReceiveLatencyMs,
       fresh,
       stale: !fresh,
+      staleReason,
     };
   }
 

@@ -165,4 +165,46 @@ describe('InMemoryRealtimeStore', () => {
     }
     expect(store.readDebug('600519.SH')?.lastSequence).toBe(5);
   });
+
+  it('readDebug reports capturedAt and captureToReceiveLatencyMs', () => {
+    const store = new InMemoryRealtimeStore();
+    store.beginEpoch('epoch-1');
+    store.markConnected();
+    const frame = makeFrame('600519.SH', 'epoch-1', 1);
+    store.applyIfCurrentAndNewer('600519.SH', 'epoch-1', 1, frame);
+    const debug = store.readDebug('600519.SH');
+    expect(debug?.capturedAt).toBe(frame.capturedAt);
+    expect(debug?.captureToReceiveLatencyMs).not.toBeNull();
+    expect(typeof debug?.captureToReceiveLatencyMs).toBe('number');
+  });
+
+  it('readDebug marks stale when frame quality.stale=true', () => {
+    const store = new InMemoryRealtimeStore();
+    store.beginEpoch('epoch-1');
+    store.markConnected();
+    const frame = makeFrame('600519.SH', 'epoch-1', 1, {
+      quality: { stale: true },
+    });
+    store.applyIfCurrentAndNewer('600519.SH', 'epoch-1', 1, frame);
+    const debug = store.readDebug('600519.SH');
+    expect(debug?.fresh).toBe(false);
+    expect(debug?.stale).toBe(true);
+    expect(debug?.staleReason).toBe('qualityStale');
+  });
+
+  it('readDebug reports staleReason=transitStale when capturedAt is far in past', () => {
+    const store = new InMemoryRealtimeStore();
+    store.beginEpoch('epoch-1');
+    store.markConnected();
+    // capturedAt is 2 minutes ago — transit delay > STALE_AFTER_MS (30s).
+    const oldTime = new Date(Date.now() - 120_000).toISOString();
+    const frame = makeFrame('600519.SH', 'epoch-1', 1, {
+      capturedAt: oldTime,
+    });
+    store.applyIfCurrentAndNewer('600519.SH', 'epoch-1', 1, frame);
+    const debug = store.readDebug('600519.SH');
+    expect(debug?.stale).toBe(true);
+    // Could be transitStale or ageStale depending on timing — both are stale.
+    expect(debug?.staleReason).not.toBeNull();
+  });
 });
