@@ -1,7 +1,11 @@
-import { realtimeModulesForMode } from './app.module';
+import {
+  qmtRealtimeModulesForMode,
+  realtimeModulesForMode,
+} from './app.module';
 import { HistoricalCollectorModule } from './collector/historical-collector.module';
 import { LegacyTdxRealtimeModule } from './sources/tdx/legacy-tdx-realtime.module';
 import { ExperimentalTdxRealtimeModule } from './sources/tdx/experimental/experimental-tdx-realtime.module';
+import { ExperimentalQmtRealtimeModule } from './sources/qmt/experimental/experimental-qmt-realtime.module';
 
 describe('TDX realtime mode module matrix', () => {
   it('uses legacy realtime by default', () => {
@@ -27,6 +31,24 @@ describe('TDX realtime mode module matrix', () => {
   it('fails closed for an unknown mode', () => {
     expect(() => realtimeModulesForMode('typo')).toThrow(
       'Unsupported TDX_REALTIME_MODE',
+    );
+  });
+});
+
+describe('QMT realtime mode module matrix', () => {
+  it('is off by default', () => {
+    expect(qmtRealtimeModulesForMode(undefined)).toEqual([]);
+  });
+
+  it('imports only the independent QMT experimental module when enabled', () => {
+    expect(qmtRealtimeModulesForMode('builtin_experimental')).toEqual([
+      ExperimentalQmtRealtimeModule,
+    ]);
+  });
+
+  it('fails closed for an unknown QMT mode', () => {
+    expect(() => qmtRealtimeModulesForMode('legacy')).toThrow(
+      'Unsupported QMT_REALTIME_MODE',
     );
   });
 });

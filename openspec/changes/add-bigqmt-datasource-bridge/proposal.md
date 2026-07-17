@@ -12,8 +12,9 @@ This change updates the design to the current decision:
 - QMT historical bars return `marketData`, not the TDX bar row model.
 - QMT historical bars use native `get_market_data_ex(..., subscribe=False)` as
   the product path; local DAT is fallback/debug evidence only.
-- The existing backend QMT realtime strategy path remains in scope as
-  unverified realtime work; historical bars do not validate or delete it.
+- The historical scope is complete; experimental QMT realtime ownership is
+  transferred to `converge-theme-a-realtime-bridges`, and historical bars do
+  not validate or enable it.
 - The full-QMT bridge uses stdlib HTTP polling only.
 
 ## What Changes
@@ -40,6 +41,9 @@ This change updates the design to the current decision:
   strategy script load/register/delete as manual QMT client actions.
 - Keep account, position, order, deal, cancel, and placement APIs out of this
   market datasource.
+- Transfer all remaining QMT realtime validation and no-K experimental work to
+  `converge-theme-a-realtime-bridges` without importing a product-persistence
+  requirement into this historical change.
 
 ## Capabilities
 

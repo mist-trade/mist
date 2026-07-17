@@ -19,8 +19,9 @@ same schema.
 - Serve QMT historical bars through full-QMT native
   `get_market_data_ex(..., subscribe=False)` as the production path.
 - Keep local DAT parsing only as fallback/debug evidence.
-- Preserve the backend QMT realtime strategy path as existing but unverified
-  work; do not count historical bars as realtime validation.
+- Transfer experimental QMT realtime ownership to
+  `converge-theme-a-realtime-bridges`; do not count historical bars as realtime
+  validation or enablement.
 - Keep TDX `:9001` TDX-only.
 
 ## Non-Goals
@@ -128,11 +129,13 @@ bridge.
 TDX request models do not contain a QMT provider selector. A caller that wants
 QMT history bars must call QMT `:9002/v1/bars/query`.
 
-### QMT realtime remains unverified
+### QMT realtime ownership is transferred
 
-Mist backend keeps the QMT WebSocket collection strategy path as an existing
-stub. This change does not validate QMT realtime subscriptions or payloads;
-that requires a separate smoke/test pass.
+This historical change does not validate or enable QMT realtime subscriptions
+or payloads. `converge-theme-a-realtime-bridges` owns the separately gated,
+memory-only experimental transport and its trading-session evidence. The
+transfer closes this parent scope without claiming live success or K
+persistence.
 
 ### QMT datasource deployment
 
@@ -161,4 +164,6 @@ on the running full-QMT client environment and operator-selected strategy model.
 3. Keep HTTP bridge owner/poll/result/health tests.
 4. Run Windows smoke with real QMT `1d`, `1m`, `3m`, `5m`, `15m`, `30m`,
    `1h`, `1w`, `1mon`, `1q`, `1hy`, and `1y` requests.
-5. Run a separate QMT realtime smoke before enabling realtime collection.
+5. Transfer QMT realtime verification to
+   `converge-theme-a-realtime-bridges`; that change remains incomplete until
+   its separate Windows evidence passes.

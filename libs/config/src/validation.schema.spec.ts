@@ -35,10 +35,26 @@ describe('mistEnvSchema data source configuration', () => {
       ...baseEnv,
       QMT_BASE_URL: 'http://127.0.0.1:9002',
       QMT_WS_CLIENT_ID: 'mist-backend-qmt-live',
+      QMT_REALTIME_MODE: 'builtin_experimental',
+      QMT_EXPERIMENTAL_ALLOWLIST: '600519.SH',
     });
 
     expect(error).toBeUndefined();
     expect(value.QMT_BASE_URL).toBe('http://127.0.0.1:9002');
     expect(value.QMT_WS_CLIENT_ID).toBe('mist-backend-qmt-live');
+    expect(value.QMT_REALTIME_MODE).toBe('builtin_experimental');
+    expect(value.QMT_EXPERIMENTAL_ALLOWLIST).toBe('600519.SH');
+  });
+
+  it('defaults QMT realtime off and rejects unknown modes', () => {
+    const defaults = mistEnvSchema.validate(baseEnv);
+    expect(defaults.error).toBeUndefined();
+    expect(defaults.value.QMT_REALTIME_MODE).toBe('off');
+
+    const invalid = mistEnvSchema.validate({
+      ...baseEnv,
+      QMT_REALTIME_MODE: 'legacy',
+    });
+    expect(invalid.error?.message).toContain('QMT_REALTIME_MODE');
   });
 });

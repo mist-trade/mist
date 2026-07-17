@@ -96,6 +96,23 @@ export const mistEnvSchema = commonEnvSchema.append({
   QMT_WS_CLIENT_ID: Joi.string()
     .default('mist-backend-qmt')
     .description('WebSocket client ID for QMT realtime data source connection'),
+
+  QMT_WS_RECONNECT_DELAY_MS: Joi.number()
+    .integer()
+    .positive()
+    .default(5000)
+    .description('QMT WebSocket reconnect delay in milliseconds'),
+
+  QMT_REALTIME_MODE: Joi.string()
+    .valid('off', 'builtin_experimental')
+    .default('off')
+    .description('QMT realtime mode: off (default) or builtin_experimental'),
+
+  QMT_EXPERIMENTAL_ALLOWLIST: Joi.string()
+    .default('')
+    .description(
+      'Comma-separated exact QMT formatCodes for experimental realtime (max 5)',
+    ),
 });
 
 /**
