@@ -181,17 +181,33 @@ export class ExperimentalTdxRealtimeClient
     // Contract accepted — mark connected (deferred from TCP open).
     this.contractRejected = false;
     this.readyReceived = true;
-    this.lastGeneration =
-      typeof payload.currentGeneration === 'number'
-        ? payload.currentGeneration
-        : null;
     this.store.markConnected();
-    if (payload.currentStreamEpoch) {
-      this.logger.log(`ready: recovering epoch ${payload.currentStreamEpoch}`);
-      this.store.beginEpoch(payload.currentStreamEpoch);
-    } else {
-      // No active owner — clear old state so stale snapshots don't appear fresh.
+
+    // Atomic epoch/generation pairing:
+    // - (null epoch, null generation) = no active owner → clear state.
+    // - (non-null epoch, positive int generation) = active owner → establish baseline.
+    // - Any mismatch (epoch without generation, or vice versa) → reject.
+    const epoch = payload.currentStreamEpoch ?? null;
+    const gen = payload.currentGeneration ?? null;
+    if (epoch === null && gen === null) {
       this.logger.log('ready: no active owner/epoch, clearing store');
+      this.lastGeneration = null;
+      this.store.clearAll();
+    } else if (
+      epoch !== null &&
+      typeof gen === 'number' &&
+      Number.isInteger(gen) &&
+      gen >= 1
+    ) {
+      this.logger.log(`ready: recovering epoch ${epoch} gen=${gen}`);
+      this.lastGeneration = gen;
+      this.store.beginEpoch(epoch);
+    } else {
+      this.logger.error(
+        `ready: invalid epoch/generation pairing (epoch=${epoch}, gen=${gen}), rejecting`,
+      );
+      this.contractRejected = true;
+      this.readyReceived = false;
       this.store.clearAll();
     }
   }
@@ -210,11 +226,19 @@ export class ExperimentalTdxRealtimeClient
       this.logger.warn('stream_started ignored: no valid ready received first');
       return;
     }
-    // Generation is REQUIRED (positive integer). Reject if missing/invalid.
+    // Atomic validation: BOTH epoch (non-empty string) AND generation (positive
+    // int) must be valid before committing ANY state. No partial updates.
     const gen = (payload as Record<string, unknown>).generation;
-    if (typeof gen !== 'number' || !Number.isInteger(gen) || gen < 1) {
+    const epoch = payload.streamEpoch;
+    if (
+      typeof epoch !== 'string' ||
+      epoch.length === 0 ||
+      typeof gen !== 'number' ||
+      !Number.isInteger(gen) ||
+      gen < 1
+    ) {
       this.logger.warn(
-        `stream_started ignored: generation missing or invalid (${gen})`,
+        `stream_started ignored: invalid epoch/generation (epoch=${epoch}, gen=${gen})`,
       );
       return;
     }
@@ -225,13 +249,10 @@ export class ExperimentalTdxRealtimeClient
       );
       return;
     }
+    // Commit both atomically (no await between, synchronous).
     this.lastGeneration = gen;
-    if (payload.streamEpoch) {
-      this.logger.log(
-        `stream_started: new epoch ${payload.streamEpoch} gen=${gen}`,
-      );
-      this.store.beginEpoch(payload.streamEpoch);
-    }
+    this.logger.log(`stream_started: new epoch ${epoch} gen=${gen}`);
+    this.store.beginEpoch(epoch);
   }
 
   private handleSnapshot(data: Record<string, unknown>): void {

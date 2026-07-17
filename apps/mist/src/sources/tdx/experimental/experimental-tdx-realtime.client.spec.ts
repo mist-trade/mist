@@ -81,6 +81,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
           draftRevision: 1,
           acquisitionProfile: 'tdx.get_market_snapshot',
           currentStreamEpoch: 'epoch-1',
+          currentGeneration: 1,
         },
       }),
     );
@@ -112,6 +113,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
           draftRevision: 1,
           acquisitionProfile: 'tdx.get_market_snapshot',
           currentStreamEpoch: 'epoch-1',
+          currentGeneration: 1,
         },
       }),
     );
@@ -133,6 +135,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
           draftRevision: 1,
           acquisitionProfile: 'tdx.get_market_snapshot',
           currentStreamEpoch: 'epoch-1',
+          currentGeneration: 1,
         },
       }),
     );
@@ -163,6 +166,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
           draftRevision: 1,
           acquisitionProfile: 'tdx.get_market_snapshot',
           currentStreamEpoch: 'epoch-1',
+          currentGeneration: 1,
         },
       }),
     );
@@ -182,6 +186,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
           draftRevision: 1,
           acquisitionProfile: 'tdx.get_market_snapshot',
           currentStreamEpoch: 'epoch-1',
+          currentGeneration: 1,
         },
       }),
     );
@@ -190,5 +195,57 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
       makeSnapshotData({ streamEpoch: 'different-epoch', sequence: 1 }),
     );
     expect(store.readDebug('600519.SH')).toBeNull();
+  });
+
+  it('rejects ready with epoch but missing generation (atomic pairing)', async () => {
+    const { client, store } = makeClient();
+    // ready has epoch but no generation — must reject, not set lastGeneration=null.
+    await (client as any).handleMessage(
+      JSON.stringify({
+        type: 'ready',
+        data: {
+          mode: 'builtin_experimental',
+          payloadType: 'tdx.realtime.snapshot',
+          schemaVersion: 0,
+          draftRevision: 1,
+          acquisitionProfile: 'tdx.get_market_snapshot',
+          currentStreamEpoch: 'epoch-4',
+          // currentGeneration intentionally MISSING
+        },
+      }),
+    );
+    // Store should be cleared (no epoch established).
+    expect(store.currentStreamEpoch).toBeNull();
+  });
+
+  it('rejects stale stream_started after ready with generation baseline', async () => {
+    const { client, store } = makeClient();
+    // Establish generation baseline = 4.
+    await (client as any).handleMessage(
+      JSON.stringify({
+        type: 'ready',
+        data: {
+          mode: 'builtin_experimental',
+          payloadType: 'tdx.realtime.snapshot',
+          schemaVersion: 0,
+          draftRevision: 1,
+          acquisitionProfile: 'tdx.get_market_snapshot',
+          currentStreamEpoch: 'epoch-4',
+          currentGeneration: 4,
+        },
+      }),
+    );
+    // Stale stream_started with generation=1 → must reject.
+    await (client as any).handleMessage(
+      JSON.stringify({
+        type: 'stream_started',
+        data: {
+          streamEpoch: 'stale-epoch',
+          generation: 1,
+          mode: 'builtin_experimental',
+        },
+      }),
+    );
+    expect(store.currentStreamEpoch).toBe('epoch-4'); // not stale-epoch
   });
 });
