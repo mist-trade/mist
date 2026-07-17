@@ -51,6 +51,9 @@ business side effects.
     `ExperimentalTdxRealtimeClient`, exact identity resolver, in-memory latest
     store, diagnostic readback. Imported by mist only when
     `mode=builtin_experimental`.
+- Remove the obsolete aggregate `CollectorModule` implementation and its stale
+  provider test after the split. The collector barrel exports
+  `HistoricalCollectorModule`; no compatibility export may bypass mode gating.
 - New independent `ExperimentalTdxRealtimeClient` (does **not** extend
   `TdxWebSocketService` or reuse `readNumber`/`readTimestamp`). Consumes typed
   wire; strictly validates JSON number/null, RFC3339, epoch, sequence, exact

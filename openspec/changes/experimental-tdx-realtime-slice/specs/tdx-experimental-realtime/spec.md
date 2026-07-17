@@ -38,6 +38,12 @@ side effects in any mode.
   `off`
 - **THEN** the process MUST fail to bootstrap
 
+#### Scenario: Obsolete aggregate collector module
+- **WHEN** the post-split Mist module graph and collector barrel are inspected
+- **THEN** the pre-split `CollectorModule` MUST NOT exist or be exported
+- **AND** callers MUST use `HistoricalCollectorModule` plus exactly one
+  mode-selected realtime module
+
 #### Scenario: Sampled K never writes the k table
 - **WHEN** the experimental path is active in any mode
 - **THEN** the experimental Mist module MUST NOT call `saveRawKData`,
