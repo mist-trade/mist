@@ -51,6 +51,7 @@ export class ExperimentalTdxRealtimeClient
   private readonly wsUrl: string;
   private readonly clientId: string;
   private readonly reconnectDelayMs: number;
+  private readonly desiredEndpoint: string;
   private ws: WebSocket | null = null;
   private isShuttingDown = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
@@ -72,6 +73,7 @@ export class ExperimentalTdxRealtimeClient
     this.clientId =
       this.configService.get<string>('TDX_WS_CLIENT_ID') ??
       'mist-backend-tdx-experimental';
+    this.desiredEndpoint = `${baseUrl}/tdx/bridge/desired`;
     const wsBaseUrl = baseUrl.replace(/^http/, 'ws');
     this.wsUrl = `${wsBaseUrl}/ws/tdx-experimental/${this.clientId}`;
     this.reconnectDelayMs = this.configService.get<number>(
@@ -88,6 +90,54 @@ export class ExperimentalTdxRealtimeClient
     this.isShuttingDown = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
     this.ws?.close();
+  }
+
+  /**
+   * POST the allowlist symbols to /tdx/bridge/desired so the gateway knows
+   * which symbols the terminal bridge should subscribe to. Called after a
+   * successful ready (production desired-state caller).
+   */
+  private async syncDesiredFromAllowlist(): Promise<void> {
+    const symbols = this.allowlist.entriesList.map((e) => e.formatCode);
+    if (symbols.length === 0) {
+      this.logger.warn('syncDesired: allowlist empty, not sending desired');
+      return;
+    }
+    try {
+      const http = await import('http');
+      const body = JSON.stringify({ symbols });
+      const url = new URL(this.desiredEndpoint);
+      const options = {
+        hostname: url.hostname,
+        port: url.port,
+        path: url.pathname,
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(body),
+        },
+        timeout: 2000,
+      };
+      return new Promise<void>((resolve) => {
+        const req = http.request(options, (res) => {
+          res.resume();
+          res.on('end', () => {
+            this.logger.log(
+              `syncDesired: sent ${symbols.length} symbols (status ${res.statusCode})`,
+            );
+            resolve();
+          });
+        });
+        req.on('error', (err) => {
+          this.logger.error(`syncDesired: POST error: ${err.message}`);
+          resolve();
+        });
+        req.write(body);
+        req.end();
+      });
+    } catch (err) {
+      this.logger.error(`syncDesired: unexpected error: ${err}`);
+    }
   }
 
   private connect(): void {
@@ -202,6 +252,10 @@ export class ExperimentalTdxRealtimeClient
       this.logger.log(`ready: recovering epoch ${epoch} gen=${gen}`);
       this.lastGeneration = gen;
       this.store.beginEpoch(epoch);
+      // Push desired symbols from allowlist (production desired-state caller).
+      this.syncDesiredFromAllowlist().catch((err) =>
+        this.logger.error(`syncDesired after ready: ${err}`),
+      );
     } else {
       this.logger.error(
         `ready: invalid epoch/generation pairing (epoch=${epoch}, gen=${gen}), rejecting`,
@@ -299,6 +353,12 @@ export class ExperimentalTdxRealtimeClient
       const acquisitionProfile = data['acquisitionProfile'];
       if (acquisitionProfile !== ACCEPTED_CONTRACT_TUPLE.acquisitionProfile)
         return null;
+      // Validate contractStatus.
+      const contractStatus = data['contractStatus'];
+      if (contractStatus !== 'experimental') return null;
+      // Validate unitStatus.
+      const unitStatus = data['unitStatus'];
+      if (unitStatus !== 'native-unverified') return null;
 
       const streamEpoch = data['streamEpoch'];
       if (typeof streamEpoch !== 'string' || streamEpoch.length === 0)
@@ -307,15 +367,20 @@ export class ExperimentalTdxRealtimeClient
       if (
         typeof sequence !== 'number' ||
         !Number.isInteger(sequence) ||
-        sequence < 1
+        sequence < 1 ||
+        sequence > Number.MAX_SAFE_INTEGER
       )
         return null;
       const symbol = data['symbol'];
       if (typeof symbol !== 'string' || symbol.length === 0) return null;
       const capturedAt = data['capturedAt'];
-      if (typeof capturedAt !== 'string') return null;
+      if (typeof capturedAt !== 'string' || !this.isRfc3339(capturedAt))
+        return null;
       const eventTime = data['eventTime'];
-      if (eventTime !== null && typeof eventTime !== 'string') return null;
+      if (eventTime !== null) {
+        if (typeof eventTime !== 'string' || !this.isRfc3339(eventTime))
+          return null;
+      }
 
       const snapRaw = data['snapshot'];
       if (typeof snapRaw !== 'object' || snapRaw === null) return null;
@@ -382,6 +447,23 @@ export class ExperimentalTdxRealtimeClient
   private requireFiniteNumber(v: unknown): number | null {
     if (typeof v !== 'number' || !Number.isFinite(v)) return null;
     return v;
+  }
+
+  /**
+   * Strict RFC3339 check: must be date-time with timezone offset.
+   * Rejects pure dates ("2026-07-17") and offset-less times.
+   */
+  private isRfc3339(value: string): boolean {
+    // Must contain 'T' (date-time separator).
+    if (!value.includes('T') && !value.includes('t')) return false;
+    // Must contain timezone offset after the date part.
+    const timePart = value.slice(10);
+    return (
+      timePart.includes('Z') ||
+      timePart.includes('z') ||
+      timePart.includes('+') ||
+      timePart.includes('-')
+    );
   }
 }
 
