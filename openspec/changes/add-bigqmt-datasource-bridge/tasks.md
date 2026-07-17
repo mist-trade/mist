@@ -57,4 +57,6 @@
 - [x] 7.4 Run Windows smoke against real full-QMT native
       `1d/1m/3m/5m/15m/30m/1h/1w/1mon/1q/1hy/1y` requests and record field/unit
       evidence in `evidence/2026-07-11-windows-qmt-smoke.md`.
-- [ ] 7.5 Run QMT realtime smoke before enabling realtime collection.
+- [x] 7.5 Transfer QMT realtime verification and enablement ownership to
+      `converge-theme-a-realtime-bridges` without claiming live success or K
+      persistence.

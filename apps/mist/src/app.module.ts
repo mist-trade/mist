@@ -23,6 +23,7 @@ import { ChanModule } from './chan/chan.module';
 import { HistoricalCollectorModule } from './collector/historical-collector.module';
 import { LegacyTdxRealtimeModule } from './sources/tdx/legacy-tdx-realtime.module';
 import { ExperimentalTdxRealtimeModule } from './sources/tdx/experimental/experimental-tdx-realtime.module';
+import { ExperimentalQmtRealtimeModule } from './sources/qmt/experimental/experimental-qmt-realtime.module';
 import { IndicatorModule } from './indicator/indicator.module';
 import { SecurityModule } from './security/security.module';
 import { mistEnvSchema } from '@app/config';
@@ -86,6 +87,7 @@ import { StrategyModule } from './strategy/strategy.module';
       inject: [ConfigService],
     }),
     ...realtimeModulesForMode(process.env.TDX_REALTIME_MODE),
+    ...qmtRealtimeModulesForMode(process.env.QMT_REALTIME_MODE),
     IndicatorModule,
     SecurityModule,
     ChanModule,
@@ -115,5 +117,19 @@ export function realtimeModulesForMode(mode: string | undefined) {
   }
   throw new Error(
     `Unsupported TDX_REALTIME_MODE=${JSON.stringify(mode)}; expected legacy, builtin_experimental, or off`,
+  );
+}
+
+/** QMT realtime is independent and default-off. */
+export function qmtRealtimeModulesForMode(mode: string | undefined) {
+  const normalized = (mode ?? 'off').trim().toLowerCase();
+  if (normalized === 'builtin_experimental') {
+    return [ExperimentalQmtRealtimeModule];
+  }
+  if (normalized === 'off') {
+    return [];
+  }
+  throw new Error(
+    `Unsupported QMT_REALTIME_MODE=${JSON.stringify(mode)}; expected builtin_experimental or off`,
   );
 }
