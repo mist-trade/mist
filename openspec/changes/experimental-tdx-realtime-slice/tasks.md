@@ -58,7 +58,9 @@
       with only `POST /collect`, CollectorService, polling strategies, registry)
       + `LegacyTdxRealtimeModule` (LegacyTdxStreamingController, KCandleAggregator,
       TdxWebSocketService with mode guard, WebSocketCollectionStrategy). Legacy
-      imports Historical for CollectorService.
+      imports Historical for CollectorService. Remove the obsolete aggregate
+      module and stale provider spec; export Historical from the collector barrel
+      and retain polling-provider coverage against the new module.
 - [x] 3.2 Add `ExperimentalTdxRealtimeModule` (mist + builtin_experimental only):
       ExperimentalTdxRealtimeClient, identity resolver, store, diagnostic
       controller.

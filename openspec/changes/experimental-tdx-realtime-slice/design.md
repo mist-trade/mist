@@ -61,6 +61,13 @@ Mist (mode-gated DI)
     diagnostic readback (/internal/experimental/tdx/realtime/:formatCode + /status)
 ```
 
+The pre-split aggregate `CollectorModule` is removed rather than retained as a
+compatibility export. Keeping it would preserve a second DI graph containing
+historical and legacy realtime providers together and could bypass the mode
+gate if accidentally imported. Its obsolete provider test is replaced by a
+test of the `HistoricalCollectorModule` polling-strategy provider; legacy
+strategy behavior remains covered by its strategy tests and the mode matrix.
+
 ## Control-plane / data-plane authority split
 
 | Plane | Owner | State |
