@@ -54,7 +54,8 @@ export interface InstrumentFenceState {
   currentEpoch: string | null;
   lastSequence: number;
   latestSnapshot: ExperimentalTdxSnapshotFrame | null;
-  receivedAt: number | null; // Date.now() of last accepted frame
+  receivedAt: number | null; // Date.now() of last accepted frame (Mist clock)
+  capturedAt: string | null; // frame.capturedAt (terminal clock, RFC3339)
 }
 
 /** Drop reasons recorded by the store/client. */
