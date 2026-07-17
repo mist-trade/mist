@@ -102,7 +102,7 @@ export class AppModule {}
  * - builtin_experimental: Historical + Experimental realtime
  * - off: Historical only
  */
-function realtimeModulesForMode(mode: string | undefined) {
+export function realtimeModulesForMode(mode: string | undefined) {
   const normalized = (mode ?? 'legacy').trim().toLowerCase();
   if (normalized === 'builtin_experimental') {
     return [HistoricalCollectorModule, ExperimentalTdxRealtimeModule];
@@ -110,6 +110,10 @@ function realtimeModulesForMode(mode: string | undefined) {
   if (normalized === 'off') {
     return [HistoricalCollectorModule];
   }
-  // legacy (default)
-  return [HistoricalCollectorModule, LegacyTdxRealtimeModule];
+  if (normalized === 'legacy') {
+    return [HistoricalCollectorModule, LegacyTdxRealtimeModule];
+  }
+  throw new Error(
+    `Unsupported TDX_REALTIME_MODE=${JSON.stringify(mode)}; expected legacy, builtin_experimental, or off`,
+  );
 }

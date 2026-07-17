@@ -99,7 +99,9 @@ state, record stable error + metric.
   "data": {
     "streamEpoch": "owner-def-generation-4",
     "generation": 4,
-    "mode": "builtin_experimental"
+    "mode": "builtin_experimental",
+    "ownerId": "tdx-bridge-pid-45678",
+    "bridgeBuildId": "mist-tdx-bridge@sha-def456"
   }
 }
 ```
@@ -107,6 +109,9 @@ state, record stable error + metric.
 `generation` is a REQUIRED positive integer (monotonically increasing). The
 Mist client MUST reject `stream_started` with missing, non-integer, or
 non-positive `generation`, and MUST reject any `generation <= lastGeneration`.
+`ownerId` and `bridgeBuildId` are REQUIRED non-empty strings. Mist validates
+and commits the four-field generation identity atomically; a malformed event
+MUST NOT partially update epoch or diagnostics.
 
 Already-connected clients receive this when the terminal owner generation
 changes. The Mist store invalidates the old epoch before accepting new
@@ -125,6 +130,7 @@ snapshots.
     "acquisitionProfile": "tdx.get_market_snapshot",
     "currentStreamEpoch": "owner-def-generation-4",
     "currentGeneration": 4,
+    "ownerId": "tdx-bridge-pid-45678",
     "datasourceBuildId": "mist-datasource@sha-abc123",
     "bridgeBuildId": "mist-tdx-bridge@sha-def456"
   }

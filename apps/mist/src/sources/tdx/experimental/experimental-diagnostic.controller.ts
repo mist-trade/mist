@@ -16,6 +16,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
+import { isIP } from 'node:net';
 import { InMemoryRealtimeStore } from './in-memory-realtime.store';
 import { ExperimentalAllowlistResolver } from './experimental-allowlist.resolver';
 
@@ -30,11 +31,12 @@ export class ExperimentalTdxDiagnosticController {
   /** Reject non-loopback requests. */
   private requireLoopback(req: Request): void {
     const ip = req.ip ?? req.socket.remoteAddress ?? '';
-    if (
-      !ip.includes('127.0.0.1') &&
-      !ip.includes('::1') &&
-      !ip.includes('localhost')
-    ) {
+    const normalized = ip.startsWith('::ffff:') ? ip.slice(7) : ip;
+    const loopback =
+      normalized === 'localhost' ||
+      normalized === '::1' ||
+      (isIP(normalized) === 4 && normalized.split('.')[0] === '127');
+    if (!loopback) {
       throw new ForbiddenException('diagnostic endpoints are loopback-only');
     }
   }
@@ -42,9 +44,15 @@ export class ExperimentalTdxDiagnosticController {
   @Get('status')
   getStatus(@Req() req: Request) {
     this.requireLoopback(req);
+    const runtime = this.store.getRuntimeMetadata();
     return {
       mode: 'builtin_experimental',
       connected: this.store.isConnected,
+      ready: runtime.ready,
+      ownerId: runtime.ownerId,
+      datasourceBuildId: runtime.datasourceBuildId,
+      bridgeBuildId: runtime.bridgeBuildId,
+      currentGeneration: runtime.currentGeneration,
       currentStreamEpoch: this.store.currentStreamEpoch,
       activeSymbolCount: this.store.activeSymbolCount,
       activeSymbols: this.store.getActiveSymbols(),
@@ -53,6 +61,8 @@ export class ExperimentalTdxDiagnosticController {
         securityId: e.securityId,
       })),
       dropCounts: this.store.getAllDropCounts(),
+      lastDrop: this.store.getLastDrop(),
+      lastError: runtime.lastError,
     };
   }
 

@@ -94,6 +94,13 @@ clock.
 - **THEN** the strict decoder MUST reject (it MUST NOT silently pick the first
   by dict order)
 
+#### Scenario: Formal HTTP snapshot receives experimental-only aliases
+- **WHEN** the formal HTTP projector receives only `Last`, `Close`, `High`, or
+  `Low`, or receives one of them before `Now`, `Max`, or `Min`
+- **THEN** it MUST preserve the pre-experiment field selection behavior
+- **AND** `Last`/`Close` MUST NOT replace `Now`
+- **AND** `High`/`Low` MUST NOT replace `Max`/`Min`
+
 ### Requirement: Gateway owns authoritative outbound sequence
 The experimental gateway SHALL assign the authoritative outbound sequence and
 MUST reject duplicate or out-of-order frames before any publish await.
@@ -126,7 +133,10 @@ stable owner epoch.
 #### Scenario: Owner generation changes
 - **WHEN** a new terminal owner registers (new generation)
 - **THEN** the gateway generates a new `streamEpoch`
-- **AND** broadcasts `stream_started` to already-connected clients
+- **AND** broadcasts `stream_started` carrying the same generation's
+  `streamEpoch`, `generation`, `ownerId`, and `bridgeBuildId` to
+  already-connected clients
+- **AND** Mist validates and commits those four fields atomically
 - **AND** late-connecting clients recover the epoch via `ready`
 
 #### Scenario: Late-connecting client
@@ -158,6 +168,12 @@ case-sensitively and MUST reject any ambiguity or miss.
 - **THEN** the resolver MUST NOT fall back to `normalizeSecurityCode` or any
   bare-code guess
 
+#### Scenario: Gateway receives distinct transport identities
+- **WHEN** desired or native active state contains `SH600519` and `600519.SH`
+- **THEN** the gateway MUST retain them as two distinct exact strings
+- **AND** it MUST NOT trim, change case, or invoke symbol canonicalization
+- **AND** convergence MUST fail when the exact desired and active sets differ
+
 ### Requirement: Terminal script is a versioned deliverable
 The terminal bridge script SHALL carry build identity and operational
 documentation.
@@ -188,3 +204,37 @@ NOT degrade or convert on mismatch.
 - **THEN** the client MUST NOT enter subscription state
 - **AND** it records a stable error and metric
 - **AND** it does NOT attempt conversion or multi-revision coexistence
+
+### Requirement: Experimental health details are loopback-only
+Detailed experimental gateway health SHALL only be exposed by
+`GET /tdx/bridge/health`, guarded by the same loopback check as the other
+bridge control routes.
+
+#### Scenario: Public caller probes experimental health
+- **WHEN** a caller requests `/health/experimental`
+- **THEN** the route MUST NOT exist
+- **AND** no owner, build, epoch, or revision details are returned
+
+### Requirement: Experimental lifecycle blocks production interpretation
+The experiment SHALL record an explicit lifecycle state, HIL owner, and HIL
+deadline, and replay completion MUST NOT imply live or production readiness.
+
+#### Scenario: macOS replay gates pass
+- **WHEN** all replay-backed implementation and safety gates pass
+- **THEN** the state advances to `HIL-pending`
+- **AND** `hilOwner=project-maintainer` and `hilBy=2026-08-17` are recorded
+- **AND** the experiment is not production-ready
+
+#### Scenario: HIL succeeds
+- **WHEN** accepted F2 evidence records datasource/Mist SHA, terminal script
+  SHA, TDX version, trading phase, raw payload, and DB write digest
+- **THEN** the state may advance to `transport-HIL-verified`
+- **AND** only a bounded one-machine, 1–2-symbol, no-write experiment with a
+  legacy rollback may advance to `live-transport-experiment-eligible`
+
+#### Scenario: HIL deadline expires
+- **WHEN** accepted HIL evidence is unavailable after `hilBy`
+- **THEN** the state becomes `reference-quarantined`
+- **AND** active provider/module/route wiring is removed
+- **AND** specs, fixtures, replay harness, and evidence are retained
+- **AND** any later restoration requires mainline rebase and replay validation

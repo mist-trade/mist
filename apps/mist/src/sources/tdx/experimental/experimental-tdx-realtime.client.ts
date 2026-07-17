@@ -11,9 +11,11 @@
  */
 import {
   Injectable,
+  Inject,
   OnModuleInit,
   OnModuleDestroy,
   Logger,
+  Optional,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import WebSocket from 'ws';
@@ -36,12 +38,29 @@ interface ReadyPayload {
   currentGeneration?: number | null;
   datasourceBuildId?: string;
   bridgeBuildId?: string | null;
+  ownerId?: string | null;
 }
+
+type FrameValidationResult =
+  | { frame: ExperimentalTdxSnapshotFrame; reason: null }
+  | { frame: null; reason: 'contractMismatch' | 'validationError' };
 
 interface StreamStartedPayload {
   streamEpoch?: string;
+  generation?: number;
   mode?: string;
+  ownerId?: string;
+  bridgeBuildId?: string;
 }
+
+export const EXPERIMENTAL_TDX_DESIRED_POSTER = Symbol(
+  'EXPERIMENTAL_TDX_DESIRED_POSTER',
+);
+
+export type ExperimentalTdxDesiredPoster = (
+  endpoint: string,
+  symbols: string[],
+) => Promise<void>;
 
 @Injectable()
 export class ExperimentalTdxRealtimeClient
@@ -55,6 +74,9 @@ export class ExperimentalTdxRealtimeClient
   private ws: WebSocket | null = null;
   private isShuttingDown = false;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
+  private desiredSyncTimer: ReturnType<typeof setTimeout> | null = null;
+  private desiredSyncInFlight = false;
+  private desiredSyncRetryAttempt = 0;
   // Contract rejected flag: set when ready carries a mismatched contract tuple.
   // Once rejected, stream_started and snapshots are ignored until a valid ready.
   private contractRejected = false;
@@ -67,6 +89,9 @@ export class ExperimentalTdxRealtimeClient
     private readonly configService: ConfigService,
     private readonly store: InMemoryRealtimeStore,
     private readonly allowlist: ExperimentalAllowlistResolver,
+    @Optional()
+    @Inject(EXPERIMENTAL_TDX_DESIRED_POSTER)
+    private readonly desiredPoster?: ExperimentalTdxDesiredPoster,
   ) {
     const baseUrl =
       this.configService.get<string>('TDX_BASE_URL') ?? 'http://127.0.0.1:9001';
@@ -89,6 +114,7 @@ export class ExperimentalTdxRealtimeClient
   async onModuleDestroy(): Promise<void> {
     this.isShuttingDown = true;
     if (this.reconnectTimer) clearTimeout(this.reconnectTimer);
+    if (this.desiredSyncTimer) clearTimeout(this.desiredSyncTimer);
     this.ws?.close();
   }
 
@@ -97,46 +123,63 @@ export class ExperimentalTdxRealtimeClient
    * which symbols the terminal bridge should subscribe to. Called after a
    * successful ready (production desired-state caller).
    */
-  private async syncDesiredFromAllowlist(): Promise<void> {
-    const symbols = this.allowlist.entriesList.map((e) => e.formatCode);
-    if (symbols.length === 0) {
-      this.logger.warn('syncDesired: allowlist empty, not sending desired');
-      return;
+  private requestDesiredSync(): void {
+    if (this.isShuttingDown || this.desiredSyncInFlight) return;
+    if (this.desiredSyncTimer) {
+      clearTimeout(this.desiredSyncTimer);
+      this.desiredSyncTimer = null;
     }
+    this.desiredSyncInFlight = true;
+    void this.syncDesiredFromAllowlist().then((succeeded) => {
+      this.desiredSyncInFlight = false;
+      if (this.isShuttingDown) return;
+      if (succeeded) {
+        this.desiredSyncRetryAttempt = 0;
+        return;
+      }
+      const delayMs = Math.min(
+        1000 * 2 ** this.desiredSyncRetryAttempt,
+        30_000,
+      );
+      this.desiredSyncRetryAttempt += 1;
+      this.logger.warn(`syncDesired: retrying in ${delayMs}ms`);
+      this.desiredSyncTimer = setTimeout(() => {
+        this.desiredSyncTimer = null;
+        this.requestDesiredSync();
+      }, delayMs);
+    });
+  }
+
+  private async syncDesiredFromAllowlist(): Promise<boolean> {
+    const symbols = this.allowlist.entriesList.map((e) => e.formatCode);
     try {
-      const http = await import('http');
-      const body = JSON.stringify({ symbols });
-      const url = new URL(this.desiredEndpoint);
-      const options = {
-        hostname: url.hostname,
-        port: url.port,
-        path: url.pathname,
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(body),
-        },
-        timeout: 2000,
-      };
-      return new Promise<void>((resolve) => {
-        const req = http.request(options, (res) => {
-          res.resume();
-          res.on('end', () => {
-            this.logger.log(
-              `syncDesired: sent ${symbols.length} symbols (status ${res.statusCode})`,
-            );
-            resolve();
+      if (this.desiredPoster) {
+        await this.desiredPoster(this.desiredEndpoint, symbols);
+      } else {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 2000);
+        let response: Response;
+        try {
+          response = await fetch(this.desiredEndpoint, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ symbols }),
+            signal: controller.signal,
           });
-        });
-        req.on('error', (err) => {
-          this.logger.error(`syncDesired: POST error: ${err.message}`);
-          resolve();
-        });
-        req.write(body);
-        req.end();
-      });
+        } finally {
+          clearTimeout(timeout);
+        }
+        if (!response.ok) {
+          throw new Error(`HTTP ${response.status}`);
+        }
+      }
+      this.logger.log(`syncDesired: sent ${symbols.length} symbols`);
+      return true;
     } catch (err) {
-      this.logger.error(`syncDesired: unexpected error: ${err}`);
+      this.logger.error(
+        `syncDesired: POST failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
+      return false;
     }
   }
 
@@ -183,9 +226,21 @@ export class ExperimentalTdxRealtimeClient
       msg = JSON.parse(raw);
     } catch {
       this.logger.warn('dropped non-JSON WS message');
+      this.store.recordDrop(
+        'decodeError',
+        null,
+        'TDX_EXPERIMENTAL_WS_DECODE_ERROR',
+      );
       return;
     }
-    if (typeof msg !== 'object' || msg === null) return;
+    if (typeof msg !== 'object' || msg === null || Array.isArray(msg)) {
+      this.store.recordDrop(
+        'validationError',
+        null,
+        'TDX_EXPERIMENTAL_WS_MESSAGE_INVALID',
+      );
+      return;
+    }
     const obj = msg as Record<string, unknown>;
     const type = obj['type'];
     const data = (obj['data'] ?? {}) as Record<string, unknown>;
@@ -208,6 +263,15 @@ export class ExperimentalTdxRealtimeClient
         `ready mode mismatch: got ${payload.mode ?? 'undefined'}, expected builtin_experimental`,
       );
       this.contractRejected = true;
+      this.store.recordDrop(
+        'contractMismatch',
+        null,
+        'TDX_EXPERIMENTAL_MODE_MISMATCH',
+      );
+      this.store.setRuntimeError(
+        'TDX_EXPERIMENTAL_MODE_MISMATCH',
+        'ready mode does not match builtin_experimental',
+      );
       return;
     }
     // Contract tuple check (exact match, no degradation).
@@ -226,12 +290,29 @@ export class ExperimentalTdxRealtimeClient
         })}, refusing to subscribe`,
       );
       this.contractRejected = true;
+      this.store.recordDrop(
+        'contractMismatch',
+        null,
+        'TDX_EXPERIMENTAL_CONTRACT_MISMATCH',
+      );
+      this.store.setRuntimeError(
+        'TDX_EXPERIMENTAL_CONTRACT_MISMATCH',
+        'ready contract tuple is not accepted by this build',
+      );
       return;
     }
     // Contract accepted — mark connected (deferred from TCP open).
     this.contractRejected = false;
     this.readyReceived = true;
     this.store.markConnected();
+    this.store.clearRuntimeError();
+    this.store.updateRuntimeMetadata({
+      ready: true,
+      ownerId: payload.ownerId ?? null,
+      datasourceBuildId: payload.datasourceBuildId ?? null,
+      bridgeBuildId: payload.bridgeBuildId ?? null,
+      currentGeneration: payload.currentGeneration ?? null,
+    });
 
     // Atomic epoch/generation pairing:
     // - (null epoch, null generation) = no active owner → clear state.
@@ -243,6 +324,12 @@ export class ExperimentalTdxRealtimeClient
       this.logger.log('ready: no active owner/epoch, clearing store');
       this.lastGeneration = null;
       this.store.clearAll();
+      this.store.updateRuntimeMetadata({
+        ownerId: null,
+        bridgeBuildId: null,
+        currentGeneration: null,
+      });
+      this.requestDesiredSync();
     } else if (
       epoch !== null &&
       typeof gen === 'number' &&
@@ -252,10 +339,7 @@ export class ExperimentalTdxRealtimeClient
       this.logger.log(`ready: recovering epoch ${epoch} gen=${gen}`);
       this.lastGeneration = gen;
       this.store.beginEpoch(epoch);
-      // Push desired symbols from allowlist (production desired-state caller).
-      this.syncDesiredFromAllowlist().catch((err) =>
-        this.logger.error(`syncDesired after ready: ${err}`),
-      );
+      this.requestDesiredSync();
     } else {
       this.logger.error(
         `ready: invalid epoch/generation pairing (epoch=${epoch}, gen=${gen}), rejecting`,
@@ -263,6 +347,16 @@ export class ExperimentalTdxRealtimeClient
       this.contractRejected = true;
       this.readyReceived = false;
       this.store.clearAll();
+      this.store.markDisconnected();
+      this.store.recordDrop(
+        'validationError',
+        null,
+        'TDX_EXPERIMENTAL_READY_STATE_INVALID',
+      );
+      this.store.setRuntimeError(
+        'TDX_EXPERIMENTAL_READY_STATE_INVALID',
+        'ready epoch and generation must both be null or both be valid',
+      );
     }
   }
 
@@ -282,17 +376,28 @@ export class ExperimentalTdxRealtimeClient
     }
     // Atomic validation: BOTH epoch (non-empty string) AND generation (positive
     // int) must be valid before committing ANY state. No partial updates.
-    const gen = (payload as Record<string, unknown>).generation;
+    const gen = payload.generation;
     const epoch = payload.streamEpoch;
+    const ownerId = payload.ownerId;
+    const bridgeBuildId = payload.bridgeBuildId;
     if (
       typeof epoch !== 'string' ||
       epoch.length === 0 ||
       typeof gen !== 'number' ||
       !Number.isInteger(gen) ||
-      gen < 1
+      gen < 1 ||
+      typeof ownerId !== 'string' ||
+      ownerId.length === 0 ||
+      typeof bridgeBuildId !== 'string' ||
+      bridgeBuildId.length === 0
     ) {
       this.logger.warn(
-        `stream_started ignored: invalid epoch/generation (epoch=${epoch}, gen=${gen})`,
+        `stream_started ignored: invalid generation identity (epoch=${epoch}, gen=${gen}, owner=${ownerId}, build=${bridgeBuildId})`,
+      );
+      this.store.recordDrop(
+        'validationError',
+        null,
+        'TDX_EXPERIMENTAL_STREAM_STARTED_INVALID',
       );
       return;
     }
@@ -307,23 +412,54 @@ export class ExperimentalTdxRealtimeClient
     this.lastGeneration = gen;
     this.logger.log(`stream_started: new epoch ${epoch} gen=${gen}`);
     this.store.beginEpoch(epoch);
+    this.store.updateRuntimeMetadata({
+      ready: true,
+      ownerId,
+      bridgeBuildId,
+      currentGeneration: gen,
+    });
+    this.requestDesiredSync();
   }
 
   private handleSnapshot(data: Record<string, unknown>): void {
     if (this.contractRejected) {
       this.logger.warn('snapshot ignored: contract rejected');
+      this.store.recordDrop(
+        'contractMismatch',
+        typeof data['symbol'] === 'string' ? data['symbol'] : null,
+        'TDX_EXPERIMENTAL_CONTRACT_REJECTED',
+      );
       return;
     }
     // Strict validation — no alias parsing, no fills.
-    const frame = this.validateFrame(data);
-    if (frame === null) return;
+    const validation = this.validateFrame(data);
+    if (validation.frame === null) {
+      const errorCode =
+        validation.reason === 'contractMismatch'
+          ? 'TDX_EXPERIMENTAL_CONTRACT_MISMATCH'
+          : 'TDX_EXPERIMENTAL_FRAME_VALIDATION_ERROR';
+      const symbol = typeof data['symbol'] === 'string' ? data['symbol'] : null;
+      this.store.recordDrop(validation.reason, symbol, errorCode);
+      if (validation.reason === 'contractMismatch') {
+        this.store.setRuntimeError(
+          errorCode,
+          'snapshot contract tuple is not accepted by this build',
+        );
+      }
+      return;
+    }
+    const frame = validation.frame;
 
     // Exact identity authorization.
     if (!this.allowlist.isAuthorized(frame.symbol)) {
       this.logger.debug(
         `dropped snapshot: symbol ${frame.symbol} not in allowlist`,
       );
-      // Record drop via store by attempting apply with a sentinel (epoch won't match).
+      this.store.recordDrop(
+        'symbolNotAuthorized',
+        frame.symbol,
+        'TDX_EXPERIMENTAL_SYMBOL_NOT_AUTHORIZED',
+      );
       return;
     }
 
@@ -340,29 +476,35 @@ export class ExperimentalTdxRealtimeClient
    * Strictly validate a raw data object into a typed frame.
    * Returns null on any validation failure (reject, no fill).
    */
-  private validateFrame(
-    data: Record<string, unknown>,
-  ): ExperimentalTdxSnapshotFrame | null {
+  private validateFrame(data: Record<string, unknown>): FrameValidationResult {
     try {
+      if (!hasExactKeys(data, ROOT_REQUIRED_KEYS, ROOT_ALLOWED_KEYS)) {
+        return { frame: null, reason: 'validationError' };
+      }
       const payloadType = data['payloadType'];
-      if (payloadType !== ACCEPTED_CONTRACT_TUPLE.payloadType) return null;
+      if (payloadType !== ACCEPTED_CONTRACT_TUPLE.payloadType)
+        return { frame: null, reason: 'contractMismatch' };
       const schemaVersion = data['schemaVersion'];
-      if (schemaVersion !== ACCEPTED_CONTRACT_TUPLE.schemaVersion) return null;
+      if (schemaVersion !== ACCEPTED_CONTRACT_TUPLE.schemaVersion)
+        return { frame: null, reason: 'contractMismatch' };
       const draftRevision = data['draftRevision'];
-      if (draftRevision !== ACCEPTED_CONTRACT_TUPLE.draftRevision) return null;
+      if (draftRevision !== ACCEPTED_CONTRACT_TUPLE.draftRevision)
+        return { frame: null, reason: 'contractMismatch' };
       const acquisitionProfile = data['acquisitionProfile'];
       if (acquisitionProfile !== ACCEPTED_CONTRACT_TUPLE.acquisitionProfile)
-        return null;
+        return { frame: null, reason: 'contractMismatch' };
       // Validate contractStatus.
       const contractStatus = data['contractStatus'];
-      if (contractStatus !== 'experimental') return null;
+      if (contractStatus !== 'experimental')
+        return { frame: null, reason: 'validationError' };
       // Validate unitStatus.
       const unitStatus = data['unitStatus'];
-      if (unitStatus !== 'native-unverified') return null;
+      if (unitStatus !== 'native-unverified')
+        return { frame: null, reason: 'validationError' };
 
       const streamEpoch = data['streamEpoch'];
       if (typeof streamEpoch !== 'string' || streamEpoch.length === 0)
-        return null;
+        return { frame: null, reason: 'validationError' };
       const sequence = data['sequence'];
       if (
         typeof sequence !== 'number' ||
@@ -370,50 +512,61 @@ export class ExperimentalTdxRealtimeClient
         sequence < 1 ||
         sequence > Number.MAX_SAFE_INTEGER
       )
-        return null;
+        return { frame: null, reason: 'validationError' };
       const symbol = data['symbol'];
-      if (typeof symbol !== 'string' || symbol.length === 0) return null;
+      if (typeof symbol !== 'string' || symbol.length === 0)
+        return { frame: null, reason: 'validationError' };
       const capturedAt = data['capturedAt'];
       if (typeof capturedAt !== 'string' || !this.isRfc3339(capturedAt))
-        return null;
-      const eventTime = data['eventTime'];
+        return { frame: null, reason: 'validationError' };
+      const eventTime = data['eventTime'] ?? null;
       if (eventTime !== null) {
         if (typeof eventTime !== 'string' || !this.isRfc3339(eventTime))
-          return null;
+          return { frame: null, reason: 'validationError' };
       }
 
       const snapRaw = data['snapshot'];
-      if (typeof snapRaw !== 'object' || snapRaw === null) return null;
+      if (
+        typeof snapRaw !== 'object' ||
+        snapRaw === null ||
+        Array.isArray(snapRaw)
+      )
+        return { frame: null, reason: 'validationError' };
       const snap = snapRaw as Record<string, unknown>;
       const prices = this.validatePrices(snap);
-      if (prices === null) return null;
+      if (prices === null) return { frame: null, reason: 'validationError' };
 
       const qualityRaw = data['quality'];
       const quality = this.validateQuality(qualityRaw);
+      if (quality === null) return { frame: null, reason: 'validationError' };
 
       return {
-        payloadType: 'tdx.realtime.snapshot',
-        schemaVersion: 0,
-        draftRevision: 1,
-        contractStatus: 'experimental',
-        acquisitionProfile: 'tdx.get_market_snapshot',
-        streamEpoch,
-        sequence,
-        symbol,
-        capturedAt,
-        eventTime: eventTime as string | null,
-        snapshot: prices,
-        unitStatus: 'native-unverified',
-        quality,
+        reason: null,
+        frame: {
+          payloadType: 'tdx.realtime.snapshot',
+          schemaVersion: 0,
+          draftRevision: 1,
+          contractStatus: 'experimental',
+          acquisitionProfile: 'tdx.get_market_snapshot',
+          streamEpoch,
+          sequence,
+          symbol,
+          capturedAt,
+          eventTime: eventTime as string | null,
+          snapshot: prices,
+          unitStatus: 'native-unverified',
+          quality,
+        },
       };
     } catch {
-      return null;
+      return { frame: null, reason: 'validationError' };
     }
   }
 
   private validatePrices(
     snap: Record<string, unknown>,
   ): ExperimentalSnapshotPrices | null {
+    if (!hasExactKeys(snap, ['last'], SNAPSHOT_ALLOWED_KEYS)) return null;
     const last = this.requireFiniteNumber(snap['last']);
     if (last === null) return null;
     // Optional fields: null/undefined allowed; present-but-invalid → reject frame.
@@ -432,14 +585,17 @@ export class ExperimentalTdxRealtimeClient
     return { last, open, high, low, lastClose, nativeVolume, nativeAmount };
   }
 
-  private validateQuality(raw: unknown): ExperimentalSnapshotQuality {
-    if (typeof raw !== 'object' || raw === null) return {};
+  private validateQuality(raw: unknown): ExperimentalSnapshotQuality | null {
+    if (typeof raw !== 'object' || raw === null || Array.isArray(raw))
+      return null;
     const q = raw as Record<string, unknown>;
+    if (!hasExactKeys(q, [], QUALITY_ALLOWED_KEYS)) return null;
     const result: ExperimentalSnapshotQuality = {};
-    if (q['stale'] === true) result.stale = true;
-    if (q['partialPrices'] === true) result.partialPrices = true;
-    if (q['nativeTimeUnavailable'] === true)
-      result.nativeTimeUnavailable = true;
+    for (const key of QUALITY_ALLOWED_KEYS) {
+      if (!(key in q)) continue;
+      if (typeof q[key] !== 'boolean') return null;
+      result[key] = q[key];
+    }
     return result;
   }
 
@@ -454,17 +610,78 @@ export class ExperimentalTdxRealtimeClient
    * Rejects pure dates ("2026-07-17") and offset-less times.
    */
   private isRfc3339(value: string): boolean {
-    // Must contain 'T' (date-time separator).
-    if (!value.includes('T') && !value.includes('t')) return false;
-    // Must contain timezone offset after the date part.
-    const timePart = value.slice(10);
-    return (
-      timePart.includes('Z') ||
-      timePart.includes('z') ||
-      timePart.includes('+') ||
-      timePart.includes('-')
-    );
+    return isStrictRfc3339(value);
   }
+}
+
+const RFC3339_PATTERN =
+  /^(\d{4})-(\d{2})-(\d{2})T([01]\d|2[0-3]):([0-5]\d):([0-5]\d)(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+
+const ROOT_REQUIRED_KEYS = [
+  'payloadType',
+  'schemaVersion',
+  'draftRevision',
+  'contractStatus',
+  'acquisitionProfile',
+  'streamEpoch',
+  'sequence',
+  'symbol',
+  'capturedAt',
+  'snapshot',
+  'unitStatus',
+  'quality',
+] as const;
+const ROOT_ALLOWED_KEYS = [...ROOT_REQUIRED_KEYS, 'eventTime'] as const;
+const SNAPSHOT_ALLOWED_KEYS = [
+  'last',
+  'open',
+  'high',
+  'low',
+  'lastClose',
+  'nativeVolume',
+  'nativeAmount',
+] as const;
+const QUALITY_ALLOWED_KEYS = [
+  'stale',
+  'partialPrices',
+  'nativeTimeUnavailable',
+] as const;
+
+function hasExactKeys(
+  object: Record<string, unknown>,
+  required: readonly string[],
+  allowed: readonly string[],
+): boolean {
+  const allowedSet = new Set(allowed);
+  return (
+    required.every((key) =>
+      Object.prototype.hasOwnProperty.call(object, key),
+    ) && Object.keys(object).every((key) => allowedSet.has(key))
+  );
+}
+
+function isStrictRfc3339(value: string): boolean {
+  const match = RFC3339_PATTERN.exec(value);
+  if (!match) return false;
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText] =
+    match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  const calendarProbe = new Date(0);
+  calendarProbe.setUTCFullYear(year, month - 1, day);
+  calendarProbe.setUTCHours(hour, minute, second, 0);
+  return (
+    calendarProbe.getUTCFullYear() === year &&
+    calendarProbe.getUTCMonth() === month - 1 &&
+    calendarProbe.getUTCDate() === day &&
+    calendarProbe.getUTCHours() === hour &&
+    calendarProbe.getUTCMinutes() === minute &&
+    calendarProbe.getUTCSeconds() === second
+  );
 }
 
 /** Sentinel for "present but invalid" — caller rejects the frame. */
