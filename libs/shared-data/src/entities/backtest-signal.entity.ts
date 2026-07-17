@@ -30,8 +30,10 @@ export class BacktestSignal {
   @Column({ type: 'int' })
   period: Period = Period.DAY;
 
+  // No default: a backtest signal is always created with an explicit tdx/qmt
+  // source, so a stale EAST_MONEY default would be misleading.
   @Column({ type: 'enum', enum: DataSource })
-  source: DataSource = DataSource.EAST_MONEY;
+  source: DataSource;
 
   @Column({
     name: 'signal_kind',
@@ -41,7 +43,7 @@ export class BacktestSignal {
   })
   signalKind: StrategySignalKind = StrategySignalKind.ENTRY;
 
-  @Column({ name: 'signal_time', type: 'datetime' })
+  @Column({ name: 'signal_time', type: 'datetime', precision: 6 })
   signalTime: Date = new Date();
 
   @Column({ name: 'context_snapshot', type: 'json', nullable: true })

@@ -22,9 +22,17 @@ Operational constraints are equally important:
   changes must enter a new `007_*.sql` migration; migration `006` is immutable.
 - Redis, a Python backtest engine, and a separate worker container are not part
   of the current deployment.
-- Daily K data is stored as source-specific forward-adjusted prices without an
-  adjustment dimension. V1 therefore produces an adjusted-price simulation,
-  not explicit dividend, split, or rights-issue accounting.
+- Daily K data has no adjustment dimension. Current TDX collection requests
+  `front`; current QMT collection requests and persists the declared
+  `front_ratio` ingestion marker. EF daily collection has no equivalent
+  adjustment contract, so V1 portfolio backtesting supports only configured
+  `tdx` and `qmt` sources. This remains an adjusted-price approximation, not
+  explicit dividend, split, or rights-issue accounting.
+- The active experimental TDX realtime slice is isolated from portfolio
+  semantics: it writes no K data and invokes no scanner or strategy side
+  effects. It does plan separate `app.module.ts` and `schedule.module.ts`
+  wiring, so implementation uses a dedicated worktree and reconciles module
+  registration at integration time.
 - Backend TypeScript uses camelCase members, snake_case database columns,
   uppercase enum members with lower-case serialized values, kebab-case files,
   single quotes, and trailing commas. Frontend TypeScript uses the existing
@@ -48,6 +56,10 @@ same strategy workspace user who defines rules and inspects live signals.
   benchmark semantics in a native TypeScript engine.
 - Preserve immutable strategy/config snapshots and auditable signal, order,
   trade, and equity facts.
+- Detect changes to the exact persisted market-data input before retrying an
+  abandoned run; fail safely rather than combine facts from different inputs.
+- Execute cursor pagination in MySQL for unbounded run/fact histories while
+  preserving the complete bounded equity-series contract.
 - Deliver a complete operator UI with run history, configuration, progress,
   metrics, charts, and fact inspection.
 - Make code and naming conventions explicit acceptance criteria, not cleanup
@@ -91,10 +103,11 @@ introduced.
 
 Setting `backtestEnabled=true` requires the current version to have valid entry
 and exit rules, the definition to include `Period.DAY`, and at least one
-configured source. Setting it to false leaves entry rules required but permits
-an absent exit rule. Creating a run revalidates the selected version and
-definition; the switch is therefore an eligibility gate, not a trusted cached
-validation result.
+configured source from the V1 portfolio allowlist `{tdx, qmt}`. Setting it to
+false leaves entry rules required but permits an absent exit rule. Creating a
+run revalidates the selected version, requested source, and definition; the
+switch is therefore an eligibility gate, not a trusted cached validation
+result.
 
 Alternative considered: add rule schema V2 and keep V1 unchanged. The platform
 has no production consumers, and a second rule model would force live scans,
@@ -199,10 +212,14 @@ immediately; running cancellation records the request and becomes `cancelled`
 after the current bounded batch.
 
 If a process dies and its lease expires, the next owner transactionally removes
-all partial facts for that run, resets engine-derived fields, increments the
-attempt count, and deterministically restarts from the snapshot. V1 deliberately
-does not checkpoint portfolio state. Terminal states are `completed`, `failed`,
-and `cancelled`; non-terminal states are `pending` and `running`.
+all partial facts for that run, resets engine-derived fields while retaining the
+market-data fingerprint, and increments the attempt count. It reloads the exact
+engine input and compares its canonical `sha256-v1` fingerprint before
+simulation. Unchanged input deterministically restarts from the snapshots;
+changed input fails as `BACKTEST_MARKET_DATA_CHANGED` without retaining mixed
+facts. V1 deliberately does not checkpoint portfolio state or materialize K
+input. Terminal states are `completed`, `failed`, and `cancelled`; non-terminal
+states are `pending` and `running`.
 
 Alternative considered: Redis/BullMQ or a new worker deployment. Neither is in
 the production topology, so it would turn a product feature into an
@@ -228,6 +245,14 @@ date it uses this sequence:
 4. Build contexts from completed bars and evaluate exit then entry rules.
 5. Persist matching signal facts and schedule their orders for the security's
    next available open after the signal bar.
+
+Evaluation state is isolated by canonical security code. Each security keeps a
+rolling normalized-bar window and its own previous context; a timestamp shared
+by multiple securities is never a cache key. The engine reuses the normalized
+bars prepared for execution, so entry and exit evaluation does not repeat
+date parsing, numeric conversion, sorting, or indicator calculation. Pending
+orders, next bars, and trades are indexed by their lookup keys rather than
+rescanning full arrays inside the date loop.
 
 No order may execute on the bar that produced its signal. Missing bars do not
 invent prices: a pending order waits for that security's next available open;
@@ -271,16 +296,16 @@ cash errors without adding a numeric dependency.
 
 The product defaults, all captured in `configSnapshot`, are:
 
-| Field | Default | Rule |
-| --- | ---: | --- |
-| `initialCash` | CNY 1,000,000 | Must be positive |
-| `maxPositions` | 10 | Integer from 1 through 50 |
-| `slippageBps` | 5 | From 0 through 10,000 |
-| `commissionRate` | 0.0003 | Both sides; from 0 through 1 |
-| `minCommission` | CNY 5 | Per filled order; non-negative |
-| `stampDutyRate` | 0.0005 | Sell side only; from 0 through 1 |
-| `transferFeeRate` | 0.00001 | Both sides; from 0 through 1 |
-| `benchmarkCode` | `000300` | Same selected source and daily period |
+| Field             |       Default | Rule                                  |
+| ----------------- | ------------: | ------------------------------------- |
+| `initialCash`     | CNY 1,000,000 | Must be positive                      |
+| `maxPositions`    |            10 | Integer from 1 through 50             |
+| `slippageBps`     |             5 | From 0 through 10,000                 |
+| `commissionRate`  |        0.0003 | Both sides; from 0 through 1          |
+| `minCommission`   |         CNY 5 | Per filled order; non-negative        |
+| `stampDutyRate`   |        0.0005 | Sell side only; from 0 through 1      |
+| `transferFeeRate` |       0.00001 | Both sides; from 0 through 1          |
+| `benchmarkCode`   |      `000300` | Same selected source and daily period |
 
 Rates are editable request inputs because statutory and broker costs change.
 The run never rereads application defaults after creation. V1 assumes full
@@ -291,31 +316,69 @@ Alternative considered: use broker-specific hard-coded fees. Backtest history
 would change silently when defaults change. Snapshotting editable rates makes
 the assumption visible and reproducible.
 
-### 7. Treat stored market data as immutable run input with explicit limits
+### 7. Validate price provenance and fingerprint the exact engine input
 
 The create request names one strategy definition, an optional version from that
 definition, 1 through 50 canonical stock codes, `Period.DAY`, one configured
-source, inclusive dates spanning no more than 10 years, execution settings,
-and benchmark code. Omitting the version resolves the current version at
-creation time. Both the resolved strategy version and normalized configuration
-are copied into JSON snapshots on the run.
+source from `{tdx, qmt}`, inclusive dates spanning no more than 10 years,
+execution settings, and benchmark code. Omitting the version resolves the
+current version at creation time. Both the resolved strategy version and
+normalized configuration are copied into JSON snapshots on the run.
 
-The processor loads lookback data before `startDate` without allowing trades or
-metrics before the requested range. Every selected stock and benchmark must
+The processor loads in-range K rows with `(timestamp, id)` keyset pages and
+loads exactly the latest `lookbackBars + 1` pre-range rows independently for
+each selected stock. The extra row supplies the previous-bar context needed by
+the first warmup evaluation; benchmark rows are bounded to the requested range.
+Loading checkpoints renew the lease, observe cancellation, and yield between K
+pages, security batches, and QMT marker batches. No warmup row may create a
+trade or contribute to requested-range metrics. Every selected stock and benchmark must
 have usable source/period coverage; otherwise the run fails with a structured
-coverage error identifying missing codes. Gaps inside otherwise usable series
+coverage error identifying missing codes. For QMT, every K row actually passed
+to the engine, including warmup, in-range universe, and benchmark rows, must
+have a persisted `KExtensionQmt.effectiveDividendType` ingestion marker equal to
+`front_ratio`; otherwise the run fails as `BACKTEST_PRICE_MODEL_UNSUPPORTED`.
+That marker records the adjustment contract requested by the current ingestion
+path and is not independent provider attestation. TDX likewise relies on its
+`dividendType=front` request contract. Gaps inside otherwise usable series
 follow the next-available-bar rule. Open positions at `endDate` remain open,
 are marked to their last available close, and appear in end positions; V1 does
 not force liquidation.
 
-The snapshot states that prices are forward-adjusted and that dividends,
-splits, allotments, delistings, and survivorship bias are not separately
-modeled. The engine never calls a raw datasource or fetches data during a run;
-it consumes persisted Mist K data so retry inputs remain stable.
+The configuration snapshot records `priceModel=tdx_front` or
+`priceModel=qmt_front_ratio`, `marketDataFingerprintAlgorithm=sha256-v1`, and
+the existing corporate-action/execution limitations. The engine never calls a
+raw datasource or fetches data during a run.
+
+After constructing the exact `bars` and `benchmarkBars` arrays consumed by the
+engine, the processor converts every row through `toEngineBar`, labels its role,
+sorts by role/security code/timestamp, and streams canonical JSON directly into
+the SHA-256 hash rather than materializing a second full canonical payload.
+Fingerprint checkpoints retain lease/cancellation responsiveness without
+changing the canonical byte sequence. Each row includes role, security code,
+security type, source, period, ISO-8601 timestamp, open, high, low, close,
+volume, and amount. Only selected warmup and in-range rows are included; older
+queried-but-unused rows are excluded. The first owner persists the 64-character
+SHA-256 digest under its active lease before entering `SIMULATING`. A retry
+compares rather than overwrites it.
+
+The fingerprint detects input drift; it is not a replayable market-data
+snapshot. A completed historical run cannot reconstruct overwritten K rows from
+the digest alone. Materializing run input remains outside V1.
+
+The first processor lease owner establishes the fingerprint only after it has
+built the exact engine input. Market-data changes between create-time and that
+first claim are therefore part of the first run input, not drift. Only a later
+owner retrying the same run compares against that retained baseline and can
+fail with `BACKTEST_MARKET_DATA_CHANGED`; the create API remains a lightweight
+asynchronous 202 and does not load or materialize K data.
 
 Alternative considered: fetch missing history on demand. That would mutate the
 input dataset during processing and make retries depend on external runtime
 availability.
+
+Alternative considered: continue retrying when the digest changes. That would
+silently attach one run identity to two economic inputs, so V1 prefers an
+auditable terminal failure.
 
 ### 8. Persist run state and facts for audit-oriented queries
 
@@ -333,6 +396,7 @@ strategy_versions
 backtest_runs
   existing identity/range/status/timestamps
   + strategy_snapshot, config_snapshot
+  + market_data_fingerprint
   + stage/progress/lease/retry/cancel fields
   + metrics, error_code, error_details
 
@@ -365,9 +429,32 @@ GET  /v1/strategy-backtests/:runId/positions?asOf=  -> reconstructed page
 ```
 
 Run listing supports strategy/status filters and stable newest-first cursors.
-Signals, orders, trades, and positions are cursor-paginated with stable
-date/id ordering; equity is returned as one bounded series. Re-running creates
-a new run and new snapshot; no endpoint mutates or overwrites a terminal run.
+Runs, signals, orders, trades, and reconstructed positions apply cursor
+predicates, ordering, and `limit + 1` in MySQL rather than loading the full
+result into memory. Ascending fact cursors use an explicit
+`time > cursorTime OR (time = cursorTime AND id > cursorId)` predicate; the
+newest-first run cursor uses the inverse comparison. Position lifecycle
+filtering is also applied in SQL before pagination. Equity is returned as one
+bounded ascending series.
+
+The run cursor must preserve the precision of `backtest_runs.created_at`, which
+is `datetime(6)`. The implementation carries an exact database microsecond sort
+value in the opaque cursor instead of round-tripping it through JavaScript
+millisecond `Date.getTime()`. MySQL integration tests cover equal timestamps,
+distinct values within one millisecond, filters, and page boundaries with no
+duplicates or omissions. Migration
+`008_strategy_portfolio_backtesting_indexes.sql` adds covering run indexes for
+definition/status filtered history queries and removes single-column or prefix
+indexes made redundant by the portfolio cursor indexes. Query indexes align
+with run/created time, signal time, scheduled order time, and trade entry time. Re-running creates a new run
+and new snapshot; no endpoint mutates or overwrites a terminal run.
+
+`BacktestOrderStatus.CANCELLED` remains a reserved persisted/API contract value
+for later order-level cancellation even though V1 cooperative run cancellation
+does not currently emit it. If a running cancellation arrives after one or more
+bounded fact batches were committed, those already persisted facts remain as
+the audit trail of work completed before the cancellation boundary; the
+cancelled run is never reclaimed or presented as a completed result.
 
 Alternative considered: store one position row per security per date. It would
 multiply storage for information already derivable from trade lifecycles and
@@ -388,9 +475,18 @@ On completion, `BacktestRun.metrics` contains:
 - average exposure as invested market value divided by equity.
 
 The equity points persist the daily inputs used to calculate these values.
-Ratios whose denominator is zero are `null`, never `Infinity` or `NaN`.
-Benchmark value starts at the portfolio initial cash on the first comparable
-date. Metric formulas live beside the pure engine and have fixed fixture tests.
+Ratios whose denominator is zero, whose input is non-positive where the formula
+requires a positive base, or whose result is non-finite are `null`, never
+`Infinity` or `NaN`.
+The processor derives the first portfolio equity timestamp from the earliest
+in-range target K row across the requested universe. The benchmark MUST contain
+an exact row at that timestamp; otherwise the run fails with
+`BACKTEST_BENCHMARK_ALIGNMENT_MISSING` and fixed benchmark/timestamp details.
+Benchmark value starts at the portfolio initial cash on that same timestamp.
+As a defensive pure-engine boundary, a series whose first equity point lacks a
+benchmark value produces null benchmark and excess returns instead of silently
+using a later base. Metric formulas live beside the pure engine and have fixed
+fixture tests.
 
 Alternative considered: calculate metrics only in the frontend. That would
 duplicate formulas, make API clients disagree, and lose the audited result
@@ -404,12 +500,24 @@ drawer rather than replacing the result view. Non-terminal rows poll detail at
 a bounded interval and expose cancel; polling stops at a terminal state or
 when the component unmounts.
 
+Run polling and result loading use independent state machines. A terminal
+transition stops run polling, refreshes the active fact family immediately,
+and starts a bounded three-attempt equity refresh whose failures do not restart
+run polling. Run-list and fact requests carry monotonically increasing request
+generations so selection, filter, tab, cursor, or as-of changes discard stale
+successes and errors. The positions date has draft and applied values; typing
+does not query until the operator applies it.
+
 The detail pane shows status/progress first, then metric cards and ECharts
 series for portfolio equity, benchmark, and drawdown. Tabs expose trades,
 orders, signals, end/as-of positions, the immutable configuration/strategy
 snapshot, and structured failure details. The strategy editor uses separate
 entry/exit JSON areas and a `backtestEnabled` switch, explains why an incomplete
 strategy cannot enable backtesting, and keeps live status controls separate.
+The new-run source selector contains only the selected definition configured
+sources intersected with `{tdx, qmt}`. Result assumptions render the immutable
+source-specific `tdx_front` or `qmt_front_ratio` snapshot value rather than a
+hard-coded generic price label.
 
 Frontend API types use `qmt`, matching backend `DataSource.QMT`; the stale
 `mqmt` label/value is removed. The UI continues to call the Mist backend base
@@ -433,8 +541,9 @@ Backend tests remain colocated `*.spec.ts`; frontend tests remain
 for lookahead prevention, next-open execution, exit-before-entry ordering,
 equal-slot sizing, 100-share lots, T+1, every fee side/minimum, missing bars,
 stable tie ordering, cancellation, expired-lease restart, open end positions,
-and repeat-run determinism. Route metadata and strict OpenSpec validation stay
-in the verification set.
+and repeat-run determinism. MySQL integration tests additionally prove SQL
+cursor boundaries, microsecond run ordering, and no duplicate/omitted facts.
+Route metadata and strict OpenSpec validation stay in the verification set.
 
 ## Risks / Trade-offs
 
@@ -444,6 +553,9 @@ in the verification set.
 - **MySQL lease races produce duplicate work** -> claim atomically, require
   lease ownership for writes, use run-scoped unique keys, and clear partial
   facts before a deterministic retry.
+- **Persisted K rows change between attempts** -> retain a canonical digest of
+  the exact first-attempt engine input and fail a retry on drift without mixed
+  facts; do not claim the digest is a replayable snapshot.
 - **Adjusted prices overstate real-world fidelity** -> label the approximation
   in every snapshot/result view and exclude explicit corporate actions from
   performance claims.
@@ -456,7 +568,12 @@ in the verification set.
 - **Cost defaults become stale** -> make all rates editable and snapshot them;
   update only defaults in a later reviewed change without affecting old runs.
 - **A 50-security, 10-year run can create many facts** -> batch inserts,
-  indexes on run/date/id, cursor pagination, and one bounded equity series.
+  aligned indexes, database-level cursor pagination, and one bounded equity
+  series. Preserve `datetime(6)` precision in run cursors.
+- **An edited migration file is skipped by an environment that already applied
+  it** -> query `schema_migrations` before deployment; revise branch-local 007
+  only for targets where it is absent, otherwise ship the additive correction
+  as 008.
 - **Breaking V1 migration discards meaning from old signal-only runs** -> the
   feature has no production users; migration 007 removes development-only
   signal-run facts rather than pretending they are portfolio results, while
@@ -471,17 +588,21 @@ in the verification set.
    `backtest_enabled=false`; rename existing `rule` data to `entry_rule`, add a
    nullable `exit_rule`, and set `lookback_bars=1`. Remove development-only
    signal backtest runs/results before reshaping the result schema, because
-   they cannot be converted into portfolio outcomes.
+   they cannot be converted into portfolio outcomes. Before deployment, query
+   `schema_migrations`; if the target has already recorded 007, leave it
+   immutable and put the fingerprint column and pagination indexes in 008.
 3. Update shared-data enums/entities and exports without changing migration
    006 or enabling TypeORM synchronization.
 4. Update strategy DTOs, definition service, rule field registry, validator,
    evaluator, context builder, signal kind persistence, and scan dedupe.
 5. Implement the pure fixed-point engine and metric fixtures, then add the
-   MySQL-backed processor, recovery, cancellation, and batched persistence.
+   MySQL-backed processor, source-specific price validation, canonical input
+   fingerprinting, recovery, cancellation, and batched persistence.
 6. Extend the existing controller/service and typed frontend API client; build
    the approved split result view and configuration drawer.
-7. Run focused and full backend/frontend tests, typechecks, lint/build,
-   migration checks, route-contract checks, and strict OpenSpec validation.
+7. Run focused and full backend/frontend tests, MySQL cursor/fingerprint
+   integration tests, typechecks, non-mutating backend lint, builds, migration
+   checks, route-contract checks, and strict OpenSpec validation.
 8. Deploy migration and backend together, then frontend. No gateway or
    container topology change is required.
 

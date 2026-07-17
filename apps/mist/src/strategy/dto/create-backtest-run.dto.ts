@@ -1,8 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsArray,
-  IsDateString,
   IsEnum,
+  IsIn,
   IsInt,
   IsNumber,
   IsOptional,
@@ -13,7 +13,13 @@ import {
   Max,
   Min,
 } from 'class-validator';
-import { DataSource, Period } from '@app/shared-data';
+import { Period } from '@app/shared-data';
+import { BEIJING_DATE_REGEX } from '@app/timezone';
+import {
+  MAX_BACKTEST_CNY,
+  STRATEGY_BACKTEST_SOURCES,
+  type StrategyBacktestSource,
+} from '../backtest/strategy-backtest.constants';
 
 export class CreateBacktestRunDto {
   @ApiProperty({ description: 'Strategy definition to replay' })
@@ -41,16 +47,23 @@ export class CreateBacktestRunDto {
   @IsEnum(Period)
   period!: Period;
 
-  @ApiProperty({ description: 'Replay data source', enum: DataSource })
-  @IsEnum(DataSource)
-  source!: DataSource;
+  @ApiProperty({
+    description: 'Replay data source',
+    enum: STRATEGY_BACKTEST_SOURCES,
+  })
+  @IsIn(STRATEGY_BACKTEST_SOURCES)
+  source!: StrategyBacktestSource;
 
-  @ApiProperty({ description: 'Inclusive replay start date' })
-  @IsDateString()
+  @ApiProperty({
+    description: 'Inclusive replay start date (Beijing calendar, YYYY-MM-DD)',
+  })
+  @Matches(BEIJING_DATE_REGEX)
   startDate!: string;
 
-  @ApiProperty({ description: 'Inclusive replay end date' })
-  @IsDateString()
+  @ApiProperty({
+    description: 'Inclusive replay end date (Beijing calendar, YYYY-MM-DD)',
+  })
+  @Matches(BEIJING_DATE_REGEX)
   endDate!: string;
 
   @ApiProperty({
@@ -61,6 +74,7 @@ export class CreateBacktestRunDto {
   @IsOptional()
   @IsNumber()
   @Min(0.01)
+  @Max(MAX_BACKTEST_CNY)
   initialCash?: number;
 
   @ApiProperty({
@@ -104,6 +118,7 @@ export class CreateBacktestRunDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  @Max(MAX_BACKTEST_CNY)
   minCommission?: number;
 
   @ApiProperty({

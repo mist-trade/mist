@@ -31,14 +31,31 @@ describe('StrategyBacktestController', () => {
     } as any;
 
     await controller.createRun(dto);
-    await controller.listRuns('1', 'pending' as any, 'run-cursor', '25');
-    await controller.findRun('1');
-    await controller.cancelRun('1');
-    await controller.listEquity('1');
-    await controller.listSignals('1', 'signal-cursor', '5');
-    await controller.listOrders('1', 'order-cursor', '10');
-    await controller.listTrades('1', 'trade-cursor', '15');
-    await controller.listPositions('1', '2026-01-01', 'position-cursor', '20');
+    await controller.listRuns({
+      strategyDefinitionId: 1,
+      status: 'pending' as any,
+      cursor: 'run-cursor',
+      limit: 25,
+    });
+    await controller.findRun({ runId: 1 });
+    await controller.cancelRun({ runId: 1 });
+    await controller.listEquity({ runId: 1 });
+    await controller.listSignals(
+      { runId: 1 },
+      { cursor: 'signal-cursor', limit: 5 },
+    );
+    await controller.listOrders(
+      { runId: 1 },
+      { cursor: 'order-cursor', limit: 10 },
+    );
+    await controller.listTrades(
+      { runId: 1 },
+      { cursor: 'trade-cursor', limit: 15 },
+    );
+    await controller.listPositions(
+      { runId: 1 },
+      { asOf: '2026-01-01', cursor: 'position-cursor', limit: 20 },
+    );
 
     expect(service.createRun).toHaveBeenCalledWith(dto);
     expect(service.listRuns).toHaveBeenCalledWith({
@@ -62,14 +79,10 @@ describe('StrategyBacktestController', () => {
       cursor: 'trade-cursor',
       limit: 15,
     });
-    expect(service.listPositions).toHaveBeenCalledWith(
-      1,
-      new Date('2026-01-01'),
-      {
-        cursor: 'position-cursor',
-        limit: 20,
-      },
-    );
+    expect(service.listPositions).toHaveBeenCalledWith(1, '2026-01-01', {
+      cursor: 'position-cursor',
+      limit: 20,
+    });
   });
 
   it('marks portfolio run creation as an accepted asynchronous request', () => {

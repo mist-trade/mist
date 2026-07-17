@@ -1,0 +1,52 @@
+import { DataSource } from '@app/shared-data';
+
+export const STRATEGY_BACKTEST_SOURCES = [
+  DataSource.TDX,
+  DataSource.QMT,
+] as const;
+
+export type StrategyBacktestSource = (typeof STRATEGY_BACKTEST_SOURCES)[number];
+
+export const MARKET_DATA_FINGERPRINT_ALGORITHM = 'sha256-v1';
+export const QMT_FRONT_RATIO_DIVIDEND_TYPE = 'front_ratio';
+
+// Upper bound on CNY monetary amounts accepted by the backtest config. Must
+// stay low enough that fen (CNY × 100) remains a safe integer:
+// 1e12 CNY → 1e14 fen ≪ Number.MAX_SAFE_INTEGER (≈9.007e15).
+export const MAX_BACKTEST_CNY = 1e12;
+
+export const STRATEGY_BACKTEST_ERROR_CODES = {
+  DEFINITION_INELIGIBLE: 'BACKTEST_DEFINITION_INELIGIBLE',
+  VERSION_MISSING: 'BACKTEST_VERSION_MISSING',
+  VERSION_INELIGIBLE: 'BACKTEST_VERSION_INELIGIBLE',
+  REQUEST_INVALID: 'BACKTEST_REQUEST_INVALID',
+  POSITION_AS_OF_INVALID: 'BACKTEST_POSITION_AS_OF_INVALID',
+  PAGE_LIMIT_INVALID: 'BACKTEST_PAGE_LIMIT_INVALID',
+  CURSOR_INVALID: 'BACKTEST_CURSOR_INVALID',
+  LEASE_LOST: 'BACKTEST_LEASE_LOST',
+  PERIOD_UNSUPPORTED: 'BACKTEST_PERIOD_UNSUPPORTED',
+  PRICE_MODEL_UNSUPPORTED: 'BACKTEST_PRICE_MODEL_UNSUPPORTED',
+  CONFIG_SNAPSHOT_INVALID: 'BACKTEST_CONFIG_SNAPSHOT_INVALID',
+  DATA_COVERAGE_MISSING: 'BACKTEST_DATA_COVERAGE_MISSING',
+  SECURITY_TYPE_UNSUPPORTED: 'BACKTEST_SECURITY_TYPE_UNSUPPORTED',
+  BENCHMARK_TYPE_UNSUPPORTED: 'BACKTEST_BENCHMARK_TYPE_UNSUPPORTED',
+  BENCHMARK_ALIGNMENT_MISSING: 'BACKTEST_BENCHMARK_ALIGNMENT_MISSING',
+  MARKET_DATA_CHANGED: 'BACKTEST_MARKET_DATA_CHANGED',
+  STRATEGY_SNAPSHOT_INVALID: 'BACKTEST_STRATEGY_SNAPSHOT_INVALID',
+  PROCESSING_FAILED: 'BACKTEST_PROCESSING_FAILED',
+} as const;
+
+export type StrategyBacktestErrorCode =
+  (typeof STRATEGY_BACKTEST_ERROR_CODES)[keyof typeof STRATEGY_BACKTEST_ERROR_CODES];
+
+export function isStrategyBacktestSource(
+  source: DataSource,
+): source is StrategyBacktestSource {
+  return STRATEGY_BACKTEST_SOURCES.includes(source as StrategyBacktestSource);
+}
+
+export function strategyBacktestPriceModel(
+  source: StrategyBacktestSource,
+): 'tdx_front' | 'qmt_front_ratio' {
+  return source === DataSource.TDX ? 'tdx_front' : 'qmt_front_ratio';
+}

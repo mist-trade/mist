@@ -132,8 +132,15 @@ status.
 - **THEN** the current version MUST contain valid entry and exit rules
 - **AND** `lookbackBars` MUST be an integer from 1 through 250
 - **AND** the definition MUST include daily period and at least one configured
-  source
+  V1 portfolio source from `tdx` or `qmt`
 - **AND** the backend MUST reject the update when any condition is not met
+
+#### Scenario: Only an unsupported portfolio source is configured
+
+- **WHEN** a definition has only `ef` configured and a client sets
+  `backtestEnabled=true`
+- **THEN** the backend MUST reject the update with a source eligibility reason
+- **AND** live strategy use of that source MUST remain unchanged
 
 #### Scenario: Backtesting is disabled
 

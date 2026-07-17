@@ -60,7 +60,7 @@ eligibility.
 
 - **WHEN** an operator enables `backtestEnabled`
 - **THEN** the frontend MUST require entry and exit rule JSON, valid lookback
-  bars, daily period, and a configured source
+  bars, daily period, and a configured `tdx` or `qmt` source
 - **AND** it MUST show the backend validation reason when eligibility fails
 - **AND** it MUST not change the live lifecycle status
 
@@ -111,6 +111,13 @@ eligible strategy through a configuration drawer.
   cash, maximum positions, benchmark, slippage, commission, minimum
   commission, stamp duty, and transfer fee controls
 - **AND** it MUST prefill the approved backend defaults
+
+#### Scenario: Backtest source choices are shown
+
+- **WHEN** an eligible strategy is selected in the new-run drawer
+- **THEN** the source choices MUST equal the definition configured sources
+  intersected with `tdx` and `qmt`
+- **AND** the drawer MUST NOT offer `ef` or a source absent from the definition
 
 #### Scenario: Ineligible strategy is selected
 
@@ -170,11 +177,20 @@ leaking polling work.
 - **WHEN** the selected run becomes completed, failed, or cancelled
 - **THEN** polling MUST stop
 - **AND** the workspace MUST refresh the relevant result families once
+- **AND** equity refresh failures MUST retry at most three times without
+  restarting run polling or blocking the fact refresh
 
 #### Scenario: Component unmounts or selection changes
 
 - **WHEN** polling is no longer relevant
 - **THEN** the frontend MUST cancel the timer and ignore stale responses
+
+#### Scenario: A newer history or fact request supersedes an older request
+
+- **WHEN** strategy, status filter, selected run, detail tab, cursor, or applied
+  as-of date changes before an earlier request settles
+- **THEN** the frontend MUST ignore both the stale response and stale error
+- **AND** loading state for the current request MUST remain independent
 
 #### Scenario: Operator cancels a run
 
@@ -182,6 +198,15 @@ leaking polling work.
 - **THEN** the frontend MUST call the run cancel endpoint
 - **AND** it MUST show the returned cancellation state without removing prior
   immutable facts from the UI
+
+#### Scenario: Run cancellation request fails
+
+- **WHEN** the cancel endpoint rejects a pending or running run request
+- **THEN** the frontend MUST show a cancellation-scoped visible error
+- **AND** it MUST restore the cancel action without overwriting the current run
+  state or producing an unhandled promise rejection
+- **AND** a later successful cancellation or run selection change MUST clear
+  that error
 
 ### Requirement: Operators Shall Inspect Portfolio Results
 
@@ -212,10 +237,17 @@ and execution facts needed to audit the result.
   snapshot
 - **AND** it MUST distinguish empty data from a failed request
 
+#### Scenario: An as-of position date is edited
+
+- **WHEN** an operator changes the date input without applying it
+- **THEN** the workspace MUST retain the draft without issuing a position query
+- **AND** applying the date MUST issue one guarded query for that applied value
+
 #### Scenario: Adjusted-price assumptions are inspected
 
 - **WHEN** the configuration snapshot is shown
-- **THEN** the workspace MUST disclose the forward-adjusted price assumption
+- **THEN** the workspace MUST render the immutable `tdx_front` or
+  `qmt_front_ratio` price model from that run snapshot
 - **AND** it MUST disclose excluded corporate-action, exchange-limit, ST,
   liquidity, and partial-fill behavior
 

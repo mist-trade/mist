@@ -62,6 +62,7 @@ describe('portfolio backtest shared-data schema', () => {
       totalWork: 0,
       progressPercent: 0,
       attemptCount: 0,
+      marketDataFingerprint: null,
     });
     expect(sharedData.BacktestRunStatus.CANCELLED).toBe('cancelled');
 
@@ -89,6 +90,9 @@ describe('portfolio backtest shared-data schema', () => {
     );
     expect(getColumnName(sharedData.BacktestRun, 'configSnapshot')).toBe(
       'config_snapshot',
+    );
+    expect(getColumnName(sharedData.BacktestRun, 'marketDataFingerprint')).toBe(
+      'market_data_fingerprint',
     );
     expect(getColumnName(sharedData.BacktestRun, 'leaseExpiresAt')).toBe(
       'lease_expires_at',

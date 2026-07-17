@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
+import { TimezoneModule } from '@app/timezone';
 import {
   BacktestRun,
   BacktestSignal,
@@ -7,6 +8,7 @@ import {
   BacktestTrade,
   BacktestEquityPoint,
   K,
+  KExtensionQmt,
   SecuritySourceConfig,
   StrategyAlertEvent,
   StrategyDefinition,
@@ -33,6 +35,7 @@ const strategyEntities = [
   BacktestTrade,
   BacktestEquityPoint,
   K,
+  KExtensionQmt,
   SecuritySourceConfig,
 ];
 
@@ -48,7 +51,7 @@ const strategyProviders = [
 ];
 
 @Module({
-  imports: [TypeOrmModule.forFeature(strategyEntities)],
+  imports: [TypeOrmModule.forFeature(strategyEntities), TimezoneModule],
   providers: strategyProviders,
   exports: [TypeOrmModule, ...strategyProviders],
 })

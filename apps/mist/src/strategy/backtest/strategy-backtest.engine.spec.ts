@@ -142,6 +142,33 @@ describe('StrategyBacktestEngine primitives', () => {
     });
   });
 
+  it('keeps same-timestamp evaluation contexts isolated by security', () => {
+    const output = new StrategyBacktestEngine().run(
+      createInput({
+        endDate: new Date(Date.UTC(2026, 0, 2)),
+        bars: [
+          createBar('000001', 1, 10),
+          createBar('600519', 1, 110),
+          createBar('000001', 2, 10),
+          createBar('600519', 2, 110),
+        ],
+      }),
+    );
+
+    expect(
+      output.signals
+        .filter((signal) => signal.signalKind === StrategySignalKind.ENTRY)
+        .map((signal) => [
+          signal.securityCode,
+          (signal.contextSnapshot.security as { code: string }).code,
+          (signal.contextSnapshot.k as { close: number }).close,
+        ]),
+    ).toEqual([
+      ['600519', '600519', 110],
+      ['600519', '600519', 110],
+    ]);
+  });
+
   it('executes simultaneous exits before entries in stable security order', () => {
     const output = new StrategyBacktestEngine().run(
       createInput({
@@ -281,6 +308,28 @@ describe('StrategyBacktestEngine primitives', () => {
         }),
       ]),
     );
+  });
+
+  it('does not calculate benchmark or excess return when the first equity point has no benchmark', () => {
+    const output = new StrategyBacktestEngine().run(
+      createInput({
+        bars: [
+          createBar('600519', 1, 80),
+          createBar('600519', 2, 80),
+          createBar('600519', 3, 80),
+        ],
+        benchmarkBars: [
+          createBar('000300', 2, 100),
+          createBar('000300', 3, 110),
+        ],
+      }),
+    );
+
+    expect(output.equityPoints[0].benchmarkValue).toBeNull();
+    expect(output.metrics).toMatchObject({
+      benchmarkReturn: null,
+      excessReturn: null,
+    });
   });
 
   it('allocates equal-weight slots using whole 100-share lots', () => {
@@ -436,6 +485,22 @@ describe('StrategyBacktestEngine primitives', () => {
       transferFee: 0,
       totalFee: 0,
     };
+    const trade = {
+      tradeIndex: 1,
+      securityCode: '600519',
+      status: 'open',
+      entryOrderIndex: 0,
+      exitOrderIndex: null,
+      entryTime: secondDay,
+      exitTime: null,
+      entryPrice: 100,
+      exitPrice: null,
+      quantity: 100,
+      entryFee: 0,
+      exitFee: 0,
+      realizedPnl: null,
+      holdingDays: null,
+    };
     const state: any = {
       cashFen: cnyToFen(10_000),
       positions: new Map([
@@ -452,31 +517,17 @@ describe('StrategyBacktestEngine primitives', () => {
           },
         ],
       ]),
-      trades: [
-        {
-          tradeIndex: 1,
-          securityCode: '600519',
-          status: 'open',
-          entryOrderIndex: 0,
-          exitOrderIndex: null,
-          entryTime: secondDay,
-          exitTime: null,
-          entryPrice: 100,
-          exitPrice: null,
-          quantity: 100,
-          entryFee: 0,
-          exitFee: 0,
-          realizedPnl: null,
-          holdingDays: null,
-        },
-      ],
+      trades: [trade],
+      tradesByIndex: new Map([[1, trade]]),
     };
 
     (engine as any).executeSellOrder(
       state,
       order,
       createBar('600519', 2, 100),
-      [createBar('600519', 2, 100), createBar('600519', 3, 100)],
+      new Map([
+        [`600519\u0000${secondDay.getTime()}`, createBar('600519', 3, 100)],
+      ]),
       createInput({ endDate: thirdDay }),
       new Map([
         [secondDay.getTime(), 0],
@@ -490,6 +541,23 @@ describe('StrategyBacktestEngine primitives', () => {
       scheduledTime: thirdDay,
       executionTime: null,
     });
+  });
+
+  it('uses Beijing calendar days for T+1 across a UTC date boundary', () => {
+    const engine = new StrategyBacktestEngine();
+
+    expect(
+      (engine as any).isSameTradingDate(
+        new Date('2026-01-01T23:30:00.000Z'),
+        new Date('2026-01-02T00:30:00.000Z'),
+      ),
+    ).toBe(true);
+    expect(
+      (engine as any).isSameTradingDate(
+        new Date('2026-01-01T15:30:00.000Z'),
+        new Date('2026-01-01T16:30:00.000Z'),
+      ),
+    ).toBe(false);
   });
 
   it('applies default directional slippage and every fee with half-up fen rounding', () => {
@@ -667,6 +735,48 @@ describe('StrategyBacktestEngine primitives', () => {
       profitFactor: null,
       averageHoldingDays: null,
       turnover: 0,
+    });
+    expect(
+      Object.values(output.metrics).every(
+        (value) =>
+          value === null || typeof value !== 'number' || Number.isFinite(value),
+      ),
+    ).toBe(true);
+  });
+
+  it('normalizes every invalid extreme-loss metric to null', () => {
+    const bars = [
+      createBar('600519', 1, 110),
+      createBar('600519', 2, 110, { open: 100 }),
+      createBar('600519', 3, 80),
+      createBar('600519', 4, 1, { open: 1 }),
+      ...Array.from({ length: 6 }, (_, index) =>
+        createBar('600519', index + 5, 1),
+      ),
+    ];
+    const output = new StrategyBacktestEngine().run(
+      createInput({
+        endDate: new Date(Date.UTC(2026, 0, 10)),
+        config: {
+          ...STRATEGY_BACKTEST_DEFAULT_CONFIG,
+          initialCash: 100_000,
+          maxPositions: 1,
+          slippageBps: 0,
+          commissionRate: 0,
+          minCommission: 40_000,
+          stampDutyRate: 0,
+          transferFeeRate: 0,
+        },
+        bars,
+      }),
+    );
+
+    expect(output.equityPoints.at(-1)?.equity).toBeLessThan(0);
+    expect(output.metrics).toMatchObject({
+      annualizedReturn: null,
+      sharpeRatio: null,
+      calmarRatio: null,
+      turnover: null,
     });
     expect(
       Object.values(output.metrics).every(

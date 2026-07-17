@@ -17,6 +17,18 @@ export type StrategyEvaluationBar = {
   amount: number | string;
 };
 
+export type StrategyNormalizedEvaluationBar = Omit<
+  StrategyEvaluationBar,
+  'open' | 'high' | 'low' | 'close' | 'volume' | 'amount'
+> & {
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
+  amount: number;
+};
+
 export type StrategyEvaluationContext = {
   k: {
     open: number;
@@ -57,16 +69,27 @@ export class StrategyEvaluationContextBuilder {
     history: StrategyEvaluationBar[] = [k],
     lookbackBars?: number,
   ): StrategyEvaluationContext {
-    const completedBars = this.selectCompletedBars(k, history, lookbackBars);
+    const completedBars = this.selectCompletedBars(
+      k,
+      history,
+      lookbackBars,
+    ).map((bar) => this.normalizeBar(bar));
 
+    return this.buildFromNormalizedK(this.normalizeBar(k), completedBars);
+  }
+
+  buildFromNormalizedK(
+    k: StrategyNormalizedEvaluationBar,
+    completedBars: StrategyNormalizedEvaluationBar[] = [k],
+  ): StrategyEvaluationContext {
     return {
       k: {
-        open: Number(k.open),
-        high: Number(k.high),
-        low: Number(k.low),
-        close: Number(k.close),
-        volume: Number(k.volume),
-        amount: Number(k.amount),
+        open: k.open,
+        high: k.high,
+        low: k.low,
+        close: k.close,
+        volume: k.volume,
+        amount: k.amount,
         timestamp: k.timestamp,
       },
       security: {
@@ -104,12 +127,12 @@ export class StrategyEvaluationContextBuilder {
   }
 
   private calculateIndicators(
-    bars: StrategyEvaluationBar[],
+    bars: StrategyNormalizedEvaluationBar[],
   ): StrategyEvaluationContext['indicator'] {
     const indicator: StrategyEvaluationContext['indicator'] = {};
-    const close = bars.map((bar) => Number(bar.close));
-    const high = bars.map((bar) => Number(bar.high));
-    const low = bars.map((bar) => Number(bar.low));
+    const close = bars.map((bar) => bar.close);
+    const high = bars.map((bar) => bar.high);
+    const low = bars.map((bar) => bar.low);
 
     const macd = this.calculateMacd(close);
     if (macd) indicator.macd = macd;
@@ -139,6 +162,20 @@ export class StrategyEvaluationContextBuilder {
     if (ma60 !== undefined) indicator.ma60 = ma60;
 
     return indicator;
+  }
+
+  private normalizeBar(
+    bar: StrategyEvaluationBar,
+  ): StrategyNormalizedEvaluationBar {
+    return {
+      ...bar,
+      open: Number(bar.open),
+      high: Number(bar.high),
+      low: Number(bar.low),
+      close: Number(bar.close),
+      volume: Number(bar.volume),
+      amount: Number(bar.amount),
+    };
   }
 
   private calculateMacd(

@@ -222,6 +222,18 @@ describe('StrategyDefinitionService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
+  it('rejects backtest enablement when EF is the only configured source', async () => {
+    const { service } = createHarness();
+    const strategy = await service.create({
+      ...pairedCreateDto,
+      sources: [DataSource.EAST_MONEY],
+    } as any);
+
+    await expect(
+      service.update(strategy.id, { backtestEnabled: true } as any),
+    ).rejects.toThrow('Backtesting requires a configured tdx or qmt source');
+  });
+
   it('keeps backtest eligibility independent from the live strategy status', async () => {
     const { service, versions } = createHarness();
     const strategy = await service.create(pairedCreateDto as any);

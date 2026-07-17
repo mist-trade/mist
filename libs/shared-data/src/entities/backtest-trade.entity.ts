@@ -33,7 +33,7 @@ export class BacktestTrade {
   @Column({ name: 'exit_order_id', type: 'int', nullable: true })
   exitOrderId?: number | null;
 
-  @Column({ name: 'entry_time', type: 'datetime' })
+  @Column({ name: 'entry_time', type: 'datetime', precision: 6 })
   entryTime: Date = new Date();
 
   @Column({ name: 'exit_time', type: 'datetime', nullable: true })

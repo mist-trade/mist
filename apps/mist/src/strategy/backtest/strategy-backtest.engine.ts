@@ -6,8 +6,8 @@ import {
 } from '@app/shared-data';
 import { StrategyRuleEvaluator } from '../rules/strategy-rule-evaluator';
 import {
-  StrategyEvaluationBar,
   StrategyEvaluationContextBuilder,
+  StrategyNormalizedEvaluationBar,
 } from '../scanner/strategy-evaluation-context.builder';
 import {
   StrategyBacktestBar,
@@ -20,6 +20,7 @@ import {
   StrategyBacktestSignal,
   StrategyBacktestTrade,
 } from './strategy-backtest.types';
+import { cloneJsonRecord } from './strategy-backtest.utils';
 
 type PositionState = {
   securityCode: string;
@@ -38,8 +39,15 @@ type EngineState = {
   signals: StrategyBacktestSignal[];
   orders: StrategyBacktestOrder[];
   trades: StrategyBacktestTrade[];
+  tradesByIndex: Map<number, StrategyBacktestTrade>;
+  pendingOrdersByTimestamp: Map<number, StrategyBacktestOrder[]>;
   equityPoints: StrategyBacktestEquityPoint[];
   peakEquityFen: number;
+};
+
+type SecurityEvaluationState = {
+  completedBars: StrategyNormalizedEvaluationBar[];
+  previousContext?: Record<string, unknown>;
 };
 
 type BenchmarkState = {
@@ -59,6 +67,9 @@ type PreparedBacktest = {
   input: StrategyBacktestInput;
   state: EngineState;
   barsBySecurity: Map<string, StrategyBacktestBar[]>;
+  evaluationBarsByKey: Map<string, StrategyNormalizedEvaluationBar>;
+  evaluationStateBySecurity: Map<string, SecurityEvaluationState>;
+  nextBarByKey: Map<string, StrategyBacktestBar>;
   eventBarsByTimestamp: Map<number, StrategyBacktestBar[]>;
   eventTimestamps: number[];
   dateIndexes: Map<number, number>;
@@ -160,6 +171,14 @@ export class StrategyBacktestEngine {
       (bar) => bar.timestamp <= input.endDate,
     );
     const barsBySecurity = this.groupBarsBySecurity(normalizedBars);
+    const evaluationBarsByKey = this.indexEvaluationBars(normalizedBars);
+    const evaluationStateBySecurity = this.createEvaluationStates(
+      barsBySecurity,
+      evaluationBarsByKey,
+      input.startDate,
+      input.lookbackBars,
+    );
+    const nextBarByKey = this.indexNextBars(barsBySecurity, input.endDate);
     const eventBarsByTimestamp = this.groupInRangeBarsByTimestamp(
       normalizedBars,
       input.startDate,
@@ -178,6 +197,8 @@ export class StrategyBacktestEngine {
       signals: [],
       orders: [],
       trades: [],
+      tradesByIndex: new Map<number, StrategyBacktestTrade>(),
+      pendingOrdersByTimestamp: new Map<number, StrategyBacktestOrder[]>(),
       equityPoints: [],
       peakEquityFen: cnyToFen(input.config.initialCash),
     };
@@ -200,6 +221,9 @@ export class StrategyBacktestEngine {
       input,
       state,
       barsBySecurity,
+      evaluationBarsByKey,
+      evaluationStateBySecurity,
+      nextBarByKey,
       eventBarsByTimestamp,
       eventTimestamps,
       dateIndexes,
@@ -220,12 +244,9 @@ export class StrategyBacktestEngine {
     const dateIndex = prepared.dateIndexes.get(timestamp) ?? 0;
 
     this.executeScheduledOrders(
-      prepared.state,
+      prepared,
       currentDate,
       currentBarsBySecurity,
-      prepared.barsBySecurity,
-      prepared.input,
-      prepared.dateIndexes,
       dateIndex,
     );
     for (const bar of currentBars) {
@@ -245,12 +266,7 @@ export class StrategyBacktestEngine {
       this.createEquityPoint(prepared.state, currentDate, benchmarkValue),
     );
 
-    this.evaluateDateRules(
-      prepared.input,
-      prepared.state,
-      currentBars,
-      prepared.barsBySecurity,
-    );
+    this.evaluateDateRules(prepared, currentBars);
   }
 
   private toOutput(prepared: PreparedBacktest): StrategyBacktestOutput {
@@ -280,13 +296,18 @@ export class StrategyBacktestEngine {
   private groupBarsBySecurity(
     bars: StrategyBacktestBar[],
   ): Map<string, StrategyBacktestBar[]> {
-    const grouped = new Map<string, StrategyBacktestBar[]>();
+    const groupedByTime = new Map<string, Map<number, StrategyBacktestBar>>();
     for (const bar of bars) {
-      const securityBars = grouped.get(bar.securityCode) ?? [];
-      securityBars.push(bar);
-      grouped.set(bar.securityCode, securityBars);
+      const securityBars = groupedByTime.get(bar.securityCode) ?? new Map();
+      securityBars.set(bar.timestamp.getTime(), bar);
+      groupedByTime.set(bar.securityCode, securityBars);
     }
-    return grouped;
+    return new Map(
+      [...groupedByTime.entries()].map(([securityCode, securityBars]) => [
+        securityCode,
+        [...securityBars.values()],
+      ]),
+    );
   }
 
   private groupInRangeBarsByTimestamp(
@@ -294,15 +315,88 @@ export class StrategyBacktestEngine {
     startDate: Date,
     endDate: Date,
   ): Map<number, StrategyBacktestBar[]> {
-    const grouped = new Map<number, StrategyBacktestBar[]>();
+    const groupedBySecurity = new Map<
+      number,
+      Map<string, StrategyBacktestBar>
+    >();
     for (const bar of bars) {
       if (bar.timestamp < startDate || bar.timestamp > endDate) continue;
       const timestamp = bar.timestamp.getTime();
-      const dateBars = grouped.get(timestamp) ?? [];
-      dateBars.push(bar);
-      grouped.set(timestamp, dateBars);
+      const dateBars = groupedBySecurity.get(timestamp) ?? new Map();
+      dateBars.set(bar.securityCode, bar);
+      groupedBySecurity.set(timestamp, dateBars);
     }
-    return grouped;
+    return new Map(
+      [...groupedBySecurity.entries()].map(([timestamp, dateBars]) => [
+        timestamp,
+        [...dateBars.values()].sort((left, right) =>
+          left.securityCode.localeCompare(right.securityCode),
+        ),
+      ]),
+    );
+  }
+
+  private indexEvaluationBars(
+    bars: StrategyBacktestBar[],
+  ): Map<string, StrategyNormalizedEvaluationBar> {
+    return new Map(
+      bars.map((bar) => [
+        this.barKey(bar.securityCode, bar.timestamp),
+        this.toEvaluationBar(bar),
+      ]),
+    );
+  }
+
+  private createEvaluationStates(
+    barsBySecurity: Map<string, StrategyBacktestBar[]>,
+    evaluationBarsByKey: Map<string, StrategyNormalizedEvaluationBar>,
+    startDate: Date,
+    lookbackBars: number,
+  ): Map<string, SecurityEvaluationState> {
+    const states = new Map<string, SecurityEvaluationState>();
+    for (const [securityCode, securityBars] of barsBySecurity) {
+      const completedBars = securityBars
+        .filter((bar) => bar.timestamp < startDate)
+        .slice(-(lookbackBars + 1))
+        .flatMap((bar) => {
+          const evaluationBar = evaluationBarsByKey.get(
+            this.barKey(bar.securityCode, bar.timestamp),
+          );
+          return evaluationBar ? [evaluationBar] : [];
+        });
+      const previousBar = completedBars.at(-1);
+      states.set(securityCode, {
+        completedBars,
+        previousContext: previousBar
+          ? (this.contextBuilder.buildFromNormalizedK(
+              previousBar,
+              completedBars,
+            ) as unknown as Record<string, unknown>)
+          : undefined,
+      });
+    }
+    return states;
+  }
+
+  private indexNextBars(
+    barsBySecurity: Map<string, StrategyBacktestBar[]>,
+    endDate: Date,
+  ): Map<string, StrategyBacktestBar> {
+    const nextBars = new Map<string, StrategyBacktestBar>();
+    for (const securityBars of barsBySecurity.values()) {
+      for (let index = 0; index + 1 < securityBars.length; index += 1) {
+        const nextBar = securityBars[index + 1];
+        if (nextBar.timestamp > endDate) continue;
+        nextBars.set(
+          this.barKey(
+            securityBars[index].securityCode,
+            securityBars[index].timestamp,
+          ),
+          nextBar,
+        );
+      }
+    }
+    return nextBars;
   }
 
   private collectPreStartCloses(
@@ -318,20 +412,16 @@ export class StrategyBacktestEngine {
   }
 
   private executeScheduledOrders(
-    state: EngineState,
+    prepared: PreparedBacktest,
     currentDate: Date,
     currentBarsBySecurity: Map<string, StrategyBacktestBar>,
-    barsBySecurity: Map<string, StrategyBacktestBar[]>,
-    input: StrategyBacktestInput,
-    dateIndexes: Map<number, number>,
     dateIndex: number,
   ): void {
-    const scheduledOrders = state.orders
-      .filter(
-        (order) =>
-          order.status === BacktestOrderStatus.PENDING &&
-          order.scheduledTime.getTime() <= currentDate.getTime(),
-      )
+    const state = prepared.state;
+    const scheduledOrders = (
+      state.pendingOrdersByTimestamp.get(currentDate.getTime()) ?? []
+    )
+      .filter((order) => order.status === BacktestOrderStatus.PENDING)
       .sort((left, right) => {
         const sideDiff =
           this.orderSideRank(left.side) - this.orderSideRank(right.side);
@@ -340,6 +430,7 @@ export class StrategyBacktestEngine {
         if (codeDiff !== 0) return codeDiff;
         return left.orderIndex - right.orderIndex;
       });
+    state.pendingOrdersByTimestamp.delete(currentDate.getTime());
 
     for (const order of scheduledOrders) {
       const bar = currentBarsBySecurity.get(order.securityCode);
@@ -352,23 +443,25 @@ export class StrategyBacktestEngine {
           state,
           order,
           bar,
-          barsBySecurity.get(order.securityCode) ?? [],
-          input,
-          dateIndexes,
+          prepared.nextBarByKey,
+          prepared.input,
+          prepared.dateIndexes,
           dateIndex,
         );
+        if (order.status === BacktestOrderStatus.PENDING) {
+          this.enqueuePendingOrder(state, order);
+        }
       } else {
-        this.executeBuyOrder(state, order, bar, input.config);
+        this.executeBuyOrder(state, order, bar, prepared.input.config);
       }
     }
   }
 
   private evaluateDateRules(
-    input: StrategyBacktestInput,
-    state: EngineState,
+    prepared: PreparedBacktest,
     currentBars: StrategyBacktestBar[],
-    barsBySecurity: Map<string, StrategyBacktestBar[]>,
   ): void {
+    const { input, state } = prepared;
     const rules = [
       {
         signalKind: StrategySignalKind.EXIT,
@@ -387,37 +480,46 @@ export class StrategyBacktestEngine {
       } => candidate.rule !== null,
     );
 
+    // Build, once per current bar, the {current, previous} evaluation contexts
+    // (filtering strictly to bars at or before this timestamp to avoid
+    // lookahead). Both entry and exit rules then reuse these pre-built
+    // contexts, eliminating the prior 2× per-(rule × bar) filter + map +
+    // full-indicator recompute.
+    const contextsBySecurity = new Map<
+      string,
+      { current: Record<string, unknown>; previous?: Record<string, unknown> }
+    >();
+    for (const bar of currentBars) {
+      const evaluationBar = prepared.evaluationBarsByKey.get(
+        this.barKey(bar.securityCode, bar.timestamp),
+      );
+      const evaluationState = prepared.evaluationStateBySecurity.get(
+        bar.securityCode,
+      );
+      if (!evaluationBar || !evaluationState) continue;
+      evaluationState.completedBars.push(evaluationBar);
+      if (evaluationState.completedBars.length > input.lookbackBars + 1) {
+        evaluationState.completedBars.shift();
+      }
+      const context = this.contextBuilder.buildFromNormalizedK(
+        evaluationBar,
+        evaluationState.completedBars,
+      ) as unknown as Record<string, unknown>;
+      contextsBySecurity.set(bar.securityCode, {
+        current: context,
+        previous: evaluationState.previousContext,
+      });
+      evaluationState.previousContext = context;
+    }
+
     for (const { signalKind, rule } of rules) {
       for (const bar of currentBars) {
-        const securityBars = barsBySecurity.get(bar.securityCode) ?? [];
-        const completedBars = securityBars.filter(
-          (candidate) => candidate.timestamp <= bar.timestamp,
-        );
-        const context = this.contextBuilder.buildFromK(
-          this.toEvaluationBar(bar),
-          completedBars.map((candidate) => this.toEvaluationBar(candidate)),
-          input.lookbackBars,
-        );
-        const previousBar = completedBars[completedBars.length - 2];
-        const previousContext = previousBar
-          ? this.contextBuilder.buildFromK(
-              this.toEvaluationBar(previousBar),
-              completedBars
-                .filter(
-                  (candidate) => candidate.timestamp <= previousBar.timestamp,
-                )
-                .map((candidate) => this.toEvaluationBar(candidate)),
-              input.lookbackBars,
-            )
-          : undefined;
-        const contextSnapshot = context as unknown as Record<string, unknown>;
-        const previousContextSnapshot = previousContext as
-          | Record<string, unknown>
-          | undefined;
+        const entry = contextsBySecurity.get(bar.securityCode);
+        if (!entry) continue;
         const evaluation = this.ruleEvaluator.evaluate(
           rule,
-          contextSnapshot,
-          previousContextSnapshot,
+          entry.current,
+          entry.previous,
         );
         if (!evaluation.matched) continue;
 
@@ -426,28 +528,21 @@ export class StrategyBacktestEngine {
           securityCode: bar.securityCode,
           signalKind,
           signalTime: new Date(bar.timestamp),
-          contextSnapshot: this.cloneRecord(contextSnapshot),
-          ruleSnapshot: this.cloneRecord(rule),
+          contextSnapshot: cloneJsonRecord(entry.current),
+          ruleSnapshot: cloneJsonRecord(rule),
         };
         state.signals.push(signal);
-        this.scheduleOrderForSignal(
-          state,
-          signal,
-          bar,
-          securityBars,
-          input.endDate,
-        );
+        this.scheduleOrderForSignal(prepared, signal, bar);
       }
     }
   }
 
   private scheduleOrderForSignal(
-    state: EngineState,
+    prepared: PreparedBacktest,
     signal: StrategyBacktestSignal,
     bar: StrategyBacktestBar,
-    securityBars: StrategyBacktestBar[],
-    endDate: Date,
   ): void {
+    const state = prepared.state;
     const side =
       signal.signalKind === StrategySignalKind.ENTRY
         ? BacktestOrderSide.BUY
@@ -470,10 +565,8 @@ export class StrategyBacktestEngine {
       return;
     }
 
-    const nextBar = this.findNextAvailableBar(
-      securityBars,
-      bar.timestamp,
-      endDate,
+    const nextBar = prepared.nextBarByKey.get(
+      this.barKey(bar.securityCode, bar.timestamp),
     );
     if (!nextBar) {
       state.orders.push(
@@ -490,17 +583,17 @@ export class StrategyBacktestEngine {
       return;
     }
 
-    state.orders.push(
-      this.createOrder(
-        state.orders.length + 1,
-        signal.signalIndex,
-        bar.securityCode,
-        side,
-        BacktestOrderStatus.PENDING,
-        null,
-        nextBar.timestamp,
-      ),
+    const order = this.createOrder(
+      state.orders.length + 1,
+      signal.signalIndex,
+      bar.securityCode,
+      side,
+      BacktestOrderStatus.PENDING,
+      null,
+      nextBar.timestamp,
     );
+    state.orders.push(order);
+    this.enqueuePendingOrder(state, order);
   }
 
   private createOrder(
@@ -606,6 +699,7 @@ export class StrategyBacktestEngine {
       holdingDays: null,
     };
     state.trades.push(trade);
+    state.tradesByIndex.set(trade.tradeIndex, trade);
     state.positions.set(order.securityCode, {
       securityCode: order.securityCode,
       quantity,
@@ -621,7 +715,7 @@ export class StrategyBacktestEngine {
     state: EngineState,
     order: StrategyBacktestOrder,
     bar: StrategyBacktestBar,
-    securityBars: StrategyBacktestBar[],
+    nextBarByKey: Map<string, StrategyBacktestBar>,
     input: StrategyBacktestInput,
     dateIndexes: Map<number, number>,
     dateIndex: number,
@@ -632,10 +726,8 @@ export class StrategyBacktestEngine {
       return;
     }
     if (this.isSameTradingDate(position.entryTime, bar.timestamp)) {
-      const nextBar = this.findNextAvailableBar(
-        securityBars,
-        bar.timestamp,
-        input.endDate,
+      const nextBar = nextBarByKey.get(
+        this.barKey(bar.securityCode, bar.timestamp),
       );
       if (!nextBar) {
         this.expireOrder(order, 't_plus_one_end_of_range', bar.timestamp);
@@ -670,9 +762,7 @@ export class StrategyBacktestEngine {
       grossAmountFen,
       fees,
     );
-    const trade = state.trades.find(
-      (candidate) => candidate.tradeIndex === position.tradeIndex,
-    );
+    const trade = state.tradesByIndex.get(position.tradeIndex);
     if (!trade) {
       throw new Error(`Missing trade for open position ${order.securityCode}`);
     }
@@ -761,16 +851,6 @@ export class StrategyBacktestEngine {
     order.status = BacktestOrderStatus.EXPIRED;
     order.reason = reason;
     order.expiredAt = new Date(expiredAt);
-  }
-
-  private findNextAvailableBar(
-    bars: StrategyBacktestBar[],
-    timestamp: Date,
-    endDate: Date,
-  ): StrategyBacktestBar | undefined {
-    return bars.find(
-      (bar) => bar.timestamp > timestamp && bar.timestamp <= endDate,
-    );
   }
 
   private orderSideRank(side: BacktestOrderSide): number {
@@ -871,29 +951,43 @@ export class StrategyBacktestEngine {
     }
 
     const finalPoint = points[points.length - 1];
-    const totalReturn = finalPoint.equity / initialCash - 1;
+    const totalReturn = this.finiteOrNull(finalPoint.equity / initialCash - 1);
     const annualizedReturn =
-      points.length > 1
-        ? (1 + totalReturn) ** (252 / (points.length - 1)) - 1
-        : totalReturn;
-    const dailyReturns = points.slice(1).map((point, index) => {
+      totalReturn !== null && finalPoint.equity > 0
+        ? this.finiteOrNull(
+            points.length > 1
+              ? (1 + totalReturn) ** (252 / (points.length - 1)) - 1
+              : totalReturn,
+          )
+        : null;
+    const dailyReturns = points.slice(1).flatMap((point, index) => {
       const previousEquity = points[index].equity;
-      return previousEquity === 0 ? 0 : point.equity / previousEquity - 1;
+      if (previousEquity <= 0) return [];
+      const dailyReturn = this.finiteOrNull(point.equity / previousEquity - 1);
+      return dailyReturn === null ? [] : [dailyReturn];
     });
     const annualizedVolatility =
-      this.calculateAnnualizedVolatility(dailyReturns);
+      dailyReturns.length === points.length - 1
+        ? this.calculateAnnualizedVolatility(dailyReturns)
+        : null;
     const sharpeRatio =
-      annualizedVolatility === null || annualizedVolatility === 0
+      annualizedReturn === null ||
+      annualizedVolatility === null ||
+      annualizedVolatility === 0
         ? null
-        : annualizedReturn / annualizedVolatility;
-    const maxDrawdown = Math.min(...points.map((point) => point.drawdown));
+        : this.finiteOrNull(annualizedReturn / annualizedVolatility);
+    const maxDrawdown = this.finiteOrNull(
+      Math.min(...points.map((point) => point.drawdown)),
+    );
     const maxDrawdownDuration = this.calculateMaxDrawdownDuration(points);
     const calmarRatio =
-      maxDrawdown === 0 ? null : annualizedReturn / Math.abs(maxDrawdown);
-    const benchmarkReturn =
-      finalPoint.benchmarkValue === null
+      annualizedReturn === null || maxDrawdown === null || maxDrawdown === 0
         ? null
-        : finalPoint.benchmarkValue / initialCash - 1;
+        : this.finiteOrNull(annualizedReturn / Math.abs(maxDrawdown));
+    const benchmarkReturn =
+      points[0].benchmarkValue === null || finalPoint.benchmarkValue === null
+        ? null
+        : this.finiteOrNull(finalPoint.benchmarkValue / initialCash - 1);
     const closedTrades = state.trades.filter(
       (trade) => trade.status === BacktestTradeStatus.CLOSED,
     );
@@ -921,25 +1015,35 @@ export class StrategyBacktestEngine {
       calmarRatio,
       benchmarkReturn,
       excessReturn:
-        benchmarkReturn === null ? null : totalReturn - benchmarkReturn,
+        benchmarkReturn === null || totalReturn === null
+          ? null
+          : this.finiteOrNull(totalReturn - benchmarkReturn),
       winRate:
         closedTrades.length === 0
           ? null
           : closedTrades.filter((trade) => (trade.realizedPnl ?? 0) > 0)
               .length / closedTrades.length,
       profitFactor:
-        negativePnl === 0 ? null : positivePnl / Math.abs(negativePnl),
+        negativePnl === 0
+          ? null
+          : this.finiteOrNull(positivePnl / Math.abs(negativePnl)),
       tradeCount: closedTrades.length,
       averageHoldingDays:
         closedTrades.length === 0
           ? null
-          : closedTrades.reduce(
-              (sum, trade) => sum + (trade.holdingDays ?? 0),
-              0,
-            ) / closedTrades.length,
-      turnover: averageEquity === 0 ? null : filledNotional / averageEquity,
-      averageExposure:
+          : this.finiteOrNull(
+              closedTrades.reduce(
+                (sum, trade) => sum + (trade.holdingDays ?? 0),
+                0,
+              ) / closedTrades.length,
+            ),
+      turnover:
+        averageEquity <= 0
+          ? null
+          : this.finiteOrNull(filledNotional / averageEquity),
+      averageExposure: this.finiteOrNull(
         points.reduce((sum, point) => sum + point.exposure, 0) / points.length,
+      ),
     };
   }
 
@@ -951,7 +1055,7 @@ export class StrategyBacktestEngine {
       returns.reduce((sum, value) => sum + (value - average) ** 2, 0) /
       returns.length;
     if (variance === 0) return null;
-    return Math.sqrt(variance) * Math.sqrt(252);
+    return this.finiteOrNull(Math.sqrt(variance) * Math.sqrt(252));
   }
 
   private calculateMaxDrawdownDuration(
@@ -979,7 +1083,9 @@ export class StrategyBacktestEngine {
     return maxDuration;
   }
 
-  private toEvaluationBar(bar: StrategyBacktestBar): StrategyEvaluationBar {
+  private toEvaluationBar(
+    bar: StrategyBacktestBar,
+  ): StrategyNormalizedEvaluationBar {
     return {
       security: {
         code: bar.securityCode,
@@ -997,16 +1103,28 @@ export class StrategyBacktestEngine {
     };
   }
 
-  private isSameTradingDate(left: Date, right: Date): boolean {
-    return (
-      left.getUTCFullYear() === right.getUTCFullYear() &&
-      left.getUTCMonth() === right.getUTCMonth() &&
-      left.getUTCDate() === right.getUTCDate()
-    );
+  private enqueuePendingOrder(
+    state: EngineState,
+    order: StrategyBacktestOrder,
+  ): void {
+    const timestamp = order.scheduledTime.getTime();
+    const pendingOrders = state.pendingOrdersByTimestamp.get(timestamp) ?? [];
+    pendingOrders.push(order);
+    state.pendingOrdersByTimestamp.set(timestamp, pendingOrders);
   }
 
-  private cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
-    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
+  private barKey(securityCode: string, timestamp: Date): string {
+    return `${securityCode}\u0000${timestamp.getTime()}`;
+  }
+
+  private finiteOrNull(value: number): number | null {
+    return Number.isFinite(value) ? value : null;
+  }
+
+  private isSameTradingDate(left: Date, right: Date): boolean {
+    const beijingDayKey = (value: Date) =>
+      Math.floor((value.getTime() + 8 * 60 * 60 * 1_000) / 86_400_000);
+    return beijingDayKey(left) === beijingDayKey(right);
   }
 }
 

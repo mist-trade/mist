@@ -16,6 +16,19 @@ describe('StrategyBacktestService', () => {
     exitRule?: Record<string, unknown> | null;
     versionDefinitionId?: number;
   }) => {
+    const createQueryBuilder = (repository: any) => {
+      const builder = {
+        where: jest.fn().mockReturnThis(),
+        andWhere: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        addSelect: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getRawAndEntities: jest.fn(async () => repository.queryResults.shift()),
+      };
+      repository.builders.push(builder);
+      return builder;
+    };
     const definition = {
       id: 3,
       currentVersionId: 9,
@@ -54,10 +67,22 @@ describe('StrategyBacktestService', () => {
       findOne: jest.fn(),
       find: jest.fn().mockResolvedValue([]),
       update: jest.fn().mockResolvedValue({ affected: 0 }),
+      queryResults: [] as any[],
+      builders: [] as any[],
+      createQueryBuilder: jest.fn(),
     };
     const factRepository = {
       find: jest.fn().mockResolvedValue([]),
+      queryResults: [] as any[],
+      builders: [] as any[],
+      createQueryBuilder: jest.fn(),
     };
+    backtestRunRepository.createQueryBuilder.mockImplementation(() =>
+      createQueryBuilder(backtestRunRepository),
+    );
+    factRepository.createQueryBuilder.mockImplementation(() =>
+      createQueryBuilder(factRepository),
+    );
     const securitySourceConfigRepository = {
       findOne: jest.fn().mockResolvedValue(
         options?.benchmarkConfigured === false
@@ -80,6 +105,17 @@ describe('StrategyBacktestService', () => {
       factRepository as any,
       securitySourceConfigRepository as any,
       new StrategyRuleValidator(),
+      {
+        parseDateString: (dateStr: string) => {
+          if (!/^\d{4}-\d{2}-\d{2}( \d{2}:\d{2}:\d{2})?$/.test(dateStr)) {
+            throw new BadRequestException(`Invalid date format: ${dateStr}`);
+          }
+          const normalized = dateStr.includes(' ')
+            ? dateStr
+            : `${dateStr} 00:00:00`;
+          return new Date(`${normalized.replace(' ', 'T')}+08:00`);
+        },
+      } as any,
     );
 
     return {
@@ -123,15 +159,35 @@ describe('StrategyBacktestService', () => {
         maxPositions: 10,
         benchmarkCode: '000300',
         executionAssumption: 'full_fill_at_adjusted_next_open',
+        priceModel: 'tdx_front',
+        limitations: expect.arrayContaining(['dividends_not_modeled']),
+        marketDataFingerprintAlgorithm: 'sha256-v1',
       }),
       strategySnapshot: expect.objectContaining({
         entryRule: { field: 'k.close', operator: 'gt', value: 100 },
         exitRule: { field: 'k.close', operator: 'lt', value: 90 },
         lookbackBars: 1,
-        priceModel: 'forward_adjusted',
-        limitations: expect.arrayContaining(['dividends_not_modeled']),
       }),
     });
+  });
+
+  it('parses start and end dates as Beijing midnight so persisted K bars on the first day are included', async () => {
+    const { service, savedRuns } = createHarness();
+
+    await service.createRun({
+      ...createDto,
+      startDate: '2026-01-01',
+      endDate: '2026-01-01',
+    } as any);
+
+    // Beijing 2026-01-01 00:00:00 == UTC 2025-12-31T16:00:00Z.
+    // Persisted QMT/TDX daily K for that trading day carries this exact
+    // instant, so a >= run.startDate filter must keep it in range.
+    expect(savedRuns).toHaveLength(1);
+    expect(savedRuns[0].startDate.toISOString()).toBe(
+      '2025-12-31T16:00:00.000Z',
+    );
+    expect(savedRuns[0].endDate.toISOString()).toBe('2025-12-31T16:00:00.000Z');
   });
 
   it('uses an explicit version only when it belongs to the selected definition', async () => {
@@ -175,6 +231,19 @@ describe('StrategyBacktestService', () => {
         endDate: '2037-01-02',
       } as any),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('rejects EF even when the definition lists it as configured', async () => {
+    const { service, definition, savedRuns } = createHarness();
+    definition.sources = [DataSource.EAST_MONEY];
+
+    await expect(
+      service.createRun({
+        ...createDto,
+        source: DataSource.EAST_MONEY,
+      } as any),
+    ).rejects.toThrow(BadRequestException);
+    expect(savedRuns).toHaveLength(0);
   });
 
   it('rejects an empty target universe before a pending run is persisted', async () => {
@@ -316,11 +385,24 @@ describe('StrategyBacktestService', () => {
       startDate: new Date('2026-01-01'),
       endDate: new Date('2026-06-30'),
     });
-    factRepository.find.mockResolvedValue([
-      { id: 3, signalTime: new Date('2026-01-03') },
-      { id: 2, signalTime: new Date('2026-01-02') },
-      { id: 1, signalTime: new Date('2026-01-02') },
-    ]);
+    factRepository.queryResults.push(
+      {
+        entities: [
+          { id: 1, signalTime: new Date('2026-01-02') },
+          { id: 2, signalTime: new Date('2026-01-02') },
+          { id: 3, signalTime: new Date('2026-01-03') },
+        ],
+        raw: [
+          { backtest_cursor_time: '2026-01-02 00:00:00.000000' },
+          { backtest_cursor_time: '2026-01-02 00:00:00.000000' },
+          { backtest_cursor_time: '2026-01-03 00:00:00.000000' },
+        ],
+      },
+      {
+        entities: [{ id: 3, signalTime: new Date('2026-01-03') }],
+        raw: [{ backtest_cursor_time: '2026-01-03 00:00:00.000000' }],
+      },
+    );
 
     const firstPage = await service.listSignals(1, { limit: 2 });
     const secondPage = await service.listSignals(1, {
@@ -336,6 +418,14 @@ describe('StrategyBacktestService', () => {
       items: [{ id: 3, signalTime: new Date('2026-01-03') }],
       nextCursor: null,
     });
+    expect(factRepository.builders[0].take).toHaveBeenCalledWith(3);
+    expect(factRepository.builders[1].andWhere).toHaveBeenCalledWith(
+      expect.stringContaining('signal.signalTime > :cursorTime'),
+      expect.objectContaining({
+        cursorTime: '2026-01-02 00:00:00.000000',
+        cursorId: 2,
+      }),
+    );
     await expect(
       service.listSignals(1, { cursor: 'not-a-cursor' }),
     ).rejects.toThrow(BadRequestException);
@@ -348,11 +438,24 @@ describe('StrategyBacktestService', () => {
     const { service, backtestRunRepository } = createHarness({
       backtestEnabled: false,
     });
-    backtestRunRepository.find.mockResolvedValue([
-      { id: 2, createTime: new Date('2026-06-30') },
-      { id: 3, createTime: new Date('2026-06-30') },
-      { id: 1, createTime: new Date('2026-06-29') },
-    ]);
+    backtestRunRepository.queryResults.push(
+      {
+        entities: [
+          { id: 3, createTime: new Date('2026-06-30') },
+          { id: 2, createTime: new Date('2026-06-30') },
+          { id: 1, createTime: new Date('2026-06-29') },
+        ],
+        raw: [
+          { backtest_cursor_time: '2026-06-30 00:00:00.123456' },
+          { backtest_cursor_time: '2026-06-30 00:00:00.123456' },
+          { backtest_cursor_time: '2026-06-29 00:00:00.999999' },
+        ],
+      },
+      {
+        entities: [{ id: 1, createTime: new Date('2026-06-29') }],
+        raw: [{ backtest_cursor_time: '2026-06-29 00:00:00.999999' }],
+      },
+    );
 
     const firstPage = await service.listRuns({
       strategyDefinitionId: 3,
@@ -366,13 +469,14 @@ describe('StrategyBacktestService', () => {
       cursor: firstPage.nextCursor ?? undefined,
     });
 
-    expect(backtestRunRepository.find).toHaveBeenCalledWith({
-      where: {
-        strategyDefinitionId: 3,
-        status: BacktestRunStatus.COMPLETED,
-      },
-      order: { createTime: 'DESC', id: 'DESC' },
-    });
+    expect(backtestRunRepository.builders[0].andWhere).toHaveBeenCalledWith(
+      'run.strategyDefinitionId = :strategyDefinitionId',
+      { strategyDefinitionId: 3 },
+    );
+    expect(backtestRunRepository.builders[0].andWhere).toHaveBeenCalledWith(
+      'run.status = :status',
+      { status: BacktestRunStatus.COMPLETED },
+    );
     expect(firstPage.items.map((run) => run.id)).toEqual([3, 2]);
     expect(secondPage.items.map((run) => run.id)).toEqual([1]);
 
@@ -381,9 +485,9 @@ describe('StrategyBacktestService', () => {
       startDate: new Date('2026-01-01'),
       endDate: new Date('2026-06-30'),
     });
-    await expect(
-      service.listPositions(1, new Date('not-a-date')),
-    ).rejects.toThrow(BadRequestException);
+    await expect(service.listPositions(1, 'not-a-date')).rejects.toThrow(
+      BadRequestException,
+    );
 
     backtestRunRepository.findOne.mockResolvedValue(undefined);
     await expect(service.listSignals(999)).rejects.toThrow(NotFoundException);
@@ -396,9 +500,11 @@ describe('StrategyBacktestService', () => {
       startDate: new Date('2026-01-01'),
       endDate: new Date('2026-01-05'),
     });
-    factRepository.find
-      .mockResolvedValueOnce([{ id: 10, pointTime: new Date('2026-01-03') }])
-      .mockResolvedValueOnce([
+    factRepository.find.mockResolvedValueOnce([
+      { id: 10, pointTime: new Date('2026-01-03') },
+    ]);
+    factRepository.queryResults.push({
+      entities: [
         {
           id: 1,
           entryTime: new Date('2026-01-01'),
@@ -409,7 +515,12 @@ describe('StrategyBacktestService', () => {
           entryTime: new Date('2026-01-01'),
           exitTime: null,
         },
-      ]);
+      ],
+      raw: [
+        { backtest_cursor_time: '2026-01-01 00:00:00.000000' },
+        { backtest_cursor_time: '2026-01-01 00:00:00.000000' },
+      ],
+    });
 
     const positions = await service.listPositions(1);
 
@@ -422,7 +533,7 @@ describe('StrategyBacktestService', () => {
       id: 1,
       progressPercent: '25.00',
       metrics: { sharpeRatio: Number.POSITIVE_INFINITY, winRate: Number.NaN },
-      errorDetails: { retryCount: 1n },
+      errorDetails: { retryCount: 1n, commission: 'provider unavailable' },
     });
 
     const run = await service.findRun(1);
@@ -430,7 +541,10 @@ describe('StrategyBacktestService', () => {
     expect(run).toMatchObject({
       progressPercent: 25,
       metrics: { sharpeRatio: null, winRate: null },
-      errorDetails: { retryCount: '1' },
+      // bigint is still stringified (JSON-safe), but the diagnostic string
+      // whose key happens to match a decimal column name must survive intact
+      // rather than being coerced to null.
+      errorDetails: { retryCount: '1', commission: 'provider unavailable' },
     });
     expect(() => JSON.stringify(run)).not.toThrow();
   });
@@ -438,18 +552,21 @@ describe('StrategyBacktestService', () => {
   it('normalizes MySQL decimal strings in portfolio fact payloads', async () => {
     const { service, backtestRunRepository, factRepository } = createHarness();
     backtestRunRepository.findOne.mockResolvedValue({ id: 1 });
-    factRepository.find.mockResolvedValue([
-      {
-        id: 1,
-        scheduledTime: new Date('2026-01-02T00:00:00.000Z'),
-        fillPrice: '120.05',
-        grossAmount: '12005.00',
-        commission: '5.00',
-        stampDuty: '0.00',
-        transferFee: '0.12',
-        totalFee: '5.12',
-      },
-    ]);
+    factRepository.queryResults.push({
+      entities: [
+        {
+          id: 1,
+          scheduledTime: new Date('2026-01-02T00:00:00.000Z'),
+          fillPrice: '120.05',
+          grossAmount: '12005.00',
+          commission: '5.00',
+          stampDuty: '0.00',
+          transferFee: '0.12',
+          totalFee: '5.12',
+        },
+      ],
+      raw: [{ backtest_cursor_time: '2026-01-02 00:00:00.000000' }],
+    });
 
     const page = await service.listOrders(1);
 

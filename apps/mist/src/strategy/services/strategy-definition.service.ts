@@ -15,6 +15,7 @@ import { Repository } from 'typeorm';
 import { CreateStrategyDefinitionDto } from '../dto/create-strategy-definition.dto';
 import { UpdateStrategyDefinitionDto } from '../dto/update-strategy-definition.dto';
 import { StrategyRuleValidator } from '../rules/strategy-rule-validator';
+import { isStrategyBacktestSource } from '../backtest/strategy-backtest.constants';
 
 @Injectable()
 export class StrategyDefinitionService {
@@ -114,6 +115,13 @@ export class StrategyDefinitionService {
     }
 
     if (backtestEnabled) {
+      if (!changesVersion) {
+        this.validateVersionRules(
+          candidateEntryRule,
+          candidateExitRule,
+          candidateLookbackBars,
+        );
+      }
       this.assertBacktestEligibility(
         definition.periods,
         definition.sources,
@@ -219,8 +227,8 @@ export class StrategyDefinitionService {
       throw new BadRequestException('Strategy entry rule is required');
     }
     if (
+      typeof lookbackBars !== 'number' ||
       !Number.isInteger(lookbackBars) ||
-      lookbackBars === undefined ||
       lookbackBars < 1 ||
       lookbackBars > 250
     ) {
@@ -259,7 +267,6 @@ export class StrategyDefinitionService {
   ): void {
     if (!backtestEnabled) return;
 
-    this.validateVersionRules(entryRule, exitRule, lookbackBars);
     if (!exitRule) {
       throw new BadRequestException(
         'Backtesting requires the current version to define an exit rule',
@@ -268,8 +275,10 @@ export class StrategyDefinitionService {
     if (!periods.includes(Period.DAY)) {
       throw new BadRequestException('Backtesting requires the daily period');
     }
-    if (sources.length === 0) {
-      throw new BadRequestException('Backtesting requires at least one source');
+    if (!sources.some(isStrategyBacktestSource)) {
+      throw new BadRequestException(
+        'Backtesting requires a configured tdx or qmt source',
+      );
     }
   }
 }

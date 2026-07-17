@@ -36,7 +36,7 @@ export class BacktestOrder {
   @Column({ type: 'varchar', length: 255, nullable: true })
   reason?: string | null;
 
-  @Column({ name: 'scheduled_time', type: 'datetime' })
+  @Column({ name: 'scheduled_time', type: 'datetime', precision: 6 })
   scheduledTime: Date = new Date();
 
   @Column({ name: 'execution_time', type: 'datetime', nullable: true })

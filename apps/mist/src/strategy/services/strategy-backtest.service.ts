@@ -19,9 +19,18 @@ import {
   StrategyDefinition,
   StrategyVersion,
 } from '@app/shared-data';
-import { Repository } from 'typeorm';
+import { Repository, SelectQueryBuilder } from 'typeorm';
+import { TimezoneService } from '@app/timezone';
+import {
+  isStrategyBacktestSource,
+  MARKET_DATA_FINGERPRINT_ALGORITHM,
+  MAX_BACKTEST_CNY,
+  STRATEGY_BACKTEST_ERROR_CODES,
+  strategyBacktestPriceModel,
+} from '../backtest/strategy-backtest.constants';
 import { normalizeStrategyBacktestConfig } from '../backtest/strategy-backtest.engine';
 import { StrategyBacktestConfig } from '../backtest/strategy-backtest.types';
+import { cloneJsonRecord } from '../backtest/strategy-backtest.utils';
 import { CreateBacktestRunDto } from '../dto/create-backtest-run.dto';
 import { StrategyRuleValidator } from '../rules/strategy-rule-validator';
 
@@ -41,6 +50,16 @@ type BacktestFactListQuery = {
   cursor?: string;
   limit?: number;
 };
+
+type Serialized<T> = T extends bigint
+  ? string
+  : T extends Date
+    ? Date
+    : T extends Array<infer Item>
+      ? Array<Serialized<Item>>
+      : T extends object
+        ? { [Key in keyof T]: Serialized<T[Key]> }
+        : T;
 
 const BACKTEST_DECIMAL_FIELDS = new Set([
   'progressPercent',
@@ -63,6 +82,20 @@ const BACKTEST_DECIMAL_FIELDS = new Set([
   'exposure',
 ]);
 
+// JSON columns that carry arbitrary nested payloads (snapshots, metrics,
+// diagnostic blobs). The serializer must NOT recurse into these with
+// decimal-field coercion: a diagnostic string like
+// { errorDetails: { commission: "provider unavailable" } } would otherwise be
+// silently turned into { commission: null }, destroying the original text.
+const BACKTEST_JSON_BLOB_FIELDS = new Set([
+  'strategySnapshot',
+  'configSnapshot',
+  'metrics',
+  'errorDetails',
+  'contextSnapshot',
+  'ruleSnapshot',
+]);
+
 @Injectable()
 export class StrategyBacktestService {
   constructor(
@@ -83,6 +116,7 @@ export class StrategyBacktestService {
     @InjectRepository(SecuritySourceConfig)
     private readonly securitySourceConfigRepository: Repository<SecuritySourceConfig>,
     private readonly ruleValidator: StrategyRuleValidator,
+    private readonly timezoneService: TimezoneService,
   ) {}
 
   async createRun(dto: CreateBacktestRunDto): Promise<BacktestRun> {
@@ -96,7 +130,7 @@ export class StrategyBacktestService {
     }
     if (!definition.backtestEnabled) {
       throw new BadRequestException({
-        message: 'BACKTEST_DEFINITION_INELIGIBLE',
+        message: STRATEGY_BACKTEST_ERROR_CODES.DEFINITION_INELIGIBLE,
         errors: {
           backtestEnabled: ['Strategy backtesting is disabled'],
         },
@@ -106,7 +140,7 @@ export class StrategyBacktestService {
     const versionId = dto.strategyVersionId ?? definition.currentVersionId;
     if (!versionId) {
       throw new BadRequestException({
-        message: 'BACKTEST_VERSION_MISSING',
+        message: STRATEGY_BACKTEST_ERROR_CODES.VERSION_MISSING,
         errors: {
           strategyVersionId: ['No current strategy version is configured'],
         },
@@ -130,18 +164,36 @@ export class StrategyBacktestService {
       benchmarkCode: dto.benchmarkCode,
     });
     this.assertEligibleVersion(version);
-    this.assertRequestBounds(dto, definition, config);
+    // Parse dates exactly once (Beijing midnight) and reuse for both bounds
+    // checking and persistence, so validation and the stored run cannot diverge.
+    const startDate = this.parseDateOnce(dto.startDate);
+    const endDate = this.parseDateOnce(dto.endDate);
+    this.assertRequestBounds(dto, definition, config, startDate, endDate);
     await this.assertConfiguredBenchmark(dto.source, config.benchmarkCode);
+    const priceModel = strategyBacktestPriceModel(dto.source);
 
     const run = this.backtestRunRepository.create({
       strategyDefinitionId: definition.id,
       strategyVersionId: version.id,
       strategySnapshot: {
-        entryRule: this.cloneRecord(version.entryRule),
-        exitRule: version.exitRule ? this.cloneRecord(version.exitRule) : null,
+        entryRule: cloneJsonRecord(version.entryRule),
+        exitRule: version.exitRule ? cloneJsonRecord(version.exitRule) : null,
         lookbackBars: version.lookbackBars,
         ruleSchemaVersion: version.ruleSchemaVersion,
-        priceModel: 'forward_adjusted',
+      },
+      targetUniverse: [...dto.targetUniverse],
+      period: dto.period,
+      source: dto.source,
+      configSnapshot: {
+        ...config,
+        priceModel,
+        // Document the provenance of the price-model claim so operators know
+        // the QMT marker is an ingestion-contract declaration, not an
+        // independent provider attestation.
+        priceModelProvenance:
+          dto.source === DataSource.QMT
+            ? 'qmt_effective_dividend_type_request_contract'
+            : 'tdx_forward_factor_request_contract',
         limitations: [
           'dividends_not_modeled',
           'splits_not_modeled',
@@ -151,17 +203,11 @@ export class StrategyBacktestService {
           'liquidity_not_modeled',
           'partial_fills_not_modeled',
         ],
-      },
-      targetUniverse: [...dto.targetUniverse],
-      period: dto.period,
-      source: dto.source,
-      configSnapshot: {
-        ...config,
-        priceModel: 'forward_adjusted',
         executionAssumption: 'full_fill_at_adjusted_next_open',
+        marketDataFingerprintAlgorithm: MARKET_DATA_FINGERPRINT_ALGORITHM,
       },
-      startDate: new Date(dto.startDate),
-      endDate: new Date(dto.endDate),
+      startDate,
+      endDate,
       status: BacktestRunStatus.PENDING,
       stage: BacktestRunStage.QUEUED,
       signalCount: 0,
@@ -181,18 +227,20 @@ export class StrategyBacktestService {
   async listRuns(
     query: BacktestRunListQuery = {},
   ): Promise<BacktestCursorPage<BacktestRun>> {
-    const where: Record<string, unknown> = {};
+    const builder = this.backtestRunRepository
+      .createQueryBuilder('run')
+      .where('1 = 1');
     if (query.strategyDefinitionId !== undefined) {
-      where.strategyDefinitionId = query.strategyDefinitionId;
+      builder.andWhere('run.strategyDefinitionId = :strategyDefinitionId', {
+        strategyDefinitionId: query.strategyDefinitionId,
+      });
     }
-    if (query.status !== undefined) where.status = query.status;
+    if (query.status !== undefined) {
+      builder.andWhere('run.status = :status', { status: query.status });
+    }
 
-    const runs = await this.backtestRunRepository.find({
-      where: where as any,
-      order: { createTime: 'DESC', id: 'DESC' },
-    });
     return this.serializePage(
-      this.paginate(runs, query, (run) => run.createTime, 'DESC'),
+      await this.queryCursorPage(builder, 'run', 'createTime', 'DESC', query),
     );
   }
 
@@ -225,14 +273,10 @@ export class StrategyBacktestService {
       return this.serialize(await this.findRunEntity(runId));
     }
 
-    const runningCancellation = await this.backtestRunRepository.update(
+    await this.backtestRunRepository.update(
       { id: runId, status: BacktestRunStatus.RUNNING },
       { cancelRequestedAt: now },
     );
-    if (runningCancellation.affected === 1) {
-      return this.serialize(await this.findRunEntity(runId));
-    }
-
     return this.serialize(await this.findRunEntity(runId));
   }
 
@@ -241,12 +285,11 @@ export class StrategyBacktestService {
     query: BacktestFactListQuery = {},
   ): Promise<BacktestCursorPage<BacktestSignal>> {
     await this.findRunEntity(runId);
-    const signals = await this.signalRepository.find({
-      where: { backtestRunId: runId },
-      order: { signalTime: 'ASC', id: 'ASC' },
-    });
+    const builder = this.signalRepository
+      .createQueryBuilder('signal')
+      .where('signal.backtestRunId = :runId', { runId });
     return this.serializePage(
-      this.paginate(signals, query, (signal) => signal.signalTime, 'ASC'),
+      await this.queryCursorPage(builder, 'signal', 'signalTime', 'ASC', query),
     );
   }
 
@@ -255,12 +298,17 @@ export class StrategyBacktestService {
     query: BacktestFactListQuery = {},
   ): Promise<BacktestCursorPage<BacktestOrder>> {
     await this.findRunEntity(runId);
-    const orders = await this.orderRepository.find({
-      where: { backtestRunId: runId },
-      order: { scheduledTime: 'ASC', id: 'ASC' },
-    });
+    const builder = this.orderRepository
+      .createQueryBuilder('order')
+      .where('order.backtestRunId = :runId', { runId });
     return this.serializePage(
-      this.paginate(orders, query, (order) => order.scheduledTime, 'ASC'),
+      await this.queryCursorPage(
+        builder,
+        'order',
+        'scheduledTime',
+        'ASC',
+        query,
+      ),
     );
   }
 
@@ -269,12 +317,11 @@ export class StrategyBacktestService {
     query: BacktestFactListQuery = {},
   ): Promise<BacktestCursorPage<BacktestTrade>> {
     await this.findRunEntity(runId);
-    const trades = await this.tradeRepository.find({
-      where: { backtestRunId: runId },
-      order: { entryTime: 'ASC', id: 'ASC' },
-    });
+    const builder = this.tradeRepository
+      .createQueryBuilder('trade')
+      .where('trade.backtestRunId = :runId', { runId });
     return this.serializePage(
-      this.paginate(trades, query, (trade) => trade.entryTime, 'ASC'),
+      await this.queryCursorPage(builder, 'trade', 'entryTime', 'ASC', query),
     );
   }
 
@@ -290,11 +337,15 @@ export class StrategyBacktestService {
 
   async listPositions(
     runId: number,
-    asOf?: Date,
+    asOf?: string,
     query: BacktestFactListQuery = {},
   ): Promise<BacktestCursorPage<BacktestTrade>> {
     const run = await this.findRunEntity(runId);
-    const latestEquityPoint = asOf
+    const parsedAsOf =
+      asOf === undefined
+        ? undefined
+        : this.timezoneService.parseDateString(asOf);
+    const latestEquityPoint = parsedAsOf
       ? undefined
       : await this.equityPointRepository.find({
           where: { backtestRunId: runId },
@@ -302,36 +353,34 @@ export class StrategyBacktestService {
           take: 1,
         });
     const effectiveAsOf =
-      asOf ?? latestEquityPoint?.[0]?.pointTime ?? run.endDate;
+      parsedAsOf ?? latestEquityPoint?.[0]?.pointTime ?? run.endDate;
     if (
       Number.isNaN(effectiveAsOf.getTime()) ||
       effectiveAsOf < run.startDate ||
       effectiveAsOf > run.endDate
     ) {
       throw new BadRequestException({
-        message: 'BACKTEST_POSITION_AS_OF_INVALID',
+        message: STRATEGY_BACKTEST_ERROR_CODES.POSITION_AS_OF_INVALID,
         errors: { asOf: ['Date must be within the requested backtest range'] },
       });
     }
 
-    const trades = await this.tradeRepository.find({
-      where: { backtestRunId: runId },
-      order: { entryTime: 'ASC', id: 'ASC' },
-    });
-    const positions = trades.filter(
-      (trade) =>
-        trade.entryTime <= effectiveAsOf &&
-        (!trade.exitTime || trade.exitTime > effectiveAsOf),
-    );
+    const builder = this.tradeRepository
+      .createQueryBuilder('trade')
+      .where('trade.backtestRunId = :runId', { runId })
+      .andWhere('trade.entryTime <= :asOf', { asOf: effectiveAsOf })
+      .andWhere('(trade.exitTime IS NULL OR trade.exitTime > :asOf)', {
+        asOf: effectiveAsOf,
+      });
     return this.serializePage(
-      this.paginate(positions, query, (trade) => trade.entryTime, 'ASC'),
+      await this.queryCursorPage(builder, 'trade', 'entryTime', 'ASC', query),
     );
   }
 
   private assertEligibleVersion(version: StrategyVersion): void {
     if (!version.exitRule) {
       throw new BadRequestException({
-        message: 'BACKTEST_VERSION_INELIGIBLE',
+        message: STRATEGY_BACKTEST_ERROR_CODES.VERSION_INELIGIBLE,
         errors: { exitRule: ['Backtesting requires an exit rule'] },
       });
     }
@@ -344,7 +393,7 @@ export class StrategyBacktestService {
     );
     if (version.lookbackBars < requiredLookbackBars) {
       throw new BadRequestException({
-        message: 'BACKTEST_VERSION_INELIGIBLE',
+        message: STRATEGY_BACKTEST_ERROR_CODES.VERSION_INELIGIBLE,
         errors: {
           lookbackBars: [
             `At least ${requiredLookbackBars} bars are required by the selected rules`,
@@ -354,14 +403,24 @@ export class StrategyBacktestService {
     }
   }
 
+  /**
+   * Parse a Beijing-calendar date string once. The DTO already validated the
+   * shape via BEIJING_DATE_REGEX; parseDateString re-validates and converts to
+   * a Date at Beijing midnight. Throws on invalid input so callers cannot
+   * silently persist a NaN date.
+   */
+  private parseDateOnce(value: string): Date {
+    return this.timezoneService.parseDateString(value);
+  }
+
   private assertRequestBounds(
     dto: CreateBacktestRunDto,
     definition: StrategyDefinition,
     config: StrategyBacktestConfig,
+    startDate: Date,
+    endDate: Date,
   ): void {
     const errors: Record<string, string[]> = {};
-    const startDate = new Date(dto.startDate);
-    const endDate = new Date(dto.endDate);
     if (dto.targetUniverse.length < 1 || dto.targetUniverse.length > 50) {
       errors.targetUniverse = ['Must contain between 1 and 50 security codes'];
     }
@@ -389,6 +448,12 @@ export class StrategyBacktestService {
     if (!definition.sources.includes(dto.source)) {
       errors.source = ['Source is not configured on the strategy definition'];
     }
+    if (!isStrategyBacktestSource(dto.source)) {
+      errors.source = [
+        ...(errors.source ?? []),
+        'Only tdx and qmt backtest sources are supported',
+      ];
+    }
     if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
       errors.dateRange = ['Start and end dates must be valid'];
     } else {
@@ -404,7 +469,7 @@ export class StrategyBacktestService {
     this.assertConfig(config, errors);
     if (Object.keys(errors).length > 0) {
       throw new BadRequestException({
-        message: 'BACKTEST_REQUEST_INVALID',
+        message: STRATEGY_BACKTEST_ERROR_CODES.REQUEST_INVALID,
         errors,
       });
     }
@@ -414,8 +479,12 @@ export class StrategyBacktestService {
     config: StrategyBacktestConfig,
     errors: Record<string, string[]>,
   ): void {
-    if (!Number.isFinite(config.initialCash) || config.initialCash <= 0) {
-      errors.initialCash = ['Must be positive'];
+    if (
+      !Number.isFinite(config.initialCash) ||
+      config.initialCash <= 0 ||
+      config.initialCash > MAX_BACKTEST_CNY
+    ) {
+      errors.initialCash = ['Must be positive and within the supported range'];
     }
     if (
       !Number.isInteger(config.maxPositions) ||
@@ -431,8 +500,14 @@ export class StrategyBacktestService {
     ) {
       errors.slippageBps = ['Must be from 0 through 10000'];
     }
-    if (!Number.isFinite(config.minCommission) || config.minCommission < 0) {
-      errors.minCommission = ['Must be non-negative'];
+    if (
+      !Number.isFinite(config.minCommission) ||
+      config.minCommission < 0 ||
+      config.minCommission > MAX_BACKTEST_CNY
+    ) {
+      errors.minCommission = [
+        'Must be non-negative and within the supported range',
+      ];
     }
     for (const field of [
       'commissionRate',
@@ -467,7 +542,7 @@ export class StrategyBacktestService {
     if (sourceConfig) return;
 
     throw new BadRequestException({
-      message: 'BACKTEST_REQUEST_INVALID',
+      message: STRATEGY_BACKTEST_ERROR_CODES.REQUEST_INVALID,
       errors: {
         benchmarkCode: [
           'Must be a configured index for the selected data source',
@@ -476,79 +551,118 @@ export class StrategyBacktestService {
     });
   }
 
-  private cloneRecord(value: Record<string, unknown>): Record<string, unknown> {
-    return JSON.parse(JSON.stringify(value)) as Record<string, unknown>;
-  }
-
-  private serializePage<T>(page: BacktestCursorPage<T>): BacktestCursorPage<T> {
+  private serializePage<T>(
+    page: BacktestCursorPage<T>,
+  ): BacktestCursorPage<Serialized<T>> {
     return {
       items: this.serialize(page.items),
       nextCursor: page.nextCursor,
     };
   }
 
-  private serialize<T>(value: T): T {
-    return this.serializeValue(value) as T;
+  /**
+   * Normalize an entity (or page of entities) for JSON serialization.
+   *
+   * Entity-row leaf transforms:
+   *   bigint  -> string  (JSON has no bigint)
+   *   NaN/Inf -> null    (JSON has no NaN/Infinity)
+   *   Date    -> copy    (avoid shared mutable references)
+   *   decimal-string columns (mysql decimal comes back as string) -> number
+   *
+   * JSON-blob columns (snapshots, metrics, errorDetails, ...) get only the
+   * type-safe transforms (bigint->string, NaN/Inf->null, Date->copy) applied
+   * recursively, but NEVER the decimal-field-name coercion: a diagnostic
+   * string like { commission: "provider unavailable" } must survive intact
+   * rather than being silently turned into { commission: null }.
+   *
+   * The mapped return type reflects bigint-to-string conversion instead of
+   * pretending that the serialized body is still the original entity type.
+   */
+  private serialize<T>(value: T): Serialized<T> {
+    return this.serializeValue(value) as Serialized<T>;
   }
 
-  private serializeValue(value: unknown, key?: string): unknown {
+  private serializeValue(
+    value: unknown,
+    key?: string,
+    coerceDecimalFields = true,
+  ): unknown {
     if (typeof value === 'bigint') return value.toString();
     if (typeof value === 'number') {
       return Number.isFinite(value) ? value : null;
     }
-    if (typeof value === 'string' && key && BACKTEST_DECIMAL_FIELDS.has(key)) {
+    if (value instanceof Date) return new Date(value);
+    if (
+      coerceDecimalFields &&
+      typeof value === 'string' &&
+      key &&
+      BACKTEST_DECIMAL_FIELDS.has(key)
+    ) {
       const numeric = Number(value);
       return Number.isFinite(numeric) ? numeric : null;
     }
-    if (value instanceof Date) return new Date(value);
     if (Array.isArray(value))
-      return value.map((item) => this.serializeValue(item));
+      return value.map((item) =>
+        this.serializeValue(item, undefined, coerceDecimalFields),
+      );
     if (typeof value !== 'object' || value === null) return value;
 
     return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [
-        key,
-        this.serializeValue(item, key),
+      Object.entries(value).map(([childKey, item]) => [
+        childKey,
+        this.serializeValue(
+          item,
+          childKey,
+          coerceDecimalFields && !BACKTEST_JSON_BLOB_FIELDS.has(childKey),
+        ),
       ]),
     );
   }
 
-  private paginate<T extends { id: number }>(
-    items: T[],
-    query: BacktestFactListQuery,
-    getTime: (item: T) => Date,
+  private async queryCursorPage<T extends { id: number }>(
+    builder: SelectQueryBuilder<T>,
+    alias: string,
+    timeProperty: string,
     direction: 'ASC' | 'DESC',
-  ): BacktestCursorPage<T> {
+    query: BacktestFactListQuery,
+  ): Promise<BacktestCursorPage<T>> {
     const limit = this.normalizeLimit(query.limit);
     const cursor = query.cursor ? this.decodeCursor(query.cursor) : null;
-    const sorted = [...items].sort((left, right) => {
-      const timeDiff = getTime(left).getTime() - getTime(right).getTime();
-      const idDiff = left.id - right.id;
-      return direction === 'ASC' ? timeDiff || idDiff : -(timeDiff || idDiff);
-    });
-    const afterCursor = cursor
-      ? sorted.filter((item) => {
-          const time = getTime(item).getTime();
-          if (direction === 'ASC') {
-            return (
-              time > cursor.time ||
-              (time === cursor.time && item.id > cursor.id)
-            );
-          }
-          return (
-            time < cursor.time || (time === cursor.time && item.id < cursor.id)
-          );
-        })
-      : sorted;
-    const pageItems = afterCursor.slice(0, limit);
-    const lastItem = pageItems[pageItems.length - 1];
+    const timeExpression = `${alias}.${timeProperty}`;
+    if (cursor) {
+      const comparator = direction === 'ASC' ? '>' : '<';
+      builder.andWhere(
+        `(${timeExpression} ${comparator} :cursorTime OR (${timeExpression} = :cursorTime AND ${alias}.id ${comparator} :cursorId))`,
+        { cursorTime: cursor.time, cursorId: cursor.id },
+      );
+    }
+
+    const result = await builder
+      .orderBy(timeExpression, direction)
+      .addOrderBy(`${alias}.id`, direction)
+      .addSelect(
+        `DATE_FORMAT(${timeExpression}, '%Y-%m-%d %H:%i:%s.%f')`,
+        'backtest_cursor_time',
+      )
+      .take(limit + 1)
+      .getRawAndEntities();
+    const hasNextPage = result.entities.length > limit;
+    const pageItems = result.entities.slice(0, limit);
+    let nextCursor: string | null = null;
+
+    if (hasNextPage) {
+      const lastIndex = pageItems.length - 1;
+      const cursorTime = result.raw[lastIndex]?.backtest_cursor_time;
+      const lastItem = pageItems[lastIndex];
+      if (typeof cursorTime !== 'string' || !lastItem) {
+        throw new Error('Backtest cursor timestamp was not returned by MySQL');
+      }
+      nextCursor = this.encodeCursor(cursorTime, lastItem.id);
+    }
 
     return {
       items: pageItems,
-      nextCursor:
-        lastItem && afterCursor.length > pageItems.length
-          ? this.encodeCursor(getTime(lastItem), lastItem.id)
-          : null,
+      nextCursor,
     };
   }
 
@@ -556,39 +670,51 @@ export class StrategyBacktestService {
     if (limit === undefined) return 100;
     if (!Number.isInteger(limit) || limit < 1 || limit > 200) {
       throw new BadRequestException({
-        message: 'BACKTEST_PAGE_LIMIT_INVALID',
+        message: STRATEGY_BACKTEST_ERROR_CODES.PAGE_LIMIT_INVALID,
         errors: { limit: ['Must be an integer from 1 through 200'] },
       });
     }
     return limit;
   }
 
-  private encodeCursor(time: Date, id: number): string {
-    return Buffer.from(
-      JSON.stringify({ time: time.getTime(), id }),
-      'utf8',
-    ).toString('base64url');
+  private encodeCursor(time: string, id: number): string {
+    return Buffer.from(JSON.stringify({ time, id }), 'utf8').toString(
+      'base64url',
+    );
   }
 
-  private decodeCursor(cursor: string): { time: number; id: number } {
+  private decodeCursor(cursor: string): { time: string; id: number } {
     try {
       const value = JSON.parse(
         Buffer.from(cursor, 'base64url').toString('utf8'),
       ) as { time?: unknown; id?: unknown };
       if (
-        typeof value.time !== 'number' ||
+        typeof value.time !== 'string' ||
         typeof value.id !== 'number' ||
-        !Number.isInteger(value.time) ||
-        !Number.isInteger(value.id)
+        !this.isMysqlDatetime6(value.time) ||
+        !Number.isInteger(value.id) ||
+        value.id < 1
       ) {
         throw new Error('Invalid cursor fields');
       }
       return { time: value.time, id: value.id };
     } catch {
       throw new BadRequestException({
-        message: 'BACKTEST_CURSOR_INVALID',
+        message: STRATEGY_BACKTEST_ERROR_CODES.CURSOR_INVALID,
         errors: { cursor: ['Cursor is invalid'] },
       });
     }
+  }
+
+  private isMysqlDatetime6(value: string): boolean {
+    if (!/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{6}$/.test(value)) {
+      return false;
+    }
+    const millisecondValue = value.slice(0, 23);
+    const parsed = new Date(`${millisecondValue.replace(' ', 'T')}Z`);
+    return (
+      !Number.isNaN(parsed.getTime()) &&
+      parsed.toISOString().slice(0, 23).replace('T', ' ') === millisecondValue
+    );
   }
 }

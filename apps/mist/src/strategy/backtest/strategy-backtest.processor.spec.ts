@@ -2,6 +2,8 @@ import {
   BacktestRun,
   BacktestRunStage,
   BacktestRunStatus,
+  DataSource,
+  StrategyRuleSchemaVersion,
 } from '@app/shared-data';
 import { StrategyBacktestEngine } from './strategy-backtest.engine';
 import { StrategyBacktestProcessor } from './strategy-backtest.processor';
@@ -24,6 +26,7 @@ describe('StrategyBacktestProcessor', () => {
       entryRule: { field: 'k.close', operator: 'gt', value: 100 },
       exitRule: { field: 'k.close', operator: 'lt', value: 90 },
       lookbackBars: 1,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
     },
     configSnapshot: {
       initialCash: 1_000_000,
@@ -34,6 +37,8 @@ describe('StrategyBacktestProcessor', () => {
       stampDutyRate: 0.0005,
       transferFeeRate: 0.00001,
       benchmarkCode: '000300',
+      priceModel: 'tdx_front',
+      marketDataFingerprintAlgorithm: 'sha256-v1',
     },
     ...overrides,
   });
@@ -74,8 +79,53 @@ describe('StrategyBacktestProcessor', () => {
     manager.getRepository.mockImplementation((target: unknown) =>
       target === BacktestRun ? managerRunRepository : factRepository,
     );
+    const inRangeRows = () => {
+      const startDate =
+        (candidate?.startDate as Date | undefined) ??
+        new Date('2026-01-01T00:00:00.000Z');
+      const endDate =
+        (candidate?.endDate as Date | undefined) ??
+        new Date('2026-01-31T00:00:00.000Z');
+      return kRows.filter(
+        (row) =>
+          (row.timestamp as Date) >= startDate &&
+          (row.timestamp as Date) <= endDate,
+      );
+    };
+    const kQuery = {
+      innerJoinAndSelect: jest.fn().mockReturnThis(),
+      where: jest.fn().mockReturnThis(),
+      andWhere: jest.fn().mockReturnThis(),
+      orderBy: jest.fn().mockReturnThis(),
+      addOrderBy: jest.fn().mockReturnThis(),
+      take: jest.fn().mockReturnThis(),
+      getMany: jest.fn(async () => inRangeRows()),
+    };
     const kRepository = {
-      find: jest.fn().mockResolvedValue(kRows),
+      createQueryBuilder: jest.fn().mockReturnValue(kQuery),
+      find: jest.fn(async (options: any) => {
+        const code = options?.where?.security?.code;
+        const startDate =
+          (candidate?.startDate as Date | undefined) ??
+          new Date('2026-01-01T00:00:00.000Z');
+        return kRows
+          .filter(
+            (row) =>
+              row.security &&
+              (row.security as { code: string }).code === code &&
+              (row.timestamp as Date) < startDate,
+          )
+          .sort(
+            (left, right) =>
+              (right.timestamp as Date).getTime() -
+                (left.timestamp as Date).getTime() ||
+              (right.id as number) - (left.id as number),
+          )
+          .slice(0, options?.take ?? kRows.length);
+      }),
+    };
+    const qmtExtensionRepository = {
+      find: jest.fn().mockResolvedValue([]),
     };
     const processor = new StrategyBacktestProcessor(
       dataSource as any,
@@ -85,6 +135,7 @@ describe('StrategyBacktestProcessor', () => {
       factRepository as any,
       factRepository as any,
       kRepository as any,
+      qmtExtensionRepository as any,
       engine,
     );
 
@@ -97,6 +148,8 @@ describe('StrategyBacktestProcessor', () => {
       runRepository,
       factRepository,
       kRepository,
+      kQuery,
+      qmtExtensionRepository,
     };
   };
 
@@ -105,9 +158,11 @@ describe('StrategyBacktestProcessor', () => {
     type: string,
     day: number,
     close: number,
+    source: DataSource = DataSource.TDX,
   ) => ({
+    id: Number(`${day}${code.slice(-3)}`),
     security: { code, type },
-    source: 'tdx',
+    source,
     period: 1440,
     timestamp: new Date(Date.UTC(2026, 0, day)),
     open: close,
@@ -179,7 +234,7 @@ describe('StrategyBacktestProcessor', () => {
     });
     const { processor, runRepository } = createHarness(null);
 
-    await (processor as any).heartbeat(
+    await (processor as any).recordHeartbeat(
       run,
       BacktestRunStage.SIMULATING,
       25,
@@ -219,7 +274,12 @@ describe('StrategyBacktestProcessor', () => {
     runRepository.update.mockResolvedValue({ affected: 0 });
 
     await expect(
-      (processor as any).heartbeat(run, BacktestRunStage.SIMULATING, 25, 100),
+      (processor as any).recordHeartbeat(
+        run,
+        BacktestRunStage.SIMULATING,
+        25,
+        100,
+      ),
     ).rejects.toThrow('BACKTEST_LEASE_LOST');
     expect(runRepository.save).not.toHaveBeenCalled();
   });
@@ -259,8 +319,12 @@ describe('StrategyBacktestProcessor', () => {
 
     await expect(processor.processNext()).resolves.toBe(true);
 
+    expect(kRepository.createQueryBuilder).toHaveBeenCalledWith('k');
     expect(kRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({ relations: ['security'] }),
+      expect.objectContaining({
+        relations: ['security'],
+        take: 2,
+      }),
     );
     expect(factRepository.save).toHaveBeenCalled();
     expect(run).toMatchObject({
@@ -268,7 +332,245 @@ describe('StrategyBacktestProcessor', () => {
       progressPercent: 100,
       completedAt: expect.any(Date),
       metrics: expect.any(Object),
+      marketDataFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
+  });
+
+  it('uses the first actual target date after a non-trading start date for benchmark alignment', async () => {
+    const run = createRun({
+      startDate: new Date('2026-01-01T00:00:00.000Z'),
+    });
+    const { processor } = createHarness(run, [
+      createKRow('600519', 'STOCK', 2, 110),
+      createKRow('600519', 'STOCK', 3, 120),
+      createKRow('000300', 'INDEX', 2, 100),
+      createKRow('000300', 'INDEX', 3, 105),
+    ]);
+
+    await expect(processor.processNext()).resolves.toBe(true);
+
+    expect(run).toMatchObject({ status: BacktestRunStatus.COMPLETED });
+  });
+
+  it('fails when benchmark data starts after the first actual target equity date', async () => {
+    const run = createRun();
+    const { processor, factRepository } = createHarness(run, [
+      createKRow('600519', 'STOCK', 1, 110),
+      createKRow('600519', 'STOCK', 2, 120),
+      createKRow('000300', 'INDEX', 2, 100),
+      createKRow('000300', 'INDEX', 3, 105),
+    ]);
+
+    await expect(processor.processNext()).resolves.toBe(true);
+
+    expect(run).toMatchObject({
+      status: BacktestRunStatus.FAILED,
+      errorCode: 'BACKTEST_BENCHMARK_ALIGNMENT_MISSING',
+      errorDetails: {
+        benchmarkCode: '000300',
+        requiredTimestamp: '2026-01-01T00:00:00.000Z',
+        firstAvailableTimestamp: '2026-01-02T00:00:00.000Z',
+      },
+    });
+    expect(factRepository.save).not.toHaveBeenCalled();
+  });
+
+  it('accepts only the v1 strategy snapshot schema and reports expected and actual versions', () => {
+    const { processor } = createHarness(null);
+    const validRun = createRun();
+
+    expect((processor as any).readStrategySnapshot(validRun)).toMatchObject({
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
+    });
+
+    for (const actual of [undefined, 'v2']) {
+      const snapshot = {
+        ...(validRun.strategySnapshot as Record<string, unknown>),
+      };
+      if (actual === undefined) delete snapshot.ruleSchemaVersion;
+      else snapshot.ruleSchemaVersion = actual;
+      expect(() =>
+        (processor as any).readStrategySnapshot(
+          createRun({ strategySnapshot: snapshot }),
+        ),
+      ).toThrow('BACKTEST_STRATEGY_SNAPSHOT_INVALID');
+      try {
+        (processor as any).readStrategySnapshot(
+          createRun({ strategySnapshot: snapshot }),
+        );
+      } catch (error) {
+        expect(error).toMatchObject({
+          details: {
+            runId: 1,
+            expected: 'v1',
+            actual: actual ?? null,
+          },
+        });
+      }
+    }
+  });
+
+  it('fingerprints every exact normalized engine field including role, warmup, and amount', async () => {
+    const { processor } = createHarness(null);
+    const baseBar = {
+      securityCode: '600519',
+      securityType: 'STOCK',
+      source: DataSource.TDX,
+      period: 1440,
+      timestamp: new Date('2026-01-01T00:00:00.000Z'),
+      open: 100,
+      high: 101,
+      low: 99,
+      close: 100,
+      volume: 1_000,
+      amount: 100_000,
+    };
+
+    const first = await (processor as any).calculateMarketDataFingerprint({
+      bars: [baseBar],
+      benchmarkBars: [
+        { ...baseBar, securityCode: '000300', securityType: 'INDEX' },
+      ],
+    });
+    const fieldMutations = [
+      { securityCode: '600520' },
+      { securityType: 'INDEX' },
+      { source: DataSource.QMT },
+      { period: 5 },
+      { timestamp: new Date('2026-01-02T00:00:00.000Z') },
+      { open: 101 },
+      { high: 102 },
+      { low: 98 },
+      { close: 101 },
+      { volume: 1_001 },
+      { amount: 100_001 },
+    ];
+    const roleChanged = await (processor as any).calculateMarketDataFingerprint(
+      {
+        bars: [],
+        benchmarkBars: [
+          baseBar,
+          { ...baseBar, securityCode: '000300', securityType: 'INDEX' },
+        ],
+      },
+    );
+
+    expect(first).toBe(
+      '2d1d98b257be04df01631f01ae426fc48edc4ad89925a1ff4bedc2543b638695',
+    );
+    for (const mutation of fieldMutations) {
+      await expect(
+        (processor as any).calculateMarketDataFingerprint({
+          bars: [{ ...baseBar, ...mutation }],
+          benchmarkBars: [
+            { ...baseBar, securityCode: '000300', securityType: 'INDEX' },
+          ],
+        }),
+      ).resolves.not.toBe(first);
+    }
+    expect(roleChanged).not.toBe(first);
+  });
+
+  it('fails an expired-lease retry when persisted K input changed and retains no mixed facts', async () => {
+    const run = createRun({
+      status: BacktestRunStatus.RUNNING,
+      stage: BacktestRunStage.SIMULATING,
+      attemptCount: 1,
+      leaseExpiresAt: new Date('2020-01-01T00:00:00.000Z'),
+      marketDataFingerprint: '0'.repeat(64),
+    });
+    const { processor, manager, factRepository } = createHarness(run, [
+      createKRow('600519', 'STOCK', 1, 110),
+      createKRow('600519', 'STOCK', 2, 120),
+      createKRow('000300', 'INDEX', 1, 100),
+      createKRow('000300', 'INDEX', 2, 110),
+    ]);
+
+    await expect(processor.processNext()).resolves.toBe(true);
+
+    expect(manager.delete).toHaveBeenCalledTimes(4);
+    expect(factRepository.save).not.toHaveBeenCalled();
+    expect(run).toMatchObject({
+      status: BacktestRunStatus.FAILED,
+      errorCode: 'BACKTEST_MARKET_DATA_CHANGED',
+      marketDataFingerprint: '0'.repeat(64),
+      errorDetails: expect.objectContaining({
+        expectedFingerprint: '0'.repeat(64),
+        actualFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/),
+      }),
+    });
+  });
+
+  it('replays unchanged market input with the same facts and metrics after an expired lease', async () => {
+    const rows = [
+      createKRow('600519', 'STOCK', 1, 110),
+      createKRow('600519', 'STOCK', 2, 120),
+      createKRow('000300', 'INDEX', 1, 100),
+      createKRow('000300', 'INDEX', 2, 110),
+    ];
+    const cleanRun = createRun();
+    const clean = createHarness(cleanRun, rows);
+
+    await expect(clean.processor.processNext()).resolves.toBe(true);
+    const cleanFingerprint = (cleanRun as any).marketDataFingerprint as string;
+    const cleanMetrics = (cleanRun as any).metrics;
+
+    const retryRun = createRun({
+      status: BacktestRunStatus.RUNNING,
+      stage: BacktestRunStage.SIMULATING,
+      attemptCount: 1,
+      leaseExpiresAt: new Date('2020-01-01T00:00:00.000Z'),
+      marketDataFingerprint: cleanFingerprint,
+    });
+    const retry = createHarness(retryRun, rows);
+
+    await expect(retry.processor.processNext()).resolves.toBe(true);
+
+    expect(retry.manager.delete).toHaveBeenCalledTimes(4);
+    expect(retryRun).toMatchObject({
+      status: BacktestRunStatus.COMPLETED,
+      attemptCount: 2,
+      marketDataFingerprint: cleanFingerprint,
+      metrics: cleanMetrics,
+    });
+    expect(retry.factRepository.save.mock.calls).toEqual(
+      clean.factRepository.save.mock.calls,
+    );
+  });
+
+  it('requires front_ratio ingestion markers for every selected QMT engine row', async () => {
+    const run = createRun({
+      source: DataSource.QMT,
+      configSnapshot: {
+        ...createRun().configSnapshot,
+        priceModel: 'qmt_front_ratio',
+      },
+    });
+    const rows = [
+      createKRow('600519', 'STOCK', 1, 110, DataSource.QMT),
+      createKRow('600519', 'STOCK', 2, 120, DataSource.QMT),
+      createKRow('000300', 'INDEX', 1, 100, DataSource.QMT),
+      createKRow('000300', 'INDEX', 2, 110, DataSource.QMT),
+    ];
+    const { processor, qmtExtensionRepository, factRepository } = createHarness(
+      run,
+      rows,
+    );
+    qmtExtensionRepository.find.mockResolvedValue(
+      rows.slice(1).map((row) => ({
+        kId: row.id,
+        effectiveDividendType: 'front_ratio',
+      })),
+    );
+
+    await expect(processor.processNext()).resolves.toBe(true);
+
+    expect(run).toMatchObject({
+      status: BacktestRunStatus.FAILED,
+      errorCode: 'BACKTEST_PRICE_MODEL_UNSUPPORTED',
+      errorDetails: expect.objectContaining({ invalidCount: 1 }),
+    });
+    expect(factRepository.save).not.toHaveBeenCalled();
   });
 
   it('persists aggregate signal counts with the completed terminal state', async () => {
@@ -391,7 +693,7 @@ describe('StrategyBacktestProcessor', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 
-  it('retains one extra warmup bar so the first replay crossover has a prior completed context', () => {
+  it('queries the exact warmup count independently of calendar gaps', async () => {
     const run = createRun({
       startDate: new Date('2026-01-14T00:00:00.000Z'),
       strategySnapshot: {
@@ -404,16 +706,32 @@ describe('StrategyBacktestProcessor', () => {
         lookbackBars: 12,
       },
     });
-    const { processor } = createHarness(null);
+    const ownedRun = {
+      ...run,
+      status: BacktestRunStatus.RUNNING,
+      leaseOwner: 'processor-1',
+      leaseExpiresAt: new Date('2099-01-01T00:00:00.000Z'),
+    };
     const rows = Array.from({ length: 14 }, (_, index) =>
       createKRow('600519', 'STOCK', index + 1, index === 13 ? 200 : 100),
     );
+    const { processor, kRepository } = createHarness(ownedRun, rows);
 
-    const selected = (processor as any).selectReplayRows(rows, run, 12);
+    const selected = await (processor as any).loadWarmupRows(ownedRun, 12);
 
-    expect(selected).toHaveLength(14);
-    expect(selected[0].timestamp).toEqual(new Date('2026-01-01T00:00:00.000Z'));
-    expect(selected.at(-1).timestamp).toEqual(run.startDate);
+    expect(kRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({
+        order: { timestamp: 'DESC', id: 'DESC' },
+        take: 13,
+      }),
+    );
+    expect(selected.get('600519')).toHaveLength(13);
+    expect(selected.get('600519')?.[0].timestamp).toEqual(
+      new Date('2026-01-01T00:00:00.000Z'),
+    );
+    expect(selected.get('600519')?.at(-1)?.timestamp).toEqual(
+      new Date('2026-01-13T00:00:00.000Z'),
+    );
   });
 
   it('clears partial run-owned facts before reclaiming an expired lease', async () => {
@@ -539,6 +857,8 @@ describe('StrategyBacktestProcessor', () => {
       engine,
     );
     runRepository.findOne
+      .mockResolvedValueOnce(null)
+      .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)
       .mockResolvedValueOnce(null)

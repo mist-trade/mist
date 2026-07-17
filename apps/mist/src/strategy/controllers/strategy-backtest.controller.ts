@@ -8,9 +8,14 @@ import {
   Post,
   Query,
 } from '@nestjs/common';
-import { BacktestRunStatus } from '@app/shared-data';
 import { ApiTags } from '@nestjs/swagger';
 import { CreateBacktestRunDto } from '../dto/create-backtest-run.dto';
+import {
+  StrategyBacktestPageQueryDto,
+  StrategyBacktestPositionQueryDto,
+  StrategyBacktestRunListQueryDto,
+  StrategyBacktestRunParamDto,
+} from '../dto/query-strategy-backtest.dto';
 import { StrategyBacktestService } from '../services/strategy-backtest.service';
 
 @ApiTags('strategy backtests v1')
@@ -27,91 +32,59 @@ export class StrategyBacktestController {
   }
 
   @Get()
-  async listRuns(
-    @Query('strategyDefinitionId') strategyDefinitionId?: string,
-    @Query('status') status?: BacktestRunStatus,
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
-  ) {
-    return await this.strategyBacktestService.listRuns({
-      strategyDefinitionId:
-        strategyDefinitionId === undefined
-          ? undefined
-          : Number(strategyDefinitionId),
-      status,
-      ...this.toPageQuery(cursor, limit),
-    });
+  async listRuns(@Query() query: StrategyBacktestRunListQueryDto) {
+    return await this.strategyBacktestService.listRuns(query);
   }
 
   @Post(':runId/cancel')
-  async cancelRun(@Param('runId') runId: string) {
-    return await this.strategyBacktestService.cancelRun(Number(runId));
+  async cancelRun(@Param() { runId }: StrategyBacktestRunParamDto) {
+    return await this.strategyBacktestService.cancelRun(runId);
   }
 
   @Get(':runId/equity')
-  async listEquity(@Param('runId') runId: string) {
-    return await this.strategyBacktestService.listEquity(Number(runId));
+  async listEquity(@Param() { runId }: StrategyBacktestRunParamDto) {
+    return await this.strategyBacktestService.listEquity(runId);
   }
 
   @Get(':runId/signals')
   async listSignals(
-    @Param('runId') runId: string,
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Param() { runId }: StrategyBacktestRunParamDto,
+    @Query() query: StrategyBacktestPageQueryDto,
   ) {
-    return await this.strategyBacktestService.listSignals(
-      Number(runId),
-      this.toPageQuery(cursor, limit),
-    );
+    return await this.strategyBacktestService.listSignals(runId, query);
   }
 
   @Get(':runId/orders')
   async listOrders(
-    @Param('runId') runId: string,
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Param() { runId }: StrategyBacktestRunParamDto,
+    @Query() query: StrategyBacktestPageQueryDto,
   ) {
-    return await this.strategyBacktestService.listOrders(
-      Number(runId),
-      this.toPageQuery(cursor, limit),
-    );
+    return await this.strategyBacktestService.listOrders(runId, query);
   }
 
   @Get(':runId/trades')
   async listTrades(
-    @Param('runId') runId: string,
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Param() { runId }: StrategyBacktestRunParamDto,
+    @Query() query: StrategyBacktestPageQueryDto,
   ) {
-    return await this.strategyBacktestService.listTrades(
-      Number(runId),
-      this.toPageQuery(cursor, limit),
-    );
+    return await this.strategyBacktestService.listTrades(runId, query);
   }
 
   @Get(':runId/positions')
   async listPositions(
-    @Param('runId') runId: string,
-    @Query('asOf') asOf?: string,
-    @Query('cursor') cursor?: string,
-    @Query('limit') limit?: string,
+    @Param() { runId }: StrategyBacktestRunParamDto,
+    @Query() query: StrategyBacktestPositionQueryDto,
   ) {
+    const { asOf, ...pageQuery } = query;
     return await this.strategyBacktestService.listPositions(
-      Number(runId),
-      asOf === undefined ? undefined : new Date(asOf),
-      this.toPageQuery(cursor, limit),
+      runId,
+      asOf,
+      pageQuery,
     );
   }
 
   @Get(':runId')
-  async findRun(@Param('runId') runId: string) {
-    return await this.strategyBacktestService.findRun(Number(runId));
-  }
-
-  private toPageQuery(cursor?: string, limit?: string) {
-    return {
-      cursor,
-      limit: limit === undefined ? undefined : Number(limit),
-    };
+  async findRun(@Param() { runId }: StrategyBacktestRunParamDto) {
+    return await this.strategyBacktestService.findRun(runId);
   }
 }

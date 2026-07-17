@@ -28,6 +28,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:ci": "jest --runInBand --watchman=false",
+    "test:mysql:backtest-cursor": "jest --runInBand --watchman=false apps/mist/src/strategy/services/strategy-backtest.mysql.integration.spec.ts",
     "ci:contracts": "node tools/test-ci-contracts.mjs",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

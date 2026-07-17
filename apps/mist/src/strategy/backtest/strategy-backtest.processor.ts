@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   BacktestEquityPoint,
   BacktestOrder,
@@ -6,9 +7,12 @@ import {
   BacktestRunStatus,
   BacktestSignal,
   BacktestTrade,
+  DataSource as MarketDataSource,
   K,
+  KExtensionQmt,
   Period,
   SecurityType,
+  StrategyRuleSchemaVersion,
 } from '@app/shared-data';
 import {
   Injectable,
@@ -18,14 +22,23 @@ import {
 } from '@nestjs/common';
 import { InjectDataSource, InjectRepository } from '@nestjs/typeorm';
 import {
-  DataSource,
+  DataSource as TypeOrmDataSource,
   EntityManager,
   EntityTarget,
   In,
-  LessThanOrEqual,
+  LessThan,
   MoreThan,
   Repository,
 } from 'typeorm';
+import {
+  isStrategyBacktestSource,
+  MARKET_DATA_FINGERPRINT_ALGORITHM,
+  MAX_BACKTEST_CNY,
+  QMT_FRONT_RATIO_DIVIDEND_TYPE,
+  STRATEGY_BACKTEST_ERROR_CODES,
+  type StrategyBacktestErrorCode,
+  strategyBacktestPriceModel,
+} from './strategy-backtest.constants';
 import { StrategyBacktestEngine } from './strategy-backtest.engine';
 import {
   StrategyBacktestBar,
@@ -38,11 +51,19 @@ const FACT_BATCH_SIZE = 500;
 const ENGINE_DATE_BATCH_SIZE = 25;
 const LEASE_DURATION_MS = 30_000;
 const POLL_INTERVAL_MS = 1_000;
+// Cap on IDs per QMT marker lookup batch. MySQL handles IN-lists of a few
+// thousand comfortably; this keeps the largest 50×10y universe (≈130k ids)
+// chunked across lease-renewed batches instead of one giant query.
+const QMT_MARKER_BATCH_SIZE = 1_000;
+const K_LOAD_BATCH_SIZE = 2_000;
+const WARMUP_HEARTBEAT_INTERVAL = 5;
+const FINGERPRINT_YIELD_BATCH_SIZE = 5_000;
 
 type StrategySnapshot = {
   entryRule: Record<string, unknown>;
   exitRule: Record<string, unknown> | null;
   lookbackBars: number;
+  ruleSchemaVersion: StrategyRuleSchemaVersion;
 };
 
 type MarketData = {
@@ -50,9 +71,29 @@ type MarketData = {
   benchmarkBars: StrategyBacktestBar[];
 };
 
+type SelectedMarketRow = {
+  role: 'target' | 'benchmark';
+  row: K;
+};
+
+type FingerprintCanonicalRow = {
+  amount: number;
+  close: number;
+  high: number;
+  low: number;
+  open: number;
+  period: number;
+  role: SelectedMarketRow['role'];
+  securityCode: string;
+  securityType: string;
+  source: string;
+  timestamp: string;
+  volume: number;
+};
+
 class BacktestProcessingError extends Error {
   constructor(
-    readonly code: string,
+    readonly code: StrategyBacktestErrorCode,
     readonly details: Record<string, unknown>,
   ) {
     super(code);
@@ -63,7 +104,7 @@ class BacktestCancelledError extends Error {}
 
 class BacktestLeaseLostError extends Error {
   constructor() {
-    super('BACKTEST_LEASE_LOST');
+    super(STRATEGY_BACKTEST_ERROR_CODES.LEASE_LOST);
   }
 }
 
@@ -80,7 +121,7 @@ export class StrategyBacktestProcessor
 
   constructor(
     @InjectDataSource()
-    private readonly dataSource: DataSource,
+    private readonly dataSource: TypeOrmDataSource,
     @InjectRepository(BacktestRun)
     private readonly runRepository: Repository<BacktestRun>,
     @InjectRepository(BacktestSignal)
@@ -93,6 +134,8 @@ export class StrategyBacktestProcessor
     private readonly equityPointRepository: Repository<BacktestEquityPoint>,
     @InjectRepository(K)
     private readonly kRepository: Repository<K>,
+    @InjectRepository(KExtensionQmt)
+    private readonly qmtExtensionRepository: Repository<KExtensionQmt>,
     private readonly engine: StrategyBacktestEngine,
   ) {}
 
@@ -186,17 +229,22 @@ export class StrategyBacktestProcessor
   private async processClaimedRun(run: BacktestRun): Promise<void> {
     try {
       await this.assertNotCancelled(run);
-      await this.heartbeat(run, BacktestRunStage.LOADING_DATA, 0, 0);
-      const marketData = await this.loadMarketData(run);
+      await this.recordHeartbeat(run, BacktestRunStage.LOADING_DATA, 0, 0);
+      // Decode both snapshots exactly once for the whole run; every downstream
+      // step reuses these typed values instead of re-reading and re-coercing.
+      const config = this.readConfigSnapshot(run);
+      const strategy = this.readStrategySnapshot(run);
+      const marketData = await this.loadMarketData(run, config, strategy);
       await this.assertNotCancelled(run);
-      await this.heartbeat(run, BacktestRunStage.SIMULATING, 0, 0);
+      await this.establishOrVerifyMarketDataFingerprint(run, marketData);
+      await this.recordHeartbeat(run, BacktestRunStage.SIMULATING, 0, 0);
 
       const output = await this.engine.runInBatches(
-        this.toEngineInput(run, marketData),
+        this.toEngineInput(run, marketData, config, strategy),
         ENGINE_DATE_BATCH_SIZE,
         async ({ processedWork, totalWork }) => {
           await this.assertNotCancelled(run);
-          await this.heartbeat(
+          await this.recordHeartbeat(
             run,
             BacktestRunStage.SIMULATING,
             processedWork,
@@ -206,7 +254,7 @@ export class StrategyBacktestProcessor
         },
       );
       await this.assertNotCancelled(run);
-      await this.heartbeat(
+      await this.recordHeartbeat(
         run,
         BacktestRunStage.FINALIZING,
         run.totalWork,
@@ -214,7 +262,7 @@ export class StrategyBacktestProcessor
       );
       await this.persistFacts(run, output);
       await this.assertNotCancelled(run);
-      await this.heartbeat(
+      await this.recordHeartbeat(
         run,
         BacktestRunStage.FINALIZING,
         run.totalWork,
@@ -231,102 +279,373 @@ export class StrategyBacktestProcessor
     }
   }
 
-  private async loadMarketData(run: BacktestRun): Promise<MarketData> {
-    const config = this.readConfigSnapshot(run);
-    const strategy = this.readStrategySnapshot(run);
+  private async loadMarketData(
+    run: BacktestRun,
+    config: StrategyBacktestConfig,
+    strategy: StrategySnapshot,
+  ): Promise<MarketData> {
     if (run.period !== Period.DAY) {
-      throw new BacktestProcessingError('BACKTEST_PERIOD_UNSUPPORTED', {
-        period: run.period,
-      });
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.PERIOD_UNSUPPORTED,
+        {
+          period: run.period,
+        },
+      );
+    }
+    if (!isStrategyBacktestSource(run.source)) {
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.PRICE_MODEL_UNSUPPORTED,
+        { source: run.source },
+      );
+    }
+    const expectedPriceModel = strategyBacktestPriceModel(run.source);
+    if (
+      run.configSnapshot.priceModel !== expectedPriceModel ||
+      run.configSnapshot.marketDataFingerprintAlgorithm !==
+        MARKET_DATA_FINGERPRINT_ALGORITHM
+    ) {
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.CONFIG_SNAPSHOT_INVALID,
+        {
+          runId: run.id,
+          expectedPriceModel,
+          actualPriceModel: run.configSnapshot.priceModel ?? null,
+          expectedFingerprintAlgorithm: MARKET_DATA_FINGERPRINT_ALGORITHM,
+          actualFingerprintAlgorithm:
+            run.configSnapshot.marketDataFingerprintAlgorithm ?? null,
+        },
+      );
     }
 
     const codes = [...new Set([...run.targetUniverse, config.benchmarkCode])];
-    const rows = await this.kRepository.find({
-      where: {
-        security: { code: In(codes) },
-        period: run.period,
-        source: run.source,
-        timestamp: LessThanOrEqual(run.endDate),
-      },
-      relations: ['security'],
-      order: { timestamp: 'ASC' },
-    });
-    const inRangeRows = rows.filter(
-      (row) => row.timestamp >= run.startDate && row.timestamp <= run.endDate,
+    const inRangeRows = await this.loadInRangeRows(run, codes);
+    const inRangeRowsByCode = new Map<string, K[]>();
+    for (const row of inRangeRows) {
+      const code = row.security.code;
+      const codeRows = inRangeRowsByCode.get(code) ?? [];
+      codeRows.push(row);
+      inRangeRowsByCode.set(code, codeRows);
+    }
+    const warmupRowsByCode = await this.loadWarmupRows(
+      run,
+      strategy.lookbackBars,
     );
     const missingCodes = [
       ...run.targetUniverse.filter(
-        (code) => !inRangeRows.some((row) => row.security.code === code),
+        (code) => (inRangeRowsByCode.get(code)?.length ?? 0) === 0,
       ),
-      ...(inRangeRows.some((row) => row.security.code === config.benchmarkCode)
+      ...((inRangeRowsByCode.get(config.benchmarkCode)?.length ?? 0) > 0
         ? []
         : [config.benchmarkCode]),
     ];
     if (missingCodes.length > 0) {
-      throw new BacktestProcessingError('BACKTEST_DATA_COVERAGE_MISSING', {
-        missingCodes: [...new Set(missingCodes)].sort(),
-      });
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.DATA_COVERAGE_MISSING,
+        {
+          missingCodes: [...new Set(missingCodes)].sort(),
+        },
+      );
     }
 
-    const unsupportedStockCodes = rows
-      .filter((row) => run.targetUniverse.includes(row.security.code))
+    const unsupportedStockCodes = run.targetUniverse
+      .flatMap((code) => inRangeRowsByCode.get(code) ?? [])
       .filter((row) => row.security.type !== SecurityType.STOCK)
       .map((row) => row.security.code);
     if (unsupportedStockCodes.length > 0) {
-      throw new BacktestProcessingError('BACKTEST_SECURITY_TYPE_UNSUPPORTED', {
-        codes: [...new Set(unsupportedStockCodes)].sort(),
-      });
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.SECURITY_TYPE_UNSUPPORTED,
+        {
+          codes: [...new Set(unsupportedStockCodes)].sort(),
+        },
+      );
     }
 
-    const benchmarkRow = rows.find(
-      (row) => row.security.code === config.benchmarkCode,
-    );
+    const benchmarkRow = inRangeRowsByCode.get(config.benchmarkCode)?.[0];
     if (benchmarkRow?.security.type !== SecurityType.INDEX) {
-      throw new BacktestProcessingError('BACKTEST_BENCHMARK_TYPE_UNSUPPORTED', {
-        code: config.benchmarkCode,
-        type: benchmarkRow ? String(benchmarkRow.security.type) : null,
-      });
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.BENCHMARK_TYPE_UNSUPPORTED,
+        {
+          code: config.benchmarkCode,
+          type: benchmarkRow ? String(benchmarkRow.security.type) : null,
+        },
+      );
     }
+
+    const requiredTimestamp = Math.min(
+      ...run.targetUniverse.flatMap((code) =>
+        (inRangeRowsByCode.get(code) ?? []).map((row) =>
+          row.timestamp.getTime(),
+        ),
+      ),
+    );
+    const benchmarkRows = inRangeRowsByCode.get(config.benchmarkCode) ?? [];
+    if (
+      !benchmarkRows.some(
+        (row) => row.timestamp.getTime() === requiredTimestamp,
+      )
+    ) {
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.BENCHMARK_ALIGNMENT_MISSING,
+        {
+          benchmarkCode: config.benchmarkCode,
+          requiredTimestamp: new Date(requiredTimestamp).toISOString(),
+          firstAvailableTimestamp:
+            benchmarkRows[0]?.timestamp.toISOString() ?? null,
+        },
+      );
+    }
+
+    const selectedRows: SelectedMarketRow[] = [
+      ...run.targetUniverse.flatMap((code) =>
+        [
+          ...(warmupRowsByCode.get(code) ?? []),
+          ...(inRangeRowsByCode.get(code) ?? []),
+        ].map((row) => ({ role: 'target' as const, row })),
+      ),
+      ...(inRangeRowsByCode.get(config.benchmarkCode) ?? []).map((row) => ({
+        role: 'benchmark' as const,
+        row,
+      })),
+    ];
+    await this.assertSelectedPriceModel(run, selectedRows);
 
     return {
-      bars: run.targetUniverse.flatMap((code) =>
-        this.selectReplayRows(
-          rows.filter((row) => row.security.code === code),
-          run,
-          strategy.lookbackBars,
-        ).map((row) => this.toEngineBar(row)),
-      ),
-      benchmarkBars: rows
-        .filter((row) => row.security.code === config.benchmarkCode)
-        .filter(
-          (row) =>
-            row.timestamp >= run.startDate && row.timestamp <= run.endDate,
-        )
-        .map((row) => this.toEngineBar(row)),
+      bars: selectedRows
+        .filter((selected) => selected.role === 'target')
+        .map((selected) => this.toEngineBar(selected.row)),
+      benchmarkBars: selectedRows
+        .filter((selected) => selected.role === 'benchmark')
+        .map((selected) => this.toEngineBar(selected.row)),
     };
   }
 
-  private selectReplayRows(
-    rows: K[],
+  private async loadInRangeRows(
+    run: BacktestRun,
+    codes: string[],
+  ): Promise<K[]> {
+    const rows: K[] = [];
+    let cursorTimestamp: Date | null = null;
+    let cursorId = 0;
+
+    while (true) {
+      const builder = this.kRepository
+        .createQueryBuilder('k')
+        .innerJoinAndSelect('k.security', 'security')
+        .where('security.code IN (:...codes)', { codes })
+        .andWhere('k.period = :period', { period: run.period })
+        .andWhere('k.source = :source', { source: run.source })
+        .andWhere('k.timestamp >= :startDate', { startDate: run.startDate })
+        .andWhere('k.timestamp <= :endDate', { endDate: run.endDate });
+      if (cursorTimestamp) {
+        builder.andWhere(
+          '(k.timestamp > :cursorTimestamp OR (k.timestamp = :cursorTimestamp AND k.id > :cursorId))',
+          { cursorTimestamp, cursorId },
+        );
+      }
+
+      const batch = await builder
+        .orderBy('k.timestamp', 'ASC')
+        .addOrderBy('k.id', 'ASC')
+        .take(K_LOAD_BATCH_SIZE)
+        .getMany();
+      rows.push(...batch);
+      await this.marketDataCheckpoint(run);
+      if (batch.length < K_LOAD_BATCH_SIZE) break;
+      const lastRow = batch.at(-1);
+      if (!lastRow) break;
+      cursorTimestamp = lastRow.timestamp;
+      cursorId = lastRow.id;
+    }
+
+    return rows;
+  }
+
+  private async loadWarmupRows(
     run: BacktestRun,
     lookbackBars: number,
-  ): K[] {
-    const warmupRows = rows
-      .filter((row) => row.timestamp < run.startDate)
-      .slice(-(lookbackBars + 1));
-    const replayRows = rows.filter(
-      (row) => row.timestamp >= run.startDate && row.timestamp <= run.endDate,
+  ): Promise<Map<string, K[]>> {
+    const rowsByCode = new Map<string, K[]>();
+    for (let index = 0; index < run.targetUniverse.length; index += 1) {
+      const code = run.targetUniverse[index];
+      const rows = await this.kRepository.find({
+        where: {
+          security: { code },
+          period: run.period,
+          source: run.source,
+          timestamp: LessThan(run.startDate),
+        },
+        relations: ['security'],
+        order: { timestamp: 'DESC', id: 'DESC' },
+        take: lookbackBars + 1,
+      });
+      rowsByCode.set(code, [...rows].reverse());
+      if (
+        (index + 1) % WARMUP_HEARTBEAT_INTERVAL === 0 ||
+        index + 1 === run.targetUniverse.length
+      ) {
+        await this.marketDataCheckpoint(run);
+      }
+    }
+    return rowsByCode;
+  }
+
+  private async marketDataCheckpoint(run: BacktestRun): Promise<void> {
+    await this.assertNotCancelled(run);
+    await this.renewLease(run);
+    await this.yieldToEventLoop();
+  }
+
+  private async assertSelectedPriceModel(
+    run: BacktestRun,
+    selectedRows: SelectedMarketRow[],
+  ): Promise<void> {
+    if (run.source !== MarketDataSource.QMT) return;
+
+    const selectedIds = [...new Set(selectedRows.map(({ row }) => row.id))];
+    // Batch the K-id lookup so a 50-security × 10-year universe (≈130k rows)
+    // does not blow past MySQL's practical IN-list size or hold the lease
+    // without a heartbeat. Each batch also renews the lease.
+    const markerByKId = new Map<number, string | null>();
+    for (
+      let offset = 0;
+      offset < selectedIds.length;
+      offset += QMT_MARKER_BATCH_SIZE
+    ) {
+      const batchIds = selectedIds.slice(
+        offset,
+        offset + QMT_MARKER_BATCH_SIZE,
+      );
+      const extensions = await this.qmtExtensionRepository.find({
+        select: { kId: true, effectiveDividendType: true },
+        where: { kId: In(batchIds) },
+      });
+      for (const extension of extensions) {
+        markerByKId.set(extension.kId, extension.effectiveDividendType);
+      }
+      await this.marketDataCheckpoint(run);
+    }
+    const invalidRows = selectedRows.filter(
+      ({ row }) => markerByKId.get(row.id) !== QMT_FRONT_RATIO_DIVIDEND_TYPE,
     );
-    return [...warmupRows, ...replayRows];
+    if (invalidRows.length === 0) return;
+
+    throw new BacktestProcessingError(
+      STRATEGY_BACKTEST_ERROR_CODES.PRICE_MODEL_UNSUPPORTED,
+      {
+        source: run.source,
+        expectedEffectiveDividendType: QMT_FRONT_RATIO_DIVIDEND_TYPE,
+        invalidCount: invalidRows.length,
+        affectedRows: invalidRows.slice(0, 100).map(({ role, row }) => ({
+          role,
+          kId: row.id,
+          securityCode: row.security.code,
+          timestamp: row.timestamp.toISOString(),
+          effectiveDividendType: markerByKId.get(row.id) ?? null,
+        })),
+      },
+    );
+  }
+
+  private async establishOrVerifyMarketDataFingerprint(
+    run: BacktestRun,
+    marketData: MarketData,
+  ): Promise<void> {
+    const actualFingerprint = await this.calculateMarketDataFingerprint(
+      marketData,
+      async () => await this.marketDataCheckpoint(run),
+    );
+    if (run.marketDataFingerprint) {
+      if (run.marketDataFingerprint !== actualFingerprint) {
+        throw new BacktestProcessingError(
+          STRATEGY_BACKTEST_ERROR_CODES.MARKET_DATA_CHANGED,
+          {
+            algorithm: MARKET_DATA_FINGERPRINT_ALGORITHM,
+            expectedFingerprint: run.marketDataFingerprint,
+            actualFingerprint,
+          },
+        );
+      }
+      return;
+    }
+
+    await this.updateOwnedRun(run, {
+      marketDataFingerprint: actualFingerprint,
+    });
+  }
+
+  private async calculateMarketDataFingerprint(
+    marketData: MarketData,
+    onBatch?: () => Promise<void>,
+  ): Promise<string> {
+    const buildCanonicalRow = (
+      role: SelectedMarketRow['role'],
+      bar: StrategyBacktestBar,
+    ): FingerprintCanonicalRow => ({
+      amount: bar.amount,
+      close: bar.close,
+      high: bar.high,
+      low: bar.low,
+      open: bar.open,
+      period: bar.period,
+      role,
+      securityCode: bar.securityCode,
+      securityType: bar.securityType,
+      source: bar.source,
+      timestamp: bar.timestamp.toISOString(),
+      volume: bar.volume,
+    });
+    const compareRows = (
+      left: FingerprintCanonicalRow,
+      right: FingerprintCanonicalRow,
+    ) =>
+      left.role.localeCompare(right.role) ||
+      left.securityCode.localeCompare(right.securityCode) ||
+      left.timestamp.localeCompare(right.timestamp);
+    const targetRows = marketData.bars
+      .map((bar) => buildCanonicalRow('target', bar))
+      .sort(compareRows);
+    const benchmarkRows = marketData.benchmarkBars
+      .map((bar) => buildCanonicalRow('benchmark', bar))
+      .sort(compareRows);
+    const hash = createHash('sha256');
+    hash.update('{"bars":[', 'utf8');
+    let processed = 0;
+    processed = await this.hashCanonicalRows(
+      hash,
+      targetRows,
+      processed,
+      onBatch,
+    );
+    hash.update('],"benchmarkBars":[', 'utf8');
+    await this.hashCanonicalRows(hash, benchmarkRows, processed, onBatch);
+    hash.update(']}', 'utf8');
+    return hash.digest('hex');
+  }
+
+  private async hashCanonicalRows(
+    hash: ReturnType<typeof createHash>,
+    rows: FingerprintCanonicalRow[],
+    processed: number,
+    onBatch?: () => Promise<void>,
+  ): Promise<number> {
+    for (let index = 0; index < rows.length; index += 1) {
+      if (index > 0) hash.update(',', 'utf8');
+      const row = rows[index];
+      hash.update(JSON.stringify(row), 'utf8');
+      processed += 1;
+      if (onBatch && processed % FINGERPRINT_YIELD_BATCH_SIZE === 0) {
+        await onBatch();
+      }
+    }
+    return processed;
   }
 
   private toEngineInput(
     run: BacktestRun,
     marketData: MarketData,
+    config: StrategyBacktestConfig,
+    strategy: StrategySnapshot,
   ): StrategyBacktestInput {
-    const strategy = this.readStrategySnapshot(run);
-    const config = this.readConfigSnapshot(run);
-
     return {
       strategyDefinitionId: run.strategyDefinitionId,
       strategyVersionId: run.strategyVersionId,
@@ -346,51 +665,93 @@ export class StrategyBacktestProcessor
     if (
       !this.isRecord(snapshot) ||
       !this.isRecord(snapshot.entryRule) ||
-      (snapshot.exitRule !== null && !this.isRecord(snapshot.exitRule)) ||
-      !Number.isInteger(snapshot.lookbackBars)
+      !this.isRecord(snapshot.exitRule) ||
+      snapshot.ruleSchemaVersion !== StrategyRuleSchemaVersion.V1 ||
+      typeof snapshot.lookbackBars !== 'number' ||
+      !Number.isInteger(snapshot.lookbackBars) ||
+      snapshot.lookbackBars < 1 ||
+      snapshot.lookbackBars > 250
     ) {
-      throw new BacktestProcessingError('BACKTEST_STRATEGY_SNAPSHOT_INVALID', {
-        runId: run.id,
-      });
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.STRATEGY_SNAPSHOT_INVALID,
+        {
+          runId: run.id,
+          expected: StrategyRuleSchemaVersion.V1,
+          actual: this.isRecord(snapshot)
+            ? (snapshot.ruleSchemaVersion ?? null)
+            : null,
+        },
+      );
     }
 
     return {
       entryRule: snapshot.entryRule,
-      exitRule: snapshot.exitRule ?? null,
-      lookbackBars: snapshot.lookbackBars as number,
+      exitRule: snapshot.exitRule,
+      lookbackBars: snapshot.lookbackBars,
+      ruleSchemaVersion: snapshot.ruleSchemaVersion,
     };
   }
 
   private readConfigSnapshot(run: BacktestRun): StrategyBacktestConfig {
     const snapshot = run.configSnapshot;
-    const keys: (keyof StrategyBacktestConfig)[] = [
-      'initialCash',
-      'maxPositions',
-      'slippageBps',
-      'commissionRate',
-      'minCommission',
-      'stampDutyRate',
-      'transferFeeRate',
-      'benchmarkCode',
-    ];
-    if (
-      !this.isRecord(snapshot) ||
-      keys.some((key) => snapshot[key] === undefined)
-    ) {
-      throw new BacktestProcessingError('BACKTEST_CONFIG_SNAPSHOT_INVALID', {
-        runId: run.id,
-      });
+    if (!this.isRecord(snapshot)) {
+      throw new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.CONFIG_SNAPSHOT_INVALID,
+        { runId: run.id },
+      );
+    }
+
+    const invalid = (field: string) =>
+      new BacktestProcessingError(
+        STRATEGY_BACKTEST_ERROR_CODES.CONFIG_SNAPSHOT_INVALID,
+        { runId: run.id, field },
+      );
+
+    // The snapshot is written by createRun from a validated config, so values
+    // are real numbers. Only accept typeof === 'number' (reject numeric
+    // strings, null, booleans) and re-validate finite/integer/range so a
+    // corrupted snapshot fails fast instead of feeding bad values to the engine.
+    const decodeNumber = (
+      key: keyof StrategyBacktestConfig,
+      constraints: { min: number; max: number; integer?: boolean },
+    ): number => {
+      const raw = snapshot[key];
+      if (typeof raw !== 'number' || !Number.isFinite(raw)) {
+        throw invalid(key);
+      }
+      if (constraints.integer && !Number.isInteger(raw)) {
+        throw invalid(key);
+      }
+      if (raw < constraints.min || raw > constraints.max) {
+        throw invalid(key);
+      }
+      return raw;
+    };
+
+    const benchmarkRaw = snapshot.benchmarkCode;
+    if (typeof benchmarkRaw !== 'string' || !/^\d{6}$/.test(benchmarkRaw)) {
+      throw invalid('benchmarkCode');
     }
 
     return {
-      initialCash: Number(snapshot.initialCash),
-      maxPositions: Number(snapshot.maxPositions),
-      slippageBps: Number(snapshot.slippageBps),
-      commissionRate: Number(snapshot.commissionRate),
-      minCommission: Number(snapshot.minCommission),
-      stampDutyRate: Number(snapshot.stampDutyRate),
-      transferFeeRate: Number(snapshot.transferFeeRate),
-      benchmarkCode: String(snapshot.benchmarkCode),
+      initialCash: decodeNumber('initialCash', {
+        min: 0.01,
+        max: MAX_BACKTEST_CNY,
+      }),
+      maxPositions: decodeNumber('maxPositions', {
+        min: 1,
+        max: 50,
+        integer: true,
+      }),
+      slippageBps: decodeNumber('slippageBps', { min: 0, max: 10_000 }),
+      commissionRate: decodeNumber('commissionRate', { min: 0, max: 1 }),
+      minCommission: decodeNumber('minCommission', {
+        min: 0,
+        max: MAX_BACKTEST_CNY,
+      }),
+      stampDutyRate: decodeNumber('stampDutyRate', { min: 0, max: 1 }),
+      transferFeeRate: decodeNumber('transferFeeRate', { min: 0, max: 1 }),
+      benchmarkCode: benchmarkRaw,
     };
   }
 
@@ -570,7 +931,7 @@ export class StrategyBacktestProcessor
     }
   }
 
-  private async heartbeat(
+  private async recordHeartbeat(
     run: BacktestRun,
     stage: BacktestRunStage,
     processedWork: number,
@@ -583,6 +944,19 @@ export class StrategyBacktestProcessor
       totalWork,
       progressPercent:
         totalWork === 0 ? 0 : Math.min(100, (processedWork / totalWork) * 100),
+      leaseHeartbeatAt: now,
+      leaseExpiresAt: this.leaseExpiry(now),
+    });
+  }
+
+  /**
+   * Renew the lease without changing stage or progress. Used to keep a long
+   * data-loading / fingerprint step (which has no natural batch boundary) from
+   * silently letting the lease expire.
+   */
+  private async renewLease(run: BacktestRun): Promise<void> {
+    const now = new Date();
+    await this.updateOwnedRun(run, {
       leaseHeartbeatAt: now,
       leaseExpiresAt: this.leaseExpiry(now),
     });
@@ -633,7 +1007,9 @@ export class StrategyBacktestProcessor
         matchedSecurityCount: 0,
         metrics: null,
         completedAt: new Date(),
-        errorCode: processingError?.code ?? 'BACKTEST_PROCESSING_FAILED',
+        errorCode:
+          processingError?.code ??
+          STRATEGY_BACKTEST_ERROR_CODES.PROCESSING_FAILED,
         errorDetails: processingError?.details ?? {
           message:
             error instanceof Error ? error.message : 'Unknown backtest error',

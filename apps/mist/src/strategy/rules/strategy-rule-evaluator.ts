@@ -79,9 +79,9 @@ export class StrategyRuleEvaluator {
           (left, right) => left <= right,
         );
       case 'eq':
-        return actual === expected;
+        return this.equalsByFieldType(field, actual, expected);
       case 'neq':
-        return actual !== expected;
+        return this.notEqualsByFieldType(field, actual, expected);
       case 'crossesAbove': {
         if (!previousContext) return false;
         const previousActual = field.resolve(previousContext);
@@ -124,5 +124,58 @@ export class StrategyRuleEvaluator {
     }
 
     return compare(actual, expected);
+  }
+
+  /**
+   * Equality must respect the field's value type. For number fields, a missing
+   * / NaN / Infinity value is "not evaluable" and therefore never matches —
+   * including for `neq` (so a rule like `indicator.ma60 neq 0` does not fire
+   * when MA60 has not been produced yet). For string fields, undefined never
+   * equals a defined string.
+   */
+  private equalsByFieldType(
+    field: { valueType: 'number' | 'string' },
+    actual: unknown,
+    expected: unknown,
+  ): boolean {
+    if (field.valueType === 'number') {
+      return (
+        typeof actual === 'number' &&
+        typeof expected === 'number' &&
+        Number.isFinite(actual) &&
+        Number.isFinite(expected) &&
+        actual === expected
+      );
+    }
+    return typeof actual === 'string' && typeof expected === 'string'
+      ? actual === expected
+      : false;
+  }
+
+  /**
+   * `neq` is the negation of `eq` ONLY when the field is evaluable. A missing
+   * / non-finite value is "not evaluable" and must not match neq either
+   * (otherwise insufficient history produces phantom signals).
+   */
+  private notEqualsByFieldType(
+    field: { valueType: 'number' | 'string' },
+    actual: unknown,
+    expected: unknown,
+  ): boolean {
+    if (field.valueType === 'number') {
+      if (
+        typeof actual !== 'number' ||
+        !Number.isFinite(actual) ||
+        typeof expected !== 'number' ||
+        !Number.isFinite(expected)
+      ) {
+        return false;
+      }
+      return actual !== expected;
+    }
+    if (typeof actual !== 'string' || typeof expected !== 'string') {
+      return false;
+    }
+    return actual !== expected;
   }
 }

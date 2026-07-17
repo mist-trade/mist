@@ -25,9 +25,17 @@ interface.
   constraints, configurable slippage, commission, stamp duty, and transfer
   fees.
 - Persist immutable strategy/config snapshots, signals, orders, trades, equity
-  points, progress, lease state, errors, and portfolio metrics. Support run
-  listing, detail, cancellation, paginated fact queries, equity data, and
-  as-of position reconstruction.
+  points, market-data fingerprints, progress, lease state, errors, and
+  portfolio metrics. Detect persisted-K drift before an expired-lease retry
+  instead of silently replaying changed inputs.
+- Require the benchmark to contain the exact first actual portfolio equity
+  timestamp so benchmark and excess returns never compare different windows.
+- Restrict V1 portfolio backtests to configured `tdx` and `qmt` daily data,
+  snapshot the source-specific requested adjustment contract, and reject QMT
+  rows whose persisted ingestion marker is not `front_ratio`.
+- Push run, signal, order, trade, and as-of position cursors into MySQL with
+  stable time/id ordering and aligned indexes. Keep equity as one complete
+  bounded ascending daily series.
 - Replace the signal-only backtest frontend with a complete operator workflow:
   run history on the left, selected result details on the right, a new-run
   configuration drawer, metric cards, equity/benchmark/drawdown charts, and
@@ -62,8 +70,11 @@ interface.
 
 - Backend: `apps/mist/src/strategy`, shared strategy evaluation rules/context,
   REST DTOs/controllers, asynchronous processing, and focused Jest coverage.
-- Data model: `libs/shared-data` strategy entities/enums and a new additive
-  `deploy/database/migrations/007_*.sql`; the applied `006` migration remains
+- Data model: `libs/shared-data` strategy entities/enums and additive SQL
+  migrations. The branch-local `007_*.sql` may be revised only when the target
+  has not recorded it in `schema_migrations`; otherwise the fingerprint and
+  filtered-query index convergence is delivered by
+  `008_strategy_portfolio_backtesting_indexes.sql`. Applied migration `006` remains
   unchanged and TypeORM synchronization remains disabled.
 - Frontend: `mist-fe/app/strategies`, `mist-fe/app/api/client.ts`, ECharts
   result visualization, and React tests.

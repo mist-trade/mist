@@ -30,8 +30,9 @@ Mist SHALL create a portfolio backtest only from a strategy definition whose
 #### Scenario: Run envelope is invalid
 
 - **WHEN** a request has fewer than 1 or more than 50 stock codes, a period
-  other than daily, a source not configured on the strategy, an end date before
-  its start date, or a range longer than 10 years
+  other than daily, a source outside `tdx` and `qmt`, a source not configured on
+  the strategy, an end date before its start date, or a range longer than 10
+  years
 - **THEN** the backend MUST reject the request with field-specific validation
   details
 
@@ -86,6 +87,7 @@ an abandoned run without retaining ambiguous partial output.
 - **THEN** the next owner MUST remove all partial engine-derived facts for the
   run
 - **AND** it MUST restart from the immutable snapshots
+- **AND** it MUST retain and compare the first-attempt market-data fingerprint
 - **AND** it MUST increment the attempt count
 
 #### Scenario: Retry completes
@@ -94,6 +96,17 @@ an abandoned run without retaining ambiguous partial output.
   data
 - **THEN** its portfolio facts and metrics MUST match a clean first attempt
   after database ids and operational timestamps are ignored
+
+#### Scenario: Retry market data has changed
+
+- **WHEN** an expired run reloads engine input whose canonical fingerprint does
+  not match the first attempt
+- **THEN** the processor MUST fail the run with
+  `BACKTEST_MARKET_DATA_CHANGED`
+- **AND** it MUST retain the expected fingerprint and structured actual digest
+  details
+- **AND** no partial signal, order, trade, or equity facts from either attempt
+  may remain
 
 ### Requirement: Portfolio Backtests Shall Support Cancellation
 
@@ -112,6 +125,15 @@ Operators SHALL be able to cancel non-terminal runs cooperatively.
 - **THEN** the processor MUST observe the request no later than the next
   bounded processing batch
 - **AND** it MUST stop producing facts and mark the run `cancelled`
+- **AND** facts committed before the observed bounded cancellation boundary
+  MUST remain available as an audit trail and MUST NOT make the run reclaimable
+
+#### Scenario: Reserved order cancellation value is inspected
+
+- **WHEN** a client or migration inspects the V1 order status contract
+- **THEN** `cancelled` MUST remain a valid reserved persisted/API enum value
+- **AND** V1 run-level cooperative cancellation is not required to emit an
+  order with that status
 
 #### Scenario: Terminal run cancellation is requested
 
@@ -264,13 +286,16 @@ and transfer fee settings from its immutable configuration snapshot.
 ### Requirement: Market Data Assumptions Shall Be Explicit
 
 Portfolio runs SHALL consume persisted Mist daily K data only and SHALL expose
-the limitations of its adjusted-price model.
+the limitations and provenance of its adjusted-price model. V1 portfolio runs
+SHALL accept only `tdx` and `qmt` sources.
 
 #### Scenario: Lookback history is loaded
 
 - **WHEN** the selected strategy declares `lookbackBars`
 - **THEN** the processor MUST load enough prior completed bars to build the
   first in-range context
+- **AND** it MUST select the latest `lookbackBars + 1` pre-range rows per
+  security rather than using a calendar-day approximation
 - **AND** it MUST NOT trade or include performance before the requested start
   date
 
@@ -281,13 +306,61 @@ the limitations of its adjusted-price model.
 - **THEN** the run MUST fail with a structured coverage error naming each
   missing code
 
+#### Scenario: Benchmark misses the first actual portfolio timestamp
+
+- **WHEN** all targets have usable in-range data but the benchmark has no row
+  at the earliest in-range target timestamp
+- **THEN** the run MUST fail with
+  `BACKTEST_BENCHMARK_ALIGNMENT_MISSING`
+- **AND** error details MUST contain `benchmarkCode`, `requiredTimestamp`, and
+  `firstAvailableTimestamp`
+- **AND** a requested `startDate` that is not a trading date MUST NOT itself be
+  used as the required timestamp
+
+#### Scenario: QMT adjustment marker is unsupported
+
+- **WHEN** any QMT warmup, in-range universe, or benchmark K row selected for
+  the engine lacks `effectiveDividendType=front_ratio`
+- **THEN** the run MUST fail with `BACKTEST_PRICE_MODEL_UNSUPPORTED`
+- **AND** the error details MUST identify the affected persisted rows
+
+#### Scenario: Exact engine input is first loaded
+
+- **WHEN** the first owner has built the final universe and benchmark bar arrays
+- **THEN** it MUST hash canonical `sha256-v1` JSON containing role, security
+  code/type, source, period, ISO timestamp, OHLC, volume, and amount for every
+  selected warmup and in-range bar
+- **AND** it MUST persist the digest under its active lease before simulation
+- **AND** queried rows not passed to the engine MUST NOT affect the digest
+
+#### Scenario: First processor owner establishes the fingerprint baseline
+
+- **WHEN** persisted K data changes after run creation but before the first
+  processor claim builds the engine input
+- **THEN** the first owner MUST treat the data it actually loads as the run
+  baseline
+- **AND** only a later retry whose input differs from that retained digest MUST
+  fail as `BACKTEST_MARKET_DATA_CHANGED`
+- **AND** run creation MUST NOT synchronously load or materialize market data
+
+#### Scenario: Fingerprint semantics are inspected
+
+- **WHEN** an operator or maintainer reads a run fingerprint
+- **THEN** it MUST be described as input-drift detection for retry safety
+- **AND** it MUST NOT be described as a replayable snapshot capable of
+  reconstructing overwritten K rows
+
 #### Scenario: Data assumptions are inspected
 
 - **WHEN** a client reads the run configuration snapshot
-- **THEN** it MUST state that stored forward-adjusted prices are used
+- **THEN** it MUST state `priceModel=tdx_front` or
+  `priceModel=qmt_front_ratio`
+- **AND** it MUST state `marketDataFingerprintAlgorithm=sha256-v1`
 - **AND** it MUST state that explicit dividends, splits, allotments, full
   exchange price-limit rules, ST rules, liquidity, and partial fills are not
   modeled
+- **AND** it MUST explain that the QMT marker records the requested ingestion
+  contract rather than independent provider attestation
 
 ### Requirement: Portfolio Facts Shall Be Auditable And Queryable
 
@@ -319,6 +392,8 @@ that explain the final portfolio result.
 
 - **WHEN** a client requests run signals, orders, trades, or as-of positions
 - **THEN** the backend MUST return stable cursor-paginated results
+- **AND** cursor predicates, ordering, and `limit + 1` MUST execute in the
+  database before rows are returned to application memory
 - **AND** positions MUST be reconstructed from trade lifecycles rather than a
   per-day-per-security position table
 
@@ -347,12 +422,16 @@ paths and SHALL support stable operator navigation.
 - **THEN** the backend MUST support strategy and status filters
 - **AND** it MUST return newest-first cursor pagination with a stable id
   tiebreaker
+- **AND** its opaque cursor MUST preserve the exact database precision of the
+  `datetime(6)` creation timestamp so rows within one millisecond are neither
+  skipped nor duplicated
 
 #### Scenario: Run detail is requested
 
 - **WHEN** a client gets `/v1/strategy-backtests/:runId`
 - **THEN** the response MUST include snapshots, lifecycle/progress, aggregate
-  counts, metrics, error details, and timestamps available for that run
+  counts, market-data fingerprint, metrics, error details, and timestamps
+  available for that run
 
 #### Scenario: Terminal run is re-run
 
@@ -380,11 +459,13 @@ exposure metrics computed from their own fact series.
 - **THEN** the metric MUST be `null`
 - **AND** the API MUST NOT serialize `Infinity` or `NaN`
 
-#### Scenario: Benchmark series is normalized
+#### Scenario: Benchmark series is normalized from the portfolio first point
 
-- **WHEN** benchmark and portfolio first have comparable in-range data
+- **WHEN** the benchmark contains the exact first portfolio equity timestamp
 - **THEN** benchmark value MUST start at initial portfolio cash
-- **AND** benchmark return MUST be calculated over the same comparable dates
+- **AND** benchmark return MUST be calculated over the same portfolio window
+- **AND** the pure engine MUST return null benchmark and excess returns if its
+  first equity point defensively lacks a benchmark value
 
 ### Requirement: Portfolio Results Shall Be Reproducible
 
@@ -401,4 +482,12 @@ snapshot, configuration snapshot, and ordered market data.
 
 - **WHEN** equivalent market rows are returned in a different repository order
 - **THEN** the engine MUST normalize them by date and canonical security code
+
+#### Scenario: Securities share an evaluation timestamp
+
+- **WHEN** two or more securities have bars at the same timestamp
+- **THEN** each rule MUST receive only that security's rolling current and
+  previous context
+- **AND** indicator or crossing state from one security MUST NOT be reused for
+  another security
 - **AND** portfolio output MUST remain unchanged

@@ -8,6 +8,10 @@ const portfolioMigrationPath = join(
   migrationsDir,
   '007_strategy_portfolio_backtesting.sql',
 );
+const portfolioIndexMigrationPath = join(
+  migrationsDir,
+  '008_strategy_portfolio_backtesting_indexes.sql',
+);
 
 describe('strategy portfolio backtesting migration', () => {
   it('keeps the already-applied strategy core migration byte-for-byte unchanged', () => {
@@ -61,6 +65,17 @@ describe('strategy portfolio backtesting migration', () => {
     expect(alertDedupeBackfill).toBeGreaterThan(signalKindColumn);
     expect(migration).toContain("CONCAT(`dedupe_key`, ':entry')");
     expect(migration).toContain("'cancelled'");
+    expect(migration).toContain(
+      'ADD COLUMN `market_data_fingerprint` char(64)',
+    );
+    expect(migration).toContain(
+      'if schema_migrations already records this filename',
+    );
+    expect(migration).toContain(
+      'MODIFY COLUMN `signal_time` datetime(6) NOT NULL',
+    );
+    expect(migration).toContain('`scheduled_time` datetime(6) NOT NULL');
+    expect(migration).toContain('`entry_time` datetime(6) NOT NULL');
 
     for (const table of [
       'backtest_orders',
@@ -77,6 +92,11 @@ describe('strategy portfolio backtesting migration', () => {
       'uq_backtest_signals_run_security_time_kind',
       'uq_backtest_orders_signal_id',
       'uq_backtest_trades_entry_order_id',
+      'idx_backtest_runs_created_id',
+      'idx_backtest_runs_definition_status_created_id',
+      'idx_backtest_signals_run_time_id',
+      'idx_backtest_orders_run_scheduled_time_id',
+      'idx_backtest_trades_run_entry_time_id',
     ]) {
       expect(migration).toContain(index);
     }
@@ -86,5 +106,27 @@ describe('strategy portfolio backtesting migration', () => {
     expect(migration).toContain(
       'FOREIGN KEY (`backtest_run_id`) REFERENCES `backtest_runs` (`id`) ON DELETE CASCADE',
     );
+  });
+
+  it('adds migration 008 for filter-aligned indexes without rewriting applied 007 history', () => {
+    const migration = readFileSync(portfolioIndexMigrationPath, 'utf8');
+
+    expect(migration).toContain(
+      '`idx_backtest_runs_definition_created_id` (`strategy_definition_id`, `created_at`, `id`)',
+    );
+    expect(migration).toContain(
+      '`idx_backtest_runs_status_created_id` (`status`, `created_at`, `id`)',
+    );
+    for (const redundantIndex of [
+      'idx_backtest_runs_status',
+      'idx_backtest_signal_results_run_id',
+      'idx_backtest_orders_run_id',
+      'idx_backtest_orders_signal_id',
+      'idx_backtest_trades_run_id',
+      'idx_backtest_equity_points_run_time',
+    ]) {
+      expect(migration).toContain(`DROP INDEX \`${redundantIndex}\``);
+    }
+    expect(migration).toContain('must never receive an edited 007 file');
   });
 });

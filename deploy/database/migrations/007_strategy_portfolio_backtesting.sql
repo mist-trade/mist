@@ -1,3 +1,6 @@
+-- Release preflight: if schema_migrations already records this filename in the
+-- target database, keep that applied history immutable and ship these V3-only
+-- fingerprint/index/datetime changes in a new 008 migration instead.
 SET NAMES utf8mb4;
 SET FOREIGN_KEY_CHECKS = 0;
 
@@ -31,6 +34,7 @@ ALTER TABLE `backtest_runs`
   MODIFY COLUMN `status` enum('pending', 'running', 'completed', 'failed', 'cancelled') NOT NULL DEFAULT 'pending',
   ADD COLUMN `strategy_snapshot` json NOT NULL AFTER `strategy_version_id`,
   ADD COLUMN `config_snapshot` json NOT NULL AFTER `source`,
+  ADD COLUMN `market_data_fingerprint` char(64) CHARACTER SET ascii COLLATE ascii_bin NULL AFTER `config_snapshot`,
   ADD COLUMN `stage` enum('queued', 'loading_data', 'simulating', 'finalizing') NOT NULL DEFAULT 'queued' AFTER `status`,
   ADD COLUMN `processed_work` int NOT NULL DEFAULT 0 AFTER `stage`,
   ADD COLUMN `total_work` int NOT NULL DEFAULT 0 AFTER `processed_work`,
@@ -43,12 +47,14 @@ ALTER TABLE `backtest_runs`
   ADD COLUMN `metrics` json NULL AFTER `cancel_requested_at`,
   ADD COLUMN `error_code` varchar(120) NULL AFTER `error_message`,
   ADD COLUMN `error_details` json NULL AFTER `error_code`,
-  ADD KEY `idx_backtest_runs_definition_created` (`strategy_definition_id`, `created_at`),
+  ADD KEY `idx_backtest_runs_created_id` (`created_at`, `id`),
+  ADD KEY `idx_backtest_runs_definition_status_created_id` (`strategy_definition_id`, `status`, `created_at`, `id`),
   ADD KEY `idx_backtest_runs_lease` (`status`, `lease_expires_at`);
 
 ALTER TABLE `backtest_signals`
+  MODIFY COLUMN `signal_time` datetime(6) NOT NULL,
   ADD COLUMN `signal_kind` enum('entry', 'exit') NOT NULL DEFAULT 'entry' AFTER `source`,
-  ADD KEY `idx_backtest_signals_run_time` (`backtest_run_id`, `signal_time`),
+  ADD KEY `idx_backtest_signals_run_time_id` (`backtest_run_id`, `signal_time`, `id`),
   ADD UNIQUE KEY `uq_backtest_signals_run_security_time_kind` (`backtest_run_id`, `security_code`, `signal_time`, `signal_kind`);
 
 CREATE TABLE IF NOT EXISTS `backtest_orders` (
@@ -59,7 +65,7 @@ CREATE TABLE IF NOT EXISTS `backtest_orders` (
   `side` enum('buy', 'sell') NOT NULL,
   `status` enum('pending', 'filled', 'rejected', 'expired', 'cancelled') NOT NULL DEFAULT 'pending',
   `reason` varchar(255) NULL,
-  `scheduled_time` datetime NOT NULL,
+  `scheduled_time` datetime(6) NOT NULL,
   `execution_time` datetime NULL,
   `expired_at` datetime NULL,
   `quantity` int NOT NULL DEFAULT 0,
@@ -73,6 +79,7 @@ CREATE TABLE IF NOT EXISTS `backtest_orders` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_backtest_orders_signal_id` (`backtest_signal_id`),
   KEY `idx_backtest_orders_run_id` (`backtest_run_id`),
+  KEY `idx_backtest_orders_run_scheduled_time_id` (`backtest_run_id`, `scheduled_time`, `id`),
   KEY `idx_backtest_orders_run_execution_time` (`backtest_run_id`, `execution_time`),
   KEY `idx_backtest_orders_signal_id` (`backtest_signal_id`),
   CONSTRAINT `fk_backtest_orders_run`
@@ -88,7 +95,7 @@ CREATE TABLE IF NOT EXISTS `backtest_trades` (
   `status` enum('open', 'closed') NOT NULL DEFAULT 'open',
   `entry_order_id` int NOT NULL,
   `exit_order_id` int NULL,
-  `entry_time` datetime NOT NULL,
+  `entry_time` datetime(6) NOT NULL,
   `exit_time` datetime NULL,
   `entry_price` decimal(20,2) NOT NULL,
   `exit_price` decimal(20,2) NULL,
@@ -102,6 +109,7 @@ CREATE TABLE IF NOT EXISTS `backtest_trades` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `uq_backtest_trades_entry_order_id` (`entry_order_id`),
   KEY `idx_backtest_trades_run_id` (`backtest_run_id`),
+  KEY `idx_backtest_trades_run_entry_time_id` (`backtest_run_id`, `entry_time`, `id`),
   KEY `idx_backtest_trades_run_security` (`backtest_run_id`, `security_code`),
   CONSTRAINT `fk_backtest_trades_run`
     FOREIGN KEY (`backtest_run_id`) REFERENCES `backtest_runs` (`id`) ON DELETE CASCADE

@@ -30,11 +30,23 @@ export class BacktestRun {
   @Column({ type: 'int' })
   period: Period = Period.DAY;
 
+  // No default: a backtest run is always created with an explicit tdx/qmt
+  // source via createRun, so a stale EAST_MONEY default would be misleading.
   @Column({ type: 'enum', enum: DataSource })
-  source: DataSource = DataSource.EAST_MONEY;
+  source: DataSource;
 
   @Column({ name: 'config_snapshot', type: 'json' })
   configSnapshot: Record<string, unknown> = {};
+
+  @Column({
+    name: 'market_data_fingerprint',
+    type: 'char',
+    length: 64,
+    charset: 'ascii',
+    collation: 'ascii_bin',
+    nullable: true,
+  })
+  marketDataFingerprint: string | null = null;
 
   @Column({ name: 'start_date', type: 'datetime' })
   startDate: Date = new Date();
