@@ -9,7 +9,10 @@ import { ExperimentalAllowlistResolver } from './experimental-allowlist.resolver
  * handleMessage exercises it end-to-end.
  */
 describe('ExperimentalTdxRealtimeClient strict validation', () => {
-  function makeClient(allowlist: string[] = ['600519.SH']) {
+  function makeClient(
+    allowlist: string[] = ['600519.SH'],
+    desiredPoster: jest.Mock = jest.fn().mockResolvedValue(undefined),
+  ) {
     const configService = {
       get: (key: string, def?: unknown) => {
         if (key === 'TDX_BASE_URL') return 'http://127.0.0.1:9001';
@@ -31,8 +34,32 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
       configService,
       store,
       allowlistResolver,
+      desiredPoster,
     );
-    return { client, store };
+    return { client, store, desiredPoster };
+  }
+
+  function readyData(
+    currentStreamEpoch: string | null = 'epoch-1',
+    currentGeneration: number | null = 1,
+  ) {
+    return {
+      mode: 'builtin_experimental',
+      payloadType: 'tdx.realtime.snapshot',
+      schemaVersion: 0,
+      draftRevision: 1,
+      acquisitionProfile: 'tdx.get_market_snapshot',
+      currentStreamEpoch,
+      currentGeneration,
+      ownerId: currentStreamEpoch === null ? null : 'owner-a',
+      datasourceBuildId: 'datasource-a',
+      bridgeBuildId: currentStreamEpoch === null ? null : 'build-a',
+    };
+  }
+
+  async function flushPromises() {
+    await Promise.resolve();
+    await Promise.resolve();
   }
 
   function makeSnapshotData(overrides: Record<string, unknown> = {}) {
@@ -94,11 +121,15 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
     await (client as any).handleMessage(
       JSON.stringify({
         type: 'ready',
-        data: { currentStreamEpoch: 'epoch-1' },
+        data: readyData(),
       }),
     );
     await handleMessage(client, makeSnapshotData({ schemaVersion: 99 }));
     expect(store.readDebug('600519.SH')).toBeNull();
+    expect(store.getDropCount('contractMismatch')).toBe(1);
+    expect(store.getRuntimeMetadata().lastError?.code).toBe(
+      'TDX_EXPERIMENTAL_CONTRACT_MISMATCH',
+    );
   });
 
   it('rejects missing last price (not filled with 0)', async () => {
@@ -172,6 +203,7 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
     );
     await handleMessage(client, makeSnapshotData({ symbol: '999999.SZ' }));
     expect(store.readDebug('999999.SZ')).toBeNull();
+    expect(store.getDropCount('symbolNotAuthorized')).toBe(1);
   });
 
   it('rejects snapshot with epoch mismatch', async () => {
@@ -243,9 +275,164 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
           streamEpoch: 'stale-epoch',
           generation: 1,
           mode: 'builtin_experimental',
+          ownerId: 'stale-owner',
+          bridgeBuildId: 'stale-build',
         },
       }),
     );
     expect(store.currentStreamEpoch).toBe('epoch-4'); // not stale-epoch
+  });
+
+  it('rejects an incomplete stream_started without partial metadata updates', async () => {
+    const { client, store } = makeClient();
+    await (client as any).handleMessage(
+      JSON.stringify({ type: 'ready', data: readyData() }),
+    );
+
+    await (client as any).handleMessage(
+      JSON.stringify({
+        type: 'stream_started',
+        data: {
+          streamEpoch: 'epoch-2',
+          generation: 2,
+          mode: 'builtin_experimental',
+          ownerId: 'owner-b',
+          // bridgeBuildId intentionally missing
+        },
+      }),
+    );
+
+    expect(store.currentStreamEpoch).toBe('epoch-1');
+    expect(store.getRuntimeMetadata()).toMatchObject({
+      ownerId: 'owner-a',
+      bridgeBuildId: 'build-a',
+      currentGeneration: 1,
+    });
+    expect(store.getLastDrop()?.errorCode).toBe(
+      'TDX_EXPERIMENTAL_STREAM_STARTED_INVALID',
+    );
+  });
+
+  it('syncs an empty desired set after ready without an owner', async () => {
+    const { client, desiredPoster } = makeClient([]);
+    await (client as any).handleMessage(
+      JSON.stringify({ type: 'ready', data: readyData(null, null) }),
+    );
+    await flushPromises();
+    expect(desiredPoster).toHaveBeenCalledWith(
+      'http://127.0.0.1:9001/tdx/bridge/desired',
+      [],
+    );
+  });
+
+  it('resyncs desired state after a new stream generation', async () => {
+    const { client, desiredPoster, store } = makeClient();
+    await (client as any).handleMessage(
+      JSON.stringify({ type: 'ready', data: readyData() }),
+    );
+    await flushPromises();
+    desiredPoster.mockClear();
+    await (client as any).handleMessage(
+      JSON.stringify({
+        type: 'stream_started',
+        data: {
+          streamEpoch: 'epoch-2',
+          generation: 2,
+          mode: 'builtin_experimental',
+          ownerId: 'owner-b',
+          bridgeBuildId: 'build-b',
+        },
+      }),
+    );
+    await flushPromises();
+    expect(desiredPoster).toHaveBeenCalledWith(
+      'http://127.0.0.1:9001/tdx/bridge/desired',
+      ['600519.SH'],
+    );
+    expect(store.getRuntimeMetadata()).toMatchObject({
+      ownerId: 'owner-b',
+      bridgeBuildId: 'build-b',
+      currentGeneration: 2,
+    });
+  });
+
+  it('retries desired-state publication after a transport failure', async () => {
+    jest.useFakeTimers();
+    const desiredPoster = jest
+      .fn()
+      .mockRejectedValueOnce(new Error('offline'))
+      .mockResolvedValue(undefined);
+    const { client } = makeClient(['600519.SH'], desiredPoster);
+    await (client as any).handleMessage(
+      JSON.stringify({ type: 'ready', data: readyData(null, null) }),
+    );
+    await flushPromises();
+    expect(desiredPoster).toHaveBeenCalledTimes(1);
+    await jest.advanceTimersByTimeAsync(1000);
+    expect(desiredPoster).toHaveBeenCalledTimes(2);
+    await client.onModuleDestroy();
+    jest.useRealTimers();
+  });
+
+  it.each([
+    '2026-07-17T14:30+08:00',
+    '2026-07-17T14:30:00+08',
+    '2026-99-99T99:99:99+99:99',
+    '2026-02-30T14:30:00+08:00',
+    'not-a-dateTstill+offset',
+  ])('rejects non-RFC3339 timestamp %s', async (capturedAt) => {
+    const { client, store } = makeClient();
+    await (client as any).handleMessage(
+      JSON.stringify({ type: 'ready', data: readyData() }),
+    );
+    await handleMessage(client, makeSnapshotData({ capturedAt }));
+    expect(store.readDebug('600519.SH')).toBeNull();
+  });
+
+  it.each([
+    ['root extra field', { unexpected: true }],
+    [
+      'snapshot extra field',
+      {
+        snapshot: {
+          ...makeSnapshotData().snapshot,
+          unexpected: true,
+        },
+      },
+    ],
+    ['non-object quality', { quality: 'bad' }],
+    ['quality extra field', { quality: { stale: true, unexpected: true } }],
+    ['quality non-boolean', { quality: { stale: 'true' } }],
+  ])('rejects exact-schema violation: %s', async (_label, overrides) => {
+    const { client, store } = makeClient();
+    await (client as any).handleMessage(
+      JSON.stringify({ type: 'ready', data: readyData() }),
+    );
+    await handleMessage(client, makeSnapshotData(overrides));
+    expect(store.readDebug('600519.SH')).toBeNull();
+    expect(store.getDropCount('validationError')).toBe(1);
+  });
+
+  it('accepts false quality markers and optional eventTime omission', async () => {
+    const { client, store } = makeClient();
+    await (client as any).handleMessage(
+      JSON.stringify({ type: 'ready', data: readyData() }),
+    );
+    const frame = makeSnapshotData({ quality: { stale: false } });
+    delete (frame as any).eventTime;
+    await handleMessage(client, frame);
+    expect(store.readDebug('600519.SH')?.snapshot?.eventTime).toBeNull();
+    expect(store.readDebug('600519.SH')?.snapshot?.quality).toEqual({
+      stale: false,
+    });
+  });
+
+  it('counts non-JSON decode failures with a stable code', async () => {
+    const { client, store } = makeClient();
+    await (client as any).handleMessage('{not-json');
+    expect(store.getDropCount('decodeError')).toBe(1);
+    expect(store.getLastDrop()?.errorCode).toBe(
+      'TDX_EXPERIMENTAL_WS_DECODE_ERROR',
+    );
   });
 });

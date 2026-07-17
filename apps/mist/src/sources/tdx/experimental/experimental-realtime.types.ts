@@ -67,3 +67,25 @@ export type DropReason =
   | 'contractMismatch'
   | 'decodeError'
   | 'validationError';
+
+export interface ExperimentalDropEvent {
+  reason: DropReason;
+  symbol: string | null;
+  at: number;
+  errorCode: string | null;
+}
+
+export interface ExperimentalRuntimeError {
+  code: string;
+  message: string;
+  at: number;
+}
+
+export interface ExperimentalRuntimeMetadata {
+  ready: boolean;
+  ownerId: string | null;
+  datasourceBuildId: string | null;
+  bridgeBuildId: string | null;
+  currentGeneration: number | null;
+  lastError: ExperimentalRuntimeError | null;
+}

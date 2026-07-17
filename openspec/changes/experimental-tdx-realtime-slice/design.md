@@ -73,14 +73,23 @@ Epoch changes arrive only via `stream_started` (already-connected) or `ready`
 (late-connect). Snapshots never implicitly switch epoch (prevents late frames
 from reverting the store to an old epoch).
 
+Every accepted `stream_started` event is an atomic generation identity tuple:
+`(streamEpoch, generation, ownerId, bridgeBuildId)`. The datasource broadcasts
+all four values from the same registered owner generation. Mist validates the
+whole tuple before changing any store or diagnostic state; invalid or stale
+events leave the previous generation untouched.
+
 ## decoder shared-projection (safe split)
 
 ```
-TDX_SNAPSHOT_FIELD_ALIASES  (shared field-name mapping)
+TDX_SNAPSHOT_FIELD_ALIASES  (shared raw provider-field mapping)
         ↓
-extract_tdx_snapshot_native_fields()  → raw optional values, no fill, no model
-        ├─ HTTP projector: existing normalize_tdx_snapshot (keeps fill-0/fill-clock semantics, UNCHANGED)
+extract_tdx_snapshot_native_fields()  → separate raw provider fields + alias hits,
+                                        no fill, no model
+        ├─ HTTP projector: reads only Now/Open/Max/Min/LastClose/Volume/
+        │                  Amount/AsOf (fill-0/fill-clock semantics UNCHANGED)
         └─ experimental decoder:
+             resolves Last/Close/High/Low alternatives only here
              ErrorId/Code validation
              last required + finite (reject NaN/Inf/bool)
              other prices: present-or-null
@@ -90,6 +99,36 @@ extract_tdx_snapshot_native_fields()  → raw optional values, no fill, no model
 
 Even if this means duplicating ~7 lines of field mapping, it is safer than
 parameterizing the live HTTP projector's missing-value policy.
+
+The gateway treats transport symbols as exact identities. It may perform
+stable de-duplication, but never trims, changes case, or calls
+`normalize_symbol` for desired/add/remove/result state. Provider Code
+canonicalization remains confined to the terminal/provider boundary.
+
+## Experimental lifecycle and exit gate
+
+Current state: `HIL-pending`; `hilOwner=project-maintainer`;
+`hilBy=2026-08-17`.
+
+Selected resolution path (2026-07-17): run the bounded Windows F2 HIL. This is
+an operator decision, not verification evidence, so the lifecycle remains
+`HIL-pending` until the acceptance record is complete. F2 stores the native SDK
+payload verbatim and a sanitized request envelope; `leaseToken` MUST be
+redacted and MUST NOT be persisted in evidence.
+
+| State | Entry evidence | Permitted runtime claim |
+|-------|----------------|-------------------------|
+| schema-draft | schema + goldens exist | design only |
+| replay-proven | macOS real HTTP/WS replay and no-K gates pass | replay-backed experiment |
+| HIL-pending | replay-proven + named owner + deadline | no live eligibility |
+| transport-HIL-verified | accepted F2 with repo/script/TDX versions, trading phase, raw payload, and DB write digest | transport verified only |
+| live-transport-experiment-eligible | HIL verified; one machine; 1–2 symbols; no writes; legacy rollback available | bounded live experiment |
+| productization / research-archived | explicit follow-up decision | follow-up change or archive |
+| reference-quarantined | HIL deadline missed or cannot be satisfied | no active wiring |
+
+Quarantined code is reference material, not assumed reusable. Reactivation
+requires mainline compatibility work and a complete replay validation before a
+new HIL attempt.
 
 ## Fixture evidence tiers
 

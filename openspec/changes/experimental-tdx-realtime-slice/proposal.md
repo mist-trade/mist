@@ -81,6 +81,18 @@ business side effects.
   HIL; use composition, not inheritance).
 - Windows HIL (hard gate for canary/live).
 
+Windows HIL execution is outside this implementation slice, but its lifecycle
+gate is not optional. The current experiment state is `HIL-pending`, owned by
+`project-maintainer`, with `hilBy=2026-08-17`. Until that gate is resolved, a
+completed macOS replay slice MUST NOT be described as production-ready.
+
+Resolution path selected on 2026-07-17: **Windows F2 HIL** (option 1). Active
+experimental wiring remains in place for that bounded verification. The
+selection does not advance lifecycle state by itself; only accepted evidence
+using the checklist in `evidence/F2-WINDOWS-HIL.md` may advance the state to
+`transport-HIL-verified`. The deadline fallback to `reference-quarantined`
+remains mandatory if accepted evidence is not available by `hilBy`.
+
 ## Impact
 
 - **mist-datasource**: new gateway, decoder, experimental WS factories,
@@ -96,3 +108,18 @@ business side effects.
 validated". The experimental path works under macOS replay (fake bridge +
 fixtures through real HTTP/WS/codec/allowlist/store); no K writes, no business
 side effects (three-layer gate); legacy fully preserved.
+
+The lifecycle remains open after those criteria pass:
+
+```text
+schema-draft → replay-proven → HIL-pending(owner + hilBy)
+  → transport-HIL-verified → live-transport-experiment-eligible
+      ├─ productization change
+      └─ research-archived
+deadline exceeded without accepted HIL → reference-quarantined
+```
+
+`reference-quarantined` removes active provider/module/route wiring but keeps
+the OpenSpec artifacts, fixtures, replay harness, and evidence tags. Restoring
+it requires rebasing against the then-current mainline and rerunning every
+macOS gate before assigning a new HIL owner and deadline.
