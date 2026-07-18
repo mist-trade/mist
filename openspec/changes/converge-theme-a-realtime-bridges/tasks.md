@@ -44,7 +44,7 @@
 
 ## 6. Master Integration And Windows Evidence
 
-- [ ] 6.1 Merge datasource, Mist, deploy, and monitoring convergence commits to master in dependency order with experimental modes still default off.
+- [x] 6.1 Merge datasource, Mist, deploy, and monitoring convergence commits to master in dependency order with experimental modes still default off.
 - [ ] 6.2 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest.
 - [ ] 6.3 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest.
 - [ ] 6.4 Re-run historical TDX HTTP and QMT native/DAT matrices, resolve all evidence findings, and record final master SHAs.
