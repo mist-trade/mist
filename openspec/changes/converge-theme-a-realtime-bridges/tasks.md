@@ -27,20 +27,20 @@
 
 ## 4. Deployment And Monitoring Convergence
 
-- [ ] 4.1 Add default-off QMT experimental mode and loopback health configuration to Windows deployment contracts.
-- [ ] 4.2 Replace the old TDX/QMT K persistence smoke with source-specific transport, diagnostic, restart, rollback, and no-K digest evidence.
-- [ ] 4.3 Update TDX smoke to consume the current experimental health shape and remove all old `tdxBridgeReady` assumptions.
-- [ ] 4.4 Add mode-aware Windows exporter metrics for TDX/QMT readiness, subscriptions, and snapshot age while preserving legacy metrics.
-- [ ] 4.5 Add source-labelled experimental alerts that remain absent when the corresponding mode is disabled.
-- [ ] 4.6 Update deployment, monitoring contracts, operator docs, and local script tests for the default-off experimental boundary.
+- [x] 4.1 Add default-off QMT experimental mode and loopback health configuration to Windows deployment contracts.
+- [x] 4.2 Replace the old TDX/QMT K persistence smoke with source-specific transport, diagnostic, restart, rollback, and no-K digest evidence.
+- [x] 4.3 Update TDX smoke to consume the current experimental health shape and remove all old `tdxBridgeReady` assumptions.
+- [x] 4.4 Add mode-aware Windows exporter metrics for TDX/QMT readiness, subscriptions, and snapshot age while preserving legacy metrics.
+- [x] 4.5 Add source-labelled experimental alerts that remain absent when the corresponding mode is disabled.
+- [x] 4.6 Update deployment, monitoring contracts, operator docs, and local script tests for the default-off experimental boundary.
 
 ## 5. Local Cross-Repo Verification
 
 - [x] 5.1 Run datasource non-live pytest, ruff, and pyright.
 - [x] 5.2 Run Mist full Jest, typecheck, lint, build, and mode/no-K tests.
-- [ ] 5.3 Run deploy PowerShell/workflow contract tests and monitoring `scripts/verify.sh`.
-- [ ] 5.4 Run strict OpenSpec validation, CI contracts with `MIST_WORKSPACE_ROOT`, and `git diff --check` in all four repositories.
-- [ ] 5.5 Commit reviewable convergence changes in all four repositories with no unrelated branch history.
+- [x] 5.3 Run deploy PowerShell/workflow contract tests and monitoring `scripts/verify.sh`.
+- [x] 5.4 Run strict OpenSpec validation, CI contracts with `MIST_WORKSPACE_ROOT`, and `git diff --check` in all four repositories.
+- [x] 5.5 Commit reviewable convergence changes in all four repositories with no unrelated branch history.
 
 ## 6. Master Integration And Windows Evidence
 
