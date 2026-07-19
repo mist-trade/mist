@@ -15,12 +15,18 @@ import { UtilsModule } from '@app/utils';
 import { HistoricalCollectorModule } from '../../collector/historical-collector.module';
 import { CollectorService } from '../../collector/collector.service';
 import { WebSocketCollectionStrategy } from '../../collector/strategies/websocket-collection.strategy';
+import { SecurityModule } from '../../security/security.module';
 import { TdxWebSocketService } from './tdx-websocket.service';
 import { KCandleAggregator } from './kcandle-aggregator';
 import { LegacyTdxStreamingController } from './legacy-tdx-streaming.controller';
 
 @Module({
-  imports: [HistoricalCollectorModule, TimezoneModule, UtilsModule],
+  imports: [
+    HistoricalCollectorModule,
+    SecurityModule,
+    TimezoneModule,
+    UtilsModule,
+  ],
   providers: [
     KCandleAggregator,
     TdxWebSocketService,
