@@ -57,4 +57,18 @@ describe('mistEnvSchema data source configuration', () => {
     });
     expect(invalid.error?.message).toContain('QMT_REALTIME_MODE');
   });
+
+  it('accepts the explicit empty allowlists emitted by Docker Compose', () => {
+    const { error, value } = mistEnvSchema.validate({
+      ...baseEnv,
+      TDX_REALTIME_MODE: 'legacy',
+      TDX_EXPERIMENTAL_ALLOWLIST: '',
+      QMT_REALTIME_MODE: 'off',
+      QMT_EXPERIMENTAL_ALLOWLIST: '',
+    });
+
+    expect(error).toBeUndefined();
+    expect(value.TDX_EXPERIMENTAL_ALLOWLIST).toBe('');
+    expect(value.QMT_EXPERIMENTAL_ALLOWLIST).toBe('');
+  });
 });
