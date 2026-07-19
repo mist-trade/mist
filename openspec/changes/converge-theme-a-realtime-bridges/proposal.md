@@ -9,6 +9,7 @@ Theme A is split across newer experimental TDX code already on `master` and olde
 - Keep both experimental transports disabled by default and prohibit K, scanner, signal, alert, or trading side effects.
 - Update Windows deployment smoke and monitoring to consume loopback experimental health without changing legacy health behavior or producing alerts while a mode is disabled.
 - Require accepted Windows TDX F2 and QMT trading-session evidence on exact `master` SHAs before Theme A is complete or Theme B may be merged.
+- Add a reversible operator-triggered Windows mode switch and four-phase evidence sequence so baseline is captured before activation and rollback is verified after experimental routes are removed.
 - Transfer the remaining realtime ownership from the historical BigQMT change and preserve its completed history evidence without importing contradictory product-persistence requirements.
 
 ## Capabilities
@@ -26,8 +27,8 @@ Theme A is split across newer experimental TDX code already on `master` and olde
 
 ## Impact
 
-- `mist-datasource`: QMT runtime mode, collector, experimental WebSocket/health routes, and strict tests.
+- `mist-datasource`: QMT runtime mode, collector, experimental WebSocket/health routes, bounded TDX native evidence readback, and strict tests.
 - `mist`: QMT experimental module, allowlist resolver, client/store/diagnostics, module matrix, and no-K guardrails.
-- `mist-deploy`: source-specific experimental transport smoke and Windows evidence capture.
+- `mist-deploy`: reversible mode switching, source-specific experimental transport smoke, and four-phase Windows evidence capture.
 - `mist-monitoring`: mode-aware loopback health parsing, metrics, and alerts.
 - `mist` OpenSpec: Theme A ownership, stable capability deltas, Windows HIL evidence, and closure gates that block Theme B.

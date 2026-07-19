@@ -17,3 +17,16 @@ The QMT realtime collector MUST permit one command in flight, use a bounded subs
 #### Scenario: Previous command has not completed
 - **WHEN** a collection interval arrives while a QMT command remains pending
 - **THEN** no second command is enqueued and the overlap counter increases
+
+### Requirement: TDX native HIL evidence is bounded and secret-free
+The TDX experimental gateway SHALL retain only the latest accepted native
+snapshot evidence for currently desired symbols and SHALL expose it only on a
+loopback route without lease credentials.
+
+#### Scenario: Accepted native snapshot is inspected
+- **WHEN** a loopback operator reads evidence for a desired TDX symbol
+- **THEN** the response contains native data, capture metadata, stream epoch, and the accepted frame but no lease token
+
+#### Scenario: Owner epoch changes
+- **WHEN** a new TDX bridge owner epoch replaces the previous owner
+- **THEN** all native evidence from the previous epoch is removed
