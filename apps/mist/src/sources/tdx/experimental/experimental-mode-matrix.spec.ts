@@ -1,19 +1,23 @@
 import 'reflect-metadata';
 import { Global, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
-import { MODULE_METADATA } from '@nestjs/common/constants';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import request from 'supertest';
 import { ExperimentalTdxRealtimeModule } from './experimental-tdx-realtime.module';
 import { ExperimentalTdxRealtimeClient } from './experimental-tdx-realtime.client';
 import { ExperimentalAllowlistResolver } from './experimental-allowlist.resolver';
 import { InMemoryRealtimeStore } from './in-memory-realtime.store';
-import { LegacyTdxStreamingController } from '../legacy-tdx-streaming.controller';
 import { TdxWebSocketService } from '../tdx-websocket.service';
 import { KCandleAggregator } from '../kcandle-aggregator';
 import { WebSocketCollectionStrategy } from '../../../collector/strategies/websocket-collection.strategy';
-import { ScheduleModule } from '../../../../../schedule/src/schedule.module';
+
+const scheduleModuleSource = readFileSync(
+  resolve(process.cwd(), 'apps/schedule/src/schedule.module.ts'),
+  'utf8',
+);
 
 const fakeDataSource = {
   entityMetadatas: [],
@@ -72,28 +76,11 @@ describe('experimental TDX DI and route mode matrix', () => {
     await app.close();
   });
 
-  it('schedule module graph and DI contain no realtime WS providers or controller', async () => {
-    const imports =
-      (Reflect.getMetadata(MODULE_METADATA.IMPORTS, ScheduleModule) as
-        | unknown[]
-        | undefined) ?? [];
-    expect(imports).not.toContain(ExperimentalTdxRealtimeModule);
-
-    const moduleRef = await Test.createTestingModule({
-      imports: [ScheduleModule],
-    })
-      .overrideProvider(getDataSourceToken())
-      .useValue(fakeDataSource)
-      .compile();
-
-    for (const token of [
-      ExperimentalTdxRealtimeClient,
-      TdxWebSocketService,
-      LegacyTdxStreamingController,
-    ]) {
-      expect(() => moduleRef.get(token, { strict: false })).toThrow();
-    }
-    await moduleRef.close();
+  it('schedule module source contains no realtime WS graph', () => {
+    expect(scheduleModuleSource).not.toContain('ExperimentalTdxRealtimeModule');
+    expect(scheduleModuleSource).not.toContain('ExperimentalTdxRealtimeClient');
+    expect(scheduleModuleSource).not.toContain('TdxWebSocketService');
+    expect(scheduleModuleSource).not.toContain('LegacyTdxStreamingController');
   });
 
   it('off-mode container has no realtime providers', async () => {
