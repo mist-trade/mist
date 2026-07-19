@@ -81,6 +81,7 @@ export const mistEnvSchema = commonEnvSchema.append({
     ),
 
   TDX_EXPERIMENTAL_ALLOWLIST: Joi.string()
+    .allow('')
     .default('')
     .description(
       'Comma-separated exact formatCodes for experimental realtime (max 5)',
@@ -109,6 +110,7 @@ export const mistEnvSchema = commonEnvSchema.append({
     .description('QMT realtime mode: off (default) or builtin_experimental'),
 
   QMT_EXPERIMENTAL_ALLOWLIST: Joi.string()
+    .allow('')
     .default('')
     .description(
       'Comma-separated exact QMT formatCodes for experimental realtime (max 5)',
