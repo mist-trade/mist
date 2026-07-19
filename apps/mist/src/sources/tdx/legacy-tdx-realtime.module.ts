@@ -10,6 +10,8 @@
 import { Logger, Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from '@app/shared-data';
+import { TimezoneModule } from '@app/timezone';
+import { UtilsModule } from '@app/utils';
 import { HistoricalCollectorModule } from '../../collector/historical-collector.module';
 import { CollectorService } from '../../collector/collector.service';
 import { WebSocketCollectionStrategy } from '../../collector/strategies/websocket-collection.strategy';
@@ -18,7 +20,7 @@ import { KCandleAggregator } from './kcandle-aggregator';
 import { LegacyTdxStreamingController } from './legacy-tdx-streaming.controller';
 
 @Module({
-  imports: [HistoricalCollectorModule],
+  imports: [HistoricalCollectorModule, TimezoneModule, UtilsModule],
   providers: [
     KCandleAggregator,
     TdxWebSocketService,
