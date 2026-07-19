@@ -11,7 +11,7 @@ This change updates the design to the current decision:
 - QMT service `:9002` is QMT-native.
 - QMT historical bars return `marketData`, not the TDX bar row model.
 - QMT historical bars use native `get_market_data_ex(..., subscribe=False)` as
-  the product path; local DAT is fallback/debug evidence only.
+  the only path; the datasource does not read QMT DAT files.
 - The historical scope is complete; experimental QMT realtime ownership is
   transferred to `converge-theme-a-realtime-bridges`, and historical bars do
   not validate or enable it.
@@ -26,7 +26,7 @@ This change updates the design to the current decision:
   `a QMT provider selector` branch, no QMT provider state, and no QMT capability manifest
   from TDX `/providers`.
 - Add QMT native `POST :9002/v1/bars/query` for historical bars through
-  `get_market_data_ex` first, with local DAT retained only as fallback/debug.
+  `get_market_data_ex`; no DAT fallback exists.
 - Use official full-QMT `get_market_data_ex`-style request parameters:
   `fields`, `stock_list`, `period`, `start_time`, `end_time`, `count`,
   `dividend_type`, and `fill_data`; HTTP API does not expose `subscribe` and
@@ -50,9 +50,8 @@ This change updates the design to the current decision:
 ### New Capabilities
 
 - `bigqmt-datasource-bridge`: QMT native service boundary, native
-  `get_market_data_ex` bars, local DAT fallback/debug evidence, stdlib HTTP
-  polling bridge, single-owner command gateway, and Windows evidence
-  requirements.
+  `get_market_data_ex` bars, stdlib HTTP polling bridge, single-owner command
+  gateway, and Windows evidence requirements.
 
 ### Modified Capabilities
 
@@ -68,7 +67,7 @@ This change updates the design to the current decision:
 
 ## Impact
 
-- `mist-datasource` QMT app routes, QMT native bars, local DAT fallback,
+- `mist-datasource` QMT app routes, QMT native bars,
   command gateway tests, QMT built-in bridge scripts, TDX v1 schemas/routes,
   adapter factory cleanup, documentation, and guardrail tests.
 - Mist backend callers that previously expected TDX `a QMT provider selector` must use

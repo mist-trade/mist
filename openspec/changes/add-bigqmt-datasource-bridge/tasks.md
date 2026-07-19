@@ -23,10 +23,9 @@
 - [x] 3.3 Keep historical semantics fixed to `subscribe=False`.
 - [x] 3.4 Return `data.marketData` column shape with native bridge metadata.
 - [x] 3.5 Keep QMT volume and amount in QMT native units.
-- [x] 3.6 Add `include_raw=true` parse evidence.
-- [x] 3.7 Add unit and integration tests for daily/minute DAT parsing,
-      field filtering, count, time filtering, block window, unstable/missing/error
-      envelopes, and unsupported request shape.
+- [x] 3.6 Add `include_raw=true` bounded native bridge evidence.
+- [x] 3.7 Remove the QMT DAT reader, settings, service configuration, and tests;
+      add product guardrails proving `/v1/bars/query` uses only the native bridge.
 
 ## 4. TDX Cleanup
 
