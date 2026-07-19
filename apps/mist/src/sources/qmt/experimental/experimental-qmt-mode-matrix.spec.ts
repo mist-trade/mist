@@ -1,10 +1,10 @@
 import 'reflect-metadata';
 import { Global, Module } from '@nestjs/common';
-import { MODULE_METADATA } from '@nestjs/common/constants';
 import { ConfigService } from '@nestjs/config';
 import { Test } from '@nestjs/testing';
 import { getDataSourceToken } from '@nestjs/typeorm';
-import { ScheduleModule } from '../../../../../schedule/src/schedule.module';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { CollectorService } from '../../../collector/collector.service';
 import { StrategyScanService } from '../../../strategy/scanner/strategy-scan.service';
 import { StrategyAlertEventService } from '../../../strategy/services/strategy-alert-event.service';
@@ -14,6 +14,11 @@ import { ExperimentalQmtAllowlistResolver } from './experimental-qmt-allowlist.r
 import { ExperimentalQmtRealtimeClient } from './experimental-qmt-realtime.client';
 import { ExperimentalQmtRealtimeModule } from './experimental-qmt-realtime.module';
 import { InMemoryQmtRealtimeStore } from './in-memory-qmt-realtime.store';
+
+const scheduleModuleSource = readFileSync(
+  resolve(process.cwd(), 'apps/schedule/src/schedule.module.ts'),
+  'utf8',
+);
 
 const fakeDataSource = {
   entityMetadatas: [],
@@ -61,10 +66,8 @@ describe('experimental QMT DI mode and poison boundary', () => {
   });
 
   it('is absent from the schedule module graph', () => {
-    const imports =
-      (Reflect.getMetadata(MODULE_METADATA.IMPORTS, ScheduleModule) as
-        | unknown[]
-        | undefined) ?? [];
-    expect(imports).not.toContain(ExperimentalQmtRealtimeModule);
+    expect(scheduleModuleSource).not.toContain('ExperimentalQmtRealtimeModule');
+    expect(scheduleModuleSource).not.toContain('ExperimentalQmtRealtimeClient');
+    expect(scheduleModuleSource).not.toContain('QmtRealtime');
   });
 });
