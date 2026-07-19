@@ -42,54 +42,41 @@ The QMT bars endpoint SHALL accept QMT native request fields shaped after
 - **AND** the datasource MUST execute historical semantics equivalent to
   `get_market_data_ex(..., subscribe=False)`
 
-#### Scenario: Unsupported period is requested
-- **WHEN** the requested period is not `1d`, `1m`, or `5m`
-- **THEN** the datasource MUST return a stable unsupported-period datasource
-  error instead of guessing a local file layout
+#### Scenario: Historical period is requested
+- **WHEN** a caller supplies a QMT period
+- **THEN** the datasource MUST forward it unchanged to `get_market_data_ex`
+- **AND** it MUST preserve any native unsupported-period failure instead of
+  guessing another data source
 
 ### Requirement: QMT bars response is native marketData
 The QMT bars endpoint SHALL return QMT native column-oriented market data
 instead of the TDX row contract.
 
-#### Scenario: Local DAT bars are returned
-- **WHEN** a configured QMT local DAT read succeeds
+#### Scenario: Native bridge bars are returned
+- **WHEN** the full-QMT bridge completes `get_market_data_ex`
 - **THEN** the response envelope MUST set `provider` to `qmt`
 - **AND** `data.marketData` MUST map stock code to `{field: {stime: value}}`
-- **AND** `data.source` MUST identify the source as `local_dat`
+- **AND** `data.source` MUST identify the source as `native_bridge`
 - **AND** the response MUST NOT include `data.bars[]` or the TDX bar row model rows
 
 #### Scenario: Raw evidence is requested
 - **WHEN** the request sets `include_raw=true`
-- **THEN** the response MUST include parse evidence for each symbol with
-  `period_code`, `record_size`, `header_size`, `struct_format`,
-  `price_scale`, and `source_path`
+- **THEN** the response MUST include bounded bridge evidence with the native
+  method and command id
+- **AND** it MUST NOT expose the owner lease token
 
-### Requirement: Local DAT historical bars are read safely
-The QMT local DAT reader SHALL support only explicitly configured full-QMT
-historical DAT files for bars.
+### Requirement: QMT history has no DAT dependency
+The QMT datasource SHALL NOT contain a local DAT reader or require a QMT data
+directory path.
 
-#### Scenario: Daily DAT file is parsed
-- **WHEN** the datasource reads a full-QMT daily DAT file
-- **THEN** it MUST parse the 8-byte header and 32-byte records
-- **AND** it MUST treat even record indexes as valid bars
-- **AND** it MUST divide prices by `1000`
-- **AND** it MUST keep volume in the native DAT unit
-- **AND** it MUST fill missing amount as `0`
+#### Scenario: Native bridge is unavailable
+- **WHEN** the product bars path has no fresh bridge owner or native execution fails
+- **THEN** the datasource MUST return a stable bridge error
+- **AND** it MUST NOT open or parse a DAT file
 
-#### Scenario: Minute DAT file is parsed
-- **WHEN** the datasource reads a full-QMT `1m` or `5m` DAT file
-- **THEN** it MUST select only from controlled candidate binary layouts
-- **AND** the selected layout MUST pass timestamp, OHLC, volume, amount,
-  sorting, and period-alignment validation
-- **AND** failed detection MUST return structured details that include
-  attempted record size, format, and header size
-
-#### Scenario: Local DAT read is blocked or unstable
-- **WHEN** the read occurs after the configured block time or the file changes
-  during the stability wait
-- **THEN** the datasource MUST NOT parse the file
-- **AND** it MUST return a retryable datasource error or a configured bridge
-  fallback result
+#### Scenario: Service configuration is inspected
+- **WHEN** operators inspect QMT datasource settings and WinSW configuration
+- **THEN** no QMT DAT path or DAT reader setting MUST be present
 
 ### Requirement: Production bridge uses HTTP polling only
 The full-QMT production bridge SHALL use a QMT-initiated stdlib HTTP polling

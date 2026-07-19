@@ -41,17 +41,3 @@ silently stalling the process.
 - **WHEN** the QMT bridge stops polling
 - **THEN** the datasource MUST report QMT bridge readiness as false while the
   datasource process remains observable
-
-### Requirement: Local historical reads avoid update collisions
-The datasource SHALL avoid reading QMT historical DAT files during configured
-update windows and while files are changing.
-
-#### Scenario: DAT read is blocked by schedule
-- **WHEN** current China time is after `QMT_LOCAL_DAT_BLOCK_AFTER`
-- **THEN** the datasource MUST avoid opening the DAT file
-- **AND** it MUST return a retryable datasource error or configured fallback
-
-#### Scenario: DAT file changes during stability check
-- **WHEN** file size or modification time changes between the pre-read and
-  post-wait stat checks
-- **THEN** the datasource MUST treat the file as unstable and MUST NOT parse it

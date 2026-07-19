@@ -50,9 +50,8 @@ fields:
 - `fill_data`: `true`
 - `include_raw`: `false`
 
-The QMT datasource product path is native `get_market_data_ex(...,
-subscribe=False)` first. Local DAT parsing is fallback/debug evidence only and
-does not define the backend product capability ceiling.
+The QMT datasource path is native `get_market_data_ex(..., subscribe=False)`.
+It has no DAT reader, filesystem fallback, or QMT data-directory setting.
 
 The datasource returns column-oriented `data.marketData[symbol][field][stime]`.
 Backend converts this to `QmtResponse[]`, persists base K rows with

@@ -18,7 +18,7 @@ same schema.
   runtime.
 - Serve QMT historical bars through full-QMT native
   `get_market_data_ex(..., subscribe=False)` as the production path.
-- Keep local DAT parsing only as fallback/debug evidence.
+- Remove local DAT parsing and all QMT data-directory configuration.
 - Transfer experimental QMT realtime ownership to
   `converge-theme-a-realtime-bridges`; do not count historical bars as realtime
   validation or enablement.
@@ -74,9 +74,8 @@ Response data is column-oriented:
 
 The product path enqueues a bridge command that calls
 `ContextInfo.get_market_data_ex(..., subscribe=False)` in the full-QMT runtime.
-`include_raw=true` may add native/fallback evidence under `rawMeta`, including
-`period_code`, `record_size`, `header_size`, `struct_format`, `price_scale`,
-and `source_path`.
+`include_raw=true` adds bounded native bridge evidence under `rawMeta`, including
+the method and command id without exposing owner credentials.
 
 ### Periods and adjustment are explicit contracts
 
@@ -88,26 +87,11 @@ The backend fixes QMT `dividend_type` to `front_ratio` in v1. TDX remains fixed
 to `front`. Future support for multiple adjustment口径 requires adding an
 adjustment dimension to the `k` unique key first.
 
-### Local DAT is fallback/debug only
+### QMT history has no filesystem path dependency
 
-The local DAT reader resolves only configured full-QMT paths:
-
-- `QMT_LOCAL_DAT_DIR/SZ/86400/000001.DAT`
-- `QMT_LOCAL_DAT_DIR/SZ/60/000001.DAT`
-- `QMT_LOCAL_DAT_DIR/SZ/300/000001.DAT`
-- SH paths follow the same market/period layout.
-
-Daily DAT parsing uses an 8-byte header and 32-byte records. Even record
-indexes are valid; prices are divided by `1000`; volume keeps the native DAT
-unit; missing amount is `0`.
-
-Minute DAT parsing uses a small set of controlled candidate layouts with
-strict validation for timestamp, OHLC, volume, sorting, and period alignment.
-Unsupported layouts fail with structured details instead of guessed data.
-
-The reader blocks after `QMT_LOCAL_DAT_BLOCK_AFTER` (default `18:00`) unless
-configuration changes the policy, and it checks file size/mtime stability
-before parsing.
+The datasource does not open QMT DAT files and has no `QMT_LOCAL_DAT_DIR`
+setting. If bridge ownership or native execution fails, `/v1/bars/query`
+returns a stable retryable bridge error rather than switching data sources.
 
 ### Bridge is stdlib HTTP polling only
 
