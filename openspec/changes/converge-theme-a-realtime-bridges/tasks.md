@@ -45,13 +45,15 @@
 ## 6. Master Integration And Windows Evidence
 
 - [x] 6.1 Merge datasource, Mist, deploy, and monitoring convergence commits to master in dependency order with experimental modes still default off.
-- [ ] 6.2 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest.
-- [ ] 6.3 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest.
-- [ ] 6.4 Re-run historical TDX HTTP and QMT native/DAT matrices, resolve all evidence findings, and record final master SHAs.
-- [ ] 6.5 Complete the experimental TDX lifecycle task, sync stable specs, archive Theme A changes, and release the Theme B merge gate.
+- [x] 6.2 Add reversible Windows experimental mode switching, backend compose environment wiring, monitoring synchronization, and operator documentation.
+- [x] 6.3 Add bounded TDX native evidence readback and four-phase baseline/enabled/restart/rollback capture with protected-table comparison.
+- [ ] 6.4 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest.
+- [ ] 6.5 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest.
+- [ ] 6.6 Re-run historical TDX HTTP and QMT native/DAT matrices, resolve all evidence findings, and record final master SHAs.
+- [ ] 6.7 Complete the experimental TDX lifecycle task, sync stable specs, archive Theme A changes, and release the Theme B merge gate.
 
 ## 7. Theme B Handoff Gate
 
-- [ ] 7.1 Create fresh Theme B integration branches only after task 6.5, cherry-picking backend `db365eb` plus `4c7880b` and frontend `13fac02` plus `132c594` without duplicate Chan history.
+- [ ] 7.1 Create fresh Theme B integration branches only after task 6.7, cherry-picking backend `db365eb` plus `4c7880b` and frontend `13fac02` plus `132c594` without duplicate Chan history.
 - [ ] 7.2 Merge Theme B code and its v3 active OpenSpec at 74/77 after non-MySQL validation; do not deploy migrations 007/008 to production.
 - [ ] 7.3 When an isolated `MIST_TEST_MYSQL_URL` is later supplied, complete Theme B tasks 9.1, 10.5, and 10.7 before stable-spec sync, archive, migration, or release.

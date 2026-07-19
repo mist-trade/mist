@@ -35,3 +35,21 @@ Theme A MUST remain incomplete until accepted TDX F2 and QMT trading-session evi
 #### Scenario: Local replay passes without Windows evidence
 - **WHEN** all macOS tests pass but either live evidence package is absent
 - **THEN** experimental modes remain default off and Theme B remains blocked from merge
+
+### Requirement: Experimental activation is reversible and evidence is phased
+Windows activation SHALL use a dedicated operator-triggered workflow that
+atomically backs up and updates datasource, backend, and monitoring modes. The
+evidence workflow SHALL not mutate those modes and SHALL compare every later
+phase with a baseline captured before activation.
+
+#### Scenario: Experimental source is enabled
+- **WHEN** an operator enables one source with an exact allowlisted symbol
+- **THEN** the workflow records a local backup identifier, recreates the affected runtime, and leaves the other source mode unchanged
+
+#### Scenario: Experimental source is rolled back
+- **WHEN** an operator supplies the recorded backup identifier
+- **THEN** the exact prior configuration is restored and the default source path becomes healthy before rollback succeeds
+
+#### Scenario: Evidence phases are captured
+- **WHEN** Windows HIL is executed
+- **THEN** `baseline`, `enabled`, `post_restart`, and `post_rollback` are captured in order and all protected table digests remain identical

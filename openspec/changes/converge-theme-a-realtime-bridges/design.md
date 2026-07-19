@@ -49,6 +49,29 @@ QMT exposes `/qmt/realtime/health` only to loopback callers. TDX keeps `/tdx/bri
 
 All experimental modes remain default-off when merged. Windows workflows must name exact repository and bridge-script SHAs. Theme B remains blocked until accepted TDX F2 and QMT trading-session evidence, restart/rollback evidence, and a before/after database content digest prove no K mutation.
 
+### Activation and evidence are separate workflows
+
+An operator-triggered mode workflow owns configuration mutation. It updates the
+datasource and Docker environment files atomically, recreates the backend so it
+reads the selected mode, synchronizes monitoring, and records a machine-local
+backup identifier. Rollback restores that exact backup. Environment backups may
+contain secrets and are never uploaded as Actions artifacts or printed.
+
+The evidence workflow never selects a mode. It captures four ordered phases:
+`baseline` before activation, `enabled` after a fresh native snapshot,
+`post_restart` after runtime and terminal-owner recovery, and `post_rollback`
+after the default mode is restored. Every phase after baseline compares all
+protected table row counts and deterministic content digests with baseline.
+
+### TDX native HIL evidence is bounded and loopback-only
+
+The TDX gateway retains only the latest accepted native request evidence for
+each currently desired symbol. A loopback-only experimental route exposes that
+bounded evidence without the lease token. Evidence is cleared on owner epoch
+change and unsubscribe. This allows Windows HIL to preserve the native
+`get_market_snapshot` object while keeping product APIs and persistence out of
+Theme A.
+
 ## Risks / Trade-offs
 
 - [QMT native field shape differs by full-QMT release] -> Preserve sanitized raw evidence, reject unknown/malformed frames, and revise the draft contract rather than filling values.
@@ -62,9 +85,10 @@ All experimental modes remain default-off when merged. Windows workflows must na
 1. Checkpoint Theme B without merging it.
 2. Merge default-off QMT datasource, backend, deploy, and monitoring changes in dependency order.
 3. Run local cross-repo replay and contract checks.
-4. Run TDX and QMT Windows evidence against exact `master` SHAs.
-5. On failure, keep modes disabled, merge the correction, and repeat all affected evidence.
-6. On success, sync stable specs and archive Theme A changes. Rollback remains setting the modes to `off` or TDX to `legacy` and restoring the previous repository refs.
+4. Capture a disabled-mode baseline, enable one source through the reversible mode workflow, then run enabled and restart evidence against exact `master` SHAs.
+5. Restore the recorded configuration backup and capture post-rollback evidence.
+6. On failure, keep modes disabled, merge the correction, and repeat all affected evidence.
+7. On success, sync stable specs and archive Theme A changes.
 
 ## Open Questions
 

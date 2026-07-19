@@ -17,3 +17,7 @@ The Windows exporter SHALL read source-specific loopback experimental health and
 #### Scenario: Mac watchdog evaluates experimental health
 - **WHEN** the watchdog runs on the Mac host
 - **THEN** it derives experimental readiness from Windows exporter metrics and makes no direct experimental datasource request
+
+#### Scenario: Operator switches an experimental source mode
+- **WHEN** the Windows mode workflow enables or rolls back TDX or QMT experimental realtime
+- **THEN** the exporter configuration is regenerated for the same effective modes and restarted before the switch is reported healthy
