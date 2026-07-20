@@ -95,6 +95,17 @@ clock.
 - **AND** `quality.nativeTimeUnavailable` MUST be `true`
 - **AND** the current clock MUST NOT be used as a substitute
 
+#### Scenario: Official snapshot omits Code
+- **WHEN** `get_market_snapshot(stock_code)` returns the documented payload
+  without a `Code` field
+- **THEN** the decoder MUST bind the payload to the bridge envelope symbol
+- **AND** the snapshot MUST NOT be rejected solely because `Code` is absent
+
+#### Scenario: Optional native Code conflicts with the envelope
+- **WHEN** a TDX build returns a non-empty `Code` that normalizes to a different
+  symbol than the bridge envelope
+- **THEN** the decoder MUST reject the snapshot
+
 #### Scenario: Conflicting native aliases
 - **WHEN** the native dict contains both `Now` and `Last` for the same value
 - **THEN** the strict decoder MUST reject (it MUST NOT silently pick the first

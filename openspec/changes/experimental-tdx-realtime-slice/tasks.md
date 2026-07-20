@@ -24,9 +24,10 @@
       shared module and both HTTP normalization and the experimental decoder
       MUST consume it; HTTP fill/clock/first-alias behavior remains regression
       covered.
-- [x] 2.2 Add strict experimental decoder: validate ErrorId/Code, last required
-      finite (reject NaN/Inf/bool), other prices null, eventTime null (no
-      clock), reject conflicting aliases.
+- [x] 2.2 Add strict experimental decoder: validate ErrorId and optional native
+      Code consistency while accepting the official Code-less snapshot shape;
+      last required finite (reject NaN/Inf/bool), other prices null, eventTime
+      null (no clock), reject conflicting aliases.
 - [x] 2.3 Add `ExperimentalTdxRealtimeGateway`: owner registration (leaseToken
       + streamEpoch + accepted tuple), four-state convergence (desired/
       attempted/converged/observedNative), atomic outbound sequence reservation
