@@ -97,7 +97,8 @@ extract_tdx_snapshot_native_fields()  → separate raw provider fields + alias h
         │                  Amount/AsOf (fill-0/fill-clock semantics UNCHANGED)
         └─ experimental decoder:
              resolves Last/Close/High/Low alternatives only here
-             ErrorId/Code validation
+             ErrorId validation; optional Code consistency validation
+             envelope symbol is authoritative when snapshot omits Code
              last required + finite (reject NaN/Inf/bool)
              other prices: present-or-null
              eventTime: present-or-null (never clock-filled)
@@ -109,8 +110,10 @@ parameterizing the live HTTP projector's missing-value policy.
 
 The gateway treats transport symbols as exact identities. It may perform
 stable de-duplication, but never trims, changes case, or calls
-`normalize_symbol` for desired/add/remove/result state. Provider Code
-canonicalization remains confined to the terminal/provider boundary.
+`normalize_symbol` for desired/add/remove/result state. The terminal binds each
+single-symbol `get_market_snapshot` response to its request symbol. Provider
+Code canonicalization, when a TDX build supplies the optional field, remains
+confined to the terminal/provider boundary.
 
 ## Experimental lifecycle and exit gate
 

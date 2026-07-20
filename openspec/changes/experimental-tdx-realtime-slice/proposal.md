@@ -26,10 +26,13 @@ business side effects.
   single-owner lease, four-state subscription convergence, and authoritative
   outbound sequence. **Rewritten from scratch** (remote WIP branch is scaffold
   / reference only — its state machine has structural defects).
-- Add experimental TDX decoder: validates `ErrorId`/`Code`/`last`, emits typed
-  draft snapshot (`last` required finite; `open`/`high`/`low`/`lastClose`
-  present-or-null). Shares raw field projection with HTTP path but does **not**
-  reuse `normalize_tdx_snapshot` (which silently fills missing prices with 0).
+- Add experimental TDX decoder: validates `ErrorId`/`last` and validates the
+  optional native `Code` when present, emits typed draft snapshot (`last`
+  required finite; `open`/`high`/`low`/`lastClose` present-or-null). The
+  official `get_market_snapshot` payload does not require `Code`, so the bridge
+  envelope binds the response to the requested symbol. Shares raw field
+  projection with HTTP path but does **not** reuse `normalize_tdx_snapshot`
+  (which silently fills missing prices with 0).
 - Add isolated `experimental_ws_manager` instance (separate from legacy
   `ConnectionManager`). No topic modification to existing manager.
 - Add experimental WS message factories (`ws_experimental_snapshot`,
