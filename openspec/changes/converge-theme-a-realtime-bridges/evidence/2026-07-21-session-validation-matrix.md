@@ -1,6 +1,6 @@
 # Theme A Session Validation Matrix
 
-Status: **execution pending**  
+Status: **after-hours verification complete; trading-session acceptance pending**
 Prepared: `2026-07-21`  
 Trading-session execution date: `2026-07-22`  
 TDX symbol: `600519.SH`  
@@ -79,7 +79,75 @@ abrupt control-path stop.
 - The 2026-07-21 after-close QMT diagnostic correctly reported
   `outside_session`, sequence zero, and no new backend symbol. It is retained as
   negative session-gating evidence, not realtime acceptance.
-- Effective state after rollback is TDX `builtin_experimental`, QMT `off`.
+- The controlled baseline transition run `29812642433` established TDX
+  `legacy` and QMT `off`; backup ID `20260721T080146Z-9eeccedd` records the
+  prior TDX experimental/QMT-off state.
+- Final mode status run `29814095118` confirms datasource and backend remain
+  TDX `legacy`, QMT `off` after both datasource services were updated and
+  restarted.
+
+## 2026-07-21 After-Hours Results
+
+All checks in this section are control-plane, historical, identity, or
+rollback-boundary evidence. They do not complete the trading-session portions
+of tasks 6.4 or 6.5.
+
+### Final Identity
+
+| Component | Exact deployed identity |
+|---|---|
+| `mist-datasource` | `41a823990c437a60ca95e7ab1a024691fd7c820b` |
+| Mist backend image | `4dd26cdaf05d77e99c49f41b2222f43cee2ae809` |
+| `mist-deploy` | `fbb7cc060dd783d24162f33c3302e254273c92ce` |
+| `mist-monitoring` | `27a79eba056b34470678559d472f98e09311bdbf` |
+| TDX bridge SHA-256 | `063943212180e1c3369905e464c72c35f2a94c62a9513880f70520aaa9a5260c` |
+| QMT bridge SHA-256 | `14b6143fa1d81f32606b7090a5d687041922ae78e0abc30e0e56e11b7bfb880b` |
+
+TDX datasource update/restart run `29813436411` and QMT datasource
+update/restart run `29813501701` both passed. The bridge artifacts were not
+copied, registered, replaced, or removed by those workflows.
+
+### Baseline And Database Boundary
+
+- TDX `600519.SH` baseline run `29813949839`: passed; datasource/backend
+  experimental routes both returned `404`.
+- QMT `300502.SZ` baseline run `29814015012`: passed; datasource/backend
+  experimental routes both returned `404`.
+- Both final artifacts contain identical protected-table states:
+  `k=4375`, `k_extensions_tdx=4371`, `k_extensions_qmt=4`, and zero rows in
+  `k_extensions_ef`, `strategy_signals`, and `strategy_alert_events`.
+- Their deterministic digests are identical across providers. In particular,
+  `k` is `91ccfd3e1bda07fa1b4e64b146460366cbbe27d63f052e8522d459813189226b`,
+  `k_extensions_tdx` is
+  `eba21ccd9ed20eb5ca15b50376bc1f5c642b88cf70bac43eb043de117f746a2d`,
+  and `k_extensions_qmt` is
+  `bf9ecbf751d3d1b5b06dc229bf64b4502138998aca693b181e020a653c756af3`.
+
+### Historical Matrices
+
+- TDX run `29813763401` passed bars, snapshots, sector, reference/instrument,
+  finance/report, formula, and legacy WebSocket subscription-control checks for
+  `600519.SH`. `require_live_quote=false`, so this run makes no realtime
+  freshness claim.
+- QMT run `29813848509` passed `/v1/bars/query` for all 21 configured periods,
+  official bar/tick fields, five dividend modes, daily/minute time windows,
+  bridge owner/health, `get_market_data_ex`, and sector-list commands for
+  `300502.SZ`.
+- QMT `get_full_tick` was intentionally skipped outside a supported market
+  session. This is the expected gate, not a matrix failure.
+
+### Findings Resolved
+
+1. Added a transactional `baseline` workflow action. It writes both datasource
+   and backend modes together, clears allowlists, restarts the required
+   services, synchronizes monitoring, and restores the exact backup on failure.
+2. Removed a stale TDX preflight inference that reported QMT historical bars as
+   unavailable. QMT availability is now decided only by the dedicated QMT
+   health/runtime checks.
+3. Removed the obsolete appliance `health-check.ps1` probe from the dedicated
+   TDX runtime workflow. Backend health and protected-table integrity remain
+   covered by the evidence workflow instead of being silently skipped with a
+   warning.
 
 ## 2026-07-22 Ordered Runbook
 
@@ -89,10 +157,10 @@ abrupt control-path stop.
    deployment checkout, monitoring marker, and both installed bridge files.
 2. Verify the Windows SHA-256 values using lowercase input when invoking the
    evidence workflow.
-3. Establish the formal baseline state `TDX_REALTIME_MODE=legacy` and
-   `QMT_REALTIME_MODE=off` using `action=baseline` in the controlled mode
-   workflow. Record the printed backup ID. The current TDX experimental state
-   is not a valid TDX `baseline`.
+3. Verify that the established formal baseline remains
+   `TDX_REALTIME_MODE=legacy` and `QMT_REALTIME_MODE=off`. Reuse final baseline
+   runs `29813949839` and `29814015012`; create a new baseline only if any exact
+   deployed identity or protected-table digest changes.
 4. Stop if that baseline cannot be established through the controlled mode
    workflow or an exact known backup. Do not edit environment files ad hoc.
 5. Capture TDX `baseline` for `600519.SH` and preserve its backup/identity

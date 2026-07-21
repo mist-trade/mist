@@ -49,7 +49,7 @@
 - [x] 6.3 Add bounded TDX native evidence readback and four-phase baseline/enabled/restart/rollback capture with protected-table comparison.
 - [ ] 6.4 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest.
 - [ ] 6.5 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest.
-- [ ] 6.6 Re-run historical TDX HTTP and QMT native bridge matrices, resolve all evidence findings, and record final master SHAs.
+- [x] 6.6 Re-run historical TDX HTTP and QMT native bridge matrices, resolve all evidence findings, and record final master SHAs.
 - [ ] 6.7 Complete the experimental TDX lifecycle task, sync stable specs, archive Theme A changes, and release the Theme B merge gate.
 
 Execution boundary for tasks 6.4-6.6 is recorded in
