@@ -80,6 +80,14 @@ function snapshot(overrides: Record<string, unknown> = {}) {
 }
 
 describe('ExperimentalQmtRealtimeClient', () => {
+  it('keeps the validated frame object instead of rebuilding it', () => {
+    const { client, store } = setup();
+    const frame = snapshot();
+    store.beginEpoch(EPOCH, 0);
+
+    expect((client as any).validateFrame(frame)).toBe(frame);
+  });
+
   it('accepts ready and publishes the complete desired set', () => {
     const { client, store, send } = setup();
     emit(client, 'ready', readyData());

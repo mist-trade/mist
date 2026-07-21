@@ -116,6 +116,15 @@ describe('ExperimentalTdxRealtimeClient strict validation', () => {
     expect(store.readDebug('600519.SH')?.lastSequence).toBe(1);
   });
 
+  it('keeps the validated frame object instead of rebuilding it', () => {
+    const { client } = makeClient();
+    const data = makeSnapshotData();
+
+    const validation = (client as any).validateFrame(data);
+
+    expect(validation.frame).toBe(data);
+  });
+
   it('rejects contract tuple mismatch (schemaVersion)', async () => {
     const { client, store } = makeClient();
     await (client as any).handleMessage(

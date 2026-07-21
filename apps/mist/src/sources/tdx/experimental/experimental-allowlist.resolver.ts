@@ -40,8 +40,6 @@ export class ExperimentalAllowlistResolver implements OnModuleInit {
     private readonly configService: ConfigService,
     @InjectRepository(SecuritySourceConfig)
     private readonly sourceConfigRepo: Repository<SecuritySourceConfig>,
-    @InjectRepository(Security)
-    private readonly securityRepo: Repository<Security>,
   ) {
     const raw = this.configService.get<string>(
       'TDX_EXPERIMENTAL_ALLOWLIST',

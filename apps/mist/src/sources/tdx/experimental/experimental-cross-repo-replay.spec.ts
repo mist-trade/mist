@@ -147,11 +147,9 @@ describeCrossRepo('experimental TDX cross-repository HTTP/WS replay', () => {
     queryBuilder.getRawMany = jest
       .fn()
       .mockResolvedValue([{ formatCode: '600519.SH', securityId: 1 }]);
-    const allowlist = new ExperimentalAllowlistResolver(
-      config,
-      { createQueryBuilder: () => queryBuilder } as any,
-      {} as any,
-    );
+    const allowlist = new ExperimentalAllowlistResolver(config, {
+      createQueryBuilder: () => queryBuilder,
+    } as any);
     await allowlist.onModuleInit();
     expect(queryBuilder.andWhere).toHaveBeenCalledWith(
       'BINARY cfg.formatCode = :formatCode',
@@ -429,11 +427,9 @@ describeCrossRepo('experimental TDX cross-repository HTTP/WS replay', () => {
     queryBuilder.getRawMany = jest
       .fn()
       .mockResolvedValue([{ formatCode: '600519.SH', securityId: 1 }]);
-    const allowlist = new ExperimentalAllowlistResolver(
-      config,
-      { createQueryBuilder: () => queryBuilder } as any,
-      {} as any,
-    );
+    const allowlist = new ExperimentalAllowlistResolver(config, {
+      createQueryBuilder: () => queryBuilder,
+    } as any);
     await allowlist.onModuleInit();
     const store = new InMemoryRealtimeStore();
     const client = new ExperimentalTdxRealtimeClient(config, store, allowlist);
