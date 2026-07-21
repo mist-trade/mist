@@ -15,6 +15,8 @@
     "skipLibCheck": true,
     "strictNullChecks": true,
     "noImplicitAny": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "strictBindCallApply": true,
     "forceConsistentCasingInFileNames": true,
     "noFallthroughCasesInSwitch": false,
@@ -22,40 +24,17 @@
     "resolveJsonModule": true,
     "types": ["jest", "node"],
     "paths": {
-      "@app/config": [
-        "libs/config/src"
-      ],
-      "@app/config/*": [
-        "libs/config/src/*"
-      ],
-      "@app/utils": [
-        "libs/utils/src"
-      ],
-      "@app/utils/*": [
-        "libs/utils/src/*"
-      ],
-      "@app/shared-data": [
-        "libs/shared-data/src"
-      ],
-      "@app/shared-data/*": [
-        "libs/shared-data/src/*"
-      ],
-      "@app/timezone": [
-        "libs/timezone/src"
-      ],
-      "@app/timezone/*": [
-        "libs/timezone/src/*"
-      ],
-      "@app/constants": [
-        "libs/constants/src"
-      ],
-      "@app/constants/*": [
-        "libs/constants/src/*"
-      ]
+      "@app/config": ["libs/config/src"],
+      "@app/config/*": ["libs/config/src/*"],
+      "@app/utils": ["libs/utils/src"],
+      "@app/utils/*": ["libs/utils/src/*"],
+      "@app/shared-data": ["libs/shared-data/src"],
+      "@app/shared-data/*": ["libs/shared-data/src/*"],
+      "@app/timezone": ["libs/timezone/src"],
+      "@app/timezone/*": ["libs/timezone/src/*"],
+      "@app/constants": ["libs/constants/src"],
+      "@app/constants/*": ["libs/constants/src/*"]
     }
   },
-  "include": [
-    "apps/**/*",
-    "libs/**/*"
-  ]
+  "include": ["apps/**/*", "libs/**/*"]
 }

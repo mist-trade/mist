@@ -236,6 +236,22 @@ ready/ping/pong. The smoke explicitly avoided the retired
 also physically removed stale `TDX_REALTIME_MODE` keys from the Windows
 datasource and Docker environment files.
 
+## 2026-07-21 Dead-Code And Conversion Audit
+
+The active TDX/QMT paths were traced from terminal bridge through datasource
+HTTP/WebSocket boundaries into the backend stores. Required JSON conversion
+remains only at process boundaries. The cleanup removed unused TDX/QMT
+instance config modules, the legacy `TdxWsMessage` and quote helper, unused QMT
+module aliases, the fake SDK path from the delivered TDX bridge, duplicate v1
+response serializers, one unused repository injection, redundant native dict
+copies, and field-by-field reconstruction of already validated backend frames.
+TDX still canonicalizes omitted optional wire fields to `null` without creating
+a replacement frame.
+
+Verification passed with datasource `358` tests, Ruff, and Pyright; backend
+`394` tests, lint, typecheck, strict unused-symbol compilation, CI contracts,
+and Nest build.
+
 This after-hours run closes the deployment/recovery control-plane task only.
 It does not close tasks 6.4 or 6.5: TDX and QMT snapshot freshness, native
 realtime payload, sequence advance, and database digest evidence still require

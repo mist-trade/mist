@@ -20,8 +20,6 @@ import { ConfigService } from '@nestjs/config';
 import WebSocket from 'ws';
 import {
   ExperimentalTdxSnapshotFrame,
-  ExperimentalSnapshotPrices,
-  ExperimentalSnapshotQuality,
   ACCEPTED_CONTRACT_TUPLE,
 } from './experimental-realtime.types';
 import { InMemoryRealtimeStore } from './in-memory-realtime.store';
@@ -519,70 +517,64 @@ export class ExperimentalTdxRealtimeClient
       )
         return { frame: null, reason: 'validationError' };
       const snap = snapRaw as Record<string, unknown>;
-      const prices = this.validatePrices(snap);
-      if (prices === null) return { frame: null, reason: 'validationError' };
+      if (!this.validatePrices(snap))
+        return { frame: null, reason: 'validationError' };
 
       const qualityRaw = data['quality'];
-      const quality = this.validateQuality(qualityRaw);
-      if (quality === null) return { frame: null, reason: 'validationError' };
+      if (!this.validateQuality(qualityRaw))
+        return { frame: null, reason: 'validationError' };
+
+      if (!Object.prototype.hasOwnProperty.call(data, 'eventTime')) {
+        data['eventTime'] = null;
+      }
+      for (const key of SNAPSHOT_ALLOWED_KEYS) {
+        if (
+          key !== 'last' &&
+          !Object.prototype.hasOwnProperty.call(snap, key)
+        ) {
+          snap[key] = null;
+        }
+      }
 
       return {
         reason: null,
-        frame: {
-          payloadType: 'tdx.realtime.snapshot',
-          schemaVersion: 0,
-          draftRevision: 1,
-          contractStatus: 'experimental',
-          acquisitionProfile: 'tdx.get_market_snapshot',
-          streamEpoch,
-          sequence,
-          symbol,
-          capturedAt,
-          eventTime: eventTime as string | null,
-          snapshot: prices,
-          unitStatus: 'native-unverified',
-          quality,
-        },
+        frame: data as unknown as ExperimentalTdxSnapshotFrame,
       };
     } catch {
       return { frame: null, reason: 'validationError' };
     }
   }
 
-  private validatePrices(
-    snap: Record<string, unknown>,
-  ): ExperimentalSnapshotPrices | null {
-    if (!hasExactKeys(snap, ['last'], SNAPSHOT_ALLOWED_KEYS)) return null;
+  private validatePrices(snap: Record<string, unknown>): boolean {
+    if (!hasExactKeys(snap, ['last'], SNAPSHOT_ALLOWED_KEYS)) return false;
     const last = this.requireFiniteNumber(snap['last']);
-    if (last === null) return null;
+    if (last === null) return false;
     // Optional fields: null/undefined allowed; present-but-invalid → reject frame.
     const open = optionalFiniteNumberStrict(snap['open']);
-    if (open === INVALID) return null;
+    if (open === INVALID) return false;
     const high = optionalFiniteNumberStrict(snap['high']);
-    if (high === INVALID) return null;
+    if (high === INVALID) return false;
     const low = optionalFiniteNumberStrict(snap['low']);
-    if (low === INVALID) return null;
+    if (low === INVALID) return false;
     const lastClose = optionalFiniteNumberStrict(snap['lastClose']);
-    if (lastClose === INVALID) return null;
+    if (lastClose === INVALID) return false;
     const nativeVolume = optionalFiniteNumberStrict(snap['nativeVolume']);
-    if (nativeVolume === INVALID) return null;
+    if (nativeVolume === INVALID) return false;
     const nativeAmount = optionalFiniteNumberStrict(snap['nativeAmount']);
-    if (nativeAmount === INVALID) return null;
-    return { last, open, high, low, lastClose, nativeVolume, nativeAmount };
+    if (nativeAmount === INVALID) return false;
+    return true;
   }
 
-  private validateQuality(raw: unknown): ExperimentalSnapshotQuality | null {
+  private validateQuality(raw: unknown): boolean {
     if (typeof raw !== 'object' || raw === null || Array.isArray(raw))
-      return null;
+      return false;
     const q = raw as Record<string, unknown>;
-    if (!hasExactKeys(q, [], QUALITY_ALLOWED_KEYS)) return null;
-    const result: ExperimentalSnapshotQuality = {};
+    if (!hasExactKeys(q, [], QUALITY_ALLOWED_KEYS)) return false;
     for (const key of QUALITY_ALLOWED_KEYS) {
       if (!(key in q)) continue;
-      if (typeof q[key] !== 'boolean') return null;
-      result[key] = q[key];
+      if (typeof q[key] !== 'boolean') return false;
     }
-    return result;
+    return true;
   }
 
   /** Required finite number; rejects null, undefined, NaN, Infinity, booleans. */

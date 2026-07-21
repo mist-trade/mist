@@ -269,17 +269,7 @@ export class ExperimentalQmtRealtimeClient
       );
       return null;
     }
-    return {
-      payloadType: QMT_EXPERIMENTAL_CONTRACT.payloadType,
-      schemaVersion: QMT_EXPERIMENTAL_CONTRACT.schemaVersion,
-      draftRevision: QMT_EXPERIMENTAL_CONTRACT.draftRevision,
-      acquisitionProfile: QMT_EXPERIMENTAL_CONTRACT.acquisitionProfile,
-      streamEpoch: epoch,
-      sequence,
-      symbol,
-      capturedAt,
-      native,
-    };
+    return data as unknown as ExperimentalQmtSnapshotFrame;
   }
 
   private invalidFrame(symbol: string | null): null {

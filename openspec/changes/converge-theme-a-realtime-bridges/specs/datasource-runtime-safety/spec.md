@@ -11,6 +11,19 @@ The TDX datasource MUST always create its builtin gateway and realtime WebSocket
 - **WHEN** a caller requests `/api/tdx/*` or `/ws/quote/*`
 - **THEN** no matching route exists
 
+### Requirement: Realtime payloads have one in-process representation
+The datasource and backend MUST retain JSON encoding and decoding at HTTP and
+WebSocket process boundaries, MUST validate native payloads once per boundary,
+and MUST NOT rebuild an already validated realtime frame field by field.
+
+#### Scenario: A valid realtime frame reaches the backend
+- **WHEN** the TDX or QMT WebSocket decoder accepts a frame
+- **THEN** the validated frame object is stored directly, with only missing optional TDX fields canonicalized to `null`
+
+#### Scenario: Retired compatibility code is scanned
+- **WHEN** repository guardrails inspect production code
+- **THEN** legacy quote helpers, `TdxWsMessage`, unused instance config modules, and fake TDX SDK runtime paths are absent
+
 ### Requirement: QMT realtime lifecycle is mode isolated
 The QMT datasource MUST create and start its realtime collector only in `builtin_experimental` mode, MUST stop it during application shutdown, and MUST reject unknown mode values at startup.
 

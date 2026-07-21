@@ -12,16 +12,16 @@
  */
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { Security, SecuritySourceConfig } from '@app/shared-data';
+import { SecuritySourceConfig } from '@app/shared-data';
 import { InMemoryRealtimeStore } from './in-memory-realtime.store';
 import { ExperimentalAllowlistResolver } from './experimental-allowlist.resolver';
 import { ExperimentalTdxRealtimeClient } from './experimental-tdx-realtime.client';
 import { ExperimentalTdxDiagnosticController } from './experimental-diagnostic.controller';
 
 @Module({
-  // Only Security + SecuritySourceConfig for the allowlist resolver.
+  // Only SecuritySourceConfig for the allowlist resolver.
   // Deliberately does NOT import K / KExtension* / HistoricalCollectorModule.
-  imports: [TypeOrmModule.forFeature([Security, SecuritySourceConfig])],
+  imports: [TypeOrmModule.forFeature([SecuritySourceConfig])],
   providers: [
     InMemoryRealtimeStore,
     ExperimentalAllowlistResolver,

@@ -91,6 +91,12 @@ function assertBackendToolingHygiene(packageJson) {
   if (tsconfig.compilerOptions?.forceConsistentCasingInFileNames !== true) {
     fail('mist tsconfig must enable forceConsistentCasingInFileNames');
   }
+  if (
+    tsconfig.compilerOptions?.noUnusedLocals !== true ||
+    tsconfig.compilerOptions?.noUnusedParameters !== true
+  ) {
+    fail('mist tsconfig must reject unused locals and parameters');
+  }
 
   const paths = tsconfig.compilerOptions?.paths ?? {};
   for (const pathKey of Object.keys(paths)) {
