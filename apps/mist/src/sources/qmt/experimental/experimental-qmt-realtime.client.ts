@@ -40,6 +40,7 @@ const NATIVE_REQUIRED_KEYS = [
 ] as const;
 const RFC3339_PATTERN =
   /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
+const QMT_TIMETAG_PATTERN = /^(?:\d{14}|\d{8} \d{2}:\d{2}:\d{2})$/;
 
 export const EXPERIMENTAL_QMT_CLOCK = Symbol('EXPERIMENTAL_QMT_CLOCK');
 export type ExperimentalQmtClock = () => number;
@@ -375,7 +376,7 @@ function isRfc3339(value: unknown): value is string {
 function isValidNative(value: unknown): value is ExperimentalQmtNativeSnapshot {
   if (!isRecord(value)) return false;
   if (!NATIVE_REQUIRED_KEYS.every((key) => key in value)) return false;
-  if (!/^\d{14}$/.test(String(value['timetag']))) return false;
+  if (!QMT_TIMETAG_PATTERN.test(String(value['timetag']))) return false;
   for (const key of NATIVE_REQUIRED_KEYS.slice(1)) {
     if (typeof value[key] !== 'number' || !Number.isFinite(value[key]))
       return false;
