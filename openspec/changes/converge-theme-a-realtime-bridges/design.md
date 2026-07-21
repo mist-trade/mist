@@ -87,6 +87,23 @@ workflow outside the session cannot substitute for that evidence. The execution
 ledger and ordered 2026-07-22 checklist are recorded in
 `evidence/2026-07-21-session-validation-matrix.md`.
 
+### Datasource and terminal restart domains are independent
+
+Windows exposes four separately triggered recovery checks: TDX datasource,
+QMT datasource, TDX terminal, and QMT terminal. QMT terminal recovery does not
+restart either datasource service. This keeps its owner/transport recovery
+evidence separate from WinSW process recovery evidence while the existing TDX
+recovery retains its already validated compatibility behavior.
+
+QMT terminal recovery runs in the logged-in operator session through dedicated
+interactive scheduled tasks. Before stopping QMT it records the current bridge
+owner and force-stops only processes whose command line contains the exact QMT
+bridge script token. It then stops QMT, starts the previously discovered or
+explicit QMT executable in the interactive session, invokes the saved-login UI,
+and waits for a different bridge owner to register. It never copies, registers,
+or deletes a QMT strategy. The QMT build is responsible for automatically
+starting the already configured bridge after login.
+
 ## Risks / Trade-offs
 
 - [QMT native field shape differs by full-QMT release] -> Preserve sanitized raw evidence, reject unknown/malformed frames, and revise the draft contract rather than filling values.

@@ -148,6 +148,10 @@ copied, registered, replaced, or removed by those workflows.
    TDX runtime workflow. Backend health and protected-table integrity remain
    covered by the evidence workflow instead of being silently skipped with a
    warning.
+4. Added a dedicated QMT desktop recovery workflow. It minimizes other content
+   windows, fences the old `mist_qmt_bridge.py` console, restarts QMT through an
+   interactive user task, clicks the saved-login UI, and requires a different
+   bridge owner without registering a strategy or restarting a datasource.
 
 ## 2026-07-22 Ordered Runbook
 
@@ -183,8 +187,8 @@ copied, registered, replaced, or removed by those workflows.
    registered full-QMT owner.
 3. Run strict QMT runtime smoke and retain one bounded native
    `get_full_tick` object for `300502.SZ`.
-4. Capture `enabled`, a later increasing sequence, and `post_restart` with a
-   new epoch and fresh snapshot.
+4. Run `Recover Windows QMT Runtime`, then capture `enabled`, a later increasing
+   sequence, and `post_restart` with a new owner, epoch, and fresh snapshot.
 5. Roll back using the exact QMT backup and capture `post_rollback`.
 6. Confirm the final effective state is TDX `legacy`, QMT `off` unless the
    operator explicitly selects and records another approved final state.
