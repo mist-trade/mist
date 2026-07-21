@@ -2,12 +2,11 @@
  * ExperimentalTdxRealtimeClient — independent WS consumer for the experimental
  * TDX realtime pathway.
  *
- * Deliberately does NOT extend TdxWebSocketService or reuse readNumber/
- * readTimestamp. It consumes the typed wire (ExperimentalTdxSnapshotFrame) and
+ * It consumes the typed wire (ExperimentalTdxSnapshotFrame) and
  * performs strict validation: JSON number/null, RFC3339, epoch, sequence,
  * exact identity. No alias parsing, no silent fills.
  *
- * Only instantiated when TDX_REALTIME_MODE=builtin_experimental.
+ * Instantiated on every Mist backend start.
  */
 import {
   Injectable,
@@ -119,9 +118,8 @@ export class ExperimentalTdxRealtimeClient
   }
 
   /**
-   * POST the allowlist symbols to /tdx/bridge/desired so the gateway knows
-   * which symbols the terminal bridge should subscribe to. Called after a
-   * successful ready (production desired-state caller).
+   * Send the complete allowlist on the realtime WebSocket. Tests may inject a
+   * poster to exercise retry behavior without a live socket.
    */
   private requestDesiredSync(): void {
     if (this.isShuttingDown || this.desiredSyncInFlight) return;
@@ -156,28 +154,16 @@ export class ExperimentalTdxRealtimeClient
       if (this.desiredPoster) {
         await this.desiredPoster(this.desiredEndpoint, symbols);
       } else {
-        const controller = new AbortController();
-        const timeout = setTimeout(() => controller.abort(), 2000);
-        let response: Response;
-        try {
-          response = await fetch(this.desiredEndpoint, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ symbols }),
-            signal: controller.signal,
-          });
-        } finally {
-          clearTimeout(timeout);
+        if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+          throw new Error('realtime WebSocket is not open');
         }
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}`);
-        }
+        this.ws.send(JSON.stringify({ type: 'sync_subscriptions', symbols }));
       }
       this.logger.log(`syncDesired: sent ${symbols.length} symbols`);
       return true;
     } catch (err) {
       this.logger.error(
-        `syncDesired: POST failed: ${err instanceof Error ? err.message : String(err)}`,
+        `syncDesired failed: ${err instanceof Error ? err.message : String(err)}`,
       );
       return false;
     }

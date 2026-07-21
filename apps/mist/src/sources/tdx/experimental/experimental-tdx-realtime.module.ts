@@ -1,7 +1,7 @@
 /**
  * ExperimentalTdxRealtimeModule — experimental TDX realtime consumer.
  *
- * Only imported by the mist app when TDX_REALTIME_MODE=builtin_experimental.
+ * Always imported by the mist app. QMT retains its independent mode switch.
  * Contains the independent WS client, allowlist resolver, in-memory store, and
  * diagnostic controller.
  *

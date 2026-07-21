@@ -50,6 +50,10 @@
 - [x] 6.3a Add QMT user-session terminal recovery that fences the old bridge, reuses saved-login UI state, waits for a new owner, and never registers a strategy or restarts a datasource.
 - [x] 6.3b Capture four independent Windows restart results for the TDX datasource, QMT datasource, TDX terminal, and QMT terminal.
 - [x] 6.3c Replace the legacy TDX restart/login/register workflow with user-session terminal recovery that waits for a new converged bridge owner and official `:17709` POST without SDK injection, strategy registration, or datasource restart.
+- [x] 6.3d Remove `TDX_REALTIME_MODE`, the datasource legacy adapter/routes/collector, and the backend legacy realtime module so builtin TDX is the only runtime path.
+- [x] 6.3e Make monitoring always probe TDX bridge health while retaining independent QMT mode gating, and update deploy/runtime-smoke contracts.
+- [x] 6.3f Move backend TDX desired-state synchronization from the loopback HTTP route to the realtime WebSocket.
+- [ ] 6.3g Deploy the converged TDX datasource/backend/monitoring SHAs and rerun both datasource and both terminal recovery workflows.
 - [ ] 6.4 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest.
 - [ ] 6.5 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest.
 - [x] 6.6 Re-run historical TDX HTTP and QMT native bridge matrices, resolve all evidence findings, and record final master SHAs.

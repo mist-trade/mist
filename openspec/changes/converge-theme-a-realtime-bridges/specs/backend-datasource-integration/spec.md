@@ -3,13 +3,20 @@
 ### Requirement: QMT experimental consumer is independent
 The backend SHALL implement QMT experimental realtime through a dedicated module, client, allowlist, store, and diagnostic controller that do not inherit from or instantiate the legacy TDX realtime graph.
 
-#### Scenario: TDX is off and QMT experimental is enabled
-- **WHEN** the Mist app starts with `TDX_REALTIME_MODE=off` and `QMT_REALTIME_MODE=builtin_experimental`
-- **THEN** historical collection and QMT experimental diagnostics are available while both TDX realtime modules are absent
+#### Scenario: QMT experimental is enabled beside TDX
+- **WHEN** the Mist app starts with `QMT_REALTIME_MODE=builtin_experimental`
+- **THEN** historical collection and the independent TDX and QMT realtime consumers are all available
 
 #### Scenario: Schedule app starts
-- **WHEN** the schedule app starts under any realtime mode values
+- **WHEN** the schedule app starts
 - **THEN** it imports historical collection only and exposes no realtime client or route
+
+### Requirement: TDX desired subscriptions use the realtime WebSocket
+The backend TDX leader SHALL send the complete desired subscription set over its datasource realtime WebSocket and SHALL NOT call a loopback-only HTTP desired-state route from Docker.
+
+#### Scenario: TDX ready frame is accepted
+- **WHEN** the backend accepts a valid TDX ready frame
+- **THEN** it sends one `sync_subscriptions` WebSocket message containing the complete resolved allowlist
 
 ### Requirement: QMT experimental readback is internal and memory-only
 The backend SHALL expose QMT latest-snapshot state only through guarded internal experimental diagnostics and SHALL NOT expose a product snapshot endpoint or persist experimental snapshots.

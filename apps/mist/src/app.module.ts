@@ -21,7 +21,6 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ChanModule } from './chan/chan.module';
 import { HistoricalCollectorModule } from './collector/historical-collector.module';
-import { LegacyTdxRealtimeModule } from './sources/tdx/legacy-tdx-realtime.module';
 import { ExperimentalTdxRealtimeModule } from './sources/tdx/experimental/experimental-tdx-realtime.module';
 import { ExperimentalQmtRealtimeModule } from './sources/qmt/experimental/experimental-qmt-realtime.module';
 import { IndicatorModule } from './indicator/indicator.module';
@@ -86,7 +85,8 @@ import { StrategyModule } from './strategy/strategy.module';
       },
       inject: [ConfigService],
     }),
-    ...realtimeModulesForMode(process.env.TDX_REALTIME_MODE),
+    HistoricalCollectorModule,
+    ExperimentalTdxRealtimeModule,
     ...qmtRealtimeModulesForMode(process.env.QMT_REALTIME_MODE),
     IndicatorModule,
     SecurityModule,
@@ -97,28 +97,6 @@ import { StrategyModule } from './strategy/strategy.module';
   providers: [AppService],
 })
 export class AppModule {}
-
-/**
- * Returns the realtime modules to import based on TDX_REALTIME_MODE.
- * - legacy (default): Historical + Legacy realtime
- * - builtin_experimental: Historical + Experimental realtime
- * - off: Historical only
- */
-export function realtimeModulesForMode(mode: string | undefined) {
-  const normalized = (mode ?? 'legacy').trim().toLowerCase();
-  if (normalized === 'builtin_experimental') {
-    return [HistoricalCollectorModule, ExperimentalTdxRealtimeModule];
-  }
-  if (normalized === 'off') {
-    return [HistoricalCollectorModule];
-  }
-  if (normalized === 'legacy') {
-    return [HistoricalCollectorModule, LegacyTdxRealtimeModule];
-  }
-  throw new Error(
-    `Unsupported TDX_REALTIME_MODE=${JSON.stringify(mode)}; expected legacy, builtin_experimental, or off`,
-  );
-}
 
 /** QMT realtime is independent and default-off. */
 export function qmtRealtimeModulesForMode(mode: string | undefined) {

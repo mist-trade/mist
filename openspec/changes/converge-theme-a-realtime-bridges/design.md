@@ -8,10 +8,10 @@ The useful QMT work is a native `get_full_tick` collector over the existing full
 
 **Goals:**
 
-- Keep the current TDX experimental transport unchanged and authoritative.
+- Keep the current TDX builtin transport authoritative and make it the only TDX realtime runtime.
 - Add QMT as a separate, default-off experimental transport with equivalent strict framing, allowlist, latest-snapshot diagnostics, and no-K isolation.
-- Preserve historical TDX/QMT, legacy TDX realtime, and schedule module behavior.
-- Make deployment and monitoring mode-aware without exposing loopback diagnostic state publicly.
+- Preserve historical TDX/QMT and schedule module behavior while removing legacy TDX realtime.
+- Make monitoring always-on for TDX and mode-aware for QMT without exposing loopback diagnostic state publicly.
 - Capture reproducible Windows evidence on exact `master` SHAs before Theme A completion.
 
 **Non-Goals:**
@@ -25,11 +25,11 @@ The useful QMT work is a native `get_full_tick` collector over the existing full
 
 ### Current TDX experimental code is the only TDX merge base
 
-The remote `add-tdx-builtin-realtime-bridge` implementation is not merged. Its useful intent is already represented by the newer gateway, while its old `get_full_tick` TDX call, public health contract, and product-persistence graph are superseded. This avoids reintroducing known defects and makes rollback the existing `legacy` mode.
+The remote `add-tdx-builtin-realtime-bridge` implementation is not merged. Its useful intent is already represented by the newer gateway, while its old `get_full_tick` TDX call, public health contract, and product-persistence graph are superseded. The builtin gateway is now always mounted; the legacy mode, adapter, routes, collector, and backend graph are removed.
 
 ### QMT has an independent experimental mode
 
-Both datasource and backend accept `QMT_REALTIME_MODE=off|builtin_experimental`, defaulting to `off`. The datasource mounts the QMT experimental WebSocket and starts its collector only in the experimental mode. The backend imports `ExperimentalQmtRealtimeModule` independently from the TDX mode, while schedule continues to import historical collection only.
+Both datasource and backend accept `QMT_REALTIME_MODE=off|builtin_experimental`, defaulting to `off`. The datasource mounts the QMT experimental WebSocket and starts its collector only in the experimental mode. The backend imports `ExperimentalQmtRealtimeModule` independently beside the always-on TDX module, while schedule continues to import historical collection only.
 
 The QMT endpoint is `/ws/qmt-experimental/{clientId}`. `ready` and snapshot frames freeze `payloadType=qmt.experimental.snapshot`, `schemaVersion=0`, `draftRevision=1`, a stream epoch, and a monotonic sequence. Owner replacement or collector restart creates a new epoch; the backend rejects stale, duplicate, out-of-order, unknown-contract, unauthorized, or malformed frames.
 
@@ -43,17 +43,17 @@ The QMT endpoint is `/ws/qmt-experimental/{clientId}`. `ready` and snapshot fram
 
 ### Detailed health stays loopback-local
 
-QMT exposes `/qmt/realtime/health` only to loopback callers. TDX keeps `/tdx/bridge/health`. The public datasource `/health` remains compatible with legacy monitoring. Windows exporter probes loopback health only when the corresponding mode is enabled; Mac watchdog consumes exporter metrics and never calls experimental routes directly.
+QMT exposes `/qmt/realtime/health` only to loopback callers. TDX keeps `/tdx/bridge/health`. Windows exporter always probes TDX bridge health and probes QMT only while QMT realtime is enabled; Mac watchdog consumes exporter metrics and never calls experimental routes directly.
 
 ### Code may enter master before HIL, activation may not
 
-All experimental modes remain default-off when merged. Windows workflows must name exact repository and bridge-script SHAs. Theme B remains blocked until accepted TDX F2 and QMT trading-session evidence, restart/rollback evidence, and a before/after database content digest prove no K mutation.
+TDX builtin realtime enters master as the sole TDX path while QMT remains default-off. Windows workflows must name exact repository and bridge-script SHAs. Theme B remains blocked until accepted TDX F2 and QMT trading-session evidence, restart/rollback evidence, and a before/after database content digest prove no K mutation.
 
 ### Activation and evidence are separate workflows
 
 An operator-triggered mode workflow owns configuration mutation. It updates the
 datasource and Docker environment files atomically, recreates the backend so it
-reads the selected mode, synchronizes monitoring, and records a machine-local
+reads the selected allowlists and QMT mode, synchronizes monitoring, and records a machine-local
 backup identifier. Rollback restores that exact backup. Environment backups may
 contain secrets and are never uploaded as Actions artifacts or printed.
 
@@ -107,27 +107,25 @@ killing arbitrary Python processes.
 
 QMT terminal recovery runs in the logged-in operator session through dedicated
 interactive scheduled tasks. Before stopping QMT it records the current bridge
-owner and force-stops only processes whose command line contains the exact QMT
-bridge script token. It then stops QMT, starts the previously discovered or
-explicit QMT executable in the interactive session, invokes the saved-login UI,
-and waits for a different bridge owner to register. It never copies, registers,
-or deletes a QMT strategy. The QMT build is responsible for automatically
-starting the already configured bridge after login.
+owner. It then stops QMT, starts the previously discovered or explicit QMT
+executable in the interactive session, relies on QMT automatic login, and waits
+for a different builtin bridge owner to register. It never kills a separate
+bridge console, copies, registers, or deletes a QMT strategy.
 
 ## Risks / Trade-offs
 
 - [QMT native field shape differs by full-QMT release] -> Preserve sanitized raw evidence, reject unknown/malformed frames, and revise the draft contract rather than filling values.
 - [Experimental modules accidentally gain product side effects] -> Enforce static dependency scans, DI mode matrices, poison mocks, and database content digests.
-- [Monitoring reports false failures while a mode is disabled] -> Export experimental metrics and alerts only when the matching mode is explicitly enabled.
+- [Monitoring reports false failures] -> Always classify TDX bridge health and suppress QMT realtime metrics while QMT is disabled.
 - [Cross-repo releases drift] -> Require exact SHAs in workflows and evidence, and rerun HIL after any functional fix.
 - [Old branches contain useful docs mixed with blocked behavior] -> Port evidence and decisions selectively; never merge the branch wholesale.
 
 ## Migration Plan
 
 1. Checkpoint Theme B without merging it.
-2. Merge default-off QMT datasource, backend, deploy, and monitoring changes in dependency order.
+2. Merge always-on TDX cleanup and default-off QMT datasource, backend, deploy, and monitoring changes in dependency order.
 3. Run local cross-repo replay and contract checks.
-4. Capture a disabled-mode baseline, enable one source through the reversible mode workflow, then run enabled and restart evidence against exact `master` SHAs.
+4. Capture a TDX-builtin/QMT-off baseline, update source allowlists or QMT mode through the reversible workflow, then run enabled and restart evidence against exact `master` SHAs.
 5. Restore the recorded configuration backup and capture post-rollback evidence.
 6. On failure, keep modes disabled, merge the correction, and repeat all affected evidence.
 7. On success, sync stable specs and archive Theme A changes.

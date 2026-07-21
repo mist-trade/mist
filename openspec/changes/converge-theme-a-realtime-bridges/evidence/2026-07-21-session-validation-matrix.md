@@ -187,9 +187,16 @@ part of task 6.4 after the built-in mode is enabled during the supported July
    covered by the evidence workflow instead of being silently skipped with a
    warning.
 4. Added a dedicated QMT desktop recovery workflow. It minimizes other content
-   windows, fences the old `mist_qmt_bridge.py` console, restarts QMT through an
-   interactive user task, clicks the saved-login UI, and requires a different
-   bridge owner without registering a strategy or restarting a datasource.
+   windows, restarts QMT through an interactive user task, relies on QMT saved
+   automatic login, and requires a different builtin bridge owner without
+   registering a strategy, killing standalone Python, or restarting a
+   datasource.
+5. TDX convergence removed `TDX_REALTIME_MODE` and the legacy adapter/runtime.
+   TDX builtin realtime is now always active; QMT retains its independent
+   `off|builtin_experimental` switch.
+6. TDX desired-state synchronization now travels over the dedicated realtime
+   WebSocket. Docker backend no longer attempts to call the loopback-only
+   bridge HTTP routes.
 
 ## 2026-07-22 Ordered Runbook
 
@@ -199,10 +206,9 @@ part of task 6.4 after the built-in mode is enabled during the supported July
    deployment checkout, monitoring marker, and both installed bridge files.
 2. Verify the Windows SHA-256 values using lowercase input when invoking the
    evidence workflow.
-3. Verify that the established formal baseline remains
-   `TDX_REALTIME_MODE=legacy` and `QMT_REALTIME_MODE=off`. Reuse final baseline
-   runs `29813949839` and `29814015012`; create a new baseline only if any exact
-   deployed identity or protected-table digest changes.
+3. Verify that TDX builtin realtime is healthy with no `TDX_REALTIME_MODE` key
+   and that `QMT_REALTIME_MODE=off`. The historical mode-based TDX baseline runs
+   predate convergence and cannot be reused as final acceptance evidence.
 4. Stop if that baseline cannot be established through the controlled mode
    workflow or an exact known backup. Do not edit environment files ad hoc.
 5. Capture TDX `baseline` for `600519.SH` and preserve its backup/identity
@@ -210,13 +216,15 @@ part of task 6.4 after the built-in mode is enabled during the supported July
 
 ### TDX First: `600519.SH`
 
-1. Between `09:40` and `11:15`, enable only TDX experimental mode.
+1. Between `09:40` and `11:15`, verify the always-on TDX builtin path and set
+   the TDX allowlist to `600519.SH`.
 2. Run strict TDX runtime smoke and inspect the bounded native payload.
 3. Capture `enabled`, then verify a later increasing sequence.
 4. Capture `post_restart` with a new epoch and a new fresh snapshot.
-5. Roll back using the exact TDX backup and capture `post_rollback`.
-6. Do not begin QMT until TDX is back at the recorded baseline and all TDX
-   artifacts have been uploaded successfully.
+5. Clear the TDX allowlist and capture `post_rollback`; there is no legacy mode
+   to restore.
+6. Do not begin QMT until TDX is back at the recorded no-subscription baseline
+   and all TDX artifacts have been uploaded successfully.
 
 ### QMT Second: `300502.SZ`
 
@@ -228,8 +236,9 @@ part of task 6.4 after the built-in mode is enabled during the supported July
 4. Run `Recover Windows QMT Runtime`, then capture `enabled`, a later increasing
    sequence, and `post_restart` with a new owner, epoch, and fresh snapshot.
 5. Roll back using the exact QMT backup and capture `post_rollback`.
-6. Confirm the final effective state is TDX `legacy`, QMT `off` unless the
-   operator explicitly selects and records another approved final state.
+6. Confirm the final effective state is TDX builtin with an empty allowlist and
+   QMT `off`, unless the operator explicitly selects and records another
+   approved final state.
 
 ### After The Session
 

@@ -57,15 +57,17 @@ TDX native response unwrapping, field alias lookup, symbol matching, and domain 
 - **THEN** the normalizer or lookup helper MUST raise the existing structured datasource error
 - **AND** it MUST NOT return the entire native payload as a fallback
 
-### Requirement: Legacy and normalized REST routes are structurally separated
+### Requirement: TDX runtime has one provider and one realtime bridge boundary
 
-The datasource SHALL keep adapter-backed legacy REST routes and normalized product REST routes in separate route packages while preserving their external paths.
+The datasource SHALL expose normalized product REST routes backed by official
+TDX HTTP and a dedicated builtin realtime bridge without an in-process SDK
+adapter.
 
-#### Scenario: Legacy REST route files are registered
+#### Scenario: Legacy REST and adapter code are inspected
 
-- **WHEN** the FastAPI app registers legacy TDX REST routes
-- **THEN** those modules MUST live under a legacy route package
-- **AND** they MUST keep the existing `/api/tdx/*` paths and adapter-backed dependency boundary
+- **WHEN** the FastAPI app and production source tree are inspected
+- **THEN** `/api/tdx/*`, `adapter_legacy`, and `tdx_legacy` MUST NOT exist
+- **AND** no runtime mode switch may restore those paths
 
 #### Scenario: Normalized REST route files are registered
 
@@ -75,9 +77,10 @@ The datasource SHALL keep adapter-backed legacy REST routes and normalized produ
 
 #### Scenario: WebSocket route remains a separate runtime boundary
 
-- **WHEN** the FastAPI app registers quote WebSocket routes
-- **THEN** WebSocket route code MUST remain outside both the legacy REST package and the normalized REST package
-- **AND** it MUST continue to use subscription, bridge, collector, and WebSocket manager dependencies
+- **WHEN** the FastAPI app registers the TDX realtime WebSocket
+- **THEN** it MUST remain outside the normalized REST package
+- **AND** it MUST use the builtin bridge gateway and its dedicated WebSocket
+  manager without legacy collector dependencies
 
 ### Requirement: Capability metadata distinguishes provider and native methods
 
@@ -110,4 +113,3 @@ The datasource SHALL include automated tests that fail when route families, prov
 - **WHEN** provider boundary tests run
 - **THEN** they MUST verify public callers can still import and use `TdxDatasourceProvider`
 - **AND** they MUST verify routes do not import internal capability operation classes directly
-

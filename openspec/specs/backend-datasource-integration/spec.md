@@ -272,9 +272,9 @@ deployment script URL resolution, and datasource WebSocket envelope behavior.
 
 #### Scenario: WebSocket unit tests cover datasource protocol
 
-- **WHEN** backend unit tests run for `TdxWebSocketService`
-- **THEN** they verify `ready`, `sync_subscriptions`, `subscribe`,
-  `unsubscribe`, `bar`, `quote`, `pong`, and `error` message behavior
+- **WHEN** backend unit tests run for `ExperimentalTdxRealtimeClient`
+- **THEN** they verify `ready`, full-set `sync_subscriptions`, snapshot,
+  `stream_started`, reconnect, and error behavior
 
 #### Scenario: Deployment script tests cover configured URL
 
@@ -288,11 +288,11 @@ deployment script URL resolution, and datasource WebSocket envelope behavior.
 - **THEN** they verify pong timestamps, canonical error payloads, data-based
   subscription acknowledgements, and centrally serialized TDX snapshot quotes
 
-#### Scenario: Old route tests cover migration boundary
+#### Scenario: Removed route tests cover the stable boundary
 
 - **WHEN** datasource route contract tests run
-- **THEN** they verify old route migration metadata or documentation exists
-- **AND** they verify normalized `/v1` routes remain the product-facing path
+- **THEN** they verify `/api/tdx/*` and `/ws/quote/*` are absent
+- **AND** they verify normalized `/v1` and the builtin realtime route remain
 
 ### Requirement: Integration documentation
 
@@ -303,9 +303,9 @@ and how to verify that connection locally and on Windows.
 
 - **WHEN** a developer needs to understand the backend datasource connection
 - **THEN** the docs identify `TdxSource`, `QmtSource`,
-  `TdxWebSocketService`, `TDX_BASE_URL`, `QMT_BASE_URL`, `TDX_WS_CLIENT_ID`,
-  `QMT_WS_CLIENT_ID`, `/v1/bars/query`, `/v1/snapshots/query`,
-  `/ws/quote/{client_id}`, and the relevant test commands
+  `ExperimentalTdxRealtimeClient`, `TDX_BASE_URL`, `QMT_BASE_URL`,
+  `/v1/bars/query`, `/v1/snapshots/query`, the dedicated builtin realtime
+  WebSocket, and the relevant test commands
 
 #### Scenario: Operator follows Windows verification docs
 
