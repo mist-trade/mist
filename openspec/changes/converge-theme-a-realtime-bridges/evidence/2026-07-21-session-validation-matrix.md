@@ -98,7 +98,7 @@ of tasks 6.4 or 6.5.
 |---|---|
 | `mist-datasource` | `41a823990c437a60ca95e7ab1a024691fd7c820b` |
 | Mist backend image | `4dd26cdaf05d77e99c49f41b2222f43cee2ae809` |
-| `mist-deploy` | `fbb7cc060dd783d24162f33c3302e254273c92ce` |
+| `mist-deploy` | `b61a322` (QMT recovery workflow and locale-safe hosted test) |
 | `mist-monitoring` | `27a79eba056b34470678559d472f98e09311bdbf` |
 | TDX bridge SHA-256 | `063943212180e1c3369905e464c72c35f2a94c62a9513880f70520aaa9a5260c` |
 | QMT bridge SHA-256 | `14b6143fa1d81f32606b7090a5d687041922ae78e0abc30e0e56e11b7bfb880b` |
@@ -106,6 +106,27 @@ of tasks 6.4 or 6.5.
 TDX datasource update/restart run `29813436411` and QMT datasource
 update/restart run `29813501701` both passed. The bridge artifacts were not
 copied, registered, replaced, or removed by those workflows.
+
+### Independent Restart Matrix
+
+| Restart domain | Evidence | Result |
+|---|---|---|
+| TDX datasource | Windows run `29816035359` | Passed; the WinSW datasource restarted independently. |
+| QMT datasource | Windows run `29816109795` | Passed; the WinSW datasource restarted independently. |
+| TDX terminal | Previously accepted user-session recovery, run `28954109319` | Passed; this result was not re-run on July 21 because the operator confirmed the TDX terminal recovery was already complete. |
+| QMT terminal | Windows run `29816225780` | Passed; 12 unrelated content windows were minimized, QMT PID changed from `27860` to `33132`, and owner changed from `bigqmt-27860` to `bigqmt-33132`. |
+
+The QMT recovery found no separately running `mist_qmt_bridge.py` console, so
+the exact-name fence safely skipped that step. It then stopped the old QMT
+terminal, started the replacement in the interactive user session, completed
+the saved-login action using the Enter fallback, observed the new owner, and
+passed the `300502.SZ` runtime smoke. The result records
+`datasourceRestarted=false` and `strategyRegistered=false`. Hosted workflow
+validation run `29815961269` also passed on Windows PowerShell 5.1.
+
+These restart results close only the four restart-domain checks. They do not
+claim fresh realtime market data outside a supported trading session; tasks
+6.4 and 6.5 remain open for the July 22 trading-session acceptance.
 
 ### Baseline And Database Boundary
 
