@@ -1,5 +1,16 @@
 ## ADDED Requirements
 
+### Requirement: TDX builtin realtime has one runtime path
+The TDX datasource MUST always create its builtin gateway and realtime WebSocket manager, MUST keep non-realtime `/v1` calls on the official HTTP provider, and MUST NOT load a process-local SDK adapter, legacy collector, or TDX realtime mode switch.
+
+#### Scenario: TDX datasource starts
+- **WHEN** the TDX WinSW service starts with no `TDX_REALTIME_MODE`
+- **THEN** `/v1/*` uses `TdxHttpClient`, `/tdx/bridge/*` is mounted, and no `tqcenter` adapter is initialized in the datasource process
+
+#### Scenario: Removed TDX surface is requested
+- **WHEN** a caller requests `/api/tdx/*` or `/ws/quote/*`
+- **THEN** no matching route exists
+
 ### Requirement: QMT realtime lifecycle is mode isolated
 The QMT datasource MUST create and start its realtime collector only in `builtin_experimental` mode, MUST stop it during application shutdown, and MUST reject unknown mode values at startup.
 

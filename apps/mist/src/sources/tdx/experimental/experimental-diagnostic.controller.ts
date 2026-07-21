@@ -1,7 +1,7 @@
 /**
  * ExperimentalTdxDiagnosticController — internal diagnostic readback.
  *
- * Only mounted when TDX_REALTIME_MODE=builtin_experimental. NOT a product API.
+ * Mounted with the always-on builtin TDX realtime module. NOT a product API.
  * Loopback/admin only: rejects non-loopback connections.
  * Returns typed snapshot, epoch, sequence, receivedAt, fresh/stale, drop
  * reasons, counters, owner, latest age, active symbols.

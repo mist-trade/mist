@@ -61,7 +61,6 @@ describe('mistEnvSchema data source configuration', () => {
   it('accepts the explicit empty allowlists emitted by Docker Compose', () => {
     const { error, value } = mistEnvSchema.validate({
       ...baseEnv,
-      TDX_REALTIME_MODE: 'legacy',
       TDX_EXPERIMENTAL_ALLOWLIST: '',
       QMT_REALTIME_MODE: 'off',
       QMT_EXPERIMENTAL_ALLOWLIST: '',

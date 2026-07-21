@@ -378,7 +378,6 @@ describeCrossRepo('experimental TDX cross-repository HTTP/WS replay', () => {
         env: {
           ...process.env,
           APP_ENV: 'development',
-          TDX_REALTIME_MODE: 'builtin_experimental',
           PYTHONUNBUFFERED: '1',
         },
       },

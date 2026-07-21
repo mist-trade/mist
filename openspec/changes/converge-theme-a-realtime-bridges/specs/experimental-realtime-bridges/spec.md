@@ -1,7 +1,11 @@
 ## ADDED Requirements
 
-### Requirement: Experimental realtime modes are explicit and default off
-The system SHALL activate a builtin experimental realtime transport only when the corresponding source mode equals `builtin_experimental`, and QMT SHALL default to `off`.
+### Requirement: TDX builtin realtime is always active and QMT is independently gated
+The system SHALL mount the TDX builtin bridge without a TDX mode switch, while QMT SHALL activate realtime only when `QMT_REALTIME_MODE=builtin_experimental` and SHALL default to `off`.
+
+#### Scenario: TDX mode environment is absent
+- **WHEN** the TDX datasource and Mist backend start
+- **THEN** the TDX bridge routes and TDX realtime consumer are active without reading `TDX_REALTIME_MODE`
 
 #### Scenario: QMT mode is omitted
 - **WHEN** the QMT datasource and backend start without `QMT_REALTIME_MODE`
@@ -23,7 +27,7 @@ Each experimental transport MUST freeze a versioned payload contract, stream epo
 - **THEN** the backend invalidates the previous epoch before accepting new snapshots
 
 ### Requirement: Experimental transports have no K or business side effects
-Experimental TDX and QMT modules MUST keep snapshots in memory only and MUST NOT write K rows or invoke historical collectors, aggregators, scanners, strategies, signals, alerts, or trading operations.
+TDX and QMT realtime modules MUST keep snapshots in memory only and MUST NOT write K rows or invoke historical collectors, aggregators, scanners, strategies, signals, alerts, or trading operations.
 
 #### Scenario: Experimental snapshot is accepted
 - **WHEN** a valid authorized TDX or QMT snapshot reaches the backend
@@ -34,17 +38,17 @@ Theme A MUST remain incomplete until accepted TDX F2 and QMT trading-session evi
 
 #### Scenario: Local replay passes without Windows evidence
 - **WHEN** all macOS tests pass but either live evidence package is absent
-- **THEN** experimental modes remain default off and Theme B remains blocked from merge
+- **THEN** QMT remains default off, TDX remains builtin, and Theme B remains blocked from merge
 
 ### Requirement: Experimental activation is reversible and evidence is phased
 Windows activation SHALL use a dedicated operator-triggered workflow that
-atomically backs up and updates datasource, backend, and monitoring modes. The
+atomically backs up and updates QMT mode and source allowlists. The
 evidence workflow SHALL not mutate those modes and SHALL compare every later
 phase with a baseline captured before activation.
 
 #### Scenario: Experimental source is enabled
 - **WHEN** an operator enables one source with an exact allowlisted symbol
-- **THEN** the workflow records a local backup identifier, recreates the affected runtime, and leaves the other source mode unchanged
+- **THEN** the workflow records a local backup identifier, recreates the affected runtime, and does not disable the other source
 
 #### Scenario: Experimental source is rolled back
 - **WHEN** an operator supplies the recorded backup identifier
@@ -73,7 +77,7 @@ datasource service as a side effect.
 
 #### Scenario: QMT terminal is restarted
 - **WHEN** the QMT terminal recovery workflow runs
-- **THEN** the old QMT bridge process is stopped before QMT, QMT is launched and logged in through an interactive user task, and a new bridge owner registers without strategy registration or datasource restart
+- **THEN** QMT is stopped and relaunched through an interactive user task, automatic login completes, and a new builtin bridge owner registers without strategy registration, external bridge-process killing, or datasource restart
 
 #### Scenario: QMT executable path is omitted
 - **WHEN** QMT is already running and the recovery workflow receives no executable path
