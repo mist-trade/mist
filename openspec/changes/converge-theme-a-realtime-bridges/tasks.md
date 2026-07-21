@@ -52,6 +52,17 @@
 - [ ] 6.6 Re-run historical TDX HTTP and QMT native bridge matrices, resolve all evidence findings, and record final master SHAs.
 - [ ] 6.7 Complete the experimental TDX lifecycle task, sync stable specs, archive Theme A changes, and release the Theme B merge gate.
 
+Execution boundary for tasks 6.4-6.6 is recorded in
+`evidence/2026-07-21-session-validation-matrix.md`:
+
+- Tasks 6.4 and 6.5 `enabled`/`post_restart` acceptance are trading-session only.
+- Their identity, baseline, health, digest, and rollback checks may run outside
+  trading hours but do not complete either task.
+- Task 6.6 historical matrices may run outside trading hours.
+- On 2026-07-22, execute TDX first with `600519.SH`, restore the baseline, then
+  execute QMT with `300502.SZ`. Do not substitute one provider's symbol or
+  evidence for the other.
+
 ## 7. Theme B Handoff Gate
 
 - [ ] 7.1 Create fresh Theme B integration branches only after task 6.7, cherry-picking backend `db365eb` plus `4c7880b` and frontend `13fac02` plus `132c594` without duplicate Chan history.

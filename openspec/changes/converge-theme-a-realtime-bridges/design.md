@@ -72,6 +72,21 @@ change and unsubscribe. This allows Windows HIL to preserve the native
 `get_market_snapshot` object while keeping product APIs and persistence out of
 Theme A.
 
+### Realtime acceptance is separated from non-session verification
+
+Build identity, bridge artifact hashes, process and owner liveness, loopback
+routes, mode status, protected-table digests, historical TDX HTTP/QMT bridge
+matrices, `baseline`, and `post_rollback` are valid outside exchange trading
+sessions. A long-running bridge health observation outside a session proves
+lifecycle stability only.
+
+`enabled` and `post_restart` acceptance require a same-session native snapshot,
+strictly increasing sequence, fresh backend diagnostic readback, and converged
+monitoring. A connected WebSocket, healthy owner, cached snapshot, or successful
+workflow outside the session cannot substitute for that evidence. The execution
+ledger and ordered 2026-07-22 checklist are recorded in
+`evidence/2026-07-21-session-validation-matrix.md`.
+
 ## Risks / Trade-offs
 
 - [QMT native field shape differs by full-QMT release] -> Preserve sanitized raw evidence, reject unknown/malformed frames, and revise the draft contract rather than filling values.

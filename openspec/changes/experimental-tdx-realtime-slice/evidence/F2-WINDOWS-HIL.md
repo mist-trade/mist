@@ -61,7 +61,12 @@ Attach the following sanitized outputs:
    `k`, every `k_extension_*`, `strategy_signal`, and
    `strategy_alert_event`.
 5. Confirmation that the legacy rollback procedure was rehearsed or verified
-   against the exact deployed builds.
+against the exact deployed builds.
+
+These preflight checks, bridge lifecycle observation, and the final rollback
+may be performed outside trading hours. They prove control-plane readiness and
+process stability only. They do not satisfy the native snapshot, freshness, or
+sequence requirements below.
 
 For each protected table, record both row count and a deterministic content
 digest. Run against a dedicated/quiescent HIL database so unrelated writers
@@ -78,6 +83,12 @@ FROM (
 ```
 
 ## Execution evidence
+
+Steps 4 through 6 are trading-session-only acceptance steps. Run them against
+`600519.SH` during a supported TDX market session, away from the open, lunch,
+and close boundaries when practical. A cached closing snapshot, a recently
+captured transport timestamp, or an owner heartbeat outside the session is not
+accepted as F2 realtime evidence.
 
 1. Start datasource, then Mist, then the TDX terminal bridge.
 2. Capture registered `ownerId`, `bridgeBuildId`, generation, and
