@@ -78,3 +78,11 @@ datasource service as a side effect.
 #### Scenario: QMT executable path is omitted
 - **WHEN** QMT is already running and the recovery workflow receives no executable path
 - **THEN** it discovers and records the executable path and working directory before stopping the process
+
+#### Scenario: TDX terminal is restarted
+- **WHEN** the TDX terminal recovery workflow runs
+- **THEN** other content windows are minimized, TDX is relaunched and logged in through the interactive user session, a different bridge owner reaches revision convergence, and the official `:17709` POST succeeds without datasource restart or strategy registration
+
+#### Scenario: Old TDX bridge remains alive after terminal shutdown
+- **WHEN** a replacement built-in bridge registers while the previous owner process is still present
+- **THEN** datasource lease takeover and fencing retire the stale owner without the recovery workflow killing arbitrary Python processes

@@ -92,8 +92,18 @@ ledger and ordered 2026-07-22 checklist are recorded in
 Windows exposes four separately triggered recovery checks: TDX datasource,
 QMT datasource, TDX terminal, and QMT terminal. QMT terminal recovery does not
 restart either datasource service. This keeps its owner/transport recovery
-evidence separate from WinSW process recovery evidence while the existing TDX
-recovery retains its already validated compatibility behavior.
+evidence separate from WinSW process recovery evidence. TDX terminal recovery
+follows the same boundary: it does not restart the datasource, load an SDK into
+the datasource process, or copy, register, start, stop, or delete a terminal
+strategy.
+
+TDX terminal recovery records the current experimental bridge owner, minimizes
+other visible content windows, stops and relaunches TDX in the logged-in user
+session, and runs the existing calibrated login steps. It succeeds only after a
+different fresh owner registers, `desiredRevision` and `convergedRevision`
+match, and the independent official `:17709` POST probe succeeds. A stale old
+bridge is retired through the datasource lease takeover protocol rather than by
+killing arbitrary Python processes.
 
 QMT terminal recovery runs in the logged-in operator session through dedicated
 interactive scheduled tasks. Before stopping QMT it records the current bridge
