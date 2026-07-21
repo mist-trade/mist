@@ -53,3 +53,11 @@ phase with a baseline captured before activation.
 #### Scenario: Evidence phases are captured
 - **WHEN** Windows HIL is executed
 - **THEN** `baseline`, `enabled`, `post_restart`, and `post_rollback` are captured in order and all protected table digests remain identical
+
+#### Scenario: Evidence is collected outside a trading session
+- **WHEN** an operator runs identity, mode, route, owner, health, historical API, database digest, baseline, or rollback checks outside the supported exchange session
+- **THEN** those control-plane and historical results MAY be retained, but they MUST NOT satisfy fresh native snapshot, sequence progression, or realtime transport acceptance
+
+#### Scenario: Enabled transport evidence is accepted
+- **WHEN** `enabled` or `post_restart` evidence is evaluated for TDX or QMT
+- **THEN** it MUST be captured during the tested symbol's supported exchange session and include a same-session native snapshot, a strictly increasing sequence, fresh backend readback, and converged monitoring state
