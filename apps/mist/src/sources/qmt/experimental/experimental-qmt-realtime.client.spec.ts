@@ -115,6 +115,19 @@ describe('ExperimentalQmtRealtimeClient', () => {
     });
   });
 
+  it('accepts the separated timetag returned by native QMT get_full_tick', () => {
+    const { client, store } = setup();
+    emit(client, 'ready', readyData());
+    const frame = snapshot();
+    frame.native.timetag = '20260721 14:25:15';
+
+    emit(client, 'qmt.experimental.snapshot', frame);
+
+    expect(store.read('600519.SH')?.snapshot.native.timetag).toBe(
+      '20260721 14:25:15',
+    );
+  });
+
   it('rejects malformed, stale, wrong-epoch, and unknown-contract frames', () => {
     const { client, store } = setup();
     emit(client, 'ready', readyData());
