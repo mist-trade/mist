@@ -193,6 +193,13 @@ function assertBackendHttpConfigHygiene() {
 }
 
 function assertBackendRuntimeSweep() {
+  const envExample = read(join(repos.mist, '.env.example'));
+  assertNotIncludes(
+    envExample,
+    'TDX_REALTIME_MODE',
+    'mist retired TDX realtime mode switch',
+  );
+
   const collectorService = read(
     join(repos.mist, 'apps/mist/src/collector/collector.service.ts'),
   );
