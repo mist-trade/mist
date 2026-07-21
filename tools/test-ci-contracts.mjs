@@ -225,44 +225,17 @@ function assertBackendRuntimeSweep() {
     'mist TdxSource period mapping',
   );
 
-  const tdxWebSocket = read(
-    join(repos.mist, 'apps/mist/src/sources/tdx/tdx-websocket.service.ts'),
-  );
-  for (const expected of [
-    'TDX_WS_RECONNECT_DELAY_MS',
-    'TDX_WS_HEARTBEAT_INTERVAL_MS',
-    'periodMappingService.fromSourceFormat',
+  for (const retiredPath of [
+    'apps/mist/src/sources/tdx/tdx-websocket.service.ts',
+    'apps/mist/src/collector/strategies/websocket-collection.strategy.ts',
+    'apps/mist/src/sources/tdx/legacy-tdx-realtime.module.ts',
+    'apps/mist/src/sources/tdx/legacy-tdx-streaming.controller.ts',
+    'apps/mist/src/sources/tdx/kcandle-aggregator.ts',
   ]) {
-    assertIncludes(tdxWebSocket, expected, 'mist TDX WebSocket runtime sweep');
+    if (existsSync(join(repos.mist, retiredPath))) {
+      fail(`retired TDX realtime artifact must not exist: ${retiredPath}`);
+    }
   }
-  for (const unexpected of [
-    'private readonly reconnectDelay = 5000',
-    'private readonly heartbeatIntervalMs = 30000',
-  ]) {
-    assertNotIncludes(
-      tdxWebSocket,
-      unexpected,
-      'mist TDX WebSocket runtime sweep',
-    );
-  }
-
-  const websocketStrategy = read(
-    join(
-      repos.mist,
-      'apps/mist/src/collector/strategies/websocket-collection.strategy.ts',
-    ),
-  );
-  const saveRawCalls = [...websocketStrategy.matchAll(/saveRawKData\(/g)];
-  if (saveRawCalls.length !== 1) {
-    fail(
-      `WebSocketCollectionStrategy must save TDX KData through one helper, found ${saveRawCalls.length}`,
-    );
-  }
-  assertIncludes(
-    websocketStrategy,
-    'saveTdxKData',
-    'mist WebSocketCollectionStrategy shared save helper',
-  );
 
   const chanService = read(
     join(repos.mist, 'apps/mist/src/chan/chan.service.ts'),
@@ -379,14 +352,6 @@ function assertBackendP3QuickWins() {
     );
   }
 
-  const debugCommentFiles = ['apps/mist/src/sources/tdx/kcandle-aggregator.ts'];
-  for (const relativePath of debugCommentFiles) {
-    const content = read(join(repos.mist, relativePath));
-    if (/\/\/\s*DEBUG\b/.test(content)) {
-      fail(`CODE_SMELL D1.6 stale DEBUG comment remains in ${relativePath}`);
-    }
-  }
-
   const channelService = read(
     join(repos.mist, 'apps/mist/src/chan/services/channel.service.ts'),
   );
@@ -447,15 +412,6 @@ function assertBackendP3ServiceCleanups() {
     'CODE_SMELL B1.2 prevOpen column comment',
   );
 
-  const tdxWebSocketService = read(
-    join(repos.mist, 'apps/mist/src/sources/tdx/tdx-websocket.service.ts'),
-  );
-  assertNotIncludes(
-    tdxWebSocketService,
-    'const periods = [',
-    'CODE_SMELL M1.2 TDX subscription periods',
-  );
-
   const eastMoneyTypes = read(
     join(repos.mist, 'apps/mist/src/sources/east-money/types.ts'),
   );
@@ -472,10 +428,7 @@ function assertBackendP3ServiceCleanups() {
     'CODE_SMELL P1.3 TDX extension type reuse',
   );
 
-  for (const relativePath of [
-    'apps/mist/src/collector/collector.service.ts',
-    'apps/mist/src/collector/strategies/websocket-collection.strategy.ts',
-  ]) {
+  for (const relativePath of ['apps/mist/src/collector/collector.service.ts']) {
     const content = read(join(repos.mist, relativePath));
     assertNotIncludes(
       content,
