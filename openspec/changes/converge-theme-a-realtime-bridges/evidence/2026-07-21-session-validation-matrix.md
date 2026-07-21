@@ -198,6 +198,38 @@ part of task 6.4 after the built-in mode is enabled during the supported July
    WebSocket. Docker backend no longer attempts to call the loopback-only
    bridge HTTP routes.
 
+## 2026-07-21 Post-Convergence Deployment
+
+Exact deployed revisions:
+
+- datasource: `59576bd7bc4b2c3d1b5956703b3956262664ad22`
+- backend image: `ed2aab287228b5fe51445eec4afd2f5d3ac4ca66`
+- monitoring: `048dda32d9adc6bcb3021bc849b747a94cd34a05`
+- deploy workflows: `64bef58c60b7838b6f00d61f1112f950cf537784`
+
+Successful deployment and recovery runs:
+
+- TDX datasource restart: `29842178187`
+- QMT datasource restart: `29842302112`
+- backend Docker deploy: `29842399236`
+- monitoring deploy: `29842623245`
+- TDX terminal recovery: `29842743802`
+- QMT terminal recovery: `29842896091`
+
+TDX recovery replaced owner `tdx-bridge-pid-31528` with
+`tdx-bridge-pid-6100`, converged revision `0`, changed stream epoch, and passed
+the official `:17709` `get_market_data` POST for `600519.SH`. QMT recovery
+replaced owner `bigqmt-22824` with `bigqmt-10792` and passed native bars plus
+bridge `health`, `get_market_data_ex`, and sector-list commands for
+`300502.SZ`. Neither terminal recovery restarted a datasource or registered a
+strategy.
+
+This after-hours run closes the deployment/recovery control-plane task only.
+It does not close tasks 6.4 or 6.5: TDX and QMT snapshot freshness, native
+realtime payload, sequence advance, and database digest evidence still require
+the 2026-07-22 trading session. QMT realtime was `off`, so subscription
+restoration was intentionally not applicable in this run.
+
 ## 2026-07-22 Ordered Runbook
 
 ### Before The Session
