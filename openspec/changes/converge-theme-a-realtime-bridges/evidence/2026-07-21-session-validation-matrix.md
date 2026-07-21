@@ -90,8 +90,9 @@ abrupt control-path stop.
 2. Verify the Windows SHA-256 values using lowercase input when invoking the
    evidence workflow.
 3. Establish the formal baseline state `TDX_REALTIME_MODE=legacy` and
-   `QMT_REALTIME_MODE=off` using a reversible recorded backup. The current TDX
-   experimental state is not a valid TDX `baseline`.
+   `QMT_REALTIME_MODE=off` using `action=baseline` in the controlled mode
+   workflow. Record the printed backup ID. The current TDX experimental state
+   is not a valid TDX `baseline`.
 4. Stop if that baseline cannot be established through the controlled mode
    workflow or an exact known backup. Do not edit environment files ad hoc.
 5. Capture TDX `baseline` for `600519.SH` and preserve its backup/identity
