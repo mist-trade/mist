@@ -205,7 +205,8 @@ Exact deployed revisions:
 - datasource: `59576bd7bc4b2c3d1b5956703b3956262664ad22`
 - backend image: `ed2aab287228b5fe51445eec4afd2f5d3ac4ca66`
 - monitoring: `048dda32d9adc6bcb3021bc849b747a94cd34a05`
-- deploy workflows: `64bef58c60b7838b6f00d61f1112f950cf537784`
+- deploy workflows: `357a7b0` (TDX smoke no longer invokes retired scripts
+  left behind in the datasource directory)
 
 Successful deployment and recovery runs:
 
@@ -215,6 +216,9 @@ Successful deployment and recovery runs:
 - monitoring deploy: `29842623245`
 - TDX terminal recovery: `29842743802`
 - QMT terminal recovery: `29842896091`
+- baseline cleanup: `29843182538`
+- QMT post-baseline runtime smoke: `29843335724`
+- TDX post-baseline runtime smoke: `29844081771`
 
 TDX recovery replaced owner `tdx-bridge-pid-31528` with
 `tdx-bridge-pid-6100`, converged revision `0`, changed stream epoch, and passed
@@ -223,6 +227,14 @@ replaced owner `bigqmt-22824` with `bigqmt-10792` and passed native bars plus
 bridge `health`, `get_market_data_ex`, and sector-list commands for
 `300502.SZ`. Neither terminal recovery restarted a datasource or registered a
 strategy.
+
+The final TDX smoke observed owner `tdx-bridge-pid-6100`, bridge build
+`mist-tdx-bridge-v0.2`, connected/ready backend state, two normalized daily
+bars and one normalized snapshot for `600519.SH`, plus realtime WebSocket
+ready/ping/pong. The smoke explicitly avoided the retired
+`run-runtime-checks.ps1` and `tqInitialized` contract. The baseline cleanup
+also physically removed stale `TDX_REALTIME_MODE` keys from the Windows
+datasource and Docker environment files.
 
 This after-hours run closes the deployment/recovery control-plane task only.
 It does not close tasks 6.4 or 6.5: TDX and QMT snapshot freshness, native
