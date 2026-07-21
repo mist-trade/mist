@@ -47,6 +47,8 @@
 - [x] 6.1 Merge datasource, Mist, deploy, and monitoring convergence commits to master in dependency order with experimental modes still default off.
 - [x] 6.2 Add reversible Windows experimental mode switching, backend compose environment wiring, monitoring synchronization, and operator documentation.
 - [x] 6.3 Add bounded TDX native evidence readback and four-phase baseline/enabled/restart/rollback capture with protected-table comparison.
+- [x] 6.3a Add QMT user-session terminal recovery that fences the old bridge, reuses saved-login UI state, waits for a new owner, and never registers a strategy or restarts a datasource.
+- [ ] 6.3b Capture four independent Windows restart results for the TDX datasource, QMT datasource, TDX terminal, and QMT terminal.
 - [ ] 6.4 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest.
 - [ ] 6.5 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest.
 - [x] 6.6 Re-run historical TDX HTTP and QMT native bridge matrices, resolve all evidence findings, and record final master SHAs.

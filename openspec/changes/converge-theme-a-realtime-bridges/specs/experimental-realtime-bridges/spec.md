@@ -61,3 +61,20 @@ phase with a baseline captured before activation.
 #### Scenario: Enabled transport evidence is accepted
 - **WHEN** `enabled` or `post_restart` evidence is evaluated for TDX or QMT
 - **THEN** it MUST be captured during the tested symbol's supported exchange session and include a same-session native snapshot, a strictly increasing sequence, fresh backend readback, and converged monitoring state
+
+### Requirement: Windows restart domains are independently recoverable
+Windows automation SHALL expose separate datasource-service and desktop-terminal
+restart workflows for TDX and QMT, and QMT terminal recovery SHALL NOT restart a
+datasource service as a side effect.
+
+#### Scenario: QMT datasource is restarted
+- **WHEN** the QMT datasource restart workflow runs
+- **THEN** only the QMT WinSW datasource is restarted and the desktop QMT process is left untouched
+
+#### Scenario: QMT terminal is restarted
+- **WHEN** the QMT terminal recovery workflow runs
+- **THEN** the old QMT bridge process is stopped before QMT, QMT is launched and logged in through an interactive user task, and a new bridge owner registers without strategy registration or datasource restart
+
+#### Scenario: QMT executable path is omitted
+- **WHEN** QMT is already running and the recovery workflow receives no executable path
+- **THEN** it discovers and records the executable path and working directory before stopping the process
