@@ -128,6 +128,23 @@ These restart results close only the four restart-domain checks. They do not
 claim fresh realtime market data outside a supported trading session; tasks
 6.4 and 6.5 remain open for the July 22 trading-session acceptance.
 
+### TDX Recovery Workflow Replacement
+
+`mist-deploy` commits `95d0060` and `46b6725` replaced the legacy
+`restart-login-register.ps1` path with isolated user-session TDX terminal
+recovery. The workflow does not receive an SDK path, restart the datasource,
+copy or register a strategy, or kill arbitrary Python processes. It requires a
+different owner and stream epoch, matching desired/converged revisions, and an
+independent official `:17709` `get_market_data` POST.
+
+Hosted Windows PowerShell validation run `29826339513` passed. Non-destructive
+preflight run `29826415496` found the deployed datasource still in `legacy`
+mode because `/tdx/bridge/health` returned `404`; no terminal restart was
+triggered. Commit `46b6725` consequently makes this a fail-closed precondition
+before window minimization or TDX shutdown. The real terminal restart remains
+part of task 6.4 after the built-in mode is enabled during the supported July
+22 trading session.
+
 ### Baseline And Database Boundary
 
 - TDX `600519.SH` baseline run `29813949839`: passed; datasource/backend
