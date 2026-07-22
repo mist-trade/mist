@@ -208,5 +208,34 @@ source mapping，因此不能执行该标的的 enable/freshness 阶段。
   完全一致，未观察到 K 线、signal 或 notification 副作用。
 
 因此 QMT 的非交易时段 subscription restoration 与 per-source config rollback 已验收；
-task 5.4 仍不勾选，因为 TDX `600030.SH` 的 enabled ACTIVE `tdx` source mapping 尚未补齐，
-无法用规定标的完成同等订阅恢复检查。双源 trading-session freshness 也仍待支持时段执行。
+该 checkpoint 时 TDX `600030.SH` 的 enabled ACTIVE `tdx` source mapping 尚未补齐，
+因此 task 5.4 暂未关闭。双源 trading-session freshness 仍待支持时段执行。
+
+## TDX 非交易时段订阅恢复与精确回滚
+
+通过既有 `/v1` security 管理边界确认生产原先不存在 `600030` 后，最小新增 ACTIVE
+`600030`（`STOCK`，security ID `9`）及 enabled TDX source mapping（mapping ID `17`，
+`formatCode=600030.SH`）；未直接操作数据库。该 mapping 保留供交易时段 HIL 使用，
+realtime allowlist 在本阶段结束时已恢复为空。
+
+- TDX enable：workflow `29935977661` 成功，backup ID
+  `20260722T160040Z-bdec4f2e`。
+- TDX terminal recovery：workflow `29936159327` 成功；owner 从
+  `tdx-bridge-pid-18732` 切换为 `tdx-bridge-pid-16564`，stream epoch 更新，
+  `desiredRevision=1` 与 `convergedRevision=1`，官方
+  `get_market_data(600030.SH)` probe 成功。
+- 非 freshness runtime smoke：workflow `29936352267` 的应用检查步骤全部成功；
+  `desiredSymbols=1`、`convergedSymbols=1`，backend allowlist 为 `600030.SH`，runtime
+  build 为 `mist-tdx-bridge-v1.1`，WebSocket ready/ping/pong 与 provider bars/snapshot
+  smoke 均通过。当前为非交易时段且 backend `activeSymbols=[]`，不将 snapshot 时间描述为
+  freshness。
+- 使用同一 backup ID 执行精确配置回滚：workflow `29936604986` 成功。
+- 回滚后 TDX baseline：workflow `29936831868` 成功；
+  `desiredSymbols=0`、`convergedSymbols=0`、backend `allowlist=[]`，owner ready，bridge
+  maintenance 标记为 `operator-managed`。
+- 回滚后六张 protected tables 的 row count 与 content digest 与 pre-HIL baseline
+  完全一致，未观察到 K 线、signal 或 notification 副作用。
+
+结合前述 QMT checkpoint，双源非交易时段 owner/subscription/cache recovery 已完成，
+task 5.4 关闭。TDX/QMT 的 full native frame、canonical adapter、freshness、increasing
+per-symbol sequence 和 datasource restart 仍必须在支持的交易时段按 tasks 5.2/5.3 验收。
