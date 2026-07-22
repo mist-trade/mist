@@ -42,7 +42,7 @@ QMT collector 为每个 symbol/epoch 维护 sequence，backend 也按 symbol fen
 
 ### TDX/QMT terminal bridge 均由操作员手动覆盖
 
-TDX 与 QMT bridge 都是终端内已注册脚本，其实际加载版本不由 datasource 文件同步或 deploy/recovery workflow 推断。每次 bridge contract 或实现发生变化，操作员必须分别在终端侧手动覆盖匹配版本、记录 SHA-256，并让对应终端重新加载。自动化只验证 installed artifact、owner/build identity 和运行结果，不复制、注册、删除或隐式升级任一 terminal bridge。
+TDX 与 QMT bridge 都是终端内已注册脚本，其实际加载版本不由 datasource 文件同步或 deploy/recovery workflow 推断。每次 bridge contract 或实现发生变化，操作员必须分别在终端侧手动覆盖匹配版本并让对应终端重新加载。installed path 与文件摘要由操作员自行维护，不进入 datasource/backend/deploy contract；自动化只验证可观察的 owner/generation、`bridgeBuildId` 和运行结果，不复制、注册、删除或隐式升级任一 terminal bridge。
 
 ### TDX/QMT 生产默认 builtin，但 activation 仍受发布 gate 约束
 
@@ -66,7 +66,7 @@ TDX 与 QMT bridge 都是终端内已注册脚本，其实际加载版本不由 
 2. 先实现 datasource schema v1、QMT fence/owner safety 与 replay fixture，再实现 backend clients/adapters/ingress。
 3. 同步 deploy/monitoring/env/current docs，执行 repository guard：活跃 realtime `experimental|legacy` 命中为零。
 4. 本地运行 strict OpenSpec、lint/typecheck/tests/build、Docker build 和跨仓库 fixture SHA。
-5. 操作员分别手动覆盖并重新加载精确版本的 TDX/QMT terminal bridge，记录 installed path 与 SHA-256；自动化不得把 datasource checkout 中的同名文件视为已安装版本。
+5. 操作员分别手动覆盖并重新加载精确版本的 TDX/QMT terminal bridge；自动化不得把 datasource checkout 中的同名文件视为已安装版本，也不得要求或持久化 terminal installed path。
 6. Windows 先 TDX `600030.SH`、后 QMT `300502.SZ`，记录 baseline/enabled/post_restart/post_rollback 与 protected-table digest；非交易时段不得声明 freshness。
 7. 分别验证 TDX/QMT 整套 `off`/旧版本 rollback 后，在同一维护窗口发布正式组件并将双源 production desired state 设为 `builtin`。
 
