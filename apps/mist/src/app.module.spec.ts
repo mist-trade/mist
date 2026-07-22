@@ -2,8 +2,8 @@ import {
   qmtRealtimeModulesForMode,
   tdxRealtimeModulesForMode,
 } from './app.module';
-import { QmtRealtimeModule } from './sources/qmt/realtime/qmt-realtime.module';
-import { TdxRealtimeModule } from './sources/tdx/realtime/tdx-realtime.module';
+import { QmtRealtimeModule } from './sources/qmt/realtime/realtime.module';
+import { TdxRealtimeModule } from './sources/tdx/realtime/realtime.module';
 
 describe('TDX realtime mode module matrix', () => {
   it('is builtin by default', () => {

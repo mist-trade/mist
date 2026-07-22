@@ -1,49 +1,29 @@
 /**
  * TdxRealtimeDiagnosticController — internal diagnostic readback.
  *
- * Mounted with the always-on builtin TDX realtime module. NOT a product API.
+ * Mounted when TDX_REALTIME_MODE=builtin. NOT a product API.
  * Loopback/admin only: rejects non-loopback connections.
  * Returns typed snapshot, epoch, sequence, receivedAt, fresh/stale, drop
  * reasons, counters, owner, latest age, active symbols.
  */
-import {
-  Controller,
-  Get,
-  Param,
-  NotFoundException,
-  Req,
-  ForbiddenException,
-} from '@nestjs/common';
+import { Controller, Get, Param, NotFoundException, Req } from '@nestjs/common';
 import { ApiTags } from '@nestjs/swagger';
 import type { Request } from 'express';
-import { isIP } from 'node:net';
-import { InMemoryRealtimeStore } from './in-memory-realtime.store';
-import { RealtimeAllowlistResolver } from './realtime-allowlist.resolver';
+import { requireRealtimeDiagnosticLoopback } from '../../../realtime/realtime-diagnostic.guard';
+import { TdxRealtimeStore } from './realtime.store';
+import { TdxRealtimeAllowlistResolver } from './realtime-allowlist.resolver';
 
 @ApiTags('tdx-realtime')
 @Controller('internal/realtime/tdx')
 export class TdxRealtimeDiagnosticController {
   constructor(
-    private readonly store: InMemoryRealtimeStore,
-    private readonly allowlist: RealtimeAllowlistResolver,
+    private readonly store: TdxRealtimeStore,
+    private readonly allowlist: TdxRealtimeAllowlistResolver,
   ) {}
-
-  /** Reject non-loopback requests. */
-  private requireLoopback(req: Request): void {
-    const ip = req.ip ?? req.socket.remoteAddress ?? '';
-    const normalized = ip.startsWith('::ffff:') ? ip.slice(7) : ip;
-    const loopback =
-      normalized === 'localhost' ||
-      normalized === '::1' ||
-      (isIP(normalized) === 4 && normalized.split('.')[0] === '127');
-    if (!loopback) {
-      throw new ForbiddenException('diagnostic endpoints are loopback-only');
-    }
-  }
 
   @Get('status')
   getStatus(@Req() req: Request) {
-    this.requireLoopback(req);
+    requireRealtimeDiagnosticLoopback(req);
     const runtime = this.store.getRuntimeMetadata();
     return {
       mode: 'builtin',
@@ -68,7 +48,7 @@ export class TdxRealtimeDiagnosticController {
 
   @Get(':formatCode')
   getSymbol(@Param('formatCode') formatCode: string, @Req() req: Request) {
-    this.requireLoopback(req);
+    requireRealtimeDiagnosticLoopback(req);
     const debug = this.store.readDebug(formatCode);
     if (!debug) {
       throw new NotFoundException(`no realtime snapshot for ${formatCode}`);

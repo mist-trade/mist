@@ -21,9 +21,10 @@ import {
   TdxRealtimeSnapshotFrame,
   ACCEPTED_CONTRACT_TUPLE,
 } from './realtime.types';
-import { InMemoryRealtimeStore } from './in-memory-realtime.store';
-import { RealtimeAllowlistResolver } from './realtime-allowlist.resolver';
+import { TdxRealtimeStore } from './realtime.store';
+import { TdxRealtimeAllowlistResolver } from './realtime-allowlist.resolver';
 import { RealtimeSnapshotIngressService } from '../../../realtime/realtime-snapshot-ingress.service';
+import { toTdxCanonicalSnapshot } from './realtime-native.adapter';
 
 interface ReadyPayload {
   mode?: string;
@@ -88,8 +89,8 @@ export class TdxRealtimeClient implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly configService: ConfigService,
-    private readonly store: InMemoryRealtimeStore,
-    private readonly allowlist: RealtimeAllowlistResolver,
+    private readonly store: TdxRealtimeStore,
+    private readonly allowlist: TdxRealtimeAllowlistResolver,
     @Optional()
     @Inject(TDX_REALTIME_DESIRED_POSTER)
     private readonly desiredPoster?: TdxRealtimeDesiredPoster,
@@ -474,7 +475,7 @@ export class TdxRealtimeClient implements OnModuleInit, OnModuleDestroy {
       frame.sequence,
       frame,
     );
-    if (accepted) this.ingress?.handleSnapshot(frame);
+    if (accepted) this.ingress?.handleSnapshot(toTdxCanonicalSnapshot(frame));
   }
 
   private validateFrame(data: Record<string, unknown>): FrameValidationResult {

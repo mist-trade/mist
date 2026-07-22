@@ -8,14 +8,15 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import WebSocket from 'ws';
-import { QmtRealtimeAllowlistResolver } from './qmt-realtime-allowlist.resolver';
+import { QmtRealtimeAllowlistResolver } from './realtime-allowlist.resolver';
 import {
   QmtNativeSnapshot,
   QmtRealtimeSnapshotFrame,
   QMT_REALTIME_CONTRACT,
-} from './qmt-realtime.types';
-import { InMemoryQmtRealtimeStore } from './in-memory-qmt-realtime.store';
+} from './realtime.types';
+import { QmtRealtimeStore } from './realtime.store';
 import { RealtimeSnapshotIngressService } from '../../../realtime/realtime-snapshot-ingress.service';
+import { toQmtCanonicalSnapshot } from './realtime-native.adapter';
 
 const MAX_FRAME_CLOCK_SKEW_MS = 60_000;
 const FRAME_KEYS = [
@@ -61,7 +62,7 @@ export class QmtRealtimeClient implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     config: ConfigService,
-    private readonly store: InMemoryQmtRealtimeStore,
+    private readonly store: QmtRealtimeStore,
     private readonly allowlist: QmtRealtimeAllowlistResolver,
     @Optional()
     @Inject(QMT_REALTIME_CLOCK)
@@ -235,7 +236,9 @@ export class QmtRealtimeClient implements OnModuleInit, OnModuleDestroy {
       );
       return;
     }
-    if (this.store.apply(frame)) this.ingress?.handleSnapshot(frame);
+    if (this.store.apply(frame)) {
+      this.ingress?.handleSnapshot(toQmtCanonicalSnapshot(frame));
+    }
   }
 
   private validateFrame(

@@ -1,6 +1,6 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { HttpStatus } from '@nestjs/common';
-import { TdxSource } from './tdx-source.service';
+import { TdxSource } from './source.service';
 import { ConfigService } from '@nestjs/config';
 import { AxiosInstance } from 'axios';
 import { DataSource } from 'typeorm';

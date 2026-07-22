@@ -69,6 +69,10 @@ bridge/WS route、backend client/module 与 monitoring probe 同步停用，但 
 `realtime.ready` 和重连时发送完整 `sync_subscriptions`；普通 WebSocket 客户端不得修改生产
 订阅。
 
+生产终端脚本为 `mist-datasource/tdx/builtin_bridge/mist_tdx_realtime_bridge.py`。
+发布 datasource commit 不会自动覆盖终端文件；Windows 验收前必须手工覆盖并记录
+实际安装路径与 SHA-256。
+
 ### QMT
 
 ```text
@@ -83,11 +87,22 @@ QMT realtime 默认 `builtin`；`off` 仅用于受控回滚。`off` 时 realtime
 backend client/module 与 metric 不存在，但 `/health`、`/v1/bars/query` 和
 `/qmt/bridge/*` 继续工作。
 
+生产终端脚本为
+`mist-datasource/qmt/builtin_bridge/mist_qmt_realtime_bridge.py`。它与
+`tools/qmt_runtime_probe/mist_qmt_runtime_probe.py` 无关；后者只用于运行时能力复验。
+QMT 与 TDX 一样需要在 Windows 终端内手工覆盖生产 bridge 并记录 SHA-256。
+
 TDX/QMT 都发送 schema v1 `mist.realtime.native_snapshot`，外层包含 `source`、
 `streamEpoch`、每个 symbol 独立的 `sequence`、`sequenceScope=symbol`、
 `capturedAt` 和完整 `native`。Datasource 不计算统一 `eventTime` 或 `quality`；backend
 在 source-specific adapter 中生成同一 `CanonicalRealtimeSnapshot`，并且只有通过
 owner/epoch/sequence fencing 的 frame 才能进入共同 ingress。
+
+Backend 两个 source 目录采用相同职责文件名（例如 `source.service.ts`、
+`realtime/realtime.client.ts`、`realtime/realtime-native.adapter.ts`）；类名仍保留
+`Tdx*`/`Qmt*` 身份。Datasource 同职责代码位于
+`src/datasource/<source>/{provider.py,realtime/runtime.py,realtime/contract.py}`。
+TDX formula/raw 与 QMT command gateway 等 provider-only 能力不制造空壳对称模块。
 
 ## 当前持久化边界
 
