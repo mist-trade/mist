@@ -93,3 +93,21 @@ module 语义，而 bridge 在进入 `init()` 前直接读取 `__file__` 计算 
 - TDX bridge SHA-256：`928717d79a713dfd2ca493ecc849e64f2d2d81db4f8ca70549bc9f7ad2713ca5`。
 
 该修复尚未执行 Windows HIL、commit、push 或生产 bridge 覆盖，release gate 保持未关闭。
+
+## 最新精确 SHA CI 与 image gate
+
+bridge runtime 修复提交并推送后，重新执行 release candidate 精确 SHA CI：
+
+- Backend CI/image：`29928049235`，成功，SHA
+  `1fdc78a9fc2021656643b37c1d617bd388a4aaab`；Node.js 24 validation 与
+  linux/amd64 GHCR image build/push 均通过。
+- Datasource CI：`29928062323`，成功，SHA
+  `fa6e95180c69dc6a95e8a816ed5ae34ed6b0c7fa`。
+- Monitoring CI：`29928078470`，成功，SHA
+  `9974cbfcfbe34127eadd89fb22493e748a5c1c75`。
+- Deploy CI：`29924017134`，成功，SHA
+  `7b896c973438bfd9a2bd935ce3f0a286166e8f51`。
+
+`normalize-tdx-qmt-source-layouts` 的最新 bridge、layout、测试与 image gate 已闭合，
+`align-realtime-native-ingress-contracts` task 5.0 完成。Windows HIL、protected-table
+digest 与生产发布 tasks 仍保持未完成。
