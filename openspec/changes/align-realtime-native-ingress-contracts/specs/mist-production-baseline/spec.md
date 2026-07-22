@@ -5,7 +5,7 @@ The refreshed production baseline SHALL record TDX and QMT as formal builtin rea
 
 #### Scenario: Final production baseline is captured
 - **WHEN** the formal realtime release is accepted
-- **THEN** evidence records exact repository/image/bridge identities, `TDX_REALTIME_MODE=builtin`, `QMT_REALTIME_MODE=builtin`, source allowlists, owner/epoch state and monitoring convergence
+- **THEN** evidence records exact repository/image identities, observable bridge runtime build identities, `TDX_REALTIME_MODE=builtin`, `QMT_REALTIME_MODE=builtin`, source allowlists, owner/epoch state and monitoring convergence
 
 #### Scenario: A realtime source is temporarily rolled back
 - **WHEN** the baseline is captured while an approved rollback has set TDX or QMT to `off`

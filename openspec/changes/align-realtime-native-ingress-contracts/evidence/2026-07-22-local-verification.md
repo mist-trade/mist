@@ -54,7 +54,7 @@
 - 尚未执行 Windows HIL：TDX `600030.SH`、QMT `300502.SZ` 的交易时段 freshness、owner generation、订阅恢复、终端/datasource restart 仍待验证。
 - 尚未记录 HIL 前后 protected-table row count/digest，也未执行 whole-version/config rollback。
 - release candidate 已部署到生产主机，但 TDX/QMT effective state 均保持显式 `off`；尚未完成 bridge 覆盖、baseline/HIL、rollback 或最终 `builtin` promotion。
-- TDX 与 QMT terminal bridge 都要求操作员手动覆盖并重新加载；datasource/deploy/recovery 同步不会替代这个步骤。生产证据必须对两个 installed artifact 分别记录实际路径和 SHA-256。
+- TDX 与 QMT terminal bridge 都要求操作员手动覆盖并重新加载；datasource/deploy/recovery 同步不会替代这个步骤。installed path 与文件摘要由操作员自行维护，生产证据只核验可观察的 `bridgeBuildId`、owner/generation 与协议行为。
 
 ## 发布前 CI
 
@@ -73,8 +73,8 @@ module 语义，而 bridge 在进入 `init()` 前直接读取 `__file__` 计算 
 修复边界：
 
 - QMT 无 `__file__` 时正常加载并执行 `init()`，运行时
-  `bridgeArtifactSha256=unavailable`；Windows evidence 继续对 installed path 执行
-  `Get-FileHash -Algorithm SHA256`，该外部结果才是发布 artifact digest。
+  `bridgeArtifactSha256=unavailable`；该 sentinel 只作诊断，不作为发布门禁。Windows
+  evidence 不请求 operator-managed installed path，改为核验 `bridgeBuildId` 与协议行为。
 - TDX 同步移除模块加载阶段未保护的 `__file__` 访问；其官方 `tq.initialize(...)` 仍要求
   从 `PYPlugins/user` 注册真实文件，pathless 运行方式会得到明确 fatal message 而不是
   `NameError`。
@@ -138,9 +138,9 @@ release candidate；本阶段未启用 realtime，也不构成 freshness/HIL 验
 
 当前阻塞：
 
-- TDX/QMT terminal bridge 必须由操作员分别手工覆盖为 `fa6e951` 中的 v1.1 artifact，
-  并提供两个实际 installed Windows path，之后才能让 evidence collector 对 installed
-  file 计算并核对 SHA-256。
+- 操作员已确认 TDX/QMT terminal bridge 均手工覆盖为 `fa6e951` 中的 v1.1 artifact；
+  installed path 不进入发布契约，待 source 启用后由 evidence collector 核验运行时
+  `bridgeBuildId`。
 - 当前生产 eligible securities 不包含 HIL 固定标的 `600030.SH`；包含
   `300502.SZ`。TDX `enable` 前必须先以既有 security 管理边界补齐 `600030.SH`，不得
   偷换为其他标的。

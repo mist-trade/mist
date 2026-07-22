@@ -11,7 +11,7 @@ QMT bridge poll and result operations MUST bind commands to the current owner ge
 - **WHEN** the builtin bridge becomes the current owner
 - **THEN** loopback health and evidence identify its owner, generation and build identity without exposing a lease secret
 - **AND** a file-backed runtime reports its artifact digest while a pathless embedded runtime reports `unavailable`
-- **AND** Windows HIL independently verifies the installed bridge path and SHA-256 instead of trusting the runtime sentinel
+- **AND** Windows HIL validates the observable `bridgeBuildId` and protocol behavior without requiring the operator-managed installed path or file digest
 
 ### Requirement: Realtime boundary rejects unsafe native objects
 Datasource HTTP and WebSocket boundaries SHALL reject native objects that cannot be represented as bounded JSON or violate configured size, depth, field, or sensitive-data guards.
