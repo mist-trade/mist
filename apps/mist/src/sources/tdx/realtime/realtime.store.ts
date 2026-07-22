@@ -1,5 +1,5 @@
 /**
- * InMemoryRealtimeStore — data-plane epoch/sequence fence for TDX realtime snapshots.
+ * TdxRealtimeStore — data-plane epoch/sequence fence for TDX realtime snapshots.
  *
  * Synchronous compare-and-set: epoch/sequence validation and state update
  * happen atomically with no `await` between check and set. This is safe for
@@ -36,8 +36,8 @@ const DROP_REASONS: readonly DropReason[] = [
 ];
 
 @Injectable()
-export class InMemoryRealtimeStore {
-  private readonly logger = new Logger(InMemoryRealtimeStore.name);
+export class TdxRealtimeStore {
+  private readonly logger = new Logger(TdxRealtimeStore.name);
   private readonly states = new Map<string, InstrumentFenceState>();
   private readonly fence = new RealtimeSymbolSequenceFence();
   private connected = false;

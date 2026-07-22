@@ -38,7 +38,7 @@ protocol field、class 名称和产品名保留原文。以下内容不做追溯
   Python 3.7+ 语法目标。
 - `docs/references/tdxquant-live-datasource-smoke.md`：删除 `TDX_SDK_PATH` 和旧
   `/ws/quote` smoke，改为 backend-owned subscription。
-- `docs/references/bigqmt-windows-spike-evidence-template.md`：明确它是复验模板，不是
+- `docs/references/bigqmt-windows-runtime-probe-evidence-template.md`：明确它是复验模板，不是
   当前 pending 状态。
 
 ### `mist-deploy`
@@ -71,7 +71,7 @@ protocol field、class 名称和产品名保留原文。以下内容不做追溯
 - `mist/apps/chan/README.md`：已描述当前 Phase A/Phase B 算法与响应形状。
 - `mist-fe` Chan fixture/设计文档：与当前两阶段渲染兼容。
 - `mist-monitoring/contracts/metrics.md`、`alerts.md`、`actions.md`：字段名仍与代码
-  contract 一致；`experimental` 是当前 metric/API 名称，不是误写的 legacy 链路。
+  contract 一致；正式 realtime metric/API 命名已替代 active experimental 链路。
 - `mist-datasource/docs/references/qmt-provider-alignment.md`：native bars、无 DAT、
   stdlib polling 与 mode-gated realtime 边界仍有效。
 - `mist-skills/skills/*/SKILL.md`：API 均为 backend `/v1/*`，没有 datasource/raw

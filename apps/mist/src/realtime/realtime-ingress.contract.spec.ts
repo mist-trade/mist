@@ -2,10 +2,10 @@ import { ConfigService } from '@nestjs/config';
 import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { InMemoryQmtRealtimeStore } from '../sources/qmt/realtime/in-memory-qmt-realtime.store';
-import { QmtRealtimeClient } from '../sources/qmt/realtime/qmt-realtime.client';
-import { InMemoryRealtimeStore } from '../sources/tdx/realtime/in-memory-realtime.store';
-import { TdxRealtimeClient } from '../sources/tdx/realtime/tdx-realtime.client';
+import { QmtRealtimeStore } from '../sources/qmt/realtime/realtime.store';
+import { QmtRealtimeClient } from '../sources/qmt/realtime/realtime.client';
+import { TdxRealtimeStore } from '../sources/tdx/realtime/realtime.store';
+import { TdxRealtimeClient } from '../sources/tdx/realtime/realtime.client';
 import { RealtimeSnapshotIngressService } from './realtime-snapshot-ingress.service';
 
 const capturedAt = new Date().toISOString();
@@ -23,7 +23,7 @@ describe('formal realtime ingress contract', () => {
   });
 
   it('funnels an accepted TDX native frame through the common ingress', async () => {
-    const store = new InMemoryRealtimeStore();
+    const store = new TdxRealtimeStore();
     const ingress = new RealtimeSnapshotIngressService();
     const client = new TdxRealtimeClient(
       new ConfigService({ TDX_BASE_URL: 'http://127.0.0.1:9001' }),
@@ -48,7 +48,7 @@ describe('formal realtime ingress contract', () => {
   });
 
   it('fences QMT sequences per symbol before the common ingress', async () => {
-    const store = new InMemoryQmtRealtimeStore();
+    const store = new QmtRealtimeStore();
     const ingress = new RealtimeSnapshotIngressService();
     const client = new QmtRealtimeClient(
       new ConfigService({ QMT_BASE_URL: 'http://127.0.0.1:9002' }),

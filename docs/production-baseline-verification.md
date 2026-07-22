@@ -173,7 +173,7 @@ TDX realtime WebSocket 是 `/ws/realtime/tdx/{client_id}`，不是已删除的
 
 ## 5. Exact-SHA 与数据库保护证据
 
-使用 `Collect Windows Experimental Realtime Evidence` 的 `baseline` phase。
+使用 `Collect Windows Realtime Evidence` workflow 的 `baseline` phase。
 每次必须提供四个 40 位仓库 SHA、64 位 bridge SHA-256 和实际安装路径。
 
 `baseline` 只读运行态和数据库，并写 evidence JSON；不得切换 realtime mode、重启

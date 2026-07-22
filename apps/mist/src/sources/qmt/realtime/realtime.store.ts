@@ -3,7 +3,7 @@ import {
   QmtRealtimeSnapshotFrame,
   QmtRealtimeDropEvent,
   QmtRealtimeDropReason,
-} from './qmt-realtime.types';
+} from './realtime.types';
 import { RealtimeSymbolSequenceFence } from '../../../realtime/realtime-symbol-sequence-fence';
 
 const STALE_AFTER_MS = 30_000;
@@ -14,7 +14,7 @@ interface StoredSnapshot {
 }
 
 @Injectable()
-export class InMemoryQmtRealtimeStore {
+export class QmtRealtimeStore {
   private readonly snapshots = new Map<string, StoredSnapshot>();
   private readonly fence = new RealtimeSymbolSequenceFence();
   private readonly dropCounts = new Map<QmtRealtimeDropReason, number>();

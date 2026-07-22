@@ -11,7 +11,7 @@ import {
 } from '@app/shared-data';
 import { PeriodMappingService, UtilsService } from '@app/utils';
 import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
-import { QmtSource } from './qmt-source.service';
+import { QmtSource } from './source.service';
 import { QmtResponse } from './types';
 
 const createInsertBuilderMock = () => ({

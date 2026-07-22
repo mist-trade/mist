@@ -9,7 +9,7 @@ export type AllowlistEntry = RealtimeAllowlistEntry;
 
 /** TDX-specific facade over the shared exact security identity boundary. */
 @Injectable()
-export class RealtimeAllowlistResolver implements OnModuleInit {
+export class TdxRealtimeAllowlistResolver implements OnModuleInit {
   constructor(private readonly shared: RealtimeSecurityAllowlistService) {}
 
   async onModuleInit(): Promise<void> {

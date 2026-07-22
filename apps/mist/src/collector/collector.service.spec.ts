@@ -1,8 +1,8 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { CollectorService } from './collector.service';
 import { EastMoneySource } from '../sources/east-money/east-money-source.service';
-import { TdxSource } from '../sources/tdx/tdx-source.service';
-import { QmtSource } from '../sources/qmt/qmt-source.service';
+import { TdxSource } from '../sources/tdx/source.service';
+import { QmtSource } from '../sources/qmt/source.service';
 import {
   Period,
   DataSource,

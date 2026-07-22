@@ -11,9 +11,9 @@
  * No K aggregation, no DB K writes, no business side effects.
  */
 import { Module } from '@nestjs/common';
-import { InMemoryRealtimeStore } from './in-memory-realtime.store';
-import { RealtimeAllowlistResolver } from './realtime-allowlist.resolver';
-import { TdxRealtimeClient } from './tdx-realtime.client';
+import { TdxRealtimeStore } from './realtime.store';
+import { TdxRealtimeAllowlistResolver } from './realtime-allowlist.resolver';
+import { TdxRealtimeClient } from './realtime.client';
 import { TdxRealtimeDiagnosticController } from './realtime-diagnostic.controller';
 import { RealtimeIngressModule } from '../../../realtime/realtime-ingress.module';
 
@@ -22,8 +22,8 @@ import { RealtimeIngressModule } from '../../../realtime/realtime-ingress.module
   // Deliberately does NOT import K / KExtension* / HistoricalCollectorModule.
   imports: [RealtimeIngressModule],
   providers: [
-    InMemoryRealtimeStore,
-    RealtimeAllowlistResolver,
+    TdxRealtimeStore,
+    TdxRealtimeAllowlistResolver,
     TdxRealtimeClient,
   ],
   controllers: [TdxRealtimeDiagnosticController],
