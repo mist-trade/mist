@@ -1,31 +1,43 @@
-# Mist Windows Docker Deployment
+# Mist Windows Docker 生产部署
 
-This is the production deployment shape for the Windows API machine.
+本文只描述当前生产拓扑。部署脚本和 workflow 的唯一所有者是
+`mist-deploy`；本目录保存 backend 镜像内的迁移与 Compose 契约，不是另一套部署入口。
 
-## Topology
+## 拓扑
 
 ```text
-Windows API machine
-  Docker Desktop
-    - mysql
-    - mist-backend on 0.0.0.0:8001
-    - chan-api on 0.0.0.0:8008
-    - mist-migrate one-shot migration runner
+Windows Docker Desktop
+  mysql
+  mist-backend :8001
+  chan-api :8008
+  mist-fe
+  web-gateway :80
+  mist-migrate（一次性）
 
-  Windows host
-    - mist-tdx-datasource WinSW service on 127.0.0.1:9001
-    - TDX Desktop, SDK files, login state, and strategy cleanup
+Windows Host / WinSW
+  mist-tdx-datasource :9001
+  mist-qmt-datasource :9002
 
-Mac / LLM machine
-  - MIST_API_BASE_URL=http://<windows-lan-ip>:8001
+Windows 用户会话
+  TDX Desktop + builtin bridge
+  QMT Desktop + builtin bridge
 ```
 
-## Default Windows Layout
+Datasource 不进入 Docker。Backend 容器使用：
+
+```env
+TDX_BASE_URL=http://host.docker.internal:9001
+QMT_BASE_URL=http://host.docker.internal:9002
+```
+
+## Windows 目录
 
 ```text
 E:\quant\MistDocker
   compose.yaml
+  nginx\templates\default.conf.template
   .env
+  .deploy-history
   mysql-data\
   backups\
   diagnostics\
@@ -34,81 +46,51 @@ F:\quant\MistAPI\datasource
   .env
   logs\
   services\mist-tdx-datasource\
+  services\mist-qmt-datasource\
 ```
 
-`E:\quant\MistDocker\.env` is the Docker environment file. It must contain
-`MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data` for the MySQL bind mount.
+生产密码只保存在 `E:\quant\MistDocker\.env`。MySQL 使用 host bind
+`MYSQL_DATA_DIR=E:\quant\MistDocker\mysql-data`。
 
-`apps/schedule` and `apps/mcp-server` are not part of the default
-production Docker stack. `apps/schedule` needs a separate production ownership
-decision before it is deployed.
+## 镜像与迁移
 
-## Runtime Contract
-
-The Docker image contains both application entrypoints:
+同一个 backend 镜像包含：
 
 ```text
 dist/apps/mist/main.js
 dist/apps/chan/main.js
-```
-
-The default image command starts `apps/mist`:
-
-```text
-node dist/apps/mist/main.js
-```
-
-`chan-api` overrides the command in Compose:
-
-```text
-node dist/apps/chan/main.js
-```
-
-Database migrations are bundled with the Mist image and run explicitly through:
-
-```text
-node tools/run-migrations.mjs
-```
-
-Migration SQL files are bundled from:
-
-```text
 deploy/database/migrations
+tools/run-migrations.mjs
 ```
 
-Deployments must not rely on TypeORM `synchronize`; app modules set
-`synchronize: false` in every environment.
+`mist-backend` 使用默认命令，`chan-api` 覆盖为
+`node dist/apps/chan/main.js`。迁移由 `mist-migrate` 显式执行；所有环境都必须保持
+TypeORM `synchronize: false`。
 
-## Datasource Boundary
+## 正式部署入口
 
-The datasources remain outside Docker as WinSW-managed Windows services.
-Containers reach them through:
-
-```text
-TDX_BASE_URL=http://host.docker.internal:9001
-QMT_BASE_URL=http://host.docker.internal:9002
-```
-
-If container-to-host health checks fail, first verify the datasource bind
-address and Windows firewall. Do not add datasource containers to the
-production stack.
-
-## Deployment Owner
-
-The deployable Compose file, machine-local `.env`, backup, rollback, health
-check, diagnostics, and GitHub Actions workflow live in `mist-deploy`.
-
-Normal production deployment is:
-
-```powershell
-.\scripts\deploy-docker-appliance.ps1 -ImageTag <tag> -PreviousImageTag <old-tag>
-```
-
-The GitHub Actions workflow is:
+使用 `mist-deploy` 的 GitHub Actions：
 
 ```text
 Deploy Windows Mist Stack
 ```
 
-Use a release tag or commit SHA for production. Use `latest` only for an
-intentional fast-forward deploy.
+Backend、frontend 和 previous tags 都使用精确 commit SHA。部署顺序为：拉取镜像、
+启动 MySQL、生产备份、执行迁移、重建 backend/Chan/frontend、最后重建
+`web-gateway` 并执行 host 与 container-to-host health。
+
+不要使用 `latest`，不要在这里直接维护 Windows applied `compose.yaml`，也不要用
+Docker 部署去重启 datasource 或桌面终端。
+
+## 独立运维入口
+
+| 目标 | Workflow |
+|---|---|
+| TDX datasource | `Manage Windows TDX Datasource` |
+| QMT datasource | `Manage Windows QMT Datasource` |
+| TDX desktop | `Recover Windows TDX Runtime` |
+| QMT desktop | `Recover Windows QMT Runtime` |
+| 数据库恢复演练 | `Test Windows MySQL Restore` |
+
+完整步骤与当前已通过证据见
+[`../../docs/production-baseline-verification.md`](../../docs/production-baseline-verification.md)。

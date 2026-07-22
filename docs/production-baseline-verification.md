@@ -1,154 +1,100 @@
-# Production Baseline Verification Runbook
+# Mist 生产基线验证手册
 
-This runbook records the current end-to-end Mist production baseline verification
-flow. It is the operational companion to the OpenSpec evidence under
-`openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/`.
+本文是当前 Mist 生产环境的唯一基线运行手册。历史证据保存在
+`openspec/changes/archive/`，不得把历史命令直接当作当前操作步骤。
 
-Latest known-good evidence:
+最新已通过基线：
 
-- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-8.md`
-- Backend baseline image:
-  `ghcr.io/mist-trade/mist:7c3efc9af7455b61712284805c94c2d9e6d42156`
-- Frontend baseline image:
-  `ghcr.io/mist-trade/mist-fe:100cf5d72fa6be83bbb1badbcccd7fdd20ec159f`
-- Deploy scripts baseline:
-  `mist-deploy@e25ebaf2bd8ef61acc5bcede6149f9c988083a6d`
-- Monitoring baseline:
-  `mist-monitoring@3a953771bcda26df412d622db989b226b17c8ea0`
-- Datasource baseline:
-  `mist-datasource@6fddd74c8247efaebfa570116734f0838b767f8c`
+- 日期：2026-07-22
+- 证据：`openspec/changes/define-mist-production-roadmap/evidence/2026-07-22-production-baseline-refresh.md`
+- Backend：`mist@401b507694958c00982c5e285ccdb1087bf4590d`
+- Frontend：`mist-fe@90b77c5cbc6dbd016d93fce5d38469831b949209`
+- Datasource：`mist-datasource@d97e29f3aba61de3eb99baf523b8caa4fe7ab47a`
+- Deploy：`mist-deploy@d5f8f2bb7841cd5d3f05ed18d8da89eab55ddea1`
+- Monitoring：`mist-monitoring@048dda32d9adc6bcb3021bc849b747a94cd34a05`
+- Skills：`mist-skills@86bd69b7f6f96be04cd17ad621af678a50e91b86`
 
-Latest recovered rerun note:
+## 当前生产拓扑
 
-- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-3-blocked.md`
-  records the intermediate TDX recovery blocker. The blocker was cleared after
-  validating `MistRuntimeLogin` from the real Windows console session and
-  rerunning recovery workflow `28641880518`.
+```text
+Windows Docker Desktop
+  mysql
+  mist-backend :8001
+  chan-api :8008
+  mist-fe
+  web-gateway :80
+  mist-migrate（一次性迁移任务）
 
-Latest round-4 rerun note:
+Windows Host / WinSW
+  mist-tdx-datasource :9001
+  mist-qmt-datasource :9002
+  mist-windows-exporter :9109
 
-- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-4.md`
-  records the current known-good baseline after deploy-side gateway image
-  digest pinning and public-host parameterization.
+Windows 用户会话
+  TDX 终端 + 已注册自动运行的 builtin bridge
+  QMT 终端 + 随终端启动的 builtin bridge
 
-Latest round-5 rerun note:
+Mac / 浏览器 / AstrBot
+  http://www.moyui.mist
+```
 
-- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-03-production-baseline-rerun-5.md`
-  records the previous known-good baseline after deploy defaults
-  centralization, monitoring container-name alignment, and backend
-  docs/OpenSpec archive updates.
+TDX 非实时 `/v1/*` 通过官方 `POST :17709`；TDX 实时通过
+`/tdx/bridge/*` 与 `/ws/tdx-experimental/{client_id}`。QMT 历史 bars 和受控
+命令都通过内置 Python 的 stdlib HTTP polling bridge；QMT realtime 默认
+`off`。两个 datasource 都在 Windows Host 运行，不进入 Docker。
 
-Latest round-6 rerun note:
+## 验证边界
 
-- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-6.md`
-  records the previous known-good baseline after backend/frontend/deploy/
-  monitoring P3 follow-up commits, Windows monitoring redeploy, a Windows
-  PowerShell diagnostics compatibility fix in `mist-deploy`, Docker stack
-  redeploy, restore rehearsal, TDX runtime smoke, Mac LAN probes, monitoring
-  metrics scrape, and backend-leader live quote verification.
+### 非交易时段可以验证
 
-Latest round-7 rerun note:
+- 六仓库精确 SHA 与 CI 状态。
+- Docker 部署、迁移、备份、恢复演练和健康检查。
+- TDX `:17709` 历史、参考、财务、报告和公式接口。
+- QMT native bars、bridge command、`get_full_tick` 已有快照和板块命令。
+- TDX/QMT owner、revision、订阅恢复、WebSocket 握手和 ping/pong。
+- Windows exporter、Mac LAN、gateway 和 container-to-host 路由。
+- 受保护数据库表的行数与确定性内容摘要。
 
-- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-7.md`
-  records the previous known-good baseline after backend K extension fixes,
-  deploy CI gate/rollback guard follow-ups, monitoring CI toolchain correction,
-  Windows monitoring redeploy, Docker stack redeploy, restore rehearsal, TDX
-  runtime smoke, Mac LAN probes, monitoring metrics scrape, and backend-leader
-  live quote verification.
+### 必须在支持的交易时段验证
 
-Latest round-8 rerun note:
+- 新产生的 TDX/QMT native snapshot。
+- `eventTime`、sequence 与价格字段的新鲜度。
+- 启用订阅后的持续回调和重启后的新 epoch 快照。
 
-- `openspec/changes/archive/2026-07-04-verify-mist-production-baseline/evidence/2026-07-04-production-baseline-rerun-8.md`
-  records the current known-good baseline after `mcp-server` decommission,
-  Windows reboot recovery, datasource update/restart, Windows monitoring
-  redeploy, Docker stack redeploy, restore rehearsal, TDX runtime smoke, Mac
-  LAN probes, monitoring metrics scrape, and backend-leader live quote
-  verification.
+A 股严格验收优先使用北京时间 `09:40-11:15` 或 `13:10-14:45`。午休、开盘
+缓冲和收盘缓冲只能证明控制链路，不能声明实时行情新鲜。
 
-## Scope
+## 1. 本地与 CI 门禁
 
-The baseline covers:
-
-- backend/frontend image build and GHCR push
-- Windows self-hosted runner deployment
-- Docker Compose health for `mysql`, `mist-backend`, `chan-api`, `mist-fe`,
-  and `web-gateway`
-- gateway routing for frontend, Mist API, and Chan API
-- host datasource health and backend-container-to-host datasource health
-- MySQL backup restore rehearsal
-- TDX datasource HTTP/WebSocket runtime smoke
-- TDX live quote subscription smoke through the backend leader path
-- Mac-side LAN and hostname probes
-
-Deferred by default:
-
-- browser UI automation
-- full product API contract sweep across every endpoint
-
-## Preconditions
-
-- Run GitHub workflow commands from an authenticated `gh` CLI session.
-- Use pinned commit SHAs for deployable image tags. Do not use `latest` for a
-  production baseline.
-- On the Mac, use `pwsh-preview` for local PowerShell checks when needed.
-- Windows runner labels: `self-hosted`, `windows`, `mist-api`.
-- Docker root: `<docker-root>`.
-- Datasource root: `<datasource-root>`.
-- Gateway hostname: `<gateway-hostname>`, resolved locally on the Mac to
-  `<windows-lan-ip>`.
-- The datasource remains a host-side WinSW service. The Docker app deploy must
-  not reinstall, remove, or replace `mist-tdx-datasource`.
-
-## Local Backend Gates
-
-Run these from the `mist` repo before using a backend commit as the deploy tag:
+Backend 本地门禁：
 
 ```bash
 env TZ=UTC pnpm run test:ci
 pnpm run typecheck
 pnpm run ci:contracts
 pnpm run build:docker
+openspec validate --all --strict
 ```
 
-The UTC test is intentional. It protects A-share market time logic and source
-date formatting from depending on the runner timezone.
-
-For a single-repo CI checkout simulation:
+使用当前提交前，确认对应 GitHub Actions 已成功：
 
 ```bash
-mkdir -p /private/tmp/mist-ci-single
-ln -s <mac-workspace-root>/mist /private/tmp/mist-ci-single/mist
-MIST_WORKSPACE_ROOT=/private/tmp/mist-ci-single pnpm run ci:contracts
+gh run list --repo mist-trade/mist --workflow "Build Docker Images" --limit 5
+gh run list --repo mist-trade/mist-fe --workflow "Build Frontend Docker Image" --limit 5
+gh run list --repo mist-trade/mist-datasource --limit 5
+gh run list --repo mist-trade/mist-deploy --workflow "Test Deploy Scripts" --limit 5
+gh run list --repo mist-trade/mist-monitoring --limit 5
+gh run list --repo mist-trade/mist-skills --limit 5
 ```
 
-## Image Build Verification
+生产镜像必须使用完整 commit SHA，不允许使用 `latest`。
 
-Backend workflow:
+## 2. Windows Docker 部署
 
-```bash
-gh run list --repo mist-trade/mist \
-  --workflow "Build Docker Images" \
-  --limit 5 \
-  --json databaseId,headSha,status,conclusion,createdAt,displayTitle,url
-```
-
-Frontend workflow:
+在 `mist-deploy` 触发 `Deploy Windows Mist Stack`：
 
 ```bash
-gh run list --repo mist-trade/mist-fe \
-  --workflow "Build Frontend Docker Image" \
-  --limit 5 \
-  --json databaseId,headSha,status,conclusion,createdAt,displayTitle,url
-```
-
-The deploy tag is ready only after the matching workflow run succeeds.
-
-## Windows Deployment
-
-Run from `mist-deploy` with the selected backend and frontend image tags:
-
-```bash
-gh workflow run deploy-windows-docker-appliance.yml \
+gh workflow run deploy-windows-mist-stack.yml \
   --repo mist-trade/mist-deploy \
   --ref master \
   -f image_repository=ghcr.io/mist-trade/mist \
@@ -157,90 +103,45 @@ gh workflow run deploy-windows-docker-appliance.yml \
   -f frontend_image_repository=ghcr.io/mist-trade/mist-fe \
   -f frontend_image_tag=<frontend-sha> \
   -f previous_frontend_image_tag=<previous-frontend-sha> \
-  -f web_gateway_image=docker.m.daocloud.io/library/nginx:1.27-alpine \
-  -f docker_root='<docker-root>' \
-  -f datasource_root='<datasource-root>' \
+  -f public_host_name=www.moyui.mist \
+  -f 'docker_root=E:\quant\MistDocker' \
+  -f 'datasource_root=F:\quant\MistAPI\datasource' \
   -f skip_migration=false \
   -f skip_backup=false \
   -f skip_health_check=false \
   -f skip_pull=false
 ```
 
-Watch the run:
+成功输出必须包含：目标 backend/frontend 标签、备份路径、诊断路径、迁移成功、
+五个长期 Compose 服务健康，以及 TDX/QMT host 和 container-to-host health。
 
-```bash
-gh run watch <deploy-run-id> \
-  --repo mist-trade/mist-deploy \
-  --exit-status \
-  --interval 20
-```
+## 3. MySQL 恢复演练
 
-Deployment evidence must include:
-
-- GHCR login success
-- image pull success
-- MySQL healthy
-- backup path, for example
-  `<docker-root>\backups\mist-YYYYMMDD-HHMMSS.sql`
-- migrations ran or were intentionally skipped
-- `mist-fe`, `mist-backend`, and `mist-chan-api` recreated
-- `mist-web-gateway` recreated after app service recreation
-- Docker status OK for all five Compose services
-- Windows-local direct health:
-  - `http://127.0.0.1:8001/app/hello`
-  - `http://127.0.0.1:8008/app/hello`
-  - `http://127.0.0.1:80/`
-- Windows-local gateway health:
-  - `http://127.0.0.1:80/api/mist/app/hello`
-  - `http://127.0.0.1:80/api/chan/app/hello`
-- datasource health:
-  - `http://127.0.0.1:9001/health`
-  - `http://host.docker.internal:9001/health` from the backend container
-- diagnostics path, for example
-  `<docker-root>\diagnostics\YYYYMMDD-HHMMSS`
-
-## MySQL Restore Rehearsal
-
-Use the backup path printed by deployment. Do not restore into the production
-MySQL container.
+使用部署输出的备份文件触发 `Test Windows MySQL Restore`：
 
 ```bash
 gh workflow run test-windows-mysql-restore.yml \
   --repo mist-trade/mist-deploy \
   --ref master \
-  -f docker_root='<docker-root>' \
-  -f backup_path='<backup-path-from-deploy>' \
+  -f 'docker_root=E:\quant\MistDocker' \
+  -f 'backup_path=<部署输出的备份绝对路径>' \
   -f timeout_seconds=120 \
   -f keep_container=false
 ```
 
-Required evidence:
+该 workflow 只能恢复到临时 MySQL 容器，不得覆盖生产数据库。
 
-- temporary MySQL container name
-- backup imported into the temporary database
-- schema validation passed
-- temporary container removed
+## 4. Datasource 运行态 smoke
 
-## TDX Runtime Smoke
-
-Run non-state-changing datasource smoke first:
+TDX 使用不同于 QMT 的标的，例如 `600030.SH`：
 
 ```bash
 gh workflow run run-windows-tdx-runtime-smoke.yml \
   --repo mist-trade/mist-deploy \
   --ref master \
-  -f datasource_root='<datasource-root>' \
-  -f appliance_root='<appliance-root>' \
-  -f base_url='http://127.0.0.1:9001' \
-  -f ws_url='' \
-  -f client_id='<runtime-smoke-client-id>' \
-  -f symbol='600519.SH' \
-  -f raw_symbol='' \
-  -f sector='880081.SH' \
-  -f sector_trade_code='880081.SH' \
-  -f period='1d' \
+  -f symbol=600030.SH \
+  -f period=1d \
   -f count=2 \
-  -f timeout_seconds=20 \
   -f include_reference_instrument_smoke=true \
   -f include_finance_report_smoke=true \
   -f include_formula_smoke=true \
@@ -249,136 +150,77 @@ gh workflow run run-windows-tdx-runtime-smoke.yml \
   -f skip_websocket=false
 ```
 
-Required evidence:
-
-- datasource SDK preflight passed
-- TDX WinSW runtime probe passed
-- basic HTTP smoke passed
-- reference/instrument smoke passed
-- finance/report smoke passed
-- formula smoke passed
-- WebSocket ping/pong smoke passed
-
-## Live Quote Subscription Smoke
-
-Do not mutate subscriptions directly from a non-leader WebSocket client in
-production. The datasource enforces a command leader. The normal leader is the
-backend client id `mist-backend-tdx`.
-
-A direct `RequireLiveQuote` runner smoke using a non-leader client is expected
-to fail with `DATASOURCE_WS_NOT_LEADER`; record that as leader-protection
-evidence, not as the positive live quote proof.
-
-Positive live quote verification uses the backend leader test endpoints:
+QMT 使用例如 `300502.SZ`：
 
 ```bash
-curl --noproxy '*' --connect-timeout 5 --max-time 20 -sS -i \
-  -X POST \
-  http://<gateway-hostname>/api/mist/v1/collector/test/tdx-streaming/subscribe \
-  -H 'Content-Type: application/json' \
-  --data '{"code":"600519","period":1,"testOnly":true}'
+gh workflow run run-windows-qmt-runtime-smoke.yml \
+  --repo mist-trade/mist-deploy \
+  --ref master \
+  -f stock_code=300502.SZ \
+  -f period=1d \
+  -f count=1 \
+  -f realtime_mode=off \
+  -f include_raw_bars=true \
+  -f require_bars_data=true \
+  -f include_bridge_commands=true \
+  -f include_full_tick=true \
+  -f include_sector_list=true
 ```
 
-Then connect a read-only observer to datasource WebSocket and wait for `quote`:
+TDX realtime WebSocket 是 `/ws/tdx-experimental/{client_id}`，不是已删除的
+`/ws/quote/{client_id}`。订阅集合由 backend leader 管理，普通 smoke 客户端不得
+直接修改生产订阅。
+
+## 5. Exact-SHA 与数据库保护证据
+
+使用 `Collect Windows Experimental Realtime Evidence` 的 `baseline` phase。
+每次必须提供四个 40 位仓库 SHA、64 位 bridge SHA-256 和实际安装路径。
+
+`baseline` 只读运行态和数据库，并写 evidence JSON；不得切换 realtime mode、重启
+服务或修改订阅。TDX/QMT 两份 evidence 的受保护表摘要必须一致：
+
+- `k`
+- `k_extensions_ef`
+- `k_extensions_tdx`
+- `k_extensions_qmt`
+- `strategy_signals`
+- `strategy_alert_events`
+
+QMT realtime 为 `off` 时，realtime datasource/backend route 为 404、没有 QMT
+realtime metrics，属于 fail-closed 的预期结果；`/health`、native bars 和 bridge
+health 仍必须成功。
+
+## 6. Mac LAN 与监控验证
 
 ```bash
-node -e "const url='ws://<windows-lan-ip>:9001/ws/quote/<observer-client-id>'; const ws=new WebSocket(url); const timeout=setTimeout(()=>{console.error('timeout waiting for quote'); ws.close(); process.exit(2);},70000); ws.addEventListener('open',()=>console.log('open '+url)); ws.addEventListener('message',(event)=>{const text=String(event.data); console.log(text); let msg; try{msg=JSON.parse(text);}catch{return;} if(msg.type==='ready'){ws.send(JSON.stringify({type:'ping'}));} if(msg.type==='quote'){clearTimeout(timeout); console.log('quote_ok symbol='+((msg.data&&msg.data.symbol)||(msg.data&&msg.data.snapshot&&msg.data.snapshot.Code)||'')); ws.close(); process.exit(0);} }); ws.addEventListener('error',(event)=>{console.error('ws error', event.message || event.type); clearTimeout(timeout); process.exit(1);});"
+dscacheutil -q host -a name www.moyui.mist
+curl --noproxy '*' http://www.moyui.mist/
+curl --noproxy '*' http://www.moyui.mist/k
+curl --noproxy '*' http://www.moyui.mist/api/mist/app/hello
+curl --noproxy '*' http://www.moyui.mist/api/chan/app/hello
+curl --noproxy '*' http://<windows-lan-ip>:9001/health
+curl --noproxy '*' http://<windows-lan-ip>:9002/health
+curl --noproxy '*' http://<windows-lan-ip>:9109/metrics
 ```
 
-Clean up through the backend leader:
+已知正确形状：
+
+- `/` 返回 307 并跳转 `/k`，`/k` 返回 200。
+- Mist、Chan、TDX health、QMT health 返回 200。
+- TDX health 包含 `tdxHttpReachable=true`、bridge owner 与收敛 revision。
+- QMT health 包含 `bridge.ready=true`、`ownerStale=false`。
+- exporter 包含 `mist_windows_exporter_up 1` 和 TDX bridge 指标。
+- QMT realtime 为 `off` 时不要求 QMT realtime 指标。
+
+## 7. 完成与回滚
+
+把每轮证据写入当前 active roadmap 的 `evidence/`，记录精确 SHA、workflow run
+链接、备份和诊断路径、盘中/盘后边界、失败项和接受理由。随后运行：
 
 ```bash
-curl --noproxy '*' --connect-timeout 5 --max-time 20 -sS -i \
-  -X POST \
-  http://<gateway-hostname>/api/mist/v1/collector/test/tdx-streaming/unsubscribe \
-  -H 'Content-Type: application/json' \
-  --data '{"code":"600519","period":1,"testOnly":true}'
+openspec validate --all --strict
 ```
 
-Confirm cleanup:
-
-```bash
-curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS \
-  http://<windows-lan-ip>:9001/health
-```
-
-Required evidence:
-
-- subscribe endpoint returns HTTP 200, `success=true`, and `count=1`
-- observer receives `ready` with `leaderClientId="mist-backend-tdx"`
-- observer receives a `quote` event whose `snapshot.Code` is `600519.SH`
-- unsubscribe endpoint returns HTTP 200 and `count=1`
-- final datasource health shows:
-  - `subscribedCount=0`
-  - `activeSubscriptions=[]`
-  - `quoteCallbackRejectedCount=0`
-  - `lastQuoteCallbackAccepted=true`
-  - `eventQueueDepth=0`
-
-## Mac LAN Probes
-
-Confirm hostname resolution:
-
-```bash
-dscacheutil -q host -a name <gateway-hostname>
-```
-
-Probe gateway and datasource paths:
-
-```bash
-curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
-  -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://<gateway-hostname>/
-
-curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
-  -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://<gateway-hostname>/k
-
-curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
-  -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://<gateway-hostname>/api/mist/app/hello
-
-curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
-  -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://<gateway-hostname>/api/chan/app/hello
-
-curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
-  -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://<windows-lan-ip>/api/mist/app/hello
-
-curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
-  -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://<windows-lan-ip>/api/chan/app/hello
-
-curl --noproxy '*' --connect-timeout 5 --max-time 15 -sS -i \
-  -w '\nremote_ip=%{remote_ip}\nhttp_code=%{http_code}\n' \
-  http://<windows-lan-ip>:9001/health
-```
-
-Known-good shape:
-
-- `<gateway-hostname>` resolves to `<windows-lan-ip>`
-- `/` returns HTTP 307 to `/k`
-- `/k` returns HTTP 200
-- Mist and Chan gateway API paths return HTTP 200
-- datasource health returns HTTP 200 with `tdxHttpReachable=true` and
-  `tqInitialized=true`
-
-## Evidence And Completion
-
-After every rerun, create or update an evidence file under:
-
-```text
-openspec/changes/verify-mist-production-baseline/evidence/
-```
-
-Then validate:
-
-```bash
-openspec validate verify-mist-production-baseline --strict
-openspec validate define-mist-production-roadmap --strict
-```
-
-The baseline can be marked known-good only when deployment, health checks,
-restore rehearsal, datasource smoke, live quote subscription smoke, and Mac LAN
-probes have all passed or have an explicit accepted disposition.
+任何必要阶段失败时，停止声明新基线。应用回滚使用部署时传入的 previous image
+SHA；数据库迁移不自动回滚，必须依据部署前备份单独决策。Datasource 与桌面终端
+恢复使用各自独立 workflow，不得用 Docker 部署替代。

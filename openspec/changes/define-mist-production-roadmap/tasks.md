@@ -36,10 +36,11 @@
 - [x] 1.5 Verify TDX product realtime uses official native snapshot events,
       synchronize the datasource/backend contracts, and preserve the
       memory-only boundary for later Theme B persistence work.
-- [ ] 1.6 Refresh the production baseline after material G1 runtime changes,
+- [x] 1.6 Refresh the production baseline after material G1 runtime changes,
       including pinned refs, Windows deployment/runtime evidence, backend leader
       path verification, and Mac-side gateway probes.
-- [ ] 1.7 Record a final disposition and evidence pointer for every G1 item.
+- [x] 1.7 Record the completed G1 disposition and evidence pointer in
+      `evidence/2026-07-22-production-baseline-refresh.md`.
 
 ## G2. Complete production operations readiness
 

@@ -137,13 +137,16 @@ The archived evidence is preserved under
 `openspec/changes/archive/2026-07-22-converge-theme-a-realtime-bridges/`, and
 `openspec/changes/archive/2026-07-22-add-bigqmt-datasource-bridge/`.
 
-The remaining G1 closure work is a refreshed production baseline that points to
-the exact archived HIL evidence, deployed refs, and leader-path verification,
-followed by a final disposition ledger update.
+G1 is complete. The refreshed production baseline is recorded at
+`evidence/2026-07-22-production-baseline-refresh.md` with pinned repository and
+bridge identities, Windows deployment and restore runs, TDX/QMT runtime smoke,
+database protection digests, backend leader state, and Mac gateway probes.
+Realtime transport remains memory-only; persistence and notification work stays
+under the separately gated Theme B roadmap and is not an unresolved G1 item.
 
 ### Decision 5: G2 consolidates the remaining operations control plane
 
-G2 creates one focused child change, provisionally named
+With G1 accepted, G2 creates one focused child change, provisionally named
 `complete-production-operations-readiness`. It reuses, rather than reimplements:
 
 - deployed monitoring and watchdog foundations;
