@@ -30,4 +30,4 @@
 - [x] 5.2 运行 datasource lint/typecheck、unit/contract tests 与 Python 3.6 guardrails，并确认 host-side WinSW datasource 仓库不提供 Dockerfile
 - [x] 5.3 运行两个仓库旧路径扫描、布局守卫与 OpenSpec strict validation
 - [x] 5.4 记录本地验证结果、发布/回滚顺序及尚未执行的 Windows HIL gate
-- [ ] 5.5 在可访问 registry 的环境完成 Mist Docker image build（当前 Docker Hub metadata 两次超时）
+- [x] 5.5 在可访问 registry 的环境完成 Mist Docker image build（GitHub Actions `29928049235` 以 Node.js 24 构建并推送 `mist@1fdc78a` linux/amd64 image）
