@@ -145,3 +145,42 @@ release candidate；本阶段未启用 realtime，也不构成 freshness/HIL 验
   `300502.SZ`。TDX `enable` 前必须先以既有 security 管理边界补齐 `600030.SH`，不得
   偷换为其他标的。
 - 当前为北京时间非交易时段，不执行或宣称 TDX/QMT freshness 验收。
+
+## Pre-HIL baseline 与非交易时段 recovery checkpoint
+
+按操作员边界修正后，evidence workflow 不再请求、保存或核验 terminal bridge installed
+path/file SHA；owner process command line 也从 evidence 中移除。自动化仅核验运行时
+`bridgeBuildId`、owner/generation、协议行为与 protected-table 不变性：
+
+- deploy 修正：`fb8587d7981541dcc19c4a9f6e8c77cf59bb8b59`，CI
+  `29933175130` 成功并 fast-forward 到 `mist-deploy/master`。
+- baseline mode switch：`29931642597` 成功，backup ID
+  `20260722T150513Z-8605aac3`；TDX/QMT 均为 `builtin` 且 allowlist 为空。
+- TDX terminal recovery：`29932230292` 成功；新 owner
+  `tdx-bridge-pid-18732`、新 epoch 已建立，官方 `600030.SH` HTTP probe 成功。该结果只
+  证明非交易时段 recovery，不作为 freshness。
+- QMT terminal recovery：`29932519716` 成功；owner 从 `bigqmt-31884` 切换为
+  `bigqmt-33568`，随后稳定 baseline 观察到 owner `bigqmt-13428`、generation 3；
+  `300502.SZ` historical smoke 成功。该结果只证明 recovery/cache path，不作为
+  freshness。
+- 最终脱敏 TDX baseline：workflow `29933373890` 成功，runtime build
+  `mist-tdx-bridge-v1.1`，owner ready，空订阅与 backend/monitoring 收敛。
+- 最终脱敏 QMT baseline：workflow `29933655170` 成功，runtime build
+  `mist-qmt-realtime-bridge-v1.1`，owner generation 3，空订阅与 backend/monitoring
+  收敛。
+- 两份 artifact 均不含 bridge script path、`PYPlugins` 或 owner command line。
+
+两源 protected-table baseline 完全一致：
+
+| table | row count | content digest |
+|---|---:|---|
+| `k` | 4375 | `91ccfd3e1bda07fa1b4e64b146460366cbbe27d63f052e8522d459813189226b` |
+| `k_extensions_ef` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `k_extensions_tdx` | 4371 | `eba21ccd9ed20eb5ca15b50376bc1f5c642b88cf70bac43eb043de117f746a2d` |
+| `k_extensions_qmt` | 4 | `bf9ecbf751d3d1b5b06dc229bf64b4502138998aca693b181e020a653c756af3` |
+| `strategy_signals` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+| `strategy_alert_events` | 0 | `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` |
+
+task 5.1 完成。task 5.4 仅完成双源 owner/cache recovery；由于 baseline allowlist 为空，
+subscription restoration 尚未验收。TDX `600030.SH` 当前也尚未成为 enabled ACTIVE `tdx`
+source mapping，因此不能执行该标的的 enable/freshness 阶段。

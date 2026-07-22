@@ -39,7 +39,7 @@
 ## 5. Release, HIL And Rollback Gates
 
 - [x] 5.0 Complete and locally validate `normalize-tdx-qmt-source-layouts`; use its renamed TDX/QMT bridge artifacts for every following HIL task.
-- [ ] 5.1 Record pre-HIL protected-table row counts/digests, exact repository/image identities and observable bridge runtime build identities; do not request terminal installed paths and do not run or change MySQL migrations.
+- [x] 5.1 Record pre-HIL protected-table row counts/digests, exact repository/image identities and observable bridge runtime build identities; do not request terminal installed paths and do not run or change MySQL migrations.
 - [ ] 5.2 Validate TDX `600030.SH` during a supported session: full native frame, canonical adapter, freshness, per-symbol sequence, owner/subscription recovery and terminal/datasource restart.
 - [ ] 5.3 Validate QMT `300502.SZ` during a supported session: Python 3.6 bridge, owner generation fence, full native frame, canonical adapter, freshness, per-symbol sequence and terminal/datasource restart.
 - [ ] 5.4 Validate non-trading-session owner/subscription/cache recovery claims without representing them as freshness evidence.
