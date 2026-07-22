@@ -184,3 +184,29 @@ path/file SHA；owner process command line 也从 evidence 中移除。自动化
 task 5.1 完成。task 5.4 仅完成双源 owner/cache recovery；由于 baseline allowlist 为空，
 subscription restoration 尚未验收。TDX `600030.SH` 当前也尚未成为 enabled ACTIVE `tdx`
 source mapping，因此不能执行该标的的 enable/freshness 阶段。
+
+## QMT 非交易时段订阅恢复与精确回滚
+
+在不接触 operator-managed bridge 文件的前提下，使用固定标的 `300502.SZ` 完成 QMT
+订阅恢复检查；该时段不支持 freshness 验收，因此只记录 owner、订阅和恢复行为：
+
+- QMT enable：workflow `29933918414` 成功，backup ID
+  `20260722T153417Z-d367de2e`。
+- QMT terminal recovery：workflow `29934109626` 成功；owner 从
+  `bigqmt-13428` 切换为 `bigqmt-30936`，日志明确确认
+  `QMT realtime subscriptions restored: 300502.SZ`，且
+  `restoredSubscriptions=[300502.SZ]`。historical bars smoke 只作为 cache/control path
+  证据，不作为实时新鲜度。
+- 使用同一 backup ID 执行精确配置回滚：workflow `29934289846` 成功并输出
+  `MIST_REALTIME_MODE_ROLLED_BACK=20260722T153417Z-d367de2e`。
+- 回滚后只读 status：workflow `29934722347` 成功，datasource/backend 两侧 TDX 与 QMT
+  均为 `builtin`。
+- 回滚后 QMT baseline：workflow `29935020629` 成功；datasource
+  `activeSubscriptions=[]`、backend `allowlist=[]`，owner ready，runtime build 为
+  `mist-qmt-realtime-bridge-v1.1`，bridge 维护边界标记为 `operator-managed`。
+- 回滚后六张 protected tables 的 row count 与 content digest 与 pre-HIL baseline
+  完全一致，未观察到 K 线、signal 或 notification 副作用。
+
+因此 QMT 的非交易时段 subscription restoration 与 per-source config rollback 已验收；
+task 5.4 仍不勾选，因为 TDX `600030.SH` 的 enabled ACTIVE `tdx` source mapping 尚未补齐，
+无法用规定标的完成同等订阅恢复检查。双源 trading-session freshness 也仍待支持时段执行。
