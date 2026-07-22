@@ -72,12 +72,10 @@ export const mistEnvSchema = commonEnvSchema.append({
     .default(30000)
     .description('TDX WebSocket heartbeat interval in milliseconds'),
 
-  TDX_EXPERIMENTAL_ALLOWLIST: Joi.string()
+  TDX_REALTIME_ALLOWLIST: Joi.string()
     .allow('')
     .default('')
-    .description(
-      'Comma-separated exact formatCodes for experimental realtime (max 5)',
-    ),
+    .description('Comma-separated exact formatCodes for TDX realtime (max 5)'),
 
   // QMT historical bars datasource configuration
   QMT_BASE_URL: Joi.string()
@@ -97,16 +95,14 @@ export const mistEnvSchema = commonEnvSchema.append({
     .description('QMT WebSocket reconnect delay in milliseconds'),
 
   QMT_REALTIME_MODE: Joi.string()
-    .valid('off', 'builtin_experimental')
-    .default('off')
-    .description('QMT realtime mode: off (default) or builtin_experimental'),
+    .valid('off', 'builtin')
+    .default('builtin')
+    .description('QMT realtime mode: builtin (default) or off for rollback'),
 
-  QMT_EXPERIMENTAL_ALLOWLIST: Joi.string()
+  QMT_REALTIME_ALLOWLIST: Joi.string()
     .allow('')
     .default('')
-    .description(
-      'Comma-separated exact QMT formatCodes for experimental realtime (max 5)',
-    ),
+    .description('Comma-separated exact QMT formatCodes for realtime (max 5)'),
 });
 
 /**
