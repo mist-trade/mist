@@ -62,3 +62,34 @@
 - Datasource CI：`29907204092`，成功，SHA `b091032b60f4dcff7c4589809c9cf886eeaf432d`。
 - Monitoring CI：`29907210917`，成功，SHA `0d5eac27ce709c2107e173bde462a622175d458d`。
 - Deploy CI 首次运行 `29907174630` 揭示 Windows CRLF 导致 fixture SHA 不稳定；加入 `eol=lf` guard 后，`29907312377` 成功，修复 SHA `1353608db5123a411cb60619c65d815322d3983f`。
+
+## HIL 前 bridge runtime 修复
+
+QMT 手工覆盖 `mist_qmt_realtime_bridge.py` 后，大 QMT 内置策略编辑器报告
+`__file__ is not defined`。根因是 embedded strategy execution 不保证 Python file-backed
+module 语义，而 bridge 在进入 `init()` 前直接读取 `__file__` 计算 SHA-256。本地普通 import
+会自动定义 `__file__`，原 guardrail 未覆盖这一真实运行方式。
+
+修复边界：
+
+- QMT 无 `__file__` 时正常加载并执行 `init()`，运行时
+  `bridgeArtifactSha256=unavailable`；Windows evidence 继续对 installed path 执行
+  `Get-FileHash -Algorithm SHA256`，该外部结果才是发布 artifact digest。
+- TDX 同步移除模块加载阶段未保护的 `__file__` 访问；其官方 `tq.initialize(...)` 仍要求
+  从 `PYPlugins/user` 注册真实文件，pathless 运行方式会得到明确 fatal message 而不是
+  `NameError`。
+- QMT/TDX build identity 分别提升为 `mist-qmt-realtime-bridge-v1.1` 与
+  `mist-tdx-bridge-v1.1`。
+- 新增 no-`__file__` execution contract tests；QMT 测试会真实调用 `init()` 并验证
+  `run_time` 注册成功。
+
+修复后本地验证：
+
+- `.venv/bin/pytest -m "not live" -q`：342 tests 通过，只有既有 Starlette/httpx
+  deprecation warning。
+- `.venv/bin/ruff check .`：通过。
+- `.venv/bin/pyright --pythonpath .venv/bin/python`：0 errors、0 warnings。
+- QMT bridge SHA-256：`bbfde4c69e312903205c3fabe5669514a98ec940fdfcddc30e6be3fc45d0cfe5`。
+- TDX bridge SHA-256：`928717d79a713dfd2ca493ecc849e64f2d2d81db4f8ca70549bc9f7ad2713ca5`。
+
+该修复尚未执行 Windows HIL、commit、push 或生产 bridge 覆盖，release gate 保持未关闭。
