@@ -55,8 +55,8 @@
 - [x] 6.3f Move backend TDX desired-state synchronization from the loopback HTTP route to the realtime WebSocket.
 - [x] 6.3g Deploy the converged TDX datasource/backend/monitoring SHAs and rerun both datasource and both terminal recovery workflows.
 - [x] 6.3h Remove dead TDX/QMT compatibility code and redundant in-process frame reconstruction while preserving boundary JSON and required native normalization.
-- [ ] 6.4 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest.
-- [ ] 6.5 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest.
+- [ ] 6.4 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest. Transport evidence passed on 2026-07-22; current terminal/runtime inventory and explicit F2 review remain.
+- [ ] 6.5 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest. Transport evidence passed on 2026-07-22; current terminal/runtime inventory and explicit acceptance review remain.
 - [x] 6.6 Re-run historical TDX HTTP and QMT native bridge matrices, resolve all evidence findings, and record final master SHAs.
 - [ ] 6.7 Complete the experimental TDX lifecycle task, sync stable specs, archive Theme A changes, and release the Theme B merge gate.
 
