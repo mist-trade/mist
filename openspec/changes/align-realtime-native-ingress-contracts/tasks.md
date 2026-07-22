@@ -31,7 +31,7 @@
 - [x] 4.3 Rename Windows exporter/Mac watchdog realtime config, types, metrics and alerts to formal `mist_realtime_*` contracts and add startup/session grace behavior.
 - [x] 4.4 Update current Simplified Chinese architecture/operator/baseline docs and generated current OpenAPI summaries without editing historical archives.
 - [x] 4.5 Add CI repository guards proving active realtime experimental/legacy names, old routes, old payloads and `builtin_experimental` are absent.
-- [ ] 4.6 Run deploy PowerShell tests with `pwsh-preview`, monitoring Go tests/lint/build and Docker builds.
+- [x] 4.6 Run deploy PowerShell tests with `pwsh-preview`, monitoring Go tests/lint/build and Docker builds.
 
 ## 5. Release, HIL And Rollback Gates
 

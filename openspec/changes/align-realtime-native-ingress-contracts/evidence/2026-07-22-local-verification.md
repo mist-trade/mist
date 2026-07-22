@@ -46,7 +46,14 @@
 
 ## 未关闭门禁
 
-- Docker image build 两次停在拉取 `docker.io/library/node:24-alpine` metadata，均为 `DeadlineExceeded`；本机没有该 base image cache。应用 webpack build 已通过，但 Docker image gate 仍未关闭。
+- 本机 Docker image build 两次停在拉取 `docker.io/library/node:24-alpine` metadata，均为 `DeadlineExceeded`；随后 GitHub Actions `29907214564` 使用 Node.js 24 完成 backend 验证、linux/amd64 image build 和 GHCR push，Docker image gate 已关闭。
 - 尚未执行 Windows HIL：TDX `600030.SH`、QMT `300502.SZ` 的交易时段 freshness、owner generation、订阅恢复、终端/datasource restart 仍待验证。
 - 尚未记录 HIL 前后 protected-table row count/digest，也未执行 whole-version/config rollback。
 - 尚未发布到生产；QMT 代码和部署模板默认已是 `builtin`，生产主机 effective state 未在本 checkpoint 中改动。
+
+## 发布前 CI
+
+- Backend CI/image：`29907214564`，成功，SHA `4103a7b4699c30c13d91b859d9323585ceb90349`。
+- Datasource CI：`29907204092`，成功，SHA `b091032b60f4dcff7c4589809c9cf886eeaf432d`。
+- Monitoring CI：`29907210917`，成功，SHA `0d5eac27ce709c2107e173bde462a622175d458d`。
+- Deploy CI 首次运行 `29907174630` 揭示 Windows CRLF 导致 fixture SHA 不稳定；加入 `eol=lf` guard 后，`29907312377` 成功，修复 SHA `1353608db5123a411cb60619c65d815322d3983f`。
