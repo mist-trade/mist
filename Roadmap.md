@@ -1,4 +1,11 @@
-# 目的
+# 历史 Roadmap（非当前执行清单）
+
+> 本文保留 2020 年代早期产品设想，仅用于历史参考。当前生产 readiness、实时
+> datasource、策略与部署计划以 `openspec/changes/` 中的 active changes 和
+> `define-mist-production-roadmap` 为准。不要依据本文恢复 MiniQMT、旧 scheduler、
+> MCP Server 或已删除的 datasource 路径。
+
+## 目的
 
 本项目是借助nest技术栈所开发的一款股票告警软件，用以通过一系列策略发出买入买出点，
 目前需求如下

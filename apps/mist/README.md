@@ -1,123 +1,68 @@
-# Mist Application
+# Mist Backend 应用
 
-Main stock market analysis application for the Mist system. Provides technical indicators, Chan Theory analysis, and trend detection for the Shanghai Stock Exchange.
+`apps/mist` 是 Mist 的主 NestJS API，负责证券配置、历史数据采集、技术指标、缠论
+业务接口、策略定义/信号/告警和 datasource realtime client。
 
-## Features
-
-- **Technical Indicators**: MACD, RSI, KDJ, ADX, ATR calculations
-- **Chan Theory Analysis**: Bi (笔), Fenxing (分型), and Channel (中枢) detection
-- **Trend Analysis**: Market trend direction detection
-- **Data Management**: Historical data storage and retrieval for multiple timeframes
-
-## Prerequisites
-
-- Node.js (v18+)
-- MySQL database
-- Redis (optional, for caching)
-
-## Installation
+## 启动
 
 ```bash
-# Install dependencies
 pnpm install
-```
-
-## Environment Variables
-
-Copy `.env.example` to `.env` and configure:
-
-```bash
-cp src/.env.example src/.env
-```
-
-### Required Variables
-
-| Variable | Description | Example |
-|----------|-------------|---------|
-| `mysql_server_host` | MySQL host | localhost |
-| `mysql_server_port` | MySQL port | 3306 |
-| `mysql_server_username` | MySQL username | root |
-| `mysql_server_password` | MySQL password | your_secure_password |
-| `mysql_server_database` | Database name | mist |
-| `nest_server_port` | Application port | 3000 |
-| `redis_server_host` | Redis host | localhost |
-| `redis_server_port` | Redis port | 6379 |
-| `redis_server_db` | Redis database number | 1 |
-
-## Database Setup
-
-Create the MySQL database:
-
-```sql
-CREATE DATABASE mist DEFAULT CHARACTER SET utf8mb4;
-```
-
-Tables will be auto-created on first run (development mode only).
-
-## Running the Application
-
-### Development Mode
-
-```bash
 pnpm run start:dev:mist
 ```
 
-The application will be available at `http://localhost:8001`
+默认地址：
 
-### Production Build
+- API：`http://127.0.0.1:8001`
+- 健康检查：`GET /app/hello`
+- Swagger：`http://127.0.0.1:8001/api-docs`
 
-```bash
-# Build the application
-pnpm run build
+生产环境通过 nginx 同源网关访问 `/api/mist/*`，frontend、skills 和 AstrBot 不应
+直连 datasource。
 
-# Start production server
-pnpm run start:prod:mist
-```
+## 主要接口
 
-## API Documentation
+- `POST /v1/indicators/k`
+- `POST /v1/indicators/macd`
+- `POST /v1/indicators/rsi`
+- `POST /v1/indicators/kdj`
+- `POST /v1/chan/merge-k`
+- `POST /v1/chan/bi`
+- `POST /v1/chan/channel`
+- `/v1/strategy-definitions`
+- `/v1/strategy-signals`
+- `/v1/strategy-alert-events`
 
-Once running, access the Swagger documentation at:
+接口细节以运行时 Swagger 和 contract tests 为准。
 
-```
-http://localhost:8001/api-docs
-```
+## Datasource
 
-## API Endpoints
+- TDX HTTP：`TDX_BASE_URL`
+- QMT HTTP：`QMT_BASE_URL`
+- TDX/QMT realtime：独立 WebSocket client 与独立 native frame contract
 
-### Health Check
-- `GET /app/hello` - Service health check
+历史数据可持久化到 `k` 与 provider extension 表。当前 realtime transport 为
+memory-only，不写数据库或生成通知。详细链路见
+[`../../docs/backend-datasource-integration.md`](../../docs/backend-datasource-integration.md)。
 
-### Chan Theory Analysis
-- `POST /v1/chan/merge-k` - Merge K-lines based on containment
-- `POST /v1/chan/bi` - Create Bi (strokes) from K-lines
-- `POST /v1/chan/channel` - Create channels (Zhongshu) from Bi
+## 数据库
 
-### Technical Indicators
-- `POST /v1/indicators/macd` - Calculate MACD indicator
-- `POST /v1/indicators/rsi` - Calculate RSI indicator
-- `POST /v1/indicators/kdj` - Calculate KDJ indicator
-- `POST /v1/indicators/k` - Get K-line data
-
-## Time Periods
-
-Data is stored for multiple timeframes:
-- 1min, 5min, 15min, 30min, 60min, daily
-
-## Troubleshooting
-
-### TypeORM Synchronize Disabled
-
-TypeORM `synchronize: false` is set in every environment for safety. Use the
-repository SQL migration runner:
+TypeORM `synchronize` 在所有环境均关闭。使用：
 
 ```bash
 pnpm run db:migrate
 ```
 
-Migration files live under `deploy/database/migrations`. Existing-database
-security identity cleanup can be audited with
-`deploy/database/audit-security-identity.sql` before running migrations.
+迁移文件位于 `deploy/database/migrations`。
 
-## License
+## 验证
+
+```bash
+env TZ=UTC pnpm run test:ci
+pnpm run lint
+pnpm run typecheck
+pnpm run ci:contracts
+```
+
+## 许可证
 
 BSD-3-Clause
