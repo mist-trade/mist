@@ -1,6 +1,6 @@
 # F2 Windows HIL Evidence Record
 
-Status: **transport evidence complete; identity review pending**
+Status: **accepted**
 Selected: `2026-07-17`  
 Owner: `project-maintainer`  
 Due: `2026-08-17`  
@@ -31,10 +31,10 @@ Fill every value from the deployed machine, not from a developer checkout.
 | `mist-datasource` git SHA | `d97e29f3aba61de3eb99baf523b8caa4fe7ab47a` |
 | bridge artifact SHA-256 | `063943212180e1c3369905e464c72c35f2a94c62a9513880f70520aaa9a5260c` |
 | `bridgeBuildId` | `mist-tdx-bridge-v0.2` |
-| TDX terminal product/version/build | pending |
-| embedded Python version | pending |
-| `tqcenter` version/build, if exposed | pending |
-| Windows version | pending |
+| TDX terminal product/version/build | `TdxW.exe` `1.0.0.1`; SHA-256 `7a07a6f7e8b78e1e73b8338a0b9751354184868a63a661b08fa85bc88df04a68` |
+| embedded Python version | External TDX bridge runtime `Python 3.12.10`; interpreter SHA-256 `4d6f5f81a4bca11191c4c7c6b43632694d0a4ce74e068619d8fdc161d469859a` |
+| `tqcenter` version/build, if exposed | No version field exposed; `tqcenter.py` SHA-256 `091cad459997693d9e4ef37466322a2811b220990ce3d00fe00c0f5869888d7d` |
+| Windows version | Windows 10 Pro `10.0.19045`, build `19045`, 64-bit |
 | trading phase (pre-open/continuous auction/lunch/close) | A-share continuous auction |
 | tested exact symbols | `600519.SH` |
 
@@ -115,7 +115,7 @@ Record relative paths and SHA-256 for each attachment.
 
 | Artifact | Path | SHA-256 |
 |---|---|---|
-| environment/build inventory | pending | pending |
+| environment/build inventory | `experimental-tdx-baseline/baseline.json` from `29887578543` | `sha256:5acc80de586e93dbab3a44d02a96929c52d92c8ccaf084b06074d0bc138b131f` |
 | datasource health before/registered/restarted | Actions artifacts from `29884138077`, `29884310794`, `29886212704` | retained by GitHub Actions |
 | Mist diagnostics before/registered/restarted/stopped | Actions artifacts from `29884138077`, `29884310794`, `29886212704`, `29886299255` | retained by GitHub Actions |
 | sanitized first accepted F2 envelope | `experimental-tdx-enabled/enabled.json` from `29884310794` | `sha256:909810ff30f8f3ca4f1ccedcf372fadf8e1e405d97a6849d05ddeccc2483b9b0` |
@@ -129,7 +129,7 @@ Record relative paths and SHA-256 for each attachment.
 
 All items must be true:
 
-- [ ] Deployed SHAs, script SHA, terminal version, Python/runtime version, and
+- [x] Deployed SHAs, script SHA, terminal version, Python/runtime version, and
       trading phase are recorded.
 - [x] Exact desired/native identities converge for one or two symbols.
 - [x] A real TDX callback produces a snapshot accepted through datasource HTTP,
@@ -142,13 +142,13 @@ All items must be true:
 - [x] No scanner, signal, alert, trading, or other business side effect occurs.
 - [x] Builtin no-subscription rollback succeeds on the same machine and deployed builds.
 - [x] No lease token appears in any retained artifact.
-- [ ] Reviewer records an explicit acceptance below.
+- [x] Reviewer records an explicit acceptance below.
 
-Decision: `pending`  
-Executed by: `pending`  
-Reviewed by: `pending`  
-Accepted at: `pending`  
-Notes: `TDX transport, terminal-owner restart, rollback, and no-K evidence passed on 2026-07-22. Immediate 30s/90s post-restart smokes timed out; the same replacement owner resumed snapshots after a multi-minute terminal cold start and the accepted retry/post_restart artifact is fresh. Current terminal product, Python runtime, tqcenter, and Windows versions still require an exact machine inventory before reviewer acceptance.`
+Decision: `accepted`
+Executed by: `Codex with project-maintainer supervision`
+Reviewed by: `project-maintainer`
+Accepted at: `2026-07-22T11:08:00+08:00`
+Notes: `TDX transport, terminal-owner restart, rollback, and no-K evidence passed on 2026-07-22. Immediate 30s/90s post-restart smokes timed out; the same replacement owner resumed snapshots after a multi-minute terminal cold start and the accepted retry/post_restart artifact is fresh. Runtime inventory run 29887578543 bound the accepted bridge owner to the current terminal, Python interpreter, tqcenter file, and Windows build. The project maintainer explicitly requested final acceptance and close-out on 2026-07-22.`
 
 Only after `Decision: accepted` may the lifecycle be changed to
 `transport-HIL-verified` and task 7.2 be checked. Acceptance permits transport

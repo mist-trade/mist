@@ -117,12 +117,11 @@ confined to the terminal/provider boundary.
 
 ## Experimental lifecycle and exit gate
 
-Current state: `HIL-pending`; `hilOwner=project-maintainer`;
-`hilBy=2026-08-17`.
+Current state: `transport-HIL-verified`; `hilOwner=project-maintainer`;
+accepted `2026-07-22` before `hilBy=2026-08-17`.
 
-Selected resolution path (2026-07-17): run the bounded Windows F2 HIL. This is
-an operator decision, not verification evidence, so the lifecycle remains
-`HIL-pending` until the acceptance record is complete. F2 stores the native SDK
+Selected resolution path (2026-07-17): run the bounded Windows F2 HIL. The
+acceptance record completed on 2026-07-22. F2 stores the native SDK
 payload verbatim and a sanitized request envelope; `leaseToken` MUST be
 redacted and MUST NOT be persisted in evidence.
 

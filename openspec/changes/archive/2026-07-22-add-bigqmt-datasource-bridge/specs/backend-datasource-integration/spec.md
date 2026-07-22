@@ -8,8 +8,8 @@ The Mist backend SHALL treat TDX and QMT as separate datasource services.
 
 - **WHEN** backend collection or analysis code needs TDX data
 - **THEN** it MUST call the TDX datasource on `:9001`
-- **AND** it MAY use TDX `/v1` routes or the TDX quote WebSocket according to
-  the existing TDX contract
+- **AND** it MAY use TDX `/v1` routes or the dedicated builtin realtime
+  WebSocket according to the existing TDX contract
 
 #### Scenario: Backend requests QMT historical bars
 
@@ -19,13 +19,13 @@ The Mist backend SHALL treat TDX and QMT as separate datasource services.
 - **AND** it MUST handle QMT native `data.marketData`
 - **AND** it MUST use the fixed v1 QMT adjustment口径 `front_ratio`
 
-#### Scenario: Backend preserves QMT realtime as unverified work
+#### Scenario: Backend preserves QMT realtime as a separate memory-only path
 
 - **WHEN** backend historical QMT bars are implemented
-- **THEN** the existing QMT WebSocket strategy path MUST NOT be deleted solely
-  because historical bars are available
-- **AND** QMT realtime MUST remain marked as unverified until a realtime smoke
-  test validates subscription and payload behavior
+- **THEN** the accepted QMT realtime path MUST remain separate from historical
+  bar collection
+- **AND** it MUST remain memory-only until a separately gated persistence
+  change is implemented and accepted
 
 ### Requirement: Backend does not call QMT bridge internals as product API
 

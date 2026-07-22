@@ -141,10 +141,10 @@
       `HIL-pending` with `hilOwner=project-maintainer` and
       `hilBy=2026-08-17`. Completion of the macOS slice MUST NOT be described
       as production readiness.
-- [ ] 7.2 Resolve `HIL-pending` by `2026-08-17`: either capture accepted F2
+- [x] 7.2 Resolve `HIL-pending` by `2026-08-17`: either capture accepted F2
       Windows evidence and advance through `transport-HIL-verified`, or enter
       `reference-quarantined` and remove active runtime wiring while preserving
       specs, fixtures, replay harness, and evidence. This task intentionally
-      remains open until one of those outcomes occurs. Resolution path selected
-      on 2026-07-17: Windows F2 HIL (option 1), using
-      `evidence/F2-WINDOWS-HIL.md`; selection alone does not complete the task.
+      remained open until one of those outcomes occurred. Windows F2 HIL was
+      accepted on 2026-07-22 using `evidence/F2-WINDOWS-HIL.md`, advancing the
+      lifecycle to `transport-HIL-verified`.

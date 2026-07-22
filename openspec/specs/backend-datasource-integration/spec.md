@@ -3,9 +3,7 @@
 ## Purpose
 
 TBD - created by archiving change connect-backend-to-datasource. Update Purpose after archive.
-
 ## Requirements
-
 ### Requirement: Configured datasource client boundary
 
 The Mist backend SHALL use the configured Python datasource service as the only
@@ -83,11 +81,12 @@ Mist K-line rows.
 - **THEN** the backend returns `QmtResponse[]` with base K fields
 - **AND** it maps QMT-specific extension fields into `KExtensionQmt`
 
-#### Scenario: QMT realtime remains unverified
+#### Scenario: QMT realtime remains memory-only
 
 - **WHEN** QMT historical bars are supported by backend collection
-- **THEN** the existing QMT WebSocket strategy path MUST remain a separate
-  unverified realtime chain until a realtime smoke validates it
+- **THEN** the accepted QMT realtime transport remains an independently gated,
+  memory-only path
+- **AND** it MUST NOT persist realtime snapshots or derived K-line data
 
 ### Requirement: TDX bar field preservation
 
@@ -171,14 +170,15 @@ upstream datasource failures with stable backend errors.
 
 ### Requirement: WebSocket subscription resync
 
-The backend TDX WebSocket client SHALL maintain desired subscriptions locally
-and resync them after every datasource WebSocket connection.
+The backend realtime leader SHALL resolve the configured symbol set, maintain it
+locally, and resync the complete set after every datasource WebSocket
+connection.
 
 #### Scenario: Datasource sends ready
 
 - **WHEN** the backend receives a WebSocket `ready` message from the datasource
 - **THEN** it sends `sync_subscriptions` with the full locally desired symbol
-  set before relying on new bar events
+  set before relying on new snapshot events
 
 #### Scenario: Backend subscribes after connection
 
@@ -191,49 +191,6 @@ and resync them after every datasource WebSocket connection.
 - **WHEN** the WebSocket reconnects after disconnect
 - **THEN** the client sends `sync_subscriptions` with all locally desired
   symbols again
-
-### Requirement: Normalized WebSocket event handling
-
-The backend SHALL consume datasource WebSocket events from the canonical
-`WSMessage` envelope, prioritize message-specific payloads under `data`, and
-aggregate K-line candles from normalized snapshot fields while preserving
-temporary legacy fallbacks during migration.
-
-#### Scenario: Normalized bar event arrives
-
-- **WHEN** the backend receives a datasource WebSocket message with
-  `type: "bar"` and normalized bar data
-- **THEN** it converts the event into the existing candle callback shape and
-  persists it through the current K-line save path
-
-#### Scenario: Quote event arrives
-
-- **WHEN** the backend receives a datasource WebSocket message with
-  `type: "quote"` and snapshot data under `data`
-- **THEN** it parses the snapshot into `code`, `formatCode`, normalized
-  aggregation fields, and `raw`
-- **AND** it routes only the normalized fields through K-line aggregation
-- **AND** the parsed snapshot MUST NOT include `stockCode`
-
-#### Scenario: WebSocket error event arrives
-
-- **WHEN** the datasource sends a WebSocket `error` event
-- **THEN** the backend logs the datasource error code, message, retryable flag,
-  and details from the canonical `data` payload
-- **AND** it does not drop the desired subscription set
-
-#### Scenario: WebSocket subscription acknowledgement arrives
-
-- **WHEN** the datasource sends a `subscribed` or `unsubscribed` event
-- **THEN** the backend reads accepted, rejected, and active symbols from the
-  canonical `data` payload
-- **AND** it may read the prior top-level shape only as a migration fallback
-
-#### Scenario: WebSocket pong event arrives
-
-- **WHEN** the datasource sends a `pong` event with timestamp and provider
-- **THEN** the backend treats it as a heartbeat response without requiring
-  provider-specific fields
 
 ### Requirement: Deployment health verifies backend-datasource connection
 
@@ -315,84 +272,27 @@ and how to verify that connection locally and on Windows.
 
 ### Requirement: Snapshot raw preservation boundary
 
-The backend SHALL preserve the full provider snapshot payload available on a
-TDX quote event for real-time pass-through or future in-memory calculation, but
-MUST NOT aggregate or persist raw snapshot fields as K-line data.
+The backend SHALL preserve the validated provider-native object carried by an
+accepted realtime snapshot, but MUST keep the experimental realtime module
+memory-only and MUST NOT aggregate or persist snapshots as K-line data.
 
 #### Scenario: Official snapshot fields are preserved
 
 - **WHEN** a TDX quote snapshot includes provider fields such as `NowVol`,
   `Inside`, `Outside`, `Buyp`, `Buyv`, `Sellp`, `Sellv`, `Average`, `Zangsu`,
   or `ZAFPre3`
-- **THEN** those fields remain present under `TdxSnapshot.raw`
+- **THEN** those fields remain present under the frame's `native` object
 
-#### Scenario: K aggregation ignores raw fields
+#### Scenario: Realtime snapshot remains memory-only
 
-- **WHEN** a TDX snapshot contains both normalized fields and additional raw
-  provider fields
-- **THEN** `KCandleAggregator` computes candles from `code`, `timestamp`,
-  `now`, `volume`, and `amount`
-- **AND** it does not copy `raw` into completed candles
+- **WHEN** an accepted TDX or QMT realtime snapshot reaches the backend
+- **THEN** it may update bounded diagnostic state and callbacks
+- **AND** it MUST NOT invoke candle aggregation or database persistence
 
-#### Scenario: Completed streaming K persistence is raw-free
+### Requirement: Removed datasource routes stay absent
 
-- **WHEN** a completed candle produced from snapshot aggregation is persisted
-- **THEN** the K save path writes `timestamp`, `open`, `high`, `low`, `close`,
-  `volume`, `amount`, and `period`
-- **AND** it does not write raw snapshot fields or opaque snapshot JSON to K
-  extension tables
-
-### Requirement: Datasource WebSocket outbound messages use one envelope
-
-The datasource service SHALL emit WebSocket server messages through a single
-`WSMessage` envelope with `type`, `provider`, `timestamp`, and `data`.
-
-#### Scenario: Ping receives timestamped pong
-
-- **WHEN** a WebSocket client sends `{"type": "ping"}` to either TDX or QMT
-- **THEN** the datasource responds with a `WSMessage` whose `type` is `pong`
-- **AND** the response includes `provider`, `timestamp`, and `data`
-
-#### Scenario: Subscription acknowledgement is data based
-
-- **WHEN** a client changes subscriptions through `sync_subscriptions`,
-  `subscribe`, or `unsubscribe`
-- **THEN** the datasource acknowledgement message MUST put `accepted`,
-  `rejected`, and `active` under `data`
-- **AND** it MUST NOT require clients to read provider-specific top-level
-  acknowledgement fields
-
-#### Scenario: Datasource error message is machine readable
-
-- **WHEN** the datasource sends a WebSocket error
-- **THEN** the error message MUST put `code`, `message`, `retryable`, and
-  `details` under `data`
-- **AND** TDX and QMT MUST use the same structure for those fields
-
-### Requirement: Datasource snapshot quote events are serialized centrally
-
-The datasource service SHALL publish TDX snapshot quote events through a shared
-serializer instead of hand-mapping snapshot field names at each publisher.
-
-#### Scenario: Collector publishes snapshot quote
-
-- **WHEN** the TDX snapshot collector publishes a quote event
-- **THEN** the message MUST be a `WSMessage` with `type: "quote"` and
-  `provider: "tdx"`
-- **AND** its `data` MUST include the subscribed symbol and a `snapshot`
-  payload
-
-#### Scenario: Snapshot serializer avoids duplicate aliases
-
-- **WHEN** a normalized `TdxSnapshot` is serialized for WebSocket quote output
-- **THEN** the snapshot payload MUST use one canonical key per value
-- **AND** it MUST NOT emit duplicate aliases such as both `Now` and `Last` for
-  the same price or both `High` and `Max` for the same high value
-
-### Requirement: Datasource old routes are migration-only
-
-The datasource product contract SHALL prefer normalized `/v1` routes, while old
-TDX/QMT routes remain explicit migration or compatibility surfaces.
+The datasource product contract SHALL use normalized `/v1` routes and dedicated
+builtin realtime WebSockets, while removed legacy TDX routes remain absent.
 
 #### Scenario: Product callers use normalized routes
 
@@ -400,14 +300,13 @@ TDX/QMT routes remain explicit migration or compatibility surfaces.
   finance, formula, or sector data
 - **THEN** they MUST use normalized `/v1` routes or the WebSocket contract
   defined in this capability
-- **AND** they MUST NOT add new product use of old bare-dict routes
+- **AND** they MUST NOT add new product use of removed bare-dict routes
 
-#### Scenario: Old route boundary is documented or marked
+#### Scenario: Removed routes are requested
 
-- **WHEN** an old datasource route remains exposed
-- **THEN** its migration status MUST be documented or exposed through
-  deprecation metadata
-- **AND** tests or static checks MUST prove the migration boundary is present
+- **WHEN** a caller requests `/api/tdx/*` or `/ws/quote/*`
+- **THEN** no matching route exists
+- **AND** contract tests MUST keep those routes absent
 
 ### Requirement: Provider-facing contracts stay narrow and typed
 
@@ -429,3 +328,82 @@ ABC that tries to cover every provider method.
 - **THEN** it MUST NOT add a large placeholder adapter interface for unused
   provider operations
 - **AND** tests MUST cover the concrete normalized contract being consumed
+
+### Requirement: QMT experimental consumer is independent
+The backend SHALL implement QMT experimental realtime through a dedicated module, client, allowlist, store, and diagnostic controller that do not inherit from or instantiate the legacy TDX realtime graph.
+
+#### Scenario: QMT experimental is enabled beside TDX
+- **WHEN** the Mist app starts with `QMT_REALTIME_MODE=builtin_experimental`
+- **THEN** historical collection and the independent TDX and QMT realtime consumers are all available
+
+#### Scenario: Schedule app starts
+- **WHEN** the schedule app starts
+- **THEN** it imports historical collection only and exposes no realtime client or route
+
+### Requirement: TDX desired subscriptions use the realtime WebSocket
+The backend TDX leader SHALL send the complete desired subscription set over its datasource realtime WebSocket and SHALL NOT call a loopback-only HTTP desired-state route from Docker.
+
+#### Scenario: TDX ready frame is accepted
+- **WHEN** the backend accepts a valid TDX ready frame
+- **THEN** it sends one `sync_subscriptions` WebSocket message containing the complete resolved allowlist
+
+### Requirement: QMT experimental readback is internal and memory-only
+The backend SHALL expose QMT latest-snapshot state only through guarded internal experimental diagnostics and SHALL NOT expose a product snapshot endpoint or persist experimental snapshots.
+
+#### Scenario: Authorized diagnostic readback
+- **WHEN** an authorized loopback or admin caller reads an allowlisted QMT format code
+- **THEN** the backend returns its latest accepted snapshot, epoch, sequence, timestamps, freshness, and counters
+
+#### Scenario: Product snapshot path is requested
+- **WHEN** a caller requests a QMT experimental snapshot through a public product route
+- **THEN** no such route exists
+
+### Requirement: Backend uses separate TDX and QMT datasource services
+
+The Mist backend SHALL treat TDX and QMT as separate datasource services.
+
+#### Scenario: Backend requests TDX data
+
+- **WHEN** backend collection or analysis code needs TDX data
+- **THEN** it MUST call the TDX datasource on `:9001`
+- **AND** it MAY use TDX `/v1` routes or the dedicated builtin realtime
+  WebSocket according to the existing TDX contract
+
+#### Scenario: Backend requests QMT historical bars
+
+- **WHEN** backend collection or analysis code needs QMT historical bars
+- **THEN** it MUST call QMT `:9002/v1/bars/query`
+- **AND** it MUST send QMT snake_case request fields
+- **AND** it MUST handle QMT native `data.marketData`
+- **AND** it MUST use the fixed v1 QMT adjustment口径 `front_ratio`
+
+#### Scenario: Backend preserves QMT realtime as a separate memory-only path
+
+- **WHEN** backend historical QMT bars are implemented
+- **THEN** the accepted QMT realtime path MUST remain separate from historical
+  bar collection
+- **AND** it MUST remain memory-only until a separately gated persistence
+  change is implemented and accepted
+
+### Requirement: Backend does not call QMT bridge internals as product API
+
+The QMT HTTP polling bridge SHALL remain an internal runtime channel between
+the datasource and the full-QMT built-in Python script.
+
+#### Scenario: Product code needs QMT data
+
+- **WHEN** backend product code needs QMT data
+- **THEN** it MUST use QMT product routes such as `:9002/v1/bars/query`
+- **AND** it MUST NOT call `/qmt/bridge/owner`, `/qmt/bridge/poll`,
+  `/qmt/bridge/result`, or `/qmt/bridge/health` as market-data APIs
+
+### Requirement: Account and trading operations stay outside backend market flow
+
+The backend SHALL NOT route QMT account, position, order, deal, cancel, or
+placement operations through the market datasource.
+
+#### Scenario: Backend feature needs QMT trading behavior
+
+- **WHEN** a backend feature needs QMT account or trading behavior
+- **THEN** a separate trading/account service design MUST be created before
+  implementation

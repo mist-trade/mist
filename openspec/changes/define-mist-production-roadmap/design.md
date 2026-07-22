@@ -21,7 +21,9 @@ changes, but its status was not rebased after later work completed. The
 | --- | --- | --- |
 | `preview-chan-bi-phases` | completed and archived | G0 prerequisite completed; canonical phase-preview spec is synced |
 | `repair-chan-bi-overlap-rendering` | completed and archived | G1 analysis-correctness prerequisite completed with backend, frontend, and browser evidence |
-| `add-bigqmt-datasource-bridge` | 33/34, in progress | G1 native-history evidence complete; realtime smoke remains |
+| `add-bigqmt-datasource-bridge` | completed and archived | G1 native-history evidence preserved; realtime ownership and HIL completed by `converge-theme-a-realtime-bridges` |
+| `experimental-tdx-realtime-slice` | completed and archived | TDX native snapshot transport accepted with Windows HIL evidence |
+| `converge-theme-a-realtime-bridges` | completed and archived | TDX and QMT realtime transport HIL accepted; Theme A gate released |
 | `define-mist-production-roadmap` | gate-driven rebaseline in progress | Parent roadmap for the remaining G1-G4 work |
 
 ## Goals / Non-Goals
@@ -88,7 +90,7 @@ The current historical ledger is:
 | Original roadmap area | Disposition | Evidence or replacement |
 | --- | --- | --- |
 | Production baseline | completed | `verify-mist-production-baseline` archived; refresh remains required after material G1/G2 runtime changes |
-| Broad TDX Python datasource refactor | superseded | `refactor-tdx-python-datasource` archived intentionally incomplete; focused provider and realtime work own the remaining concerns |
+| Broad TDX Python datasource refactor | superseded | `refactor-tdx-python-datasource` archived intentionally incomplete; the accepted builtin bridge and provider contracts own the remaining concerns |
 | TDX/QMT provider contract alignment | completed | `align-tdx-qmt-datasource-contracts` archived with Windows baseline evidence |
 | Separate OpenSpec/branch reconciliation child | superseded | Individual archive notes and branch decisions now record the relevant dispositions |
 | Separate Windows TDX guard validation child | superseded | `add-tdx-desktop-guard` archived after the normal-management versus explicit-recovery runner split |
@@ -121,21 +123,23 @@ verification evidence preserved in the archive.
 G1 combines datasource availability with the correctness of analysis rendered
 from that data. Its Chan correctness prerequisite is complete through
 `repair-chan-bi-overlap-rendering`, and the real full-QMT native history matrix
-is complete with evidence in `add-bigqmt-datasource-bridge`. The remaining work
-is:
+is complete with evidence in `add-bigqmt-datasource-bridge`.
 
-1. Complete QMT realtime smoke before enabling realtime collection, or split and
-   explicitly defer it to a focused change while the realtime path remains
-   disabled and documented as unverified.
-2. Create `settle-tdx-realtime-contract` to choose and verify the accepted TDX
-   product behavior: snapshot fallback, normalized `bar` events, or a documented
-   staged combination.
-3. Refresh the production baseline after material G1 runtime changes so the
-   evidence ledger points to exact deployed refs and leader-path verification.
+The TDX and QMT realtime transport concerns were settled by
+`experimental-tdx-realtime-slice` and `converge-theme-a-realtime-bridges`.
+Windows HIL accepted both native snapshot paths, captured runtime identities,
+and preserved protected database digests. Realtime remains memory-only; database
+snapshot persistence, candle aggregation, and notification context belong to
+the separately gated Theme B strategy work.
 
-G1 is closed only when none of these concerns remains implicit. A deferred
-realtime path must remain disabled or constrained exactly as its child change
-states.
+The archived evidence is preserved under
+`openspec/changes/archive/2026-07-22-experimental-tdx-realtime-slice/`,
+`openspec/changes/archive/2026-07-22-converge-theme-a-realtime-bridges/`, and
+`openspec/changes/archive/2026-07-22-add-bigqmt-datasource-bridge/`.
+
+The remaining G1 closure work is a refreshed production baseline that points to
+the exact archived HIL evidence, deployed refs, and leader-path verification,
+followed by a final disposition ledger update.
 
 ### Decision 5: G2 consolidates the remaining operations control plane
 
