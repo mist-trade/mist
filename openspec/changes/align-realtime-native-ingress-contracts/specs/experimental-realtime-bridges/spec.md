@@ -2,7 +2,7 @@
 
 ### Requirement: TDX builtin realtime is always active and QMT is independently gated
 **Reason**: The experimental activation contract is superseded by formal dual-source builtin production realtime.
-**Migration**: Use `realtime-market-data-ingress`; configure production QMT as `builtin` and retain `off` only for explicit rollback.
+**Migration**: Use `realtime-market-data-ingress`; configure production TDX/QMT as `builtin` and retain per-source `off` only for explicit rollback.
 
 ### Requirement: Experimental snapshots are fenced and strict
 **Reason**: Formal schema v1 native frames and per-symbol fencing replace the draft transport.

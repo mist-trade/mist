@@ -186,9 +186,9 @@ TDX realtime WebSocket 是 `/ws/realtime/tdx/{client_id}`，不是已删除的
 - `strategy_signals`
 - `strategy_alert_events`
 
-QMT realtime 为 `off` 时，realtime datasource/backend route 为 404、没有 QMT
-realtime metrics，属于 fail-closed 的预期结果；`/health`、native bars 和 bridge
-health 仍必须成功。
+TDX 或 QMT realtime 为 `off` 时，对应 realtime datasource/backend route 为 404、
+没有该 source 的 realtime metrics，属于 fail-closed 的预期结果；该 datasource 的
+`/health` 与历史查询仍必须成功。
 
 ## 6. Mac LAN 与监控验证
 
@@ -210,7 +210,7 @@ curl --noproxy '*' http://<windows-lan-ip>:9109/metrics
 - TDX health 包含 `tdxHttpReachable=true`、bridge owner 与收敛 revision。
 - QMT health 包含 `bridge.ready=true`、`ownerStale=false`。
 - exporter 包含 `mist_windows_exporter_up 1` 和 TDX bridge 指标。
-- QMT realtime 为 `off` 时不要求 QMT realtime 指标。
+- TDX 或 QMT realtime 为 `off` 时不要求对应 source 的 realtime 指标。
 
 ## 7. 完成与回滚
 

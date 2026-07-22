@@ -13,6 +13,7 @@
 - [x] 2.5 Bind QMT poll/result commands to the active owner generation or lease, rotate epoch on owner replacement, reject retired in-flight results, and expose build/artifact identity without secrets.
 - [x] 2.6 Add bounded JSON size/depth/sensitive-field validation and retain QMT builtin Python 3.6 compatibility guards.
 - [x] 2.7 Run datasource unit/integration/replay tests, Ruff, Pyright and formal route-absence guards.
+- [x] 2.8 Add `TDX_REALTIME_MODE=builtin|off`, default missing configuration to `builtin`, and omit the TDX realtime gateway/routes when explicitly off while preserving HTTP APIs.
 
 ## 3. Backend Formal Ingress
 
@@ -23,6 +24,7 @@
 - [x] 3.5 Unify accepted/rejected fencing results, quality/freshness, source-labelled drops and disconnect/epoch behavior without adding Redis, K, scanner, signal, alert or notification dependencies.
 - [x] 3.6 Replace `QMT_REALTIME_MODE=builtin_experimental` with `builtin|off`, default missing configuration to `builtin`, and retain `off` as explicit rollback.
 - [x] 3.7 Run backend unit/replay/no-side-effect/module tests, lint, typecheck, Jest and Nest builds.
+- [x] 3.8 Gate `TdxRealtimeModule` with the same strict default-builtin/explicit-off module matrix as QMT.
 
 ## 4. Deploy And Monitoring Promotion
 
@@ -32,6 +34,7 @@
 - [x] 4.4 Update current Simplified Chinese architecture/operator/baseline docs and generated current OpenAPI summaries without editing historical archives.
 - [x] 4.5 Add CI repository guards proving active realtime experimental/legacy names, old routes, old payloads and `builtin_experimental` are absent.
 - [x] 4.6 Run deploy PowerShell tests with `pwsh-preview`, monitoring Go tests/lint/build and Docker builds.
+- [x] 4.7 Propagate and validate both source modes through Compose, reversible switching, monitoring config and current operator documentation.
 
 ## 5. Release, HIL And Rollback Gates
 
@@ -39,6 +42,6 @@
 - [ ] 5.2 Validate TDX `600030.SH` during a supported session: full native frame, canonical adapter, freshness, per-symbol sequence, owner/subscription recovery and terminal/datasource restart.
 - [ ] 5.3 Validate QMT `300502.SZ` during a supported session: Python 3.6 bridge, owner generation fence, full native frame, canonical adapter, freshness, per-symbol sequence and terminal/datasource restart.
 - [ ] 5.4 Validate non-trading-session owner/subscription/cache recovery claims without representing them as freshness evidence.
-- [ ] 5.5 Execute whole-version/config rollback with QMT `off`, verify old-version compatibility boundary, and record post-phase protected-table digests identical to baseline.
-- [ ] 5.6 Promote the verified release atomically, set production QMT desired state to `builtin`, confirm dual-source monitoring convergence, and refresh production baseline evidence.
+- [ ] 5.5 Execute per-source whole-chain/config rollback with TDX and QMT `off`, verify old-version compatibility boundary, and record post-phase protected-table digests identical to baseline.
+- [ ] 5.6 Promote the verified release atomically, set production TDX/QMT desired state to `builtin`, confirm dual-source monitoring convergence, and refresh production baseline evidence.
 - [ ] 5.7 Run final OpenSpec strict validation, all-repository clean/status checks and document residual gates for the separate Redis productization change.
