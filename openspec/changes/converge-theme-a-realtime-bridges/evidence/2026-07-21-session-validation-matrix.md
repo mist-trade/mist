@@ -1,6 +1,6 @@
 # Theme A Session Validation Matrix
 
-Status: **after-hours verification complete; trading-session acceptance pending**
+Status: **trading-session transport verified; runtime inventory and acceptance review pending**
 Prepared: `2026-07-21`  
 Trading-session execution date: `2026-07-22`  
 TDX symbol: `600519.SH`  
@@ -58,7 +58,7 @@ abrupt control-path stop.
 
 | Evidence phase | Session requirement | Acceptance rule |
 |---|---|---|
-| `baseline` | Any time | Source experimental routes/metrics absent; exact SHAs and before-digests captured |
+| `baseline` | Any time | TDX builtin routes remain ready with zero desired/converged subscriptions; disabled QMT routes/metrics are absent; exact SHAs and before-digests are captured |
 | `enabled` | Trading session only | Native snapshot, fresh backend readback, sequence, subscription, and metrics all converge |
 | `post_restart` | Trading session only | New epoch/generation plus a new fresh native snapshot after restart |
 | `post_rollback` | Any time | Recorded backup restored; experimental routes/metrics absent; digests unchanged |
@@ -310,3 +310,79 @@ restoration was intentionally not applicable in this run.
    evidence record.
 4. Only then complete task 6.7, sync stable specs, archive Theme A, and release
    the Theme B gate.
+
+## 2026-07-22 Trading-Session Results
+
+The ordered TDX-then-QMT run completed against the following exact deployed
+identities:
+
+| Component | Exact identity |
+|---|---|
+| `mist-datasource` | `d97e29f3aba61de3eb99baf523b8caa4fe7ab47a` |
+| Mist backend | `a08ac44ea262a1e2b1e0c895b3d57920efef2bde` |
+| `mist-deploy` | `ce9107a42e8bcfcd6dfbcfb6f8416911e02ed42c` |
+| `mist-monitoring` | `048dda32d9adc6bcb3021bc849b747a94cd34a05` |
+| TDX bridge | `mist-tdx-bridge-v0.2`, SHA-256 `063943212180e1c3369905e464c72c35f2a94c62a9513880f70520aaa9a5260c` |
+| QMT bridge | SHA-256 `14b6143fa1d81f32606b7090a5d687041922ae78e0abc30e0e56e11b7bfb880b` |
+
+### TDX `600519.SH`
+
+- Baseline `29884138077`, enabled capture `29884310794`, and initial strict
+  smokes `29884263718` and `29884358373` passed. The latter observed sequence
+  progression from `13` to `34` in the original stream.
+- Terminal recovery `29885539439` replaced owner `tdx-bridge-pid-11096` with
+  `tdx-bridge-pid-1332`, reconverged revision `1`, and passed the independent
+  official `:17709` POST.
+- Immediate 30-second and 90-second live smokes (`29885613182` and
+  `29885691893`) timed out with the new owner healthy and subscriptions
+  converged but no first snapshot. A later datasource timestamp proved the
+  callback resumed after that bounded wait. This is recorded as a terminal
+  cold-start delay, not as accepted evidence from either failed run.
+- The bounded retry `29886156553` then passed with the same replacement owner:
+  sequence `16`, last `1294.19`, native volume `34450`, and capture time
+  `2026-07-22T10:34:26+08:00`.
+- Final `post_restart` capture `29886212704` passed with a fresh native
+  `get_market_snapshot` object, sequence `28`, zero backend drop counts, and a
+  matching owner/epoch across datasource and Mist. Artifact digest:
+  `sha256:7523b6028c50e1e0d9d02fc8c05860e2196955a5d70acb50550db6ee68d38088`.
+- Rollback `29886252380` and final `post_rollback` capture `29886299255`
+  passed. Artifact digest:
+  `sha256:42619ef407536c3da66c1a479cf445fa818c452282880327e09593082cf5ff4e`.
+
+### QMT `300502.SZ`
+
+- Baseline `29884583009`, enable `29884670398`, strict smoke `29884750216`,
+  and enabled capture `29884816858` passed. The first retained native
+  `get_full_tick` contained same-session time `10:03:21`, last price `540.49`,
+  and full bid/ask levels.
+- Later smoke `29884870502` advanced the sequence from `81` to `222` and
+  retained a newer native tick at `10:05:48`.
+- Terminal recovery `29884949919` replaced owner `bigqmt-34036` with
+  `bigqmt-31036` without restarting a datasource or registering a strategy.
+- `post_restart` capture `29885071190` passed with the new owner, a new epoch,
+  sequence `92`, and native `timetag=20260722 10:10:21`. Artifact digest:
+  `sha256:a7e8ee4ce557d0a282e59e801088583778343093f0cc55695f9616f123e743bd`.
+- Rollback `29885123101` and `post_rollback` capture `29885170367` passed.
+  Artifact digest:
+  `sha256:cc76fbb63d589defc47f0e22d575ff2eb2a03ce12830e763d0f0736299410024`.
+
+### Database And Final State
+
+Every TDX and QMT phase retained identical protected-table row counts and
+content digests: `k=4375`, `k_extensions_tdx=4371`,
+`k_extensions_qmt=4`, and zero rows in `k_extensions_ef`,
+`strategy_signals`, and `strategy_alert_events`. The principal digests remain:
+
+- `k`: `91ccfd3e1bda07fa1b4e64b146460366cbbe27d63f052e8522d459813189226b`
+- `k_extensions_tdx`: `eba21ccd9ed20eb5ca15b50376bc1f5c642b88cf70bac43eb043de117f746a2d`
+- `k_extensions_qmt`: `bf9ecbf751d3d1b5b06dc229bf64b4502138998aca693b181e020a653c756af3`
+
+Final status runs `29885922512` and `29885922553` confirmed datasource and
+backend state TDX `builtin`, QMT `off`. The final TDX rollback evidence also
+confirmed an empty desired/converged subscription set and empty backend
+allowlist.
+
+The transport, restart, rollback, and no-K portions of tasks 6.4 and 6.5 are
+complete. Formal acceptance remains open until the current Windows terminal
+product/runtime inventory is captured and the F2 reviewer records an explicit
+decision. Task 6.7 and the Theme B release gate therefore remain open.
