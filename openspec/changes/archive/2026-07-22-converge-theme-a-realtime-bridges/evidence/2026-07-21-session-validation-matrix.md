@@ -1,6 +1,6 @@
 # Theme A Session Validation Matrix
 
-Status: **trading-session transport verified; runtime inventory and acceptance review pending**
+Status: **accepted; Theme A transport HIL complete**
 Prepared: `2026-07-21`  
 Trading-session execution date: `2026-07-22`  
 TDX symbol: `600519.SH`  
@@ -383,6 +383,15 @@ confirmed an empty desired/converged subscription set and empty backend
 allowlist.
 
 The transport, restart, rollback, and no-K portions of tasks 6.4 and 6.5 are
-complete. Formal acceptance remains open until the current Windows terminal
-product/runtime inventory is captured and the F2 reviewer records an explicit
-decision. Task 6.7 and the Theme B release gate therefore remain open.
+complete. Runtime inventory runs `29887578543` and `29887578560` additionally
+captured Windows 10 build `19045`, TDX `TdxW.exe 1.0.0.1`, TDX bridge Python
+`3.12.10`, QMT `XtItClient.exe 2.1.19.0`, owner process identities, and exact
+terminal/bridge hashes. The QMT embedded Python version remains the previously
+captured same-machine spike value `3.6.8`; its transient spike JSON had been
+removed before the final inventory run, which is recorded rather than hidden.
+
+The project maintainer explicitly accepted the bounded transport evidence and
+requested close-out on 2026-07-22. TDX lifecycle state is therefore
+`transport-HIL-verified`; QMT trading-session evidence is accepted. This does
+not authorize realtime K persistence or productization, which require a
+separate change.

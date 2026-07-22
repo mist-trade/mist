@@ -1,7 +1,8 @@
 # monitoring-health-alerts Specification
 
 ## Purpose
-TBD - created by archiving change repair-monitoring-health-alerts. Update Purpose after archive.
+Define stable datasource, bridge, probe, metric, and alert-delivery
+observability across the Windows exporter and Mac watchdog.
 ## Requirements
 ### Requirement: Mac watchdog parses datasource health bodies
 The Mac watchdog SHALL parse successful datasource `/health` response bodies
@@ -14,15 +15,13 @@ into datasource health state and metrics.
 - **AND** watchdog classification MUST activate `tdx_http_unreachable`
 - **AND** collected metrics MUST include `mist_datasource_tdx_http_reachable 0`
 
-#### Scenario: Datasource health reports tqcenter not initialized
-- **WHEN** the Mac watchdog probes a datasource health endpoint returning a
-  successful HTTP status with `tqInitialized=false`
-- **THEN** watchdog classification MUST activate `tdx_not_initialized`
-- **AND** collected metrics MUST include `mist_datasource_tq_initialized 0`
-
-#### Scenario: Datasource health has a negative queue depth
-- **WHEN** datasource health parsing receives `eventQueueDepth` below zero
-- **THEN** the exported queue depth metric MUST be clamped to `0`
+#### Scenario: Windows metrics report TDX bridge unavailable
+- **WHEN** the Windows exporter reports that the TDX builtin bridge has no fresh
+  owner or has divergent desired and applied revisions
+- **THEN** watchdog classification MUST activate the corresponding
+  `tdx_bridge_unavailable` or `tdx_bridge_subscription_drift` condition
+- **AND** it MUST NOT infer bridge readiness from removed `tqInitialized` or
+  event-queue fields
 
 ### Requirement: Probe and notifier failures are observable
 Monitoring collectors SHALL expose probe and alert-delivery failures without
@@ -96,3 +95,24 @@ health checks.
   `contracts/metrics.md`
 - **AND** names used in collectors MUST match the contract entries
 
+### Requirement: Realtime monitoring follows source lifecycle
+Monitoring SHALL always probe and classify TDX builtin bridge readiness and SHALL probe QMT realtime only when QMT is configured in `builtin_experimental` mode.
+
+#### Scenario: QMT realtime mode is disabled
+- **WHEN** QMT is configured as off
+- **THEN** monitoring emits no QMT realtime-unavailable alert while continuing to report TDX bridge health
+
+#### Scenario: Enabled source has no fresh owner or snapshot
+- **WHEN** an enabled experimental source reports an unready owner, divergent subscription state, or stale snapshot
+- **THEN** monitoring emits a source-labelled experimental realtime alert with stable health evidence
+
+### Requirement: Loopback experimental health is proxied by Windows metrics
+The Windows exporter SHALL read source-specific loopback experimental health and the Mac watchdog SHALL consume the resulting metrics rather than calling those routes remotely.
+
+#### Scenario: Mac watchdog evaluates experimental health
+- **WHEN** the watchdog runs on the Mac host
+- **THEN** it derives experimental readiness from Windows exporter metrics and makes no direct experimental datasource request
+
+#### Scenario: Operator changes QMT mode or a source allowlist
+- **WHEN** the Windows workflow applies or rolls back the configuration
+- **THEN** the exporter configuration is regenerated with always-on TDX health and the effective QMT mode before the switch is reported healthy

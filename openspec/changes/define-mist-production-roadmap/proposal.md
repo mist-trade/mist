@@ -8,15 +8,15 @@ repairs, API standardization, and strategy-platform work were completed. Its
 unchecked task count now mixes real future work with changes that have already
 been completed, archived, or intentionally superseded.
 
-The current active work is narrower and more concrete:
+The current work is narrower and more concrete:
 
-- `preview-chan-bi-phases` is complete and awaiting archive.
-- `repair-chan-bi-overlap-rendering` is an in-progress correctness repair that
-  follows the phase-preview work.
-- `add-bigqmt-datasource-bridge` is implemented locally but still requires real
-  Windows full-QMT history and realtime evidence.
-- TDX realtime behavior still needs one explicit product contract instead of
-  inheriting stale assumptions from the abandoned broad datasource refactor.
+- `preview-chan-bi-phases` and `repair-chan-bi-overlap-rendering` are completed
+  and archived correctness prerequisites.
+- `add-bigqmt-datasource-bridge` supplied the full-QMT native history evidence;
+  the later convergence change completed the QMT realtime evidence.
+- TDX realtime behavior is now explicitly owned by the archived builtin bridge
+  and convergence contracts instead of the abandoned broad datasource
+  refactor.
 
 The roadmap therefore needs a current-state reset that preserves historical
 decisions while exposing only the work that can still affect production
@@ -33,8 +33,8 @@ readiness.
   - G4 engineering repeatability and roadmap closure.
 - Add a disposition ledger that separates `completed`, `superseded`, `deferred`,
   and `dropped` work from the executable backlog.
-- Register the active Chan overlap repair and BigQMT live validation as G1
-  blockers, and retain a focused TDX realtime-contract child change in G1.
+- Record the completed Chan, QMT, and TDX realtime children as G1 evidence and
+  leave only baseline refresh and final disposition as executable G1 work.
 - Re-scope monitoring, guard, and AstrBot work around the remaining production
   operations control plane instead of recreating already completed foundations.
 - Keep the strategy-platform roadmap and other product feature roadmaps outside

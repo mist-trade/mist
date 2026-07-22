@@ -88,16 +88,14 @@ business side effects.
 - Windows HIL (hard gate for canary/live).
 
 Windows HIL execution is outside this implementation slice, but its lifecycle
-gate is not optional. The current experiment state is `HIL-pending`, owned by
-`project-maintainer`, with `hilBy=2026-08-17`. Until that gate is resolved, a
-completed macOS replay slice MUST NOT be described as production-ready.
+gate is not optional. The experiment entered `HIL-pending`, owned by
+`project-maintainer`, with `hilBy=2026-08-17`. Accepted Windows F2 evidence on
+2026-07-22 advanced it to `transport-HIL-verified`; this verifies transport
+only and does not make the experiment a product persistence path.
 
-Resolution path selected on 2026-07-17: **Windows F2 HIL** (option 1). Active
-experimental wiring remains in place for that bounded verification. The
-selection does not advance lifecycle state by itself; only accepted evidence
-using the checklist in `evidence/F2-WINDOWS-HIL.md` may advance the state to
-`transport-HIL-verified`. The deadline fallback to `reference-quarantined`
-remains mandatory if accepted evidence is not available by `hilBy`.
+Resolution path selected on 2026-07-17: **Windows F2 HIL** (option 1). The
+checklist in `evidence/F2-WINDOWS-HIL.md` was accepted on 2026-07-22, before
+the deadline fallback to `reference-quarantined` applied.
 
 ## Impact
 

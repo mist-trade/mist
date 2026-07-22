@@ -55,10 +55,10 @@
 - [x] 6.3f Move backend TDX desired-state synchronization from the loopback HTTP route to the realtime WebSocket.
 - [x] 6.3g Deploy the converged TDX datasource/backend/monitoring SHAs and rerun both datasource and both terminal recovery workflows.
 - [x] 6.3h Remove dead TDX/QMT compatibility code and redundant in-process frame reconstruction while preserving boundary JSON and required native normalization.
-- [ ] 6.4 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest. Transport evidence passed on 2026-07-22; current terminal/runtime inventory and explicit F2 review remain.
-- [ ] 6.5 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest. Transport evidence passed on 2026-07-22; current terminal/runtime inventory and explicit acceptance review remain.
+- [x] 6.4 Capture accepted TDX F2 Windows evidence on exact master SHAs, including native payload, epoch/sequence, restart, rollback, and unchanged database content digest.
+- [x] 6.5 Capture accepted QMT trading-session evidence on exact master SHAs, including owner, native snapshot, epoch/sequence, restart, rollback, and unchanged database content digest.
 - [x] 6.6 Re-run historical TDX HTTP and QMT native bridge matrices, resolve all evidence findings, and record final master SHAs.
-- [ ] 6.7 Complete the experimental TDX lifecycle task, sync stable specs, archive Theme A changes, and release the Theme B merge gate.
+- [x] 6.7 Complete the experimental TDX lifecycle task, sync stable specs, archive Theme A changes, and release the Theme B merge gate.
 
 Execution boundary for tasks 6.4-6.6 is recorded in
 `evidence/2026-07-21-session-validation-matrix.md`:
@@ -71,8 +71,11 @@ Execution boundary for tasks 6.4-6.6 is recorded in
   execute QMT with `300502.SZ`. Do not substitute one provider's symbol or
   evidence for the other.
 
-## 7. Theme B Handoff Gate
+## Theme B Handoff
 
-- [ ] 7.1 Create fresh Theme B integration branches only after task 6.7, cherry-picking backend `db365eb` plus `4c7880b` and frontend `13fac02` plus `132c594` without duplicate Chan history.
-- [ ] 7.2 Merge Theme B code and its v3 active OpenSpec at 74/77 after non-MySQL validation; do not deploy migrations 007/008 to production.
-- [ ] 7.3 When an isolated `MIST_TEST_MYSQL_URL` is later supplied, complete Theme B tasks 9.1, 10.5, and 10.7 before stable-spec sync, archive, migration, or release.
+Theme A releases the Theme B merge gate but does not implement Theme B. The
+next work remains owned by `add-strategy-portfolio-backtesting` and the living
+production roadmap: create fresh integration branches, cherry-pick the recorded
+backend/frontend commits without duplicate Chan history, keep migrations
+007/008 out of production, and complete the isolated `MIST_TEST_MYSQL_URL`
+gates before stable-spec sync, migration, or release.

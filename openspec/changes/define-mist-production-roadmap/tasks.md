@@ -24,16 +24,18 @@
       overlapping valid completed Bis, preserve invalid Phase A diagnostics,
       retain zoom-crossing overlays, regenerate affected fixtures, and record
       backend/frontend/browser evidence.
-- [x] 1.2 Complete `add-bigqmt-datasource-bridge` task 7.4 by running the real
-      Windows full-QMT native history matrix and recording fields and units.
-- [ ] 1.3 Complete QMT realtime smoke before enabling realtime collection, or
-      split it into a focused deferred child while the path remains disabled and
-      explicitly unverified.
-- [ ] 1.4 Create `settle-tdx-realtime-contract` with the current datasource and
-      backend behavior as its baseline.
-- [ ] 1.5 Decide and verify whether TDX product realtime uses snapshot fallback,
-      normalized `bar` events, or a documented staged combination; update both
-      `mist-datasource` and `mist` contracts accordingly.
+- [x] 1.2 Complete and archive `add-bigqmt-datasource-bridge` after running the
+      real Windows full-QMT native history matrix and recording fields and
+      units.
+- [x] 1.3 Complete QMT realtime smoke with native snapshot, freshness, field,
+      owner, and secret-free Windows evidence in
+      `converge-theme-a-realtime-bridges`.
+- [x] 1.4 Settle the TDX realtime contract through
+      `experimental-tdx-realtime-slice` and the convergence change, using the
+      current datasource and backend behavior as the baseline.
+- [x] 1.5 Verify TDX product realtime uses official native snapshot events,
+      synchronize the datasource/backend contracts, and preserve the
+      memory-only boundary for later Theme B persistence work.
 - [ ] 1.6 Refresh the production baseline after material G1 runtime changes,
       including pinned refs, Windows deployment/runtime evidence, backend leader
       path verification, and Mac-side gateway probes.

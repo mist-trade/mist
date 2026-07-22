@@ -4,9 +4,7 @@
 Defines provider-neutral datasource response, capability, endpoint, raw-call,
 subscription, trading-boundary, and smoke-test expectations for TDX/QMT market
 data providers.
-
 ## Requirements
-
 ### Requirement: Provider-neutral response contract
 The datasource SHALL expose normalized responses that are independent of TDX,
 QMT, or any provider-native SDK shape.
@@ -160,3 +158,73 @@ normalized outputs, unsupported-provider behavior, and live smoke paths.
 - **WHEN** QMT is unavailable or not configured
 - **THEN** the QMT contract test can still validate manifest shape and explicit
   unsupported responses without requiring a live QMT terminal
+
+### Requirement: QMT builtin experimental snapshot transport
+The QMT datasource SHALL provide a mode-gated experimental WebSocket transport backed by the existing single-owner full-QMT command gateway and native `get_full_tick`, without changing historical bar responses or exposing the command bridge as a product API.
+
+#### Scenario: Allowlisted subscriptions are active during a trading session
+- **WHEN** an experimental WebSocket leader synchronizes valid QMT symbols and a fresh bridge owner is registered
+- **THEN** the datasource polls one native snapshot command at a time and emits strictly validated, fenced snapshot frames
+
+#### Scenario: Market is outside the supported session
+- **WHEN** subscribed symbols exist outside their Beijing trading session
+- **THEN** no native realtime command is enqueued and health reports the outside-session state
+
+#### Scenario: Historical QMT bars are queried
+- **WHEN** a client calls the existing QMT historical endpoint while experimental realtime is enabled or disabled
+- **THEN** the historical request and native response contract are unchanged
+
+### Requirement: QMT experimental health is loopback-only
+The datasource SHALL expose detailed QMT experimental owner, epoch, subscription, freshness, and error state only through a loopback-protected health route.
+
+#### Scenario: Remote caller requests experimental health
+- **WHEN** a non-loopback caller requests `/qmt/realtime/health`
+- **THEN** the datasource rejects the request without disclosing experimental state
+
+### Requirement: TDX and QMT datasource contracts are separate
+The datasource layer SHALL expose TDX and QMT through separate service
+contracts rather than a shared `provider` selector in the TDX service.
+
+#### Scenario: TDX v1 request models are inspected
+- **WHEN** TDX v1 schemas are generated
+- **THEN** request models MUST NOT include a `provider` field
+- **AND** requests containing `provider` MUST be rejected as invalid input
+
+#### Scenario: TDX provider metadata is requested
+- **WHEN** a caller requests TDX `/providers`
+- **THEN** the response MUST describe TDX only
+- **AND** it MUST NOT advertise QMT capabilities from the TDX service
+
+### Requirement: QMT bars keep native market-data shape
+The QMT service SHALL return QMT historical bars in QMT native column shape.
+
+#### Scenario: QMT historical bars are requested
+- **WHEN** a caller requests QMT `:9002/v1/bars/query`
+- **THEN** the response MUST return `data.marketData`
+- **AND** it MUST NOT convert rows into the TDX `data.bars[]` contract
+- **AND** it MUST NOT expose QMT bars through a TDX provider selector
+
+#### Scenario: Cross-provider consumers need a common row shape
+- **WHEN** Mist backend, charts, or strategy code needs to compare TDX and QMT
+  historical bars
+- **THEN** that caller or a backend-level adapter MUST perform the row shaping
+- **AND** the QMT datasource MUST keep provider-native details behind its own
+  QMT contract
+
+### Requirement: QMT account and trading APIs remain outside market datasource
+The QMT market datasource SHALL exclude account, position, order, deal, cancel,
+and placement APIs.
+
+#### Scenario: QMT account or trading method is requested
+- **WHEN** a QMT market datasource route or bridge command attempts to expose
+  account, position, order, deal, cancel, or placement behavior
+- **THEN** static guardrails or runtime validation MUST reject it
+
+### Requirement: Legacy QMT adapter surfaces are removed
+The datasource SHALL remove legacy QMT adapter and mock surfaces from the
+production code path.
+
+#### Scenario: Repository guardrails inspect QMT production code
+- **WHEN** guardrails scan production paths
+- **THEN** they MUST fail on legacy QMT adapter factories, mock adapter classes,
+  legacy QMT route groups, and bridge realtime-duplex endpoints
