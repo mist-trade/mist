@@ -39,7 +39,7 @@ Mac / 浏览器 / AstrBot
 ```
 
 TDX 非实时 `/v1/*` 通过官方 `POST :17709`；TDX 实时通过
-`/tdx/bridge/*` 与 `/ws/tdx-experimental/{client_id}`。QMT 历史 bars 和受控
+`/tdx/bridge/*` 与 `/ws/realtime/tdx/{client_id}`。QMT 历史 bars 和正式
 命令都通过内置 Python 的 stdlib HTTP polling bridge；QMT realtime 默认
 `off`。两个 datasource 都在 Windows Host 运行，不进入 Docker。
 
@@ -167,7 +167,7 @@ gh workflow run run-windows-qmt-runtime-smoke.yml \
   -f include_sector_list=true
 ```
 
-TDX realtime WebSocket 是 `/ws/tdx-experimental/{client_id}`，不是已删除的
+TDX realtime WebSocket 是 `/ws/realtime/tdx/{client_id}`，不是已删除的
 `/ws/quote/{client_id}`。订阅集合由 backend leader 管理，普通 smoke 客户端不得
 直接修改生产订阅。
 

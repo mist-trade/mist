@@ -57,28 +57,34 @@ datasource 不强迫两个 provider 返回相同原生结构。
 ```text
 TDX builtin script
   -> loopback /tdx/bridge/owner|poll|result|snapshot
-  -> datasource /ws/tdx-experimental/{client_id}
-  -> ExperimentalTdxRealtimeClient (backend leader)
-  -> bounded in-memory diagnostics/callbacks
+  -> datasource /ws/realtime/tdx/{client_id}
+  -> TdxRealtimeClient (backend leader)
+  -> RealtimeSnapshotIngressService
 ```
 
 TDX realtime 没有 legacy mode switch。Builtin bridge 使用官方
 `get_market_snapshot`，不使用 QMT 的 `get_full_tick`。Backend leader 在连接、
-`ready` 和重连时发送完整 `sync_subscriptions`；普通 WebSocket 客户端不得修改生产
+`realtime.ready` 和重连时发送完整 `sync_subscriptions`；普通 WebSocket 客户端不得修改生产
 订阅。
 
 ### QMT
 
 ```text
 QMT builtin script stdlib HTTP polling
-  -> QMT command gateway / native get_full_tick
-  -> mode-gated /ws/qmt-experimental/{client_id}
-  -> ExperimentalQmtRealtimeClient
-  -> bounded in-memory diagnostics/callbacks
+  -> generation/lease-fenced QMT command gateway / native get_full_tick
+  -> /ws/realtime/qmt/{client_id}
+  -> QmtRealtimeClient
+  -> RealtimeSnapshotIngressService
 ```
 
-QMT realtime 默认 `off`。`off` 时 realtime route 与 metric 不存在是 fail-closed
-预期，但 `/health`、`/v1/bars/query` 和 `/qmt/bridge/*` 继续工作。
+QMT realtime 默认 `builtin`；`off` 仅用于受控回滚。`off` 时 realtime route 与
+metric 不存在，但 `/health`、`/v1/bars/query` 和 `/qmt/bridge/*` 继续工作。
+
+TDX/QMT 都发送 schema v1 `mist.realtime.native_snapshot`，外层包含 `source`、
+`streamEpoch`、每个 symbol 独立的 `sequence`、`sequenceScope=symbol`、
+`capturedAt` 和完整 `native`。Datasource 不计算统一 `eventTime` 或 `quality`；backend
+在 source-specific adapter 中生成同一 `CanonicalRealtimeSnapshot`，并且只有通过
+owner/epoch/sequence fencing 的 frame 才能进入共同 ingress。
 
 ## 当前持久化边界
 

@@ -35,21 +35,21 @@ describe('mistEnvSchema data source configuration', () => {
       ...baseEnv,
       QMT_BASE_URL: 'http://127.0.0.1:9002',
       QMT_WS_CLIENT_ID: 'mist-backend-qmt-live',
-      QMT_REALTIME_MODE: 'builtin_experimental',
-      QMT_EXPERIMENTAL_ALLOWLIST: '600519.SH',
+      QMT_REALTIME_MODE: 'builtin',
+      QMT_REALTIME_ALLOWLIST: '600519.SH',
     });
 
     expect(error).toBeUndefined();
     expect(value.QMT_BASE_URL).toBe('http://127.0.0.1:9002');
     expect(value.QMT_WS_CLIENT_ID).toBe('mist-backend-qmt-live');
-    expect(value.QMT_REALTIME_MODE).toBe('builtin_experimental');
-    expect(value.QMT_EXPERIMENTAL_ALLOWLIST).toBe('600519.SH');
+    expect(value.QMT_REALTIME_MODE).toBe('builtin');
+    expect(value.QMT_REALTIME_ALLOWLIST).toBe('600519.SH');
   });
 
-  it('defaults QMT realtime off and rejects unknown modes', () => {
+  it('defaults QMT realtime builtin and rejects unknown modes', () => {
     const defaults = mistEnvSchema.validate(baseEnv);
     expect(defaults.error).toBeUndefined();
-    expect(defaults.value.QMT_REALTIME_MODE).toBe('off');
+    expect(defaults.value.QMT_REALTIME_MODE).toBe('builtin');
 
     const invalid = mistEnvSchema.validate({
       ...baseEnv,
@@ -61,13 +61,13 @@ describe('mistEnvSchema data source configuration', () => {
   it('accepts the explicit empty allowlists emitted by Docker Compose', () => {
     const { error, value } = mistEnvSchema.validate({
       ...baseEnv,
-      TDX_EXPERIMENTAL_ALLOWLIST: '',
-      QMT_REALTIME_MODE: 'off',
-      QMT_EXPERIMENTAL_ALLOWLIST: '',
+      TDX_REALTIME_ALLOWLIST: '',
+      QMT_REALTIME_MODE: 'builtin',
+      QMT_REALTIME_ALLOWLIST: '',
     });
 
     expect(error).toBeUndefined();
-    expect(value.TDX_EXPERIMENTAL_ALLOWLIST).toBe('');
-    expect(value.QMT_EXPERIMENTAL_ALLOWLIST).toBe('');
+    expect(value.TDX_REALTIME_ALLOWLIST).toBe('');
+    expect(value.QMT_REALTIME_ALLOWLIST).toBe('');
   });
 });

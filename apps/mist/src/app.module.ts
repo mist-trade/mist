@@ -21,8 +21,8 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { ChanModule } from './chan/chan.module';
 import { HistoricalCollectorModule } from './collector/historical-collector.module';
-import { ExperimentalTdxRealtimeModule } from './sources/tdx/experimental/experimental-tdx-realtime.module';
-import { ExperimentalQmtRealtimeModule } from './sources/qmt/experimental/experimental-qmt-realtime.module';
+import { TdxRealtimeModule } from './sources/tdx/realtime/tdx-realtime.module';
+import { QmtRealtimeModule } from './sources/qmt/realtime/qmt-realtime.module';
 import { IndicatorModule } from './indicator/indicator.module';
 import { SecurityModule } from './security/security.module';
 import { mistEnvSchema } from '@app/config';
@@ -86,7 +86,7 @@ import { StrategyModule } from './strategy/strategy.module';
       inject: [ConfigService],
     }),
     HistoricalCollectorModule,
-    ExperimentalTdxRealtimeModule,
+    TdxRealtimeModule,
     ...qmtRealtimeModulesForMode(process.env.QMT_REALTIME_MODE),
     IndicatorModule,
     SecurityModule,
@@ -98,16 +98,16 @@ import { StrategyModule } from './strategy/strategy.module';
 })
 export class AppModule {}
 
-/** QMT realtime is independent and default-off. */
+/** QMT realtime is enabled by default; off is the explicit rollback mode. */
 export function qmtRealtimeModulesForMode(mode: string | undefined) {
-  const normalized = (mode ?? 'off').trim().toLowerCase();
-  if (normalized === 'builtin_experimental') {
-    return [ExperimentalQmtRealtimeModule];
+  const normalized = (mode ?? 'builtin').trim().toLowerCase();
+  if (normalized === 'builtin') {
+    return [QmtRealtimeModule];
   }
   if (normalized === 'off') {
     return [];
   }
   throw new Error(
-    `Unsupported QMT_REALTIME_MODE=${JSON.stringify(mode)}; expected builtin_experimental or off`,
+    `Unsupported QMT_REALTIME_MODE=${JSON.stringify(mode)}; expected builtin or off`,
   );
 }

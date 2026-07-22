@@ -1,15 +1,13 @@
 import { qmtRealtimeModulesForMode } from './app.module';
-import { ExperimentalQmtRealtimeModule } from './sources/qmt/experimental/experimental-qmt-realtime.module';
+import { QmtRealtimeModule } from './sources/qmt/realtime/qmt-realtime.module';
 
 describe('QMT realtime mode module matrix', () => {
-  it('is off by default', () => {
-    expect(qmtRealtimeModulesForMode(undefined)).toEqual([]);
+  it('is builtin by default', () => {
+    expect(qmtRealtimeModulesForMode(undefined)).toEqual([QmtRealtimeModule]);
   });
 
-  it('imports only the independent QMT experimental module when enabled', () => {
-    expect(qmtRealtimeModulesForMode('builtin_experimental')).toEqual([
-      ExperimentalQmtRealtimeModule,
-    ]);
+  it('imports the formal QMT realtime module when enabled', () => {
+    expect(qmtRealtimeModulesForMode('builtin')).toEqual([QmtRealtimeModule]);
   });
 
   it('fails closed for an unknown QMT mode', () => {

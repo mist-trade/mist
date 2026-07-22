@@ -1,0 +1,11 @@
+{
+  "schemaVersion": 1,
+  "fixture": "realtime-native-frame-v1.json",
+  "sha256": "5d070445835b159222e4df70beae133650457c9a21e6cfe3d9b971863490472a",
+  "consumers": [
+    "mist",
+    "mist-datasource",
+    "mist-deploy",
+    "mist-monitoring"
+  ]
+}
