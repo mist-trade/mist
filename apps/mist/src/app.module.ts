@@ -86,7 +86,7 @@ import { StrategyModule } from './strategy/strategy.module';
       inject: [ConfigService],
     }),
     HistoricalCollectorModule,
-    TdxRealtimeModule,
+    ...tdxRealtimeModulesForMode(process.env.TDX_REALTIME_MODE),
     ...qmtRealtimeModulesForMode(process.env.QMT_REALTIME_MODE),
     IndicatorModule,
     SecurityModule,
@@ -97,6 +97,20 @@ import { StrategyModule } from './strategy/strategy.module';
   providers: [AppService],
 })
 export class AppModule {}
+
+/** TDX realtime is enabled by default; off is the explicit rollback mode. */
+export function tdxRealtimeModulesForMode(mode: string | undefined) {
+  const normalized = (mode ?? 'builtin').trim().toLowerCase();
+  if (normalized === 'builtin') {
+    return [TdxRealtimeModule];
+  }
+  if (normalized === 'off') {
+    return [];
+  }
+  throw new Error(
+    `Unsupported TDX_REALTIME_MODE=${JSON.stringify(mode)}; expected builtin or off`,
+  );
+}
 
 /** QMT realtime is enabled by default; off is the explicit rollback mode. */
 export function qmtRealtimeModulesForMode(mode: string | undefined) {

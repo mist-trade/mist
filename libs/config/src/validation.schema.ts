@@ -72,6 +72,11 @@ export const mistEnvSchema = commonEnvSchema.append({
     .default(30000)
     .description('TDX WebSocket heartbeat interval in milliseconds'),
 
+  TDX_REALTIME_MODE: Joi.string()
+    .valid('off', 'builtin')
+    .default('builtin')
+    .description('TDX realtime mode: builtin (default) or off for rollback'),
+
   TDX_REALTIME_ALLOWLIST: Joi.string()
     .allow('')
     .default('')
@@ -83,7 +88,7 @@ export const mistEnvSchema = commonEnvSchema.append({
     .optional()
     .description('QMT data source base URL (mist-qmt-datasource service)'),
 
-  // QMT realtime streaming remains a separate, unverified chain.
+  // QMT realtime streaming uses the same production mode contract as TDX.
   QMT_WS_CLIENT_ID: Joi.string()
     .default('mist-backend-qmt')
     .description('WebSocket client ID for QMT realtime data source connection'),

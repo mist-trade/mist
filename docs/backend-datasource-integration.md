@@ -62,8 +62,10 @@ TDX builtin script
   -> RealtimeSnapshotIngressService
 ```
 
-TDX realtime 没有 legacy mode switch。Builtin bridge 使用官方
-`get_market_snapshot`，不使用 QMT 的 `get_full_tick`。Backend leader 在连接、
+TDX realtime 默认 `builtin`；`off` 仅用于受控回滚。`off` 时 datasource realtime
+bridge/WS route、backend client/module 与 monitoring probe 同步停用，但 `/health` 和
+`/v1/*` 继续工作。Builtin bridge 使用官方 `get_market_snapshot`，不使用 QMT 的
+`get_full_tick`。Backend leader 在连接、
 `realtime.ready` 和重连时发送完整 `sync_subscriptions`；普通 WebSocket 客户端不得修改生产
 订阅。
 
@@ -77,8 +79,9 @@ QMT builtin script stdlib HTTP polling
   -> RealtimeSnapshotIngressService
 ```
 
-QMT realtime 默认 `builtin`；`off` 仅用于受控回滚。`off` 时 realtime route 与
-metric 不存在，但 `/health`、`/v1/bars/query` 和 `/qmt/bridge/*` 继续工作。
+QMT realtime 默认 `builtin`；`off` 仅用于受控回滚。`off` 时 realtime route、
+backend client/module 与 metric 不存在，但 `/health`、`/v1/bars/query` 和
+`/qmt/bridge/*` 继续工作。
 
 TDX/QMT 都发送 schema v1 `mist.realtime.native_snapshot`，外层包含 `source`、
 `streamEpoch`、每个 symbol 独立的 `sequence`、`sequenceScope=symbol`、

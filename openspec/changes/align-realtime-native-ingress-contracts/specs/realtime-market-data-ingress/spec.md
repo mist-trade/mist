@@ -45,17 +45,17 @@ Active runtime code, configuration, routes, payloads, errors, metrics, scripts a
 - **THEN** they use `/ws/realtime/{source}/{clientId}` and formal internal diagnostics
 - **AND** old experimental WebSocket and diagnostic routes do not exist
 
-### Requirement: QMT production runtime is builtin by default
-Production deployment SHALL configure QMT realtime as `builtin`, SHALL probe it as a normal production source, and SHALL retain `off` only as an explicit operator rollback state.
+### Requirement: TDX and QMT production runtimes are builtin by default
+Production deployment SHALL configure TDX and QMT realtime as `builtin`, SHALL probe both as normal production sources, and SHALL retain per-source `off` only as an explicit operator rollback state.
 
 #### Scenario: Production desired state is applied
 - **WHEN** the verified realtime release is promoted to production
-- **THEN** datasource, backend and monitoring all use `QMT_REALTIME_MODE=builtin`
-- **AND** absence of the setting deterministically resolves to the production default `builtin`
+- **THEN** datasource, backend and monitoring all use `TDX_REALTIME_MODE=builtin` and `QMT_REALTIME_MODE=builtin`
+- **AND** absence of either setting deterministically resolves that source to the production default `builtin`
 
-#### Scenario: Operator rolls QMT back
-- **WHEN** an operator applies the recorded realtime rollback
-- **THEN** QMT changes to `off`, its routes/client stop, monitoring reports the intentional mode, and TDX remains active
+#### Scenario: Operator rolls one source back
+- **WHEN** an operator applies the recorded TDX or QMT realtime rollback
+- **THEN** that source changes to `off`, its realtime routes/client stop, monitoring reports the intentional mode, and the other source remains active
 
 ### Requirement: Windows HIL gates production activation
 The formal contract MUST NOT become the production baseline until source-specific Windows HIL verifies native frames, fencing, owner recovery, restart, rollback and protected-table digest invariance.

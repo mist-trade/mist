@@ -16,12 +16,14 @@
 - `pnpm run lint:check`：通过。
 - `pnpm run typecheck`：通过。
 - `pnpm run build:docker`：Mist/Chan webpack build 通过。
+- TDX/QMT default-builtin/explicit-off module matrix 与 env schema 定向测试：2 suites、14 tests 全部通过。
+- `pnpm run ci:contracts`：通过，CI guard 已接受 `TDX_REALTIME_MODE=builtin`。
 - `openspec validate align-realtime-native-ingress-contracts --strict`：通过。
 - 本机 Node.js 为 22.12.0，低于仓库声明的 Node.js 24；上述命令均完成，但 CI/镜像仍须以 Node.js 24 复验。
 
 ### `mist-datasource`
 
-- `UV_CACHE_DIR=.uv-cache uv run pytest -q`：333 tests 全部通过，只有 Starlette/httpx deprecation warning。
+- `UV_CACHE_DIR=/tmp/mist-uv-cache uv run pytest -m "not live" -q`：335 tests 全部通过，只有 Starlette/httpx deprecation warning。
 - `UV_CACHE_DIR=.uv-cache uv run ruff check .`：通过。
 - `UV_CACHE_DIR=.uv-cache uv run pyright`：0 errors、0 warnings。
 
@@ -31,11 +33,13 @@
 - `scripts/test-docker-compose-config.ps1`：通过。
 - `scripts/test-deploy-windows-monitoring.ps1`：通过。
 - `scripts/test-workflow-config.ps1`：通过。
+- Windows CI 清单中的 14 个 deploy PowerShell test scripts 全部通过，覆盖 per-source `disable`、backup restore contract 和双源 monitoring mode 传递。
 - 所有 PowerShell 验证均使用 `pwsh-preview`。
 
 ### `mist-monitoring`
 
 - `go test ./...`：在允许 `httptest` 绑定 loopback 的环境中全部通过。
+- `go vet ./...`：通过；TDX/QMT 任一 source 为 `off` 时 exporter 均跳过该 source realtime metrics。
 - `go build ./windows/mist-windows-exporter ./mac/mist-watchdog`：通过。
 - `python3 -m unittest tests.test_metrics_contract`：5 tests 全部通过。
 
@@ -49,7 +53,8 @@
 - 本机 Docker image build 两次停在拉取 `docker.io/library/node:24-alpine` metadata，均为 `DeadlineExceeded`；随后 GitHub Actions `29907214564` 使用 Node.js 24 完成 backend 验证、linux/amd64 image build 和 GHCR push，Docker image gate 已关闭。
 - 尚未执行 Windows HIL：TDX `600030.SH`、QMT `300502.SZ` 的交易时段 freshness、owner generation、订阅恢复、终端/datasource restart 仍待验证。
 - 尚未记录 HIL 前后 protected-table row count/digest，也未执行 whole-version/config rollback。
-- 尚未发布到生产；QMT 代码和部署模板默认已是 `builtin`，生产主机 effective state 未在本 checkpoint 中改动。
+- 尚未发布到生产；TDX/QMT 代码和部署模板默认均为 `builtin`，生产主机 effective state 未在本 checkpoint 中改动。
+- TDX 与 QMT terminal bridge 都要求操作员手动覆盖并重新加载；datasource/deploy/recovery 同步不会替代这个步骤。生产证据必须对两个 installed artifact 分别记录实际路径和 SHA-256。
 
 ## 发布前 CI
 

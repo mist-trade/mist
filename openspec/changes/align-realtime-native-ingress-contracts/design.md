@@ -11,7 +11,7 @@ TDX 与 QMT 当前都经过 terminal owner、loopback datasource、WebSocket、M
 - 将唯一存活的 TDX/QMT realtime transport 晋级为正式 schema v1，并在活跃代码中移除 realtime `experimental`/`legacy` 命名。
 - 让 datasource 只验证并传递 source-specific native object，在 backend 统一生成 canonical snapshot。
 - 让两源都按 `(source, symbol, streamEpoch)` fencing，并在写入副作用前具备等价的 owner/result safety。
-- 将 QMT 生产 desired state 设为 `builtin`，提供显式 `off` 整体回滚。
+- 将 TDX/QMT 生产 desired state 均设为 `builtin`，提供逐源显式 `off` 整体链路回滚。
 - 为下一 change 提供稳定的 `RealtimeSnapshotIngressService`，但保持本 change side-effect-free。
 
 **Non-Goals:**
@@ -40,9 +40,13 @@ QMT collector 为每个 symbol/epoch 维护 sequence，backend 也按 symbol fen
 
 活跃目录、类、route、payload、env、error code、metric、workflow 和脚本全部使用 `realtime`/`builtin`。内部 WS 与 diagnostic route 没有公共第三方 consumer，采用同一维护窗口直接切换；不保留长期 alias。历史 archive/evidence 保留旧名字。rollback 以已记录的整套 repository/image/config 版本执行，而不是混跑 v0/v1。
 
-### QMT 生产默认 builtin，但 activation 仍受发布 gate 约束
+### TDX/QMT terminal bridge 均由操作员手动覆盖
 
-代码与部署正式值为 `builtin|off`，缺失值默认解析为 `builtin`；`off` 仅用于 operator rollback。HIL 前不修改生产主机 effective state，只有双源 contract/HIL/rollback/protected digest 通过后才发布新版本并让该默认值生效。
+TDX 与 QMT bridge 都是终端内已注册脚本，其实际加载版本不由 datasource 文件同步或 deploy/recovery workflow 推断。每次 bridge contract 或实现发生变化，操作员必须分别在终端侧手动覆盖匹配版本、记录 SHA-256，并让对应终端重新加载。自动化只验证 installed artifact、owner/build identity 和运行结果，不复制、注册、删除或隐式升级任一 terminal bridge。
+
+### TDX/QMT 生产默认 builtin，但 activation 仍受发布 gate 约束
+
+两源代码与部署正式值均为 `builtin|off`，缺失值默认解析为 `builtin`；`off` 仅用于 operator 对单源执行整体链路回滚。`off` 时对应 datasource realtime route、backend client/module 与 monitoring probe 同步停用，但历史 HTTP API 保持可用。HIL 前不修改生产主机 effective state，只有双源 contract/HIL/rollback/protected digest 通过后才发布新版本并让默认值生效。
 
 ### 共同 freshness 不等于共同采集机制
 
@@ -62,8 +66,9 @@ QMT collector 为每个 symbol/epoch 维护 sequence，backend 也按 symbol fen
 2. 先实现 datasource schema v1、QMT fence/owner safety 与 replay fixture，再实现 backend clients/adapters/ingress。
 3. 同步 deploy/monitoring/env/current docs，执行 repository guard：活跃 realtime `experimental|legacy` 命中为零。
 4. 本地运行 strict OpenSpec、lint/typecheck/tests/build、Docker build 和跨仓库 fixture SHA。
-5. Windows 先 TDX `600030.SH`、后 QMT `300502.SZ`，记录 baseline/enabled/post_restart/post_rollback 与 protected-table digest；非交易时段不得声明 freshness。
-6. 验证整套 `off`/旧版本 rollback 后，在同一维护窗口发布正式组件并将 QMT production desired state 设为 `builtin`。
+5. 操作员分别手动覆盖并重新加载精确版本的 TDX/QMT terminal bridge，记录 installed path 与 SHA-256；自动化不得把 datasource checkout 中的同名文件视为已安装版本。
+6. Windows 先 TDX `600030.SH`、后 QMT `300502.SZ`，记录 baseline/enabled/post_restart/post_rollback 与 protected-table digest；非交易时段不得声明 freshness。
+7. 分别验证 TDX/QMT 整套 `off`/旧版本 rollback 后，在同一维护窗口发布正式组件并将双源 production desired state 设为 `builtin`。
 
 ## Open Questions
 

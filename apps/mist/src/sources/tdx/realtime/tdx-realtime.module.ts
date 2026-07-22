@@ -1,7 +1,7 @@
 /**
  * TdxRealtimeModule — formal TDX realtime consumer.
  *
- * Always imported by the mist app. QMT retains its independent mode switch.
+ * Imported by default; explicit TDX_REALTIME_MODE=off omits the whole module.
  * Contains the independent WS client, allowlist resolver, in-memory store, and
  * diagnostic controller.
  *
