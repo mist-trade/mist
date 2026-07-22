@@ -33,4 +33,4 @@ The formal monitoring release SHALL emit only documented `mist_realtime_*` metri
 
 #### Scenario: Monitoring contract tests run
 - **WHEN** exporter and watchdog render realtime metrics
-- **THEN** formal names match `contracts/metrics.md` and old experimental names are absent
+- **THEN** formal names match `mist-monitoring/docs/metrics.md` and old experimental names are absent
