@@ -92,7 +92,7 @@ health checks.
 #### Scenario: Metric contract is inspected
 - **WHEN** tests inspect monitoring metric names
 - **THEN** shared Mac and Windows probe metrics MUST be listed in
-  `contracts/metrics.md`
+  `mist-monitoring/docs/metrics.md`
 - **AND** names used in collectors MUST match the contract entries
 
 ### Requirement: Realtime monitoring follows source lifecycle

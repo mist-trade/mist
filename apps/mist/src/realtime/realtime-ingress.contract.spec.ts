@@ -12,13 +12,16 @@ const capturedAt = new Date().toISOString();
 
 describe('formal realtime ingress contract', () => {
   it('pins the shared golden fixture SHA', () => {
-    const root = join(process.cwd(), 'contracts/realtime');
+    const root = join(process.cwd(), 'test/fixtures/realtime');
     const fixture = readFileSync(join(root, 'realtime-native-frame-v1.json'));
-    const manifest = JSON.parse(
-      readFileSync(join(root, 'manifest.json'), 'utf8'),
-    ) as { sha256: string };
+    const expectedSha = readFileSync(
+      join(root, 'realtime-native-frame-v1.sha256'),
+      'utf8',
+    )
+      .trim()
+      .split(/\s+/)[0];
     expect(createHash('sha256').update(fixture).digest('hex')).toBe(
-      manifest.sha256,
+      expectedSha,
     );
   });
 

@@ -70,7 +70,7 @@ protocol field、class 名称和产品名保留原文。以下内容不做追溯
 
 - `mist/apps/chan/README.md`：已描述当前 Phase A/Phase B 算法与响应形状。
 - `mist-fe` Chan fixture/设计文档：与当前两阶段渲染兼容。
-- `mist-monitoring/contracts/metrics.md`、`alerts.md`、`actions.md`：字段名仍与代码
+- `mist-monitoring/docs/metrics.md`、`alerts.md`、`actions.md`：字段名仍与代码
   contract 一致；正式 realtime metric/API 命名已替代 active experimental 链路。
 - `mist-datasource/docs/references/qmt-provider-alignment.md`：native bars、无 DAT、
   stdlib polling 与 mode-gated realtime 边界仍有效。

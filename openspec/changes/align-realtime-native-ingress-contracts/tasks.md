@@ -2,7 +2,7 @@
 
 - [x] 1.1 Record six-repository branch/master/checkpoint audit, confirm migration 006 is untouched, and defer checkpoint 007/008 pending production migration inventory.
 - [x] 1.2 Define schema v1 `mist.realtime.native_snapshot` golden fixtures for TDX `600030.SH` and QMT `300502.SZ`, including ready, stream restart, reject and per-symbol sequence cases.
-- [x] 1.3 Add a cross-repository fixture manifest/SHA guard consumed by datasource, backend, deploy smoke and monitoring tests.
+- [x] 1.3 Add a cross-repository fixture/SHA guard consumed by datasource, backend, deploy smoke and monitoring tests.
 
 ## 2. Datasource Formal Realtime Contract
 
