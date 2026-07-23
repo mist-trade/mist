@@ -6,10 +6,10 @@ export function toTdxCanonicalSnapshot(
 ): CanonicalRealtimeSnapshot {
   const native = frame.native;
   const last = requiredNumber(native, ['Now', 'now', 'Price', 'price']);
-  const open = optionalNumber(native, ['Open', 'open']);
-  const high = optionalNumber(native, ['Max', 'High', 'high']);
-  const low = optionalNumber(native, ['Min', 'Low', 'low']);
-  const lastClose = optionalNumber(native, [
+  const open = readTdxNativeNumber(native, ['Open', 'open']);
+  const high = readTdxNativeNumber(native, ['Max', 'High', 'high']);
+  const low = readTdxNativeNumber(native, ['Min', 'Low', 'low']);
+  const lastClose = readTdxNativeNumber(native, [
     'LastClose',
     'PreClose',
     'lastClose',
@@ -24,8 +24,8 @@ export function toTdxCanonicalSnapshot(
     sequence: frame.sequence,
     streamEpoch: frame.streamEpoch,
     prices: { last, open, high, low, lastClose },
-    cumulativeVolume: optionalNumber(native, ['Volume', 'volume']),
-    cumulativeAmount: optionalNumber(native, ['Amount', 'amount']),
+    cumulativeVolume: readTdxNativeNumber(native, ['Volume', 'volume']),
+    cumulativeAmount: readTdxNativeNumber(native, ['Amount', 'amount']),
     quality: {
       eventTimeAvailable: eventTime !== null,
       partialPrices: [open, high, low, lastClose].some(
@@ -40,23 +40,29 @@ function requiredNumber(
   native: Record<string, unknown>,
   aliases: readonly string[],
 ): number {
-  const value = optionalNumber(native, aliases);
+  const value = readTdxNativeNumber(native, aliases);
   if (value === null || value <= 0) {
     throw new Error(`missing positive native field: ${aliases.join('|')}`);
   }
   return value;
 }
 
-function optionalNumber(
+export function readTdxNativeNumber(
   native: Record<string, unknown>,
   aliases: readonly string[],
 ): number | null {
   for (const alias of aliases) {
     const value = native[alias];
     if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string' && STRICT_NUMERIC_STRING.test(value)) {
+      const parsed = Number(value);
+      if (Number.isFinite(parsed)) return parsed;
+    }
   }
   return null;
 }
+
+const STRICT_NUMERIC_STRING = /^[+-]?(?:\d+(?:\.\d*)?|\.\d+)(?:[eE][+-]?\d+)?$/;
 
 function parseBeijingTime(value: unknown): string | null {
   if (typeof value !== 'string') return null;
