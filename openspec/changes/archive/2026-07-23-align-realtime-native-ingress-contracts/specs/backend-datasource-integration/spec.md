@@ -13,6 +13,11 @@ The backend SHALL preserve the validated provider-native object carried by an ac
 - **THEN** the appropriate source adapter produces the common canonical shape
 - **AND** it MUST NOT invoke Redis, candle aggregation, database persistence, scanner, signal, alert, notification, or trading code
 
+#### Scenario: Realtime snapshot remains memory-only
+- **WHEN** an accepted TDX or QMT realtime snapshot reaches the backend
+- **THEN** it may update bounded diagnostic state and callbacks
+- **AND** it MUST NOT invoke candle aggregation or database persistence
+
 ## ADDED Requirements
 
 ### Requirement: Formal realtime clients share one product ingress
