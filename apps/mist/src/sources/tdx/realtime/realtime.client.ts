@@ -2,8 +2,8 @@
  * TdxRealtimeClient — formal WS consumer for the TDX realtime pathway.
  *
  * It consumes the typed wire (TdxRealtimeSnapshotFrame) and
- * performs strict validation: JSON number/null, RFC3339, epoch, sequence,
- * exact identity. No alias parsing, no silent fills.
+ * performs strict validation: provider-native numeric values, RFC3339, epoch,
+ * sequence, exact identity. No silent fills.
  *
  * Instantiated on every Mist backend start.
  */
@@ -24,7 +24,10 @@ import {
 import { TdxRealtimeStore } from './realtime.store';
 import { TdxRealtimeAllowlistResolver } from './realtime-allowlist.resolver';
 import { RealtimeSnapshotIngressService } from '../../../realtime/realtime-snapshot-ingress.service';
-import { toTdxCanonicalSnapshot } from './realtime-native.adapter';
+import {
+  readTdxNativeNumber,
+  toTdxCanonicalSnapshot,
+} from './realtime-native.adapter';
 
 interface ReadyPayload {
   mode?: string;
@@ -563,10 +566,8 @@ function hasPositiveNumber(
   native: Record<string, unknown>,
   aliases: readonly string[],
 ): boolean {
-  return aliases.some((alias) => {
-    const value = native[alias];
-    return typeof value === 'number' && Number.isFinite(value) && value > 0;
-  });
+  const value = readTdxNativeNumber(native, aliases);
+  return value !== null && value > 0;
 }
 
 function isStrictRfc3339(value: string): boolean {

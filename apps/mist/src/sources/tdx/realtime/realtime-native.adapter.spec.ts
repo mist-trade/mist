@@ -1,4 +1,7 @@
-import { toTdxCanonicalSnapshot } from './realtime-native.adapter';
+import {
+  readTdxNativeNumber,
+  toTdxCanonicalSnapshot,
+} from './realtime-native.adapter';
 import { TdxRealtimeSnapshotFrame } from './realtime.types';
 
 describe('TDX realtime native adapter', () => {
@@ -19,6 +22,38 @@ describe('TDX realtime native adapter', () => {
     expect(result.eventTime).toBe('2026-07-22T10:01:02+08:00');
     expect(result.native).toEqual(native);
     expect(result.native).not.toBe(native);
+  });
+
+  it('parses provider-native numeric strings without changing the native object', () => {
+    const native = {
+      Now: '1294.59',
+      Open: '1288.00',
+      Max: '1298.50',
+      Min: '1285.25',
+      LastClose: '1287.75',
+      Volume: '34450',
+      Amount: '44592710.5',
+      DateTime: '2026-07-22 10:35:38',
+    };
+
+    const result = toTdxCanonicalSnapshot(frame(native));
+
+    expect(result.prices).toEqual({
+      last: 1294.59,
+      open: 1288,
+      high: 1298.5,
+      low: 1285.25,
+      lastClose: 1287.75,
+    });
+    expect(result.cumulativeVolume).toBe(34450);
+    expect(result.cumulativeAmount).toBe(44592710.5);
+    expect(result.native).toEqual(native);
+  });
+
+  it('rejects non-finite and loosely formatted numeric strings', () => {
+    expect(readTdxNativeNumber({ Now: 'NaN' }, ['Now'])).toBeNull();
+    expect(readTdxNativeNumber({ Now: ' 1294.59 ' }, ['Now'])).toBeNull();
+    expect(readTdxNativeNumber({ Now: '1294.59 CNY' }, ['Now'])).toBeNull();
   });
 });
 
