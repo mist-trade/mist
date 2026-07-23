@@ -11,9 +11,21 @@ Monitoring SHALL probe and classify both TDX and QMT formal realtime readiness i
 - **WHEN** an operator rolls QMT or another supported source to `off`
 - **THEN** monitoring reports the intentional mode without emitting a misleading transport-down alert
 
+#### Scenario: QMT realtime mode is disabled
+- **WHEN** QMT is configured as `off`
+- **THEN** monitoring emits no QMT realtime-unavailable alert while continuing to report TDX bridge health
+
 #### Scenario: Enabled source has no fresh owner or snapshot
 - **WHEN** an enabled source remains without a ready owner, converged subscription, or fresh snapshot beyond its startup/session grace
 - **THEN** monitoring emits a source-labelled formal realtime alert with stable health evidence
+
+## REMOVED Requirements
+
+### Requirement: Loopback experimental health is proxied by Windows metrics
+**Reason**: Formal `mist_realtime_*` metrics replace the experimental monitoring contract.
+**Migration**: Use `Loopback realtime health is proxied by Windows metrics`.
+
+## ADDED Requirements
 
 ### Requirement: Loopback realtime health is proxied by Windows metrics
 The Windows exporter SHALL read source-specific loopback formal realtime health and the Mac watchdog SHALL consume `mist_realtime_*` metrics rather than calling those routes remotely.
@@ -25,8 +37,6 @@ The Windows exporter SHALL read source-specific loopback formal realtime health 
 #### Scenario: Operator changes a source mode or allowlist
 - **WHEN** the Windows workflow applies or rolls back configuration
 - **THEN** exporter configuration is regenerated with the effective source mode before the switch is reported converged
-
-## ADDED Requirements
 
 ### Requirement: Experimental realtime metrics are retired atomically
 The formal monitoring release SHALL emit only documented `mist_realtime_*` metric and alert families and SHALL remove experimental config/type/metric names from active exporter and watchdog code.
