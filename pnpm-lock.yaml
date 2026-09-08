@@ -110,15 +110,15 @@ importers:
       nestjs-pino:
         specifier: ^4.6.1
         version: 4.6.1(@nestjs/common@10.4.15(class-transformer@0.5.1)(class-validator@0.14.1)(reflect-metadata@0.2.2)(rxjs@7.8.1))(pino-http@11.0.0)(pino@10.3.1)(rxjs@7.8.1)
+      nodejs-polars:
+        specifier: 0.26.0
+        version: 0.26.0
       reflect-metadata:
         specifier: ^0.2.0
         version: 0.2.2
       rxjs:
         specifier: ^7.8.1
         version: 7.8.1
-      technicalindicators:
-        specifier: 3.1.0
-        version: 3.1.0
       typeorm:
         specifier: ^0.3.20
         version: 0.3.20(ioredis@5.11.1)(mysql2@3.12.0)(ts-node@10.9.2(@types/node@20.17.17)(typescript@5.7.3))
@@ -1429,9 +1429,6 @@ packages:
 
   '@types/node@20.17.17':
     resolution: {integrity: sha512-/WndGO4kIfMicEQLTi/mDANUu/iVUhT7KboZPdEqqHQ4aTS+3qT3U5gIqWDFV+XouorjfgGqvKILJeHhuQgFYg==}
-
-  '@types/node@6.14.13':
-    resolution: {integrity: sha512-J1F0XJ/9zxlZel5ZlbeSuHW2OpabrUAqpFuC2sm2I3by8sERQ8+KCjNKUcq8QHuzpGMWiJpo9ZxeHrqrP2KzQw==}
 
   '@types/oracledb@6.5.2':
     resolution: {integrity: sha512-kK1eBS/Adeyis+3OlBDMeQQuasIDLUYXsi2T15ccNJ0iyUpQ4xDF7svFu3+bGVrI0CMBUclPciz+lsQR3JX3TQ==}
@@ -3228,6 +3225,58 @@ packages:
   node-releases@2.0.19:
     resolution: {integrity: sha512-xxOWJsBKtzAq7DY0J+DTzuz58K8e7sJbdgwkbMWQe8UYB6ekmsQ45q0M/tJDsGaZmbC+l7n57UV8Hl5tHxO9uw==}
 
+  nodejs-polars-android-arm64@0.26.0:
+    resolution: {integrity: sha512-6ctV+Vd/wiNX8KQaQkUNydI+xaNJ8kx7wmEe53XGanXRoY1LWDy+/2xiaWbfAf+MvcRXJNhUQwEsZmXICdmY1w==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [android]
+
+  nodejs-polars-darwin-arm64@0.26.0:
+    resolution: {integrity: sha512-ih7OmPpcOy4BCLCBsfT/h8g+D21TlSPHLg4K16ynHnSIHUBZIdPvalCCBikpnCrc2/4/x/5lo/be/PSfx0TeyQ==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [darwin]
+
+  nodejs-polars-darwin-x64@0.26.0:
+    resolution: {integrity: sha512-HMDX9kLoU2qW6RxR2Tez1277nzwVNLNyLiCTvk9+esS8MpULJTOz3e4/M/IFLb91mvBpri3BrS9hkh503AE2QA==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [darwin]
+
+  nodejs-polars-linux-arm64-gnu@0.26.0:
+    resolution: {integrity: sha512-H1C0PoqFsQNxFwEH+avjeF3CkUuGq/aGqbOmJco0zhEYJtl8PoLWbUG1avEq/Lr3BafS4hQ3RG4bmoOVqpXtNA==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [linux]
+
+  nodejs-polars-linux-arm64-musl@0.26.0:
+    resolution: {integrity: sha512-sG0AttOamzMFN/6x0Phkm5zDq1hmgjckYYW0v4qTvxky+CRZxdd/DGmKX8tC8ruBZrtSwsACz7cT66s/c2ohoA==}
+    engines: {node: '>= 22'}
+    cpu: [arm64]
+    os: [linux]
+
+  nodejs-polars-linux-x64-gnu@0.26.0:
+    resolution: {integrity: sha512-O/iLzU+BLcfusedFA304ObpvX8KoUwihTKauB020GcY/IWKGqejSD7GuPTGRpO55+yyE+AxwiqpvN9XNbfHEkw==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [linux]
+
+  nodejs-polars-linux-x64-musl@0.26.0:
+    resolution: {integrity: sha512-8Rq8zPI8gOu8MRKuUXAFFiCbqBzn9fnabIkOzhNJla/tZfcQJ1o6LTq/MKXEFOMWpatl/c4L36oG5fZ5XQ7OJA==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [linux]
+
+  nodejs-polars-win32-x64-msvc@0.26.0:
+    resolution: {integrity: sha512-9y8mBD97MN4yxB1G4yJ5X562PE8qCuK4KGuxStkMHn3b53lukhVsSGzy4Jufz+0yrOlyOiIt3ZSeLIoD6h38UQ==}
+    engines: {node: '>= 22'}
+    cpu: [x64]
+    os: [win32]
+
+  nodejs-polars@0.26.0:
+    resolution: {integrity: sha512-hmob36sShxYEUC5It1nX7JxkbhaBRh/Gqy6a8dlkvd2d72CbFojx4swDesdk40QkeZQYmbmZ5bxrVCM8oNWI+Q==}
+    engines: {node: '>= 20'}
+
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
@@ -3853,9 +3902,6 @@ packages:
   tapable@2.2.1:
     resolution: {integrity: sha512-GNzQvQTOIP6RyTfE2Qxb8ZVlNmw0n88vp1szwWRimP02mnTsx3Wtn5qRdqY9w2XduFNUgvOwhNnQsjwCp+kqaQ==}
     engines: {node: '>=6'}
-
-  technicalindicators@3.1.0:
-    resolution: {integrity: sha512-f16mOc+Y05hNy/of+UbGxhxQQmxUztCiluhsqC5QLUYz4WowUgKde9m6nIjK1Kay0wGHigT0IkOabpp0+22UfA==}
 
   terser-webpack-plugin@5.3.11:
     resolution: {integrity: sha512-RVCsMfuD0+cTt3EwX8hSl2Ks56EbFHWmhluwcqoPKtBnfjiT6olaq7PRIRfhyU8nnC2MrnDrBLfrD/RGE+cVXQ==}
@@ -5827,8 +5873,6 @@ snapshots:
   '@types/node@20.17.17':
     dependencies:
       undici-types: 6.19.8
-
-  '@types/node@6.14.13': {}
 
   '@types/oracledb@6.5.2':
     dependencies:
@@ -7937,6 +7981,41 @@ snapshots:
 
   node-releases@2.0.19: {}
 
+  nodejs-polars-android-arm64@0.26.0:
+    optional: true
+
+  nodejs-polars-darwin-arm64@0.26.0:
+    optional: true
+
+  nodejs-polars-darwin-x64@0.26.0:
+    optional: true
+
+  nodejs-polars-linux-arm64-gnu@0.26.0:
+    optional: true
+
+  nodejs-polars-linux-arm64-musl@0.26.0:
+    optional: true
+
+  nodejs-polars-linux-x64-gnu@0.26.0:
+    optional: true
+
+  nodejs-polars-linux-x64-musl@0.26.0:
+    optional: true
+
+  nodejs-polars-win32-x64-msvc@0.26.0:
+    optional: true
+
+  nodejs-polars@0.26.0:
+    optionalDependencies:
+      nodejs-polars-android-arm64: 0.26.0
+      nodejs-polars-darwin-arm64: 0.26.0
+      nodejs-polars-darwin-x64: 0.26.0
+      nodejs-polars-linux-arm64-gnu: 0.26.0
+      nodejs-polars-linux-arm64-musl: 0.26.0
+      nodejs-polars-linux-x64-gnu: 0.26.0
+      nodejs-polars-linux-x64-musl: 0.26.0
+      nodejs-polars-win32-x64-msvc: 0.26.0
+
   normalize-path@3.0.0: {}
 
   npm-run-path@4.0.1:
@@ -8558,10 +8637,6 @@ snapshots:
   systeminformation@5.33.1: {}
 
   tapable@2.2.1: {}
-
-  technicalindicators@3.1.0:
-    dependencies:
-      '@types/node': 6.14.13
 
   terser-webpack-plugin@5.3.11(webpack@5.97.1):
     dependencies:

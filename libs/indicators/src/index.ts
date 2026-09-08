@@ -22,3 +22,27 @@ export type {
   UnitForceTrendInput,
   UnitForceItem,
 } from './force';
+
+export {
+  computeTsRankSeries,
+  computeTsRankObservation,
+  computeTsArgMaxSeries,
+  computeTsArgMaxObservation,
+  computeTsArgMinSeries,
+  computeTsArgMinObservation,
+  computeDecayLinearSeries,
+  computeDecayLinearObservation,
+  computeRollingCorrSeries,
+  computeRollingCorrObservation,
+  computeRollingStdSeries,
+  computeRollingStdObservation,
+  computeTsDeltaSeries,
+  computeTsDeltaObservation,
+  computeTsDelaySeries,
+  computeTsDelayObservation,
+} from './time-series';
+export type {
+  TimeSeriesResult,
+  TsRankOptions,
+  RollingStdOptions,
+} from './time-series';

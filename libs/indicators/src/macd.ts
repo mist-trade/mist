@@ -1,4 +1,4 @@
-import { MACD } from 'technicalindicators';
+import pl from 'nodejs-polars';
 import { IndicatorInputError, IndicatorValueError } from './errors';
 
 export interface MacdSeriesResult {
@@ -14,46 +14,49 @@ export interface MacdObservation {
   readonly histogram: number;
 }
 
-interface CompleteMacdValue {
-  MACD: number;
-  signal: number;
-  histogram: number;
+/**
+ * Evaluates exponential moving average (EMA) seeded by the initial period SMA,
+ * executing strictly via Polars native rollingMean and ewmMean operators.
+ */
+function computePolarsEma(arr: readonly number[], period: number): number[] {
+  const s = pl.Series(arr);
+  const sma = s.rollingMean(period).toArray() as (number | null)[];
+  const seed = sma[period - 1] as number;
+  const tail = [seed, ...arr.slice(period)];
+  const tailSeries = pl.Series(tail);
+  return tailSeries.ewmMean(2 / (period + 1), false).toArray() as number[];
 }
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-function isCompleteMacdValue(value: {
-  MACD?: number;
-  signal?: number;
-  histogram?: number;
-}): value is CompleteMacdValue {
-  return (
-    isFiniteNumber(value.MACD) &&
-    isFiniteNumber(value.signal) &&
-    isFiniteNumber(value.histogram)
-  );
-}
-
-/** MACD(12/26/9 EMA) full series. Warm-up positions carry no value; `out[i]` aligns to `in[i + begIndex]`. */
+/** MACD(12/26/9 EMA) full series computed via Polars vectorized operators. Warm-up positions carry no value; `out[i]` aligns to `in[i + begIndex]`. */
 export function computeMacdSeries(closes: readonly number[]): MacdSeriesResult {
-  const values = [...closes];
-  const output = MACD.calculate({
-    values,
-    fastPeriod: 12,
-    slowPeriod: 26,
-    signalPeriod: 9,
-    SimpleMAOscillator: false,
-    SimpleMASignal: false,
-  }).filter(isCompleteMacdValue);
+  if (closes.length < 34) {
+    return {
+      begIndex: closes.length,
+      macd: [],
+      signal: [],
+      histogram: [],
+    };
+  }
 
-  const macd = output.map((value) => value.MACD);
-  const signal = output.map((value) => value.signal);
-  const histogram = output.map((value) => value.histogram);
+  const fastTail = computePolarsEma(closes, 12);
+  const slowTail = computePolarsEma(closes, 26);
+  const fastForSlow = fastTail.slice(26 - 12);
+
+  const dif = pl
+    .Series(fastForSlow)
+    .sub(pl.Series(slowTail))
+    .toArray() as number[];
+
+  const signalTail = computePolarsEma(dif, 9);
+  const macd = dif.slice(8);
+  const signal = signalTail;
+  const histogram = pl
+    .Series(macd)
+    .sub(pl.Series(signal))
+    .toArray() as number[];
 
   return {
-    begIndex: values.length - macd.length,
+    begIndex: closes.length - macd.length,
     macd,
     signal,
     histogram,

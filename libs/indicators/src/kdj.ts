@@ -1,4 +1,4 @@
-import { SMA, Stochastic } from 'technicalindicators';
+import pl from 'nodejs-polars';
 import { IndicatorInputError, IndicatorValueError } from './errors';
 
 export interface KdjSeriesResult {
@@ -20,11 +20,7 @@ export interface KdjSeriesParams {
   readonly dSmoothing?: number;
 }
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value);
-}
-
-/** KDJ(9,3,3) full series. Warm-up positions carry no value; `out[i]` aligns to `in[i + begIndex]`. */
+/** KDJ(9,3,3) full series computed via Polars vectorized operators. Warm-up positions carry no value; `out[i]` aligns to `in[i + begIndex]`. */
 export function computeKdjSeries(
   high: readonly number[],
   low: readonly number[],
@@ -36,30 +32,54 @@ export function computeKdjSeries(
       `computeKdjSeries requires equal-length high/low/close arrays; got ${high.length}/${low.length}/${close.length}`,
     );
   }
-  const highs = [...high];
-  const lows = [...low];
-  const closes = [...close];
 
   const period = params?.period ?? 9;
   const kSmoothing = params?.kSmoothing ?? 3;
   const dSmoothing = params?.dSmoothing ?? 3;
 
-  const raw = Stochastic.calculate({
-    high: highs,
-    low: lows,
-    close: closes,
-    period,
-    signalPeriod: kSmoothing,
-  });
-  const slowK = raw
-    .filter((value) => isFiniteNumber(value.d))
-    .map((value) => value.d);
-  const D = SMA.calculate({ values: slowK, period: dSmoothing });
+  const minRequired = period + kSmoothing + dSmoothing - 2;
+  if (close.length < minRequired) {
+    return {
+      begIndex: close.length,
+      K: [],
+      D: [],
+      J: [],
+    };
+  }
+
+  const df = pl.DataFrame({ high, low, close });
+  const lowN = pl.col('low').rollingMin(period);
+  const highN = pl.col('high').rollingMax(period);
+  const denom = highN.sub(lowN);
+  const fastKExpr = pl
+    .when(denom.eq(0))
+    .then(pl.lit(50))
+    .otherwise(pl.col('close').sub(lowN).div(denom).mul(100));
+
+  const fK = df
+    .select(fastKExpr.alias('fk'))
+    .getColumn('fk')
+    .toArray()
+    .slice(period - 1) as number[];
+
+  const slowK = pl
+    .Series(fK)
+    .rollingMean(kSmoothing)
+    .toArray()
+    .slice(kSmoothing - 1) as number[];
+
+  const D = pl
+    .Series(slowK)
+    .rollingMean(dSmoothing)
+    .toArray()
+    .slice(dSmoothing - 1) as number[];
+
   const K = slowK.slice(slowK.length - D.length);
-  const J = K.map((kValue, index) => 3 * kValue - 2 * D[index]);
+
+  const J = pl.Series(K).mul(3).sub(pl.Series(D).mul(2)).toArray() as number[];
 
   return {
-    begIndex: closes.length - K.length,
+    begIndex: close.length - K.length,
     K,
     D,
     J,
@@ -73,9 +93,14 @@ export function computeKdjObservation(
   close: readonly number[],
   opts?: { readonly windowSize?: number },
 ): KdjObservation {
-  if (opts?.windowSize !== undefined && close.length !== opts.windowSize) {
+  if (
+    opts?.windowSize !== undefined &&
+    (high.length !== opts.windowSize ||
+      low.length !== opts.windowSize ||
+      close.length !== opts.windowSize)
+  ) {
     throw new IndicatorInputError(
-      `computeKdjObservation requires exactly ${opts.windowSize} closes; got ${close.length}`,
+      `computeKdjObservation requires exactly ${opts.windowSize} elements; got ${close.length}`,
     );
   }
 
