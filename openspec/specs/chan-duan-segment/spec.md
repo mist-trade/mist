@@ -11,11 +11,8 @@ ChanCore SHALL expose a stateless `createDuan(bis)` facade that consumes the `Ch
 standard characteristic-sequence method (缠论 line-segment division). The implementation SHALL follow the orthodox
 algorithm: maintain the current segment direction and its characteristic sequence, process characteristic-sequence
 inclusion, identify the directional fenxing, and confirm segment termination through the two gap cases (the second
-case requiring retrospective confirmation). When the candidate turning Bi is the first reverse Bi of the segment
-(no characteristic-sequence element precedes the turning point — 缠论 71 课「第一笔就破坏前线段」situation),
-termination SHALL instead be confirmed by the lesson-71 first-Bi-break rule (转笔延伸出三笔且第三笔或其后同向笔
-破点第一笔的结束位置 → 前线段结束；先破第一笔的开始位置 → 旧线段延续，判据作废) rather than by a fenxing on
-missing elements, and a Duan of a single Bi confirmed this way SHALL be a legal complete Duan.
+case requiring retrospective confirmation). In accordance with 缠论 65 课公理 ("线段至少由三笔组成。线段的破坏只有一种情况，就是被另一条线段所破坏，不可能被单笔破坏"), a complete Duan MUST consist of at least three constituent Bi (`originBis.length >= 3`, `endIdx - segStartIdx >= 2`), and the engine SHALL NOT finalize single-Bi complete segments.
+The semantic change SHALL be released with `ChanCore.algorithmVersion` incrementing `7 → 8`.
 
 #### Scenario: A Duan is derived from Bi
 - **WHEN** a caller passes the `ChanBi[]` Phase B sequence returned by `createBi` to `createDuan`
@@ -66,14 +63,12 @@ missing elements, and a Duan of a single Bi confirmed this way SHALL be a legal 
 - **AND** the end/start break competition MUST be resolved in temporal order (the first breaker wins)
   and MAY scan without a bounded horizon (71 课复杂分支「最终还是先破…谁先破…」)
 
-#### Scenario: A single-Bi Duan confirmed by the first-Bi-break rule is a valid complete Duan
-- **WHEN** the lesson-71 rule confirms termination of a segment whose constituent span is exactly one Bi
-  (the turning Bi is the first reverse Bi, so endIdx equals the segment start Bi)
-- **THEN** that single-Bi Duan MUST be emitted as a valid complete `ChanDuan` (startBi and endBi both
-  equal to that Bi, `type=complete`, `status=valid`)
-- **AND** the usual "a Duan consists of at least three Bi" minimum MUST NOT apply to this lesson-71
-  outcome (缠论 71 课「前线段一定结束」与 65 课「线段至少三笔」的组合语义；被一笔破坏而尚未成立的反向段
-  在后续扫描中以该转笔为起点自然形成)
+#### Scenario: Candidate turning point with fewer than three bis cannot terminate a complete Duan
+- **GIVEN** a segment scan starting from `segStartIdx`
+- **WHEN** the algorithm detects a reverse break or candidate turning point, but `endIdx - segStartIdx < 2`
+- **THEN** that turning point MUST NOT be finalized as the current segment's complete termination endpoint
+- **AND** the current segment MUST continue scanning and extending
+- **AND** any Duan emitted as `type: complete, status: valid` MUST contain at least three constituent Bi (`originBis.length >= 3`)
 
 #### Scenario: Termination is confirmed without a gap (first case)
 - **WHEN** a characteristic-sequence fenxing forms and its first and second elements have NO gap (their intervals
