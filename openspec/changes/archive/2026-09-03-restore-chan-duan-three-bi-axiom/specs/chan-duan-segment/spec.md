@@ -1,8 +1,8 @@
-# Spec: chan-duan-segment
+# chan-duan-segment Specification Delta
 
-## Requirements
+## MODIFIED Requirements
 
-### Requirement: 线段至少三笔公理约束 (Minimum Three Bis for Complete Duan)
+### Requirement: ChanCore Shall Enforce Minimum Three Bis For Complete Duan (Lesson 65 Axiom)
 任何被标记为 `type: Complete, status: Valid` 的已完成线段，其包含的原始笔集合 `originBis` 的长度必须 $\ge 3$。系统严禁输出包含笔数 $< 3$（如单笔线段）的完整线段。
 
 #### Scenario: 候选转折点不足三笔时不可结算为完成线段

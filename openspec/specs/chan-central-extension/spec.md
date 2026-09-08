@@ -9,29 +9,37 @@ adjacent same-level Channels overlap or touch in wave range and merged expansion
 
 ### Requirement: ChanCore Shall Resolve Channel Central Expansion At Both Levels
 
-`ChanCore.createChannels` (Bi-level) and `ChanCore.createDuanChannels` (Duan-level) SHALL recognize
-central expansion (中枢扩张) between adjacent same-level Channels and resolve it so that each Phase B
-output contains **no pair of adjacent same-level Channels that satisfies the expansion condition**.
-Per 缠论 20 课中心定理二, expansion (forming a higher-level Central) holds exactly when two adjacent
-same-level Channels have **strictly separated central zones** (`max(prev.zd, next.zd) > min(prev.zg, next.zg)`:
-`后ZG < 前ZD` or `后ZD > 前ZG`) **and** overlapping or touching wave ranges
-(`max(prev.dd, next.dd) <= min(prev.gg, next.gg)`: `后GG >= 前DD` or `后DD <= 前GG`). A pair whose
-central zones overlap belongs to the same zone region revisited (中心定理一: extension/overlap of the
-same Central), and is NOT an expansion regardless of wave-range overlap. The resolution SHALL merge an
-expanded adjacent pair into a single higher-level Central carrying an explicit `expanded` marker,
-iterating to a fixed point. This provides the clean non-overlapping Channel input that trend-chain
-(背驰) consumption requires at both levels, and MUST NOT alter the output of
-`mergeK/findFenxings/createBi/createDuan`.
+`ChanCore.createChannels` (Bi-level) and `ChanCore.createDuanChannels` (Duan-level) SHALL derive
+Channels using a sequential confirmation lifecycle state machine:
+1. Base Channel formation from valid confirmed units;
+2. Extension strictly bounded by Lesson 20 touch-zone condition (`high >= ZD` AND `low <= ZG`);
+3. Closure (sealing) triggered by departure with 3rd Buy/Sell-Point confirmation (`low > ZG` or `high < ZD` on callback) or 9-unit level enlargement (3+3+3 combinations);
+4. Adjacent pairwise central expansion resolution per Lesson 20 Theorem 2 without unbounded transitive collapsing.
 
-A Central being extended at either level SHALL treat all constituent units as sharing one common
-overlapping zone: the central bounds MUST be the common overlapping intersection of **all** window
-units (`zd = max(all lows)`, `zg = min(all highs)`), extension SHALL continue only while that common
-intersection stays valid (`zg > zd`), and the wave-range extrema (`dd = min(all lows)`,
-`gg = max(all highs)`) and boundary IDs/timestamps SHALL reflect the full extended window. This
-replaces the previous behavior of freezing the initial zone (`zd/zg`) while extending, which distorted
-the drawn box and diverged buy/sell-point (三类买卖点) and divergence baselines. The semantic change
-SHALL be released together with `ChanCore.algorithmVersion` bump `3 → 4` so consumers can key off the
-version.
+The derivation MUST NOT produce multi-month single-channel artifacts in oscillating markets.
+The semantic change SHALL be released with `ChanCore.algorithmVersion` incrementing `6 → 7`.
+
+#### Scenario: Channel extension obeys Lesson 20 touch rule
+- **WHEN** a candidate or confirmed Channel in Phase B is extended with incoming units
+- **THEN** incoming units MUST touch the current central zone `[zd, zg]` (`high >= zd` and `low <= zg`)
+- **AND** the dynamic central zone MUST reflect the common intersection of all constituent units
+- **AND** if an incoming unit completely departs the zone and the subsequent pullback does not re-enter the zone, the Channel MUST be closed and sealed immediately
+
+#### Scenario: Channel closure via 3rd Buy/Sell Point
+- **WHEN** a unit departs the central zone and the subsequent counter-unit does not touch `[zd, zg]`
+- **THEN** a 3rd Buy/Sell Point condition MUST be established
+- **AND** the current Channel MUST be finalized and sealed up to the last unit before departure
+- **AND** subsequent units MUST be processed as independent new trend / channel candidates
+
+#### Scenario: Channel level enlargement via 9-wave accumulation
+- **WHEN** a Channel extends continuously without departure for 9 constituent units (3+3+3)
+- **THEN** the Channel MUST be marked with `expanded: true`
+- **AND** it MUST be closed as a completed higher-level Central
+
+#### Scenario: Pairwise central expansion is strictly bounded
+- **WHEN** two adjacent independent completed same-level Channels are evaluated for expansion
+- **THEN** expansion MUST hold if and only if their central zones are strictly separated AND their wave ranges `[dd, gg]` overlap or touch
+- **AND** expansion resolution MUST NOT transitively collapse non-adjacent multi-month market structures into a single composite channel
 
 #### Scenario: Adjacent same-level Channels with overlapping or touching wave ranges are resolved
 - **WHEN** either `createChannels` or `createDuanChannels` produces a Phase B sequence in which two
