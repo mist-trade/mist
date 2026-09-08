@@ -23,6 +23,7 @@ const forbiddenPackagePrefixes = [
   'node:http',
   'node:https',
   'dotenv',
+  'technicalindicators',
 ] as const;
 
 describe('Indicators pure boundary', () => {
@@ -77,12 +78,12 @@ describe('Indicators pure boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('confines the technicalindicators dependency to this library', () => {
+  it('confines the nodejs-polars dependency to this library', () => {
     const violations = allSourceFiles()
       .filter((file) => !file.startsWith(`${libraryRoot}${sep}`))
       .flatMap((file) =>
         importsOf(file)
-          .filter((source) => source === 'technicalindicators')
+          .filter((source) => source === 'nodejs-polars')
           .map((source) => `${relative(repositoryRoot, file)} -> ${source}`),
       );
 

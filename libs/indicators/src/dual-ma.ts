@@ -1,4 +1,4 @@
-import { SMA } from 'technicalindicators';
+import pl from 'nodejs-polars';
 
 export interface DualMaSeriesResult {
   readonly begIndex: number;
@@ -11,20 +11,38 @@ export interface DualMaSeriesParams {
   readonly longPeriod?: number;
 }
 
-/** Dual moving average (SMA 13/60) full series. `out[i]` aligns to `in[i + begIndex]`. */
+/** Dual moving average (SMA 13/60) full series via Polars rollingMean. `out[i]` aligns to `in[i + begIndex]`. */
 export function computeDualMaSeries(
   closes: readonly number[],
   params?: DualMaSeriesParams,
 ): DualMaSeriesResult {
-  const values = [...closes];
   const shortPeriod = params?.shortPeriod ?? 13;
   const longPeriod = params?.longPeriod ?? 60;
 
-  const shortMA = SMA.calculate({ values, period: shortPeriod });
-  const longMA = SMA.calculate({ values, period: longPeriod });
+  if (closes.length < shortPeriod) {
+    return {
+      begIndex: closes.length,
+      shortMA: [],
+      longMA: [],
+    };
+  }
+
+  const s = pl.Series(closes);
+  const shortMA = s
+    .rollingMean(shortPeriod)
+    .toArray()
+    .slice(shortPeriod - 1) as number[];
+
+  const longMA =
+    closes.length < longPeriod
+      ? []
+      : (s
+          .rollingMean(longPeriod)
+          .toArray()
+          .slice(longPeriod - 1) as number[]);
 
   return {
-    begIndex: values.length - shortMA.length,
+    begIndex: closes.length - shortMA.length,
     shortMA,
     longMA,
   };

@@ -1,7 +1,7 @@
 {
   "name": "mist",
   "version": "1.0.0",
-  "description": "\u80a1\u7968\u5e02\u573a\u5206\u6790\u548c\u9884\u8b66\u7cfb\u7edf - A-share market analysis and alert system with AI-powered intelligent agents",
+  "description": "股票市场分析和预警系统 - A-share market analysis and alert system with AI-powered intelligent agents",
   "author": "moyui",
   "private": true,
   "license": "BSD-3-Clause",
@@ -82,9 +82,9 @@
     "joi": "^18.0.2",
     "mysql2": "^3.12.0",
     "nestjs-pino": "^4.6.1",
+    "nodejs-polars": "0.26.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "technicalindicators": "3.1.0",
     "typeorm": "^0.3.20",
     "ws": "^8.20.0"
   },
