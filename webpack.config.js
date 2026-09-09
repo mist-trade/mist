@@ -13,6 +13,7 @@ module.exports = function (options, webpack) {
     ...options,
     externals: {
       talib: 'commonjs talib',
+      'nodejs-polars': 'commonjs nodejs-polars',
       // The OTel SDK is initialized by otel-preload.js (node -r) so its hooks
       // run before http/express/pino are loaded. For the bundle's own spans
       // (candleTracer, registerCandleMetrics) to share that SDK's global
