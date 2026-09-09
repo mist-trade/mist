@@ -82,7 +82,7 @@ export class IndicatorService {
     nbElement: number;
     rsi: number[];
   }> {
-    const { begIndex, rsi } = computeRsiSeries(prices, period);
+    const { begIndex, rsi } = computeRsiSeries(prices.map(Number), period);
 
     return {
       begIndex,
@@ -99,9 +99,9 @@ export class IndicatorService {
     J: number[];
   }> {
     const { begIndex, K, D, J } = computeKdjSeries(
-      data.high,
-      data.low,
-      data.close,
+      data.high.map(Number),
+      data.low.map(Number),
+      data.close.map(Number),
       {
         period: data.period,
         kSmoothing: data.kSmoothing,
@@ -120,9 +120,9 @@ export class IndicatorService {
 
   async runADX(data: RunOhlcIndicatorDto): Promise<number[]> {
     const { adx } = computeAdxSeries(
-      data.high,
-      data.low,
-      data.close,
+      data.high.map(Number),
+      data.low.map(Number),
+      data.close.map(Number),
       data.period,
     );
     return adx;
@@ -131,7 +131,7 @@ export class IndicatorService {
   async runDualMA(
     data: RunDualMADto,
   ): Promise<{ shortMA: number[]; longMA: number[] }> {
-    const { shortMA, longMA } = computeDualMaSeries(data.close, {
+    const { shortMA, longMA } = computeDualMaSeries(data.close.map(Number), {
       shortPeriod: data.shortPeriod,
       longPeriod: data.longPeriod,
     });
@@ -140,9 +140,9 @@ export class IndicatorService {
 
   async runATR(data: RunOhlcIndicatorDto): Promise<number[]> {
     const { atr } = computeAtrSeries(
-      data.high,
-      data.low,
-      data.close,
+      data.high.map(Number),
+      data.low.map(Number),
+      data.close.map(Number),
       data.period,
     );
     return atr;

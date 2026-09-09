@@ -27,7 +27,7 @@ export function computeDualMaSeries(
     };
   }
 
-  const s = pl.Series(closes);
+  const s = pl.Series('close', closes as any).cast(pl.Float64);
   const shortMA = s
     .rollingMean(shortPeriod)
     .toArray()

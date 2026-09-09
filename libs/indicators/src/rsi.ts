@@ -6,11 +6,11 @@ export interface RsiSeriesResult {
 }
 
 function computeWilderRma(arr: readonly number[], period: number): number[] {
-  const s = pl.Series(arr);
+  const s = pl.Series('v', arr as any).cast(pl.Float64);
   const sma = s.rollingMean(period).toArray() as (number | null)[];
   const seed = sma[period - 1] as number;
   const tail = [seed, ...arr.slice(period)];
-  const tailSeries = pl.Series(tail);
+  const tailSeries = pl.Series('tail', tail as any).cast(pl.Float64);
   return tailSeries.ewmMean(1 / period, false).toArray() as number[];
 }
 
@@ -26,7 +26,9 @@ export function computeRsiSeries(
     };
   }
 
-  const df = pl.DataFrame({ close: closes });
+  const df = pl.DataFrame({
+    close: pl.Series('close', closes as any).cast(pl.Float64),
+  });
   const diff = pl.col('close').diff(1, 'ignore');
   const gainExpr = pl.when(diff.gt(0)).then(diff).otherwise(pl.lit(0));
   const lossExpr = pl.when(diff.lt(0)).then(diff.abs()).otherwise(pl.lit(0));
