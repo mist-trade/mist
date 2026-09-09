@@ -54,6 +54,16 @@ describe('computeKdjSeries', () => {
     expect(close).toEqual(c);
   });
 
+  it('handles string-encoded numeric arrays gracefully (TypeORM decimal compatibility)', () => {
+    const strHigh = high.map(String) as unknown as number[];
+    const strLow = low.map(String) as unknown as number[];
+    const strClose = close.map(String) as unknown as number[];
+
+    const result = computeKdjSeries(strHigh, strLow, strClose);
+    expect(result.K).toHaveLength(68);
+    expect(result.K[0]).toBeCloseTo(31.687287, 6);
+  });
+
   it('returns empty output for empty input', () => {
     const result = computeKdjSeries([], [], []);
 

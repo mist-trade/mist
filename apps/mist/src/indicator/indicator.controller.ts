@@ -109,9 +109,9 @@ export class IndicatorController {
 
     const KDJParams = data.reduce<RunKDJDto>(
       (prev, cur) => {
-        prev.high.push(cur.high);
-        prev.low.push(cur.low);
-        prev.close.push(cur.close);
+        prev.high.push(Number(cur.high));
+        prev.low.push(Number(cur.low));
+        prev.close.push(Number(cur.close));
         return prev;
       },
       {
@@ -160,7 +160,7 @@ export class IndicatorController {
     });
 
     const rsiResult = await this.indicatorService.runRSI(
-      data.map((item) => item.close),
+      data.map((item) => Number(item.close)),
     );
 
     return data.map((item, index) => ({

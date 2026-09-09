@@ -6,11 +6,11 @@ export interface AtrSeriesResult {
 }
 
 function computeWilderRma(arr: readonly number[], period: number): number[] {
-  const s = pl.Series(arr);
+  const s = pl.Series('v', arr as any).cast(pl.Float64);
   const sma = s.rollingMean(period).toArray() as (number | null)[];
   const seed = sma[period - 1] as number;
   const tail = [seed, ...arr.slice(period)];
-  const tailSeries = pl.Series(tail);
+  const tailSeries = pl.Series('tail', tail as any).cast(pl.Float64);
   return tailSeries.ewmMean(1 / period, false).toArray() as number[];
 }
 
@@ -28,7 +28,11 @@ export function computeAtrSeries(
     };
   }
 
-  const df = pl.DataFrame({ high, low, close });
+  const df = pl.DataFrame({
+    high: pl.Series('high', high as any).cast(pl.Float64),
+    low: pl.Series('low', low as any).cast(pl.Float64),
+    close: pl.Series('close', close as any).cast(pl.Float64),
+  });
   const prevClose = pl.col('close').shift(1);
   const tr1 = pl.col('high').sub(pl.col('low'));
   const tr2 = pl.col('high').sub(prevClose).abs();

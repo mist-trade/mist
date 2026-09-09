@@ -47,7 +47,11 @@ export function computeKdjSeries(
     };
   }
 
-  const df = pl.DataFrame({ high, low, close });
+  const df = pl.DataFrame({
+    high: pl.Series('high', high as any).cast(pl.Float64),
+    low: pl.Series('low', low as any).cast(pl.Float64),
+    close: pl.Series('close', close as any).cast(pl.Float64),
+  });
   const lowN = pl.col('low').rollingMin(period);
   const highN = pl.col('high').rollingMax(period);
   const denom = highN.sub(lowN);
