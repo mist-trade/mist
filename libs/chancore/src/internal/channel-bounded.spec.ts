@@ -353,4 +353,83 @@ describe('ChannelCalculator.getAdjacentBoundedChannels', () => {
     expect(zs.zd).toBe(32);
     expect(zs.bis[0].startTime.toISOString()).toBe('2026-01-01T11:25:00.000Z');
   });
+
+  it('correctly bounds 30m sub-bis inside daily macro bi when daily timestamps are midnight (00:00:00+08:00)', () => {
+    // Daily Downward Bi: 2026-01-14 00:00:00+08:00 to 2026-02-03 00:00:00+08:00
+    // (In UTC: 2026-01-13T16:00:00Z to 2026-02-02T16:00:00Z)
+    // High: 4190.87, Low: 4002.78
+    const macroBis = [
+      makeMockBi(
+        TrendDirection.Down,
+        4002.78,
+        4190.87,
+        '2026-01-13T16:00:00Z',
+        '2026-02-02T16:00:00Z',
+      ),
+    ];
+
+    // 7 30m sub-bis forming a downward base central inside this daily stroke:
+    // Notice subBi #1 starts on 2026-01-14 at 11:30 (03:30Z), 11.5 hours AFTER daily bar 00:00!
+    // And subBi #7 ends on 2026-02-03 at 11:00 (03:00Z), 11 hours AFTER daily bar 00:00!
+    const subBis = [
+      makeMockBi(
+        TrendDirection.Down,
+        4096.85,
+        4190.87,
+        '2026-01-14T03:30:00Z',
+        '2026-01-15T05:30:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4096.85,
+        4140.23,
+        '2026-01-15T05:30:00Z',
+        '2026-01-16T02:00:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4080.29,
+        4140.23,
+        '2026-01-16T02:00:00Z',
+        '2026-01-20T02:30:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4080.29,
+        4160.99,
+        '2026-01-20T02:30:00Z',
+        '2026-01-26T03:00:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4101.83,
+        4160.99,
+        '2026-01-26T03:00:00Z',
+        '2026-01-27T02:30:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4101.83,
+        4170.21,
+        '2026-01-27T02:30:00Z',
+        '2026-01-29T06:30:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4002.78,
+        4170.21,
+        '2026-01-29T06:30:00Z',
+        '2026-02-03T03:00:00Z',
+      ),
+    ];
+
+    const result = ChanCore.createAdjacentBoundedChannels(subBis, macroBis);
+    expect(result.phaseB).toHaveLength(1);
+    const zs = result.phaseB[0];
+    expect(zs.trend).toBe(TrendDirection.Up);
+    expect(zs.zg).toBe(4140.23);
+    expect(zs.zd).toBe(4101.83);
+    expect(zs.bis.length).toBeGreaterThanOrEqual(5);
+    expect(zs.bis[0].startTime.toISOString()).toBe('2026-01-15T05:30:00.000Z');
+  });
 });

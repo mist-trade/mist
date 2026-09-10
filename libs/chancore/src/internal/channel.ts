@@ -84,17 +84,51 @@ export class ChannelCalculator {
 
   /**
    * 利用父级别起止分型窗口在次级别笔序列中精确定位属于该大笔的子序列
+   *
+   * 算法契约：
+   * 1. 物理区间感知：判断父级别时间戳是否为日期型（如日线/周线 00:00:00），还是分时型（如 30m/5m/1m）；
+   * 2. 动态搜索窗口：
+   *    - 日线/周线等日期型宏观笔：起点与终点分型窗口向两侧放宽 24 小时（覆盖前一交易日到后一交易日全天时段）；
+   *    - 分时型宏观笔：分型窗口放宽 72 小时（覆盖周末 66.5h 休市及隔夜跳空）；
+   * 3. 极值锚定：在窗口内精确定位次级别反向笔出分型与本级别大笔极值对应的起止笔；
+   * 4. 保底边界：若未命中极值，按大笔完整物理时间区间 [getBarStartTimeMs, getBarEndTimeMs] 截取，
+   *    杜绝日线以 00:00:00 截断当天盘中交易的问题。
    */
   private sliceSubBisForMacroBi(
     macroBi: ChanBi,
     subBis: readonly ChanBi[],
   ): readonly ChanBi[] {
     const isUp = macroBi.trend === TrendDirection.Up;
-    const sTimeMs = new Date(macroBi.startTime).getTime();
-    const eTimeMs = new Date(macroBi.endTime).getTime();
+    const sTime = new Date(macroBi.startTime);
+    const eTime = new Date(macroBi.endTime);
 
-    // 分型窗口搜索范围（以大笔起止时间为中心，向两侧放宽 4 小时以覆盖跨日/多根合并K线的分型区间）
-    const windowBufferMs = 4 * 3600 * 1000;
+    const isDailyOrWeekly =
+      isDateOnlyTimestamp(sTime) || isDateOnlyTimestamp(eTime);
+
+    let sWindowStart: number;
+    let sWindowEnd: number;
+    let eWindowStart: number;
+    let eWindowEnd: number;
+
+    if (isDailyOrWeekly) {
+      const sStartMs = getBarStartTimeMs(sTime);
+      const sEndMs = getBarEndTimeMs(sTime);
+      sWindowStart = sStartMs - 24 * 3600 * 1000;
+      sWindowEnd = sEndMs + 24 * 3600 * 1000;
+
+      const eStartMs = getBarStartTimeMs(eTime);
+      const eEndMs = getBarEndTimeMs(eTime);
+      eWindowStart = eStartMs - 24 * 3600 * 1000;
+      eWindowEnd = eEndMs + 24 * 3600 * 1000;
+    } else {
+      const sMs = sTime.getTime();
+      const eMs = eTime.getTime();
+      const buf = 72 * 3600 * 1000;
+      sWindowStart = sMs - buf;
+      sWindowEnd = sMs + buf;
+      eWindowStart = eMs - buf;
+      eWindowEnd = eMs + buf;
+    }
 
     // 1. 在起点分型窗口中寻找极值锚点笔：
     // 向上大笔起点必为窗口内最低点 (min low) 且方向为向上
@@ -104,7 +138,7 @@ export class ChannelCalculator {
 
     subBis.forEach((s, idx) => {
       const ms = new Date(s.startTime).getTime();
-      if (ms >= sTimeMs - windowBufferMs && ms <= sTimeMs + windowBufferMs) {
+      if (ms >= sWindowStart && ms <= sWindowEnd) {
         if (isUp && s.trend === TrendDirection.Up) {
           if (s.low < startExtreme) {
             startExtreme = s.low;
@@ -127,7 +161,7 @@ export class ChannelCalculator {
 
     subBis.forEach((s, idx) => {
       const ms = new Date(s.endTime).getTime();
-      if (ms >= eTimeMs - windowBufferMs && ms <= eTimeMs + windowBufferMs) {
+      if (ms >= eWindowStart && ms <= eWindowEnd) {
         if (isUp && s.trend === TrendDirection.Up) {
           if (s.high > endExtreme) {
             endExtreme = s.high;
@@ -142,15 +176,18 @@ export class ChannelCalculator {
       }
     });
 
-    // 兜底保护：若数据边缘或分型异常未匹配到极值，平滑退化为时间戳边界切片
+    // 兜底保护：若数据边缘或分型异常未匹配到极值，平滑退化为时间戳物理区间切片
+    const macroStartBoundaryMs = getBarStartTimeMs(sTime);
+    const macroEndBoundaryMs = getBarEndTimeMs(eTime);
+
     if (startIdx === -1) {
       startIdx = subBis.findIndex(
-        (s) => new Date(s.startTime).getTime() >= sTimeMs,
+        (s) => new Date(s.startTime).getTime() >= macroStartBoundaryMs,
       );
     }
     if (endIdx === -1) {
       for (let i = subBis.length - 1; i >= 0; i--) {
-        if (new Date(subBis[i].endTime).getTime() <= eTimeMs) {
+        if (new Date(subBis[i].endTime).getTime() <= macroEndBoundaryMs) {
           endIdx = i;
           break;
         }
@@ -475,4 +512,55 @@ export class ChannelCalculator {
       displayEndId,
     };
   }
+}
+
+/**
+ * 提取北京时间（UTC+8）的年、月、日、时、分、秒分量
+ */
+function getShanghaiDateComponents(d: Date): {
+  year: number;
+  month: number;
+  date: number;
+  hours: number;
+  minutes: number;
+  seconds: number;
+} {
+  const ms = d.getTime();
+  const shanghaiMs = ms + 8 * 3600 * 1000;
+  const sDate = new Date(shanghaiMs);
+  return {
+    year: sDate.getUTCFullYear(),
+    month: sDate.getUTCMonth(),
+    date: sDate.getUTCDate(),
+    hours: sDate.getUTCHours(),
+    minutes: sDate.getUTCMinutes(),
+    seconds: sDate.getUTCSeconds(),
+  };
+}
+
+/**
+ * 判断是否为日期型时间戳（即北京时间下的时、分、秒均为 0，如日线、周线、月线）
+ */
+function isDateOnlyTimestamp(d: Date): boolean {
+  const comp = getShanghaiDateComponents(d);
+  return comp.hours === 0 && comp.minutes === 0 && comp.seconds === 0;
+}
+
+/**
+ * 获取该时间戳在物理时间上对应的开盘时刻/起始时刻（毫秒）
+ */
+function getBarStartTimeMs(d: Date): number {
+  return d.getTime();
+}
+
+/**
+ * 获取该时间戳在物理时间上对应的闭市时刻/结束时刻（毫秒）
+ * 若为日线/周线等日期型时间戳（00:00:00），其代表的是该交易日全天，闭市时刻为当天 23:59:59.999
+ */
+function getBarEndTimeMs(d: Date): number {
+  const ms = d.getTime();
+  if (isDateOnlyTimestamp(d)) {
+    return ms + 24 * 3600 * 1000 - 1;
+  }
+  return ms;
 }
