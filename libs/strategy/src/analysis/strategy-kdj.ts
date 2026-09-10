@@ -1,4 +1,4 @@
-import type { StrategyBar } from '../market-data/strategy-bar';
+import type { StrategyBar } from '@app/market-data';
 import { computeKdjObservation } from '@app/indicators';
 import type { KdjObservation } from '@app/indicators';
 import { requireExactStrategyBars } from './strategy-analysis.guard';

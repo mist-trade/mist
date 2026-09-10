@@ -1,4 +1,4 @@
-import type { StrategyBar } from '../market-data/strategy-bar';
+import type { StrategyBar } from '@app/market-data';
 
 export function requireExactStrategyBars(
   bars: readonly StrategyBar[],

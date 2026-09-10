@@ -1,4 +1,4 @@
-import type { StrategyBar } from '../market-data/strategy-bar';
+import type { StrategyBar } from '@app/market-data';
 import {
   STRATEGY_KDJ_CALCULATION_BAR_COUNT,
   calculateStrategyKdj,
