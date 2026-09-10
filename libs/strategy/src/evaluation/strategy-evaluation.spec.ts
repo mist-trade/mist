@@ -1,4 +1,4 @@
-import type { StrategyBar } from '../market-data/strategy-bar';
+import type { StrategyBar } from '@app/market-data';
 import { StrategySeriesImputer } from '@app/market-data';
 import { compileStoredStrategyRule } from '../rules/strategy-rule.compiler';
 import {

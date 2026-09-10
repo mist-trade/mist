@@ -1,4 +1,4 @@
-import type { StrategyBar } from '../market-data/strategy-bar';
+import type { StrategyBar } from '@app/market-data';
 import { computeMacdObservation } from '@app/indicators';
 import type { MacdObservation } from '@app/indicators';
 import { requireExactStrategyBars } from './strategy-analysis.guard';

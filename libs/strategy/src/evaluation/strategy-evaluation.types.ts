@@ -1,6 +1,6 @@
-import type { StrategyBarType } from '../market-data/strategy-bar';
 import type {
   ProjectedStrategyBar,
+  StrategyBarType,
   StrategyImputationResolution,
 } from '@app/market-data';
 import type { StrategyFieldPath } from '../rules/strategy-field.catalog';
