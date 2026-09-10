@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { DataSource, Period, Security, SecurityStatus } from '@app/shared-data';
+import { formatTradingDayString } from '@app/timezone';
 import { PostCloseSyncService } from './post-close-sync.service';
 import { DataFreshnessStatus } from './types/post-close-sync.types';
 
@@ -48,7 +49,7 @@ describe('PostCloseSyncService', () => {
         (str: string) => new Date(str.replace(' ', 'T') + '+08:00'),
       ),
       formatDate: jest.fn((date: Date) => format(date, 'yyyy-MM-dd')),
-      formatTradingDay: jest.fn((date: Date) => format(date, 'yyyyMMdd')),
+      formatTradingDay: jest.fn((date: Date) => formatTradingDayString(date)),
       isTradingDay: jest.fn().mockResolvedValue(true),
     };
 
