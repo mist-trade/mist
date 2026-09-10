@@ -435,4 +435,192 @@ describe('ChannelCalculator.getAdjacentBoundedChannels', () => {
       '2026-02-03T03:00:00.000Z',
     );
   });
+
+  it('correctly identifies two centrals inside macro daily bi for April 2026 30m sequence', () => {
+    const macroBis = [
+      makeMockBi(
+        TrendDirection.Up,
+        3794.68,
+        4114.84,
+        '2026-03-22T16:00:00Z',
+        '2026-04-22T16:00:00Z',
+      ),
+    ];
+
+    const subBis = [
+      // Bi 23: 03-23 15:00 -> 03-26 10:00
+      makeMockBi(
+        TrendDirection.Up,
+        3794.68,
+        3937.1,
+        '2026-03-23T07:00:00Z',
+        '2026-03-26T02:00:00Z',
+        1,
+        5,
+      ),
+      // Bi 24: 03-26 10:00 -> 03-27 10:00
+      makeMockBi(
+        TrendDirection.Down,
+        3852.09,
+        3937.1,
+        '2026-03-26T02:00:00Z',
+        '2026-03-27T02:00:00Z',
+        5,
+        10,
+      ),
+      // Bi 25: 03-27 10:00 -> 03-27 13:30
+      makeMockBi(
+        TrendDirection.Up,
+        3852.09,
+        3924.11,
+        '2026-03-27T02:00:00Z',
+        '2026-03-27T05:30:00Z',
+        10,
+        15,
+      ),
+      // Bi 26: 03-27 13:30 -> 03-30 10:00
+      makeMockBi(
+        TrendDirection.Down,
+        3872.78,
+        3924.11,
+        '2026-03-27T05:30:00Z',
+        '2026-03-30T02:00:00Z',
+        15,
+        20,
+      ),
+      // Bi 27: 03-30 10:00 -> 03-31 10:00
+      makeMockBi(
+        TrendDirection.Up,
+        3872.78,
+        3948.81,
+        '2026-03-30T02:00:00Z',
+        '2026-03-31T02:00:00Z',
+        20,
+        25,
+      ),
+      // Bi 28: 03-31 10:00 -> 03-31 15:00
+      makeMockBi(
+        TrendDirection.Down,
+        3891.86,
+        3948.81,
+        '2026-03-31T02:00:00Z',
+        '2026-03-31T07:00:00Z',
+        25,
+        30,
+      ),
+      // Bi 29: 03-31 15:00 -> 04-01 14:00
+      makeMockBi(
+        TrendDirection.Up,
+        3891.86,
+        3955.94,
+        '2026-03-31T07:00:00Z',
+        '2026-04-01T06:00:00Z',
+        30,
+        35,
+      ),
+      // Bi 30: 04-01 14:00 -> 04-03 13:30
+      makeMockBi(
+        TrendDirection.Down,
+        3871.3,
+        3955.94,
+        '2026-04-01T06:00:00Z',
+        '2026-04-03T05:30:00Z',
+        35,
+        40,
+      ),
+      // Bi 31: 04-03 13:30 -> 04-08 15:00
+      makeMockBi(
+        TrendDirection.Up,
+        3871.3,
+        3995.0,
+        '2026-04-03T05:30:00Z',
+        '2026-04-08T07:00:00Z',
+        40,
+        45,
+      ),
+      // Bi 32: 04-08 15:00 -> 04-09 13:30
+      makeMockBi(
+        TrendDirection.Down,
+        3955.25,
+        3995.0,
+        '2026-04-08T07:00:00Z',
+        '2026-04-09T05:30:00Z',
+        45,
+        50,
+      ),
+      // Bi 33: 04-09 13:30 -> 04-10 10:30
+      makeMockBi(
+        TrendDirection.Up,
+        3955.25,
+        4011.02,
+        '2026-04-09T05:30:00Z',
+        '2026-04-10T02:30:00Z',
+        50,
+        55,
+      ),
+      // Bi 34: 04-10 10:30 -> 04-13 10:00
+      makeMockBi(
+        TrendDirection.Down,
+        3966.2,
+        4011.02,
+        '2026-04-10T02:30:00Z',
+        '2026-04-13T02:00:00Z',
+        55,
+        60,
+      ),
+      // Bi 35: 04-13 10:00 -> 04-15 10:30
+      makeMockBi(
+        TrendDirection.Up,
+        3966.2,
+        4050.62,
+        '2026-04-13T02:00:00Z',
+        '2026-04-15T02:30:00Z',
+        60,
+        65,
+      ),
+      // Bi 36: 04-15 10:30 -> 04-15 15:00
+      makeMockBi(
+        TrendDirection.Down,
+        4020.9,
+        4050.62,
+        '2026-04-15T02:30:00Z',
+        '2026-04-15T07:00:00Z',
+        65,
+        70,
+      ),
+      // Bi 37: 04-15 15:00 -> 04-23 10:00
+      makeMockBi(
+        TrendDirection.Up,
+        4020.9,
+        4114.84,
+        '2026-04-15T07:00:00Z',
+        '2026-04-23T02:00:00Z',
+        70,
+        75,
+      ),
+    ];
+
+    const result = ChanCore.createAdjacentBoundedChannels(subBis, macroBis);
+    expect(result.phaseB).toHaveLength(2);
+
+    const [c0, c1] = result.phaseB;
+
+    // Central 0 (March 23 -> April 01)
+    expect(c0.zg).toBe(3924.11);
+    expect(c0.zd).toBe(3891.86);
+    expect(c0.bis).toHaveLength(7);
+    expect(c0.bis[0].startTime.toISOString()).toBe('2026-03-23T07:00:00.000Z');
+    expect(c0.bis[c0.bis.length - 1].endTime.toISOString()).toBe(
+      '2026-04-01T06:00:00.000Z',
+    );
+
+    // Central 1 (April 03 13:30 -> April 15 10:30)
+    expect(c1.zg).toBe(3995.0);
+    expect(c1.zd).toBe(3966.2);
+    expect(c1.bis).toHaveLength(5);
+    expect(c1.bis[0].startTime.toISOString()).toBe('2026-04-03T05:30:00.000Z');
+    expect(c1.bis[c1.bis.length - 1].endTime.toISOString()).toBe(
+      '2026-04-15T02:30:00.000Z',
+    );
+  });
 });
