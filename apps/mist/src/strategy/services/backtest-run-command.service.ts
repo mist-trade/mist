@@ -124,6 +124,8 @@ export class BacktestRunCommandService {
         });
       }
       kind = StrategyKind.CHAN_BSP;
+    } else if (definition.kind === StrategyKind.DECISION_FLOW) {
+      kind = StrategyKind.DECISION_FLOW;
     } else {
       kind = StrategyKind.RULE_DSL;
     }
