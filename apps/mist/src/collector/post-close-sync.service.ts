@@ -49,10 +49,12 @@ export class PostCloseSyncService {
   ) {}
 
   /**
-   * 三段前置（design D1）：统计缺失 → 提交下载 job → 轮询完成。
-   * 仅 QMT/TDX 源标的参与（TDX 的 refresh 由 datasource get_bars 内置——
-   * 本方法对其提交下载 job 以显式触发缺口回填）；缺口为空或预算超时 →
-   * 降级为既有路径（采集照跑，数据可能部分缺失，由重试/晨间兜底自愈）。
+   * 三段前置（design D1 判定树）：② 交易日判定 → ① 统计缺失 → ③ 提交下载 job
+   * → 轮询完成。仅 QMT/TDX 源标的参与；缺口为空或预算超时 → 降级为既有路径
+   * （采集照跑，数据可能部分缺失，由重试/晨间兜底自愈）。
+   *
+   * @returns 本轮下载已完成（poll outcome === 'all_done'）的 securityId 集合——
+   *          采集仍 0 条时按"疑似停牌"归类（④，info 不算 notReady）。
    */
   private async ensureHistoryDownloaded(
     securities: Security[],
@@ -60,7 +62,17 @@ export class PostCloseSyncService {
     startWindow: Date,
     endWindow: Date,
     windowName: string,
-  ): Promise<void> {
+  ): Promise<Set<number>> {
+    // ② 真实数据判定：非交易日 → 无真实数据 → 跳过下载（不算缺口）。
+    // isTradingDay 失败时内部回退周末判断（fail-open 到交易日，不阻塞流程）。
+    if (!(await this.timezoneService.isTradingDay(startWindow))) {
+      this.logger.log(
+        `[PostCloseSync] event=history_download_skipped_non_trading_day ` +
+          `date=${startWindow.toISOString().slice(0, 10)} windowName=${windowName}`,
+      );
+      return new Set<number>();
+    }
+
     const basePeriods = [
       ...new Set(
         periods
@@ -77,7 +89,7 @@ export class PostCloseSyncService {
       ),
     ];
     if (basePeriods.length === 0) {
-      return;
+      return new Set<number>();
     }
 
     const startStr = startWindow.toISOString().slice(0, 10).replace(/-/g, '');
@@ -120,12 +132,17 @@ export class PostCloseSyncService {
       }
     }
 
-    const submissions: Array<{ source: DownloadSource; jobId: string }> = [];
+    const submissions: Array<{
+      source: DownloadSource;
+      jobId: string;
+      securityIds: number[];
+    }> = [];
     for (const source of ['qmt', 'tdx'] as DownloadSource[]) {
-      const symbols = gapSymbolsBySource[source].map((s) => s.code);
-      if (symbols.length === 0) {
+      const gapSecurities = gapSymbolsBySource[source];
+      if (gapSecurities.length === 0) {
         continue;
       }
+      const symbols = gapSecurities.map((s) => s.code);
       this.logger.log(
         `[PostCloseSync] event=history_download_submit source=${source} ` +
           `symbols=${symbols.join(',')} basePeriods=${basePeriods.join(',')} ` +
@@ -138,7 +155,11 @@ export class PostCloseSyncService {
           basePeriods,
           window,
         );
-        submissions.push({ source, jobId: submission.jobId });
+        submissions.push({
+          source,
+          jobId: submission.jobId,
+          securityIds: gapSecurities.map((s) => s.id),
+        });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
@@ -148,26 +169,35 @@ export class PostCloseSyncService {
       }
     }
     if (submissions.length === 0) {
-      return;
+      return new Set<number>();
     }
 
     const budgetMs = HistoryDownloadClient.JOB_BUDGET_MS;
     const deadline = Date.now() + budgetMs;
+    const downloadedSecurityIds = new Set<number>();
     const outcomes = await Promise.all(
-      submissions.map(async ({ source, jobId }) => {
+      submissions.map(async ({ source, jobId, securityIds }) => {
         const outcome = await this.historyDownloadClient.pollUntilDone(
           source,
           jobId,
           Math.max(deadline - Date.now(), 0),
         );
-        return { source, jobId, outcome };
+        return { source, securityIds, outcome };
       }),
     );
-    for (const { source, outcome } of outcomes) {
+    for (const { source, securityIds, outcome } of outcomes) {
       this.logger.log(
         `[PostCloseSync] event=history_download_poll source=${source} outcome=${outcome}`,
       );
+      // ④ 前提：下载完成后仍空才可归类疑似停牌；any_failed/timeout 的窗口
+      // 下载不完整，0 条仍按 notReady 处理。
+      if (outcome === 'all_done') {
+        for (const id of securityIds) {
+          downloadedSecurityIds.add(id);
+        }
+      }
     }
+    return downloadedSecurityIds;
   }
 
   /**
@@ -198,9 +228,10 @@ export class PostCloseSyncService {
 
     const { startWindow, endWindow } = this.calculateDateWindow(targetDateStr);
 
-    // 三段前置（design D1）：统计缺失 → 提交下载 job → 轮询完成后采集。
+    // 三段前置（design D1 判定树）：② 交易日判定 → ① 统计缺失 → ③ 下载 →
+    // 轮询完成后采集；④ 下载后仍空按疑似停牌归类。
     // 仅 QMT/TDX 源标的参与；缺口为空或预算超时 → 降级为既有路径（采集照跑）。
-    await this.ensureHistoryDownloaded(
+    const downloadedSecurityIds = await this.ensureHistoryDownloaded(
       securities,
       periods,
       startWindow,
@@ -223,6 +254,7 @@ export class PostCloseSyncService {
             endWindow,
             targetDateStr,
             criteria.sourceOverride,
+            downloadedSecurityIds.has(security.id),
           ),
         ),
       );
@@ -259,6 +291,12 @@ export class PostCloseSyncService {
     const failedTasks = taskResults.filter(
       (t) => !t.success && Boolean(t.error),
     ).length;
+    const suspendedTasks = taskResults.filter(
+      (t) =>
+        !t.success &&
+        !t.error &&
+        t.freshnessStatus === DataFreshnessStatus.SUSPENDED,
+    ).length;
     const totalKLinesSaved = taskResults.reduce((acc, t) => acc + t.count, 0);
 
     // 记录 OTel 耗时与成功运行
@@ -270,7 +308,8 @@ export class PostCloseSyncService {
     this.logger.log(
       `[PostCloseSync] event=sync_finished targetDate=${targetDateStr} window=${windowName} ` +
         `totalTasks=${taskResults.length} succeeded=${succeededTasks} notReady=${notReadyTasks} ` +
-        `failed=${failedTasks} totalKLines=${totalKLinesSaved} durationMs=${durationMs}`,
+        `failed=${failedTasks} suspended=${suspendedTasks} ` +
+        `totalKLines=${totalKLinesSaved} durationMs=${durationMs}`,
     );
 
     return {
@@ -281,6 +320,7 @@ export class PostCloseSyncService {
       succeededTasks,
       notReadyTasks,
       failedTasks,
+      suspendedTasks,
       totalKLinesSaved,
       durationMs,
       details: taskResults,
@@ -294,6 +334,7 @@ export class PostCloseSyncService {
     endWindow: Date,
     targetDateStr: string,
     sourceOverride?: DataSource,
+    downloadAttempted = false,
   ): Promise<SecuritySyncTaskResult> {
     const source =
       sourceOverride ??
@@ -313,6 +354,23 @@ export class PostCloseSyncService {
 
       // 2. 数据就绪自检（若返回 0 条记录且非停牌，视为数据源未就绪）
       if (count === 0) {
+        // ④（design D1）：下载已完成仍 0 条 → 疑似停牌/当日无真实数据，
+        // info 记录、不算 notReady 失败（停牌股每夜报缺口是噪声）。
+        if (downloadAttempted) {
+          this.syncMetrics.recordTask('suspended', source, period);
+          this.logger.log(
+            `[PostCloseSync] event=task_suspected_no_data securityCode=${security.code} ` +
+              `source=${source} period=${period} reason="0 bars after download completed"`,
+          );
+          return {
+            securityCode: security.code,
+            period,
+            source,
+            success: false,
+            freshnessStatus: DataFreshnessStatus.SUSPENDED,
+            count: 0,
+          };
+        }
         const validation = this.freshnessValidator.validateFreshness(
           [],
           targetDateStr,

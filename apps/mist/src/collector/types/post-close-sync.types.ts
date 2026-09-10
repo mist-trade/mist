@@ -42,6 +42,7 @@ export interface PostCloseSyncReport {
   succeededTasks: number;
   notReadyTasks: number;
   failedTasks: number;
+  suspendedTasks: number;
   totalKLinesSaved: number;
   durationMs: number;
   details: SecuritySyncTaskResult[];
