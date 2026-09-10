@@ -460,14 +460,18 @@ export class PostCloseSyncService {
   private async resolveTargetSecurities(
     securityCodes?: string[],
   ): Promise<Security[]> {
+    // sourceConfigs 必须预载：下载前置靠它解析 provider 全码（不带 relations
+    // 时为 undefined，全部标的解析失败 → 下载被跳过，2026-09-10 夜间实跑教训）。
     if (securityCodes && securityCodes.length > 0) {
       return this.securityRepository.find({
         where: { code: In(securityCodes) },
+        relations: ['sourceConfigs'],
       });
     }
 
     return this.securityRepository.find({
       where: { status: SecurityStatus.ACTIVE },
+      relations: ['sourceConfigs'],
     });
   }
 

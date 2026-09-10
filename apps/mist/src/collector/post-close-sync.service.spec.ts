@@ -112,11 +112,17 @@ describe('PostCloseSyncService', () => {
       service,
       collectorService,
       dataSourceSelectionService,
+      securityRepository,
       syncMetrics,
     } = createHarness();
 
     const report = await service.syncPostClose({ window: 'nightly_2230' });
 
+    // 下载前置依赖 sourceConfigs 解析 provider 全码 → find 必须预载该关系
+    // （2026-09-10 夜间实跑教训：缺 relations 导致全部标的解析失败）。
+    expect(securityRepository.find).toHaveBeenCalledWith(
+      expect.objectContaining({ relations: ['sourceConfigs'] }),
+    );
     expect(report.targetDate).toBe('2026-08-24');
     expect(report.window).toBe('nightly_2230');
     expect(report.totalSecurities).toBe(2);
