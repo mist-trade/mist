@@ -303,7 +303,7 @@ export class ChannelCalculator {
             break;
           }
 
-          // 极值守卫：顺势震荡不得跌破起始底 DD 或冲破起始顶 GG
+          // 极值守卫
           if (isUp && (curr.low < curDd || nextBi.low < curDd)) {
             break;
           }
@@ -347,23 +347,11 @@ export class ChannelCalculator {
             break;
           }
 
-          // 极值破坏守卫：顺势震荡不得跌破中枢起始底 DD 或中枢下沿 ZD，反弹不得冲破起始顶 GG 或中枢上沿 ZG
-          if (
-            isUp &&
-            (p1.low < curDd ||
-              p2.low < curDd ||
-              p1.low < curZd ||
-              p2.low < curZd)
-          ) {
+          // 极值破坏守卫
+          if (isUp && (p1.low < curDd || p2.low < curDd)) {
             break;
           }
-          if (
-            !isUp &&
-            (p1.high > curGg ||
-              p2.high > curGg ||
-              p1.high > curZg ||
-              p2.high > curZg)
-          ) {
+          if (!isUp && (p1.high > curGg || p2.high > curGg)) {
             break;
           }
 
