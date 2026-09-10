@@ -431,8 +431,8 @@ export class ChannelCalculator {
       );
       sequential.push(sealedChannel);
 
-      // 指针后移至离开点 / 下一个扫描位置
-      cursor = Math.max(cursor + 1, nextIdx);
+      // 指针后移至当前中枢的离开笔（尾笔），使离开笔作为下一个中枢的进入笔参与计算
+      cursor = cursor + channelBis.length - 1;
     }
 
     return { phaseA, sequential };
