@@ -623,4 +623,185 @@ describe('ChannelCalculator.getAdjacentBoundedChannels', () => {
       '2026-04-15T02:30:00.000Z',
     );
   });
+
+  it('partitions sequential 30m macro strokes and 5m sub-bis without cross-stroke penetration or duplicate centrals', () => {
+    // 3 Sequential 30m Macro Bis:
+    // M1: Up 3958 -> 4103.93 (06-11 ~ 06-16 03:00Z)
+    // M2: Down 4103.93 -> 4073.73 (06-16 03:00Z ~ 06-17 05:30Z)
+    // M3: Up 4073.73 -> 4117.45 (06-17 05:30Z ~ 06-18 02:30Z)
+    const macroBis = [
+      makeMockBi(
+        TrendDirection.Up,
+        3958.0,
+        4103.93,
+        '2026-06-11T03:30:00Z',
+        '2026-06-16T03:00:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4073.73,
+        4103.93,
+        '2026-06-16T03:00:00Z',
+        '2026-06-17T05:30:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4073.73,
+        4117.45,
+        '2026-06-17T05:30:00Z',
+        '2026-06-18T02:30:00Z',
+      ),
+    ];
+
+    // 5m sub-bis around the M1 -> M2 peak (4103.93) and M2 -> M3 trough (4073.73)
+    const subBis = [
+      // In M1:
+      makeMockBi(
+        TrendDirection.Up,
+        3958,
+        4060,
+        '2026-06-11T03:30:00Z',
+        '2026-06-12T03:00:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4023,
+        4060,
+        '2026-06-12T03:00:00Z',
+        '2026-06-12T06:50:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4023,
+        4092,
+        '2026-06-12T06:50:00Z',
+        '2026-06-15T02:05:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4063,
+        4092,
+        '2026-06-15T02:05:00Z',
+        '2026-06-15T05:15:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4063,
+        4085,
+        '2026-06-15T05:15:00Z',
+        '2026-06-15T06:15:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4077,
+        4085,
+        '2026-06-15T06:15:00Z',
+        '2026-06-16T02:00:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4077,
+        4103.93,
+        '2026-06-16T02:00:00Z',
+        '2026-06-16T02:45:00Z',
+      ), // Peak!
+
+      // In M2:
+      makeMockBi(
+        TrendDirection.Down,
+        4093.53,
+        4103.93,
+        '2026-06-16T02:45:00Z',
+        '2026-06-16T03:10:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4093.53,
+        4102.83,
+        '2026-06-16T03:10:00Z',
+        '2026-06-16T05:10:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4077.87,
+        4102.83,
+        '2026-06-16T05:10:00Z',
+        '2026-06-16T05:45:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4077.87,
+        4100.43,
+        '2026-06-16T05:45:00Z',
+        '2026-06-16T06:25:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4074.29,
+        4100.43,
+        '2026-06-16T06:25:00Z',
+        '2026-06-17T01:35:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4074.29,
+        4098.7,
+        '2026-06-17T01:35:00Z',
+        '2026-06-17T02:20:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4073.73,
+        4098.7,
+        '2026-06-17T02:20:00Z',
+        '2026-06-17T05:10:00Z',
+      ), // Trough!
+
+      // In M3:
+      makeMockBi(
+        TrendDirection.Up,
+        4073.73,
+        4097.64,
+        '2026-06-17T05:10:00Z',
+        '2026-06-17T05:45:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Down,
+        4086.7,
+        4097.64,
+        '2026-06-17T05:45:00Z',
+        '2026-06-17T06:15:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4086.7,
+        4117.45,
+        '2026-06-17T06:15:00Z',
+        '2026-06-18T02:05:00Z',
+      ), // Peak!
+    ];
+
+    const result = ChanCore.createAdjacentBoundedChannels(subBis, macroBis);
+
+    // Verify no duplicates
+    const signatureSet = new Set<string>();
+    for (const c of result.phaseB) {
+      const sig = `${c.bis[0].startTime.toISOString()}_${c.zd}_${c.zg}`;
+      expect(signatureSet.has(sig)).toBe(false);
+      signatureSet.add(sig);
+    }
+
+    // Verify that centrals in M2 never cross before 06-16T02:45 or after 06-17T05:10
+    const m2Centrals = result.phaseB.filter(
+      (c) => c.trend === TrendDirection.Down,
+    );
+    for (const c of m2Centrals) {
+      expect(c.bis[0].startTime.getTime()).toBeGreaterThanOrEqual(
+        new Date('2026-06-16T02:45:00Z').getTime(),
+      );
+      expect(c.bis[c.bis.length - 1].endTime.getTime()).toBeLessThanOrEqual(
+        new Date('2026-06-17T05:45:00Z').getTime(),
+      );
+    }
+  });
 });

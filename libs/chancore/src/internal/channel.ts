@@ -65,8 +65,9 @@ export class ChannelCalculator {
     const allPhaseA: ChanChannel[] = [];
     const allPhaseB: ChanChannel[] = [];
 
-    for (const macroBi of validMacroBis) {
-      const slice = this.sliceSubBisForMacroBi(macroBi, subBis);
+    const slices = this.partitionSubBisForMacroBis(validMacroBis, subBis);
+
+    for (const slice of slices) {
       if (slice.length < 5) {
         continue;
       }
@@ -83,121 +84,112 @@ export class ChannelCalculator {
   }
 
   /**
-   * 利用父级别起止分型窗口在次级别笔序列中精确定位属于该大笔的子序列
+   * 基于宏观拐点首尾相接拓扑对齐，将次级别笔序列无缝划分（Partition）给各宏观大笔
    *
    * 算法契约：
-   * 1. 物理区间感知：判断父级别时间戳是否为日期型（如日线/周线 00:00:00），还是分时型（如 30m/5m/1m）；
-   * 2. 动态搜索窗口：
-   *    - 日线/周线等日期型宏观笔：起点与终点分型窗口向两侧放宽 24 小时（覆盖前一交易日到后一交易日全天时段）；
-   *    - 分时型宏观笔：分型窗口放宽 72 小时（覆盖周末 66.5h 休市及隔夜跳空）；
-   * 3. 极值锚定：在窗口内精确定位次级别反向笔出分型与本级别大笔极值对应的起止笔；
-   * 4. 保底边界：若未命中极值，按大笔完整物理时间区间 [getBarStartTimeMs, getBarEndTimeMs] 截取，
-   *    杜绝日线以 00:00:00 截断当天盘中交易的问题。
+   * 1. 首尾相接无缝切片：大笔是连续折线链条 M0 -> M1 -> M2 ...，相邻宏观笔在拐点处首尾相接；
+   * 2. 拐点极值对齐：每个宏观拐点（分型极值）在次级别小笔中唯一对应一个极值拐点笔索引；
+   * 3. 杜绝时间窗口渗透：彻底抛弃 72 小时等跨多日的大窗口，按宏观 K 线分型窗口精准锚定，单调推进；
+   * 4. 消除包不住与包多了：切片覆盖整个序列（不漏包），且每个切片封闭于宏观大笔（不越界、不重复）。
    */
-  private sliceSubBisForMacroBi(
-    macroBi: ChanBi,
+  private partitionSubBisForMacroBis(
+    macroBis: readonly ChanBi[],
     subBis: readonly ChanBi[],
-  ): readonly ChanBi[] {
-    const isUp = macroBi.trend === TrendDirection.Up;
-    const sTime = new Date(macroBi.startTime);
-    const eTime = new Date(macroBi.endTime);
+  ): (readonly ChanBi[])[] {
+    if (macroBis.length === 0 || subBis.length === 0) return [];
 
-    const isDailyOrWeekly =
-      isDateOnlyTimestamp(sTime) || isDateOnlyTimestamp(eTime);
+    const findVertexIndex = (
+      vertexTime: Date,
+      targetPrice: number,
+      isHigh: boolean,
+      searchStartIdx: number,
+    ): number => {
+      const isDaily = isDateOnlyTimestamp(vertexTime);
+      let winStart: number;
+      let winEnd: number;
 
-    let sWindowStart: number;
-    let sWindowEnd: number;
-    let eWindowStart: number;
-    let eWindowEnd: number;
-
-    if (isDailyOrWeekly) {
-      const sStartMs = getBarStartTimeMs(sTime);
-      const sEndMs = getBarEndTimeMs(sTime);
-      sWindowStart = sStartMs - 24 * 3600 * 1000;
-      sWindowEnd = sEndMs + 24 * 3600 * 1000;
-
-      const eStartMs = getBarStartTimeMs(eTime);
-      const eEndMs = getBarEndTimeMs(eTime);
-      eWindowStart = eStartMs - 24 * 3600 * 1000;
-      eWindowEnd = eEndMs + 24 * 3600 * 1000;
-    } else {
-      const sMs = sTime.getTime();
-      const eMs = eTime.getTime();
-      const buf = 72 * 3600 * 1000;
-      sWindowStart = sMs - buf;
-      sWindowEnd = sMs + buf;
-      eWindowStart = eMs - buf;
-      eWindowEnd = eMs + buf;
-    }
-
-    // 1. 在起点分型窗口中寻找极值锚点笔：
-    // 向上大笔起点必为窗口内最低点 (min low) 且方向为向上
-    // 向下大笔起点必为窗口内最高点 (max high) 且方向为向下
-    let startIdx = -1;
-    let startExtreme = isUp ? Infinity : -Infinity;
-
-    subBis.forEach((s, idx) => {
-      const ms = new Date(s.startTime).getTime();
-      if (ms >= sWindowStart && ms <= sWindowEnd) {
-        if (isUp && s.trend === TrendDirection.Up) {
-          if (s.low < startExtreme) {
-            startExtreme = s.low;
-            startIdx = idx;
-          }
-        } else if (!isUp && s.trend === TrendDirection.Down) {
-          if (s.high > startExtreme) {
-            startExtreme = s.high;
-            startIdx = idx;
-          }
-        }
+      if (isDaily) {
+        winStart = getBarStartTimeMs(vertexTime) - 4 * 3600 * 1000;
+        winEnd = getBarEndTimeMs(vertexTime) + 4 * 3600 * 1000;
+      } else {
+        const vMs = vertexTime.getTime();
+        // 分时级别：90 分钟（即 3 根 30m K 线分型窗口）足以覆盖 5m 极值笔时间偏移
+        winStart = vMs - 90 * 60 * 1000;
+        winEnd = vMs + 90 * 60 * 1000;
       }
-    });
 
-    // 2. 在终点分型窗口中寻找极值锚点笔：
-    // 向上大笔终点必为窗口内最高点 (max high) 且方向为向上
-    // 向下大笔终点必为窗口内最低点 (min low) 且方向为向下
-    let endIdx = -1;
-    let endExtreme = isUp ? -Infinity : Infinity;
+      let bestIdx = searchStartIdx;
+      let bestPDiff = Infinity;
+      let bestTimeDiff = Infinity;
 
-    subBis.forEach((s, idx) => {
-      const ms = new Date(s.endTime).getTime();
-      if (ms >= eWindowStart && ms <= eWindowEnd) {
-        if (isUp && s.trend === TrendDirection.Up) {
-          if (s.high > endExtreme) {
-            endExtreme = s.high;
-            endIdx = idx;
+      for (let i = searchStartIdx; i < subBis.length; i++) {
+        const sb = subBis[i];
+        const sMs = sb.startTime.getTime();
+        const eMs = sb.endTime.getTime();
+
+        if (eMs >= winStart && sMs <= winEnd) {
+          const p = isHigh ? sb.high : sb.low;
+          const pDiff = Math.abs(p - targetPrice);
+          const tDiff = Math.abs(eMs - vertexTime.getTime());
+
+          if (
+            pDiff < bestPDiff - 1e-4 ||
+            (Math.abs(pDiff - bestPDiff) <= 1e-4 && tDiff < bestTimeDiff)
+          ) {
+            bestPDiff = pDiff;
+            bestTimeDiff = tDiff;
+            bestIdx = i;
           }
-        } else if (!isUp && s.trend === TrendDirection.Down) {
-          if (s.low < endExtreme) {
-            endExtreme = s.low;
-            endIdx = idx;
-          }
-        }
-      }
-    });
-
-    // 兜底保护：若数据边缘或分型异常未匹配到极值，平滑退化为时间戳物理区间切片
-    const macroStartBoundaryMs = getBarStartTimeMs(sTime);
-    const macroEndBoundaryMs = getBarEndTimeMs(eTime);
-
-    if (startIdx === -1) {
-      startIdx = subBis.findIndex(
-        (s) => new Date(s.startTime).getTime() >= macroStartBoundaryMs,
-      );
-    }
-    if (endIdx === -1) {
-      for (let i = subBis.length - 1; i >= 0; i--) {
-        if (new Date(subBis[i].endTime).getTime() <= macroEndBoundaryMs) {
-          endIdx = i;
+        } else if (sMs > winEnd && bestPDiff < Infinity) {
           break;
         }
       }
+
+      if (bestPDiff === Infinity) {
+        let minT = Infinity;
+        for (let i = searchStartIdx; i < subBis.length; i++) {
+          const diff = Math.abs(
+            subBis[i].endTime.getTime() - vertexTime.getTime(),
+          );
+          if (diff < minT) {
+            minT = diff;
+            bestIdx = i;
+          }
+        }
+      }
+
+      return bestIdx;
+    };
+
+    const slices: (readonly ChanBi[])[] = [];
+    let currentStartIdx = 0;
+
+    const firstM = macroBis[0];
+    const firstIsUp = firstM.trend === TrendDirection.Up;
+    currentStartIdx = findVertexIndex(
+      firstM.startTime,
+      firstIsUp ? firstM.low : firstM.high,
+      !firstIsUp,
+      0,
+    );
+
+    for (let m = 0; m < macroBis.length; m++) {
+      const mb = macroBis[m];
+      const isUp = mb.trend === TrendDirection.Up;
+      const endVertexIdx = findVertexIndex(
+        mb.endTime,
+        isUp ? mb.high : mb.low,
+        isUp,
+        currentStartIdx,
+      );
+
+      const sliceEnd = Math.max(currentStartIdx, endVertexIdx);
+      const slice = subBis.slice(currentStartIdx, sliceEnd + 1);
+      slices.push(slice);
+      currentStartIdx = sliceEnd;
     }
 
-    if (startIdx !== -1 && endIdx !== -1 && endIdx >= startIdx) {
-      return subBis.slice(startIdx, endIdx + 1);
-    }
-    return [];
+    return slices;
   }
 
   /**
