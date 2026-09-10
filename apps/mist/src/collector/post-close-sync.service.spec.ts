@@ -48,6 +48,7 @@ describe('PostCloseSyncService', () => {
         (str: string) => new Date(str.replace(' ', 'T') + '+08:00'),
       ),
       formatDate: jest.fn((date: Date) => format(date, 'yyyy-MM-dd')),
+      formatTradingDay: jest.fn((date: Date) => format(date, 'yyyyMMdd')),
       isTradingDay: jest.fn().mockResolvedValue(true),
     };
 

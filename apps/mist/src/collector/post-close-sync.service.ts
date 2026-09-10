@@ -95,10 +95,11 @@ export class PostCloseSyncService {
       return new Set<number>();
     }
 
-    // 下载窗口日期串用北京日历日（YYYYMMDD）——toISOString 是 UTC，北京零点
-    // 会回退到前一日（off-by-one），端点校验与 QMT 原生 API 都按日历日理解。
-    const startStr = this.formatDateString(startWindow).replace(/-/g, '');
-    const endStr = this.formatDateString(endWindow).replace(/-/g, '');
+    // 下载窗口日期串用北京日历日（YYYYMMDD，TimezoneService.formatTradingDay）
+    // ——toISOString 是 UTC，北京零点会回退到前一日（off-by-one），端点校验与
+    // QMT 原生 API 都按日历日理解。
+    const startStr = this.timezoneService.formatTradingDay(startWindow);
+    const endStr = this.timezoneService.formatTradingDay(endWindow);
     const window = { start: startStr, end: endStr };
 
     // 下载端点要求 provider 全码（`^\d{6}\.(SH|SZ|BJ)$`），Security.code 是
