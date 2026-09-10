@@ -11,6 +11,7 @@ import {
 import { normalizeSecurityCode } from '@app/utils';
 import {
   compileStoredStrategyRuleWithNormalized,
+  type DecisionFlowNode,
   type StrategyRealtimeSource,
 } from '@app/strategy';
 import { In, Repository } from 'typeorm';
@@ -312,21 +313,34 @@ function compileRegistryDefinition(
           },
           ruleSnapshot: version.rule as Readonly<Record<string, unknown>>,
         }
-      : (() => {
-          const compilation = compileStoredStrategyRuleWithNormalized(
-            version.rule,
-            version.signalKind,
-          );
-          return {
+      : definition.kind === StrategyKind.DECISION_FLOW
+        ? {
             executionPlan: {
-              kind: 'rule_dsl',
-              plan: compilation.plan,
+              kind: 'decision_flow',
+              flow: version.rule as unknown as DecisionFlowNode,
+              signalKind: version.signalKind,
+              requiredBarCount:
+                typeof (version.rule as any)?.requiredBarCount === 'number'
+                  ? (version.rule as any).requiredBarCount
+                  : 50,
             },
-            ruleSnapshot: compilation.normalizedRule as Readonly<
-              Record<string, unknown>
-            >,
-          };
-        })();
+            ruleSnapshot: version.rule as Readonly<Record<string, unknown>>,
+          }
+        : (() => {
+            const compilation = compileStoredStrategyRuleWithNormalized(
+              version.rule,
+              version.signalKind,
+            );
+            return {
+              executionPlan: {
+                kind: 'rule_dsl',
+                plan: compilation.plan,
+              },
+              ruleSnapshot: compilation.normalizedRule as Readonly<
+                Record<string, unknown>
+              >,
+            };
+          })();
   return Object.freeze({
     definitionId: definition.id,
     versionId: version.id,

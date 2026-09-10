@@ -2,7 +2,10 @@ import {
   evaluateStrategyPlan,
   serializeStrategyContextSnapshot,
   StrategyAnalysisObservationCache,
+  DecisionFlowEvaluator,
   type CompiledStrategyExecutionPlan,
+  type DecisionFlowNode,
+  type FactorContext,
   type StrategyEvaluationOutcome,
   type StrategyRealtimeMarketDataPort,
   type StrategyRealtimeSource,
@@ -38,6 +41,12 @@ export type RealtimeStrategyExecutionPlan = {
       readonly kind: 'chan_bsp';
       readonly plan: ChanBspPlan;
     }
+  | {
+      readonly kind: 'decision_flow';
+      readonly flow: DecisionFlowNode;
+      readonly signalKind?: 'entry' | 'exit';
+      readonly requiredBarCount: number;
+    }
 );
 
 export interface ShadowStrategyCandidate {
@@ -55,6 +64,9 @@ export interface ShadowStrategyCandidate {
     StrategyEvaluationOutcome,
     { status: 'evaluated' }
   >;
+  readonly confidence?: number | null;
+  readonly confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  readonly decisionTrace?: Record<string, unknown> | null;
   readonly contextSnapshot: Readonly<Record<string, unknown>>;
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
 }
@@ -71,6 +83,7 @@ export class RealtimeStrategyEvaluationService {
     private readonly episodes = new RealtimeEpisodeStore(),
     private readonly chanBspDetector = new ChanBspDetector(),
     private readonly chanBspCursors = new ChanBspEpisodeCursor(),
+    private readonly decisionFlowEvaluator = new DecisionFlowEvaluator(),
   ) {}
 
   async evaluate(
@@ -90,7 +103,11 @@ export class RealtimeStrategyEvaluationService {
     if (eligible.length === 0) return Object.freeze([]);
 
     const requiredBars = Math.max(
-      ...eligible.map((candidate) => candidate.plan.requiredBarCount),
+      ...eligible.map((candidate) =>
+        candidate.kind === 'decision_flow'
+          ? candidate.requiredBarCount
+          : candidate.plan.requiredBarCount,
+      ),
     );
     const append = await this.windows.prepare(
       this.marketData,
@@ -109,6 +126,10 @@ export class RealtimeStrategyEvaluationService {
     for (const execution of eligible) {
       if (execution.kind === 'chan_bsp') {
         this.evaluateChanBsp(execution, bar, projected, candidates);
+        continue;
+      }
+      if (execution.kind === 'decision_flow') {
+        await this.evaluateDecisionFlow(execution, bar, projected, candidates);
         continue;
       }
       const outcome = evaluateStrategyPlan(execution.plan, projected, analysis);
@@ -140,6 +161,13 @@ export class RealtimeStrategyEvaluationService {
         triggerPrice: bar.close,
         barType: bar.type,
         evaluation: outcome,
+        confidence: 80.0,
+        confidenceLevel: 'HIGH' as const,
+        decisionTrace: {
+          flowId: 'legacy_rule_dsl',
+          matched: true,
+          signalKind: execution.plan.signalKind,
+        },
         contextSnapshot: serializeStrategyContextSnapshot(
           execution.plan,
           outcome.context,
@@ -190,11 +218,120 @@ export class RealtimeStrategyEvaluationService {
             fields: Object.freeze({}),
           }),
         }),
+        confidence: event.type.startsWith('first_')
+          ? 92.0
+          : event.type.startsWith('third_')
+            ? 90.0
+            : 86.0,
+        confidenceLevel: 'HIGH' as const,
+        decisionTrace: {
+          flowId: 'legacy_chan_bsp',
+          matched: true,
+          eventType: event.type,
+          price: event.price,
+        },
         contextSnapshot: serializeChanBspContextSnapshot(event, bar.period),
         ruleSnapshot: execution.ruleSnapshot,
       });
       out.push(candidate);
     }
+  }
+
+  private async evaluateDecisionFlow(
+    execution: Extract<
+      RealtimeStrategyExecutionPlan,
+      { kind: 'decision_flow' }
+    >,
+    bar: StrategyBar,
+    projected: readonly ProjectedStrategyBar[],
+    out: ShadowStrategyCandidate[],
+  ): Promise<void> {
+    const factorContext: FactorContext = {
+      securityId: bar.securityId,
+      securityCode: String(bar.securityId),
+      timestamp: bar.timestamp,
+      period: bar.period,
+      bars: projected,
+      attributes: new Map(),
+    };
+
+    const decisionResult = await this.decisionFlowEvaluator.evaluate(
+      execution.flow,
+      factorContext,
+    );
+
+    const signalKind: 'entry' | 'exit' =
+      execution.signalKind ??
+      (decisionResult.action === 'SELL' ? 'exit' : 'entry');
+
+    const identity: RealtimeEpisodeIdentity = {
+      definitionId: execution.definitionId,
+      versionId: execution.versionId,
+      securityId: bar.securityId,
+      source: execution.source,
+      period: execution.period,
+      signalKind,
+    };
+
+    const anchor = projected.at(-1);
+    if (!anchor) return;
+
+    const isMatched = decisionResult.status === 'SIGNAL_EMITTED';
+    const mockOutcome: Extract<
+      StrategyEvaluationOutcome,
+      { status: 'evaluated' }
+    > = Object.freeze({
+      status: 'evaluated',
+      matched: isMatched,
+      context: Object.freeze({
+        anchor,
+        barType: bar.type,
+        fields: Object.freeze({}),
+      }),
+    });
+
+    this.lastOutcome = isMatched
+      ? 'evaluated_matched'
+      : 'evaluated_not_matched';
+
+    const decision = this.episodes.decide(identity, mockOutcome);
+    if (decision !== 'emit' || !isMatched) return;
+
+    const candidate = Object.freeze({
+      definitionId: execution.definitionId,
+      versionId: execution.versionId,
+      securityId: bar.securityId,
+      source: execution.source,
+      period: execution.period,
+      signalKind,
+      signalTime: bar.timestamp,
+      triggerTime: bar.timestamp.toISOString(),
+      triggerPrice: bar.close,
+      barType: bar.type,
+      evaluation: mockOutcome,
+      confidence: decisionResult.confidence,
+      confidenceLevel: decisionResult.confidenceLevel,
+      decisionTrace: {
+        status: decisionResult.status,
+        action: decisionResult.action,
+        confidence: decisionResult.confidence,
+        confidenceLevel: decisionResult.confidenceLevel,
+        signalTag: decisionResult.signalTag,
+        reason: decisionResult.reason,
+        trace: decisionResult.trace,
+      },
+      contextSnapshot: {
+        decisionResult: {
+          action: decisionResult.action,
+          confidence: decisionResult.confidence,
+          confidenceLevel: decisionResult.confidenceLevel,
+          signalTag: decisionResult.signalTag,
+          reason: decisionResult.reason,
+        },
+      },
+      ruleSnapshot: execution.ruleSnapshot,
+    });
+    out.push(candidate);
   }
 
   activate(candidate: ShadowStrategyCandidate): void {

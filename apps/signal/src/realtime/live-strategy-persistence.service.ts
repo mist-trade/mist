@@ -47,6 +47,9 @@ export class LiveStrategyPersistenceService {
           signalTime: candidate.signalTime,
           signalSource: StrategySignalSource.LIVE,
           signalKind: candidate.signalKind as StrategySignalKind,
+          confidence: candidate.confidence,
+          confidenceLevel: candidate.confidenceLevel,
+          decisionTrace: candidate.decisionTrace,
           contextSnapshot: {
             ...candidate.contextSnapshot,
             triggerTime: candidate.triggerTime,

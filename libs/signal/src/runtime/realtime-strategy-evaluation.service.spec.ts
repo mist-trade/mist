@@ -1,5 +1,7 @@
 import {
   compileStoredStrategyRule,
+  LegacyStrategyCompiler,
+  type DecisionFlowNode,
   type StrategyBar,
   type StrategyRealtimeMarketDataPort,
 } from '@app/strategy';
@@ -272,5 +274,86 @@ describe('RealtimeStrategyEvaluationService dispatch', () => {
     expect(marketData.loadRealtimeWindow).toHaveBeenCalledWith(
       expect.objectContaining({ requiredBars: 500 }),
     );
+  });
+
+  it('evaluates a native decision_flow plan and emits candidate with confidence and trace', async () => {
+    const window = makeWindow(20);
+    const service = new RealtimeStrategyEvaluationService(
+      marketDataWithWindow(window),
+    );
+    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
+
+    const flow: DecisionFlowNode = {
+      id: 'term_direct_buy',
+      type: 'TERMINAL',
+      action: 'BUY',
+      signalTag: 'DIRECT_ENTRY',
+      reason: '直接发射买入信号',
+    };
+
+    const plan: RealtimeStrategyExecutionPlan = {
+      definitionId: 10,
+      versionId: 20,
+      source: 'tdx',
+      period: 30,
+      kind: 'decision_flow',
+      flow,
+      signalKind: 'entry',
+      requiredBarCount: 20,
+      ruleSnapshot: { type: 'flow' },
+    };
+
+    const candidates = await service.evaluate(bar, [plan]);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      definitionId: 10,
+      versionId: 20,
+      signalKind: 'entry',
+      triggerPrice: 20,
+      confidence: 85,
+      confidenceLevel: 'HIGH',
+    });
+    expect(candidates[0].decisionTrace).toMatchObject({
+      status: 'SIGNAL_EMITTED',
+      signalTag: 'DIRECT_ENTRY',
+    });
+  });
+
+  it('evaluates legacy rule plan compiled via LegacyStrategyCompiler with exact parity', async () => {
+    const window = makeWindow(20);
+    const service = new RealtimeStrategyEvaluationService(
+      marketDataWithWindow(window),
+    );
+    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
+
+    const compiledRule = compileStoredStrategyRule(
+      { field: 'k.close', operator: 'gt', value: 10 },
+      'entry',
+    );
+    const flow = LegacyStrategyCompiler.compileRuleToDecisionFlow(compiledRule);
+
+    const plan: RealtimeStrategyExecutionPlan = {
+      definitionId: 11,
+      versionId: 21,
+      source: 'tdx',
+      period: 30,
+      kind: 'decision_flow',
+      flow,
+      signalKind: 'entry',
+      requiredBarCount: 20,
+      ruleSnapshot: { field: 'k.close', operator: 'gt', value: 10 },
+    };
+
+    const candidates = await service.evaluate(bar, [plan]);
+
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0].definitionId).toBe(11);
+    expect(candidates[0].confidence).toBe(80);
+    expect(candidates[0].confidenceLevel).toBe('HIGH');
+    expect(candidates[0].decisionTrace).toMatchObject({
+      status: 'SIGNAL_EMITTED',
+      signalTag: 'LEGACY_DSL',
+    });
   });
 });
