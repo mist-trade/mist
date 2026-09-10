@@ -29,6 +29,7 @@ import { SecurityModule } from '../security/security.module';
 import { TimezoneModule } from '@app/timezone';
 import { PostCloseSyncService } from './post-close-sync.service';
 import { DataFreshnessValidator } from './helpers/data-freshness.validator';
+import { HistoryDownloadClient } from './history-download.client';
 import { PostCloseSyncMetrics } from './observability/post-close-sync-metrics';
 import {
   COLLECTION_STRATEGIES,
@@ -67,6 +68,7 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
     CollectorService,
     PostCloseSyncService,
     DataFreshnessValidator,
+    HistoryDownloadClient,
     PostCloseSyncMetrics,
     EastMoneyCollectionStrategy,
     TdxCollectionStrategy,

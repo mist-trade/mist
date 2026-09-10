@@ -54,18 +54,32 @@ describe('PostCloseSyncService', () => {
       recordSuccessfulRun: jest.fn(),
     };
 
+    const kRepository = {
+      count: jest.fn().mockResolvedValue(240),
+    };
+
+    const historyDownloadClient = {
+      submitDownloadJob: jest
+        .fn()
+        .mockResolvedValue({ jobId: 'dl-test', tasks: [] }),
+      pollUntilDone: jest.fn().mockResolvedValue('all_done'),
+    };
+
     const service = new PostCloseSyncService(
       securityRepository as any,
+      kRepository as any,
       collectorService as any,
       dataSourceSelectionService as any,
       timezoneService as any,
       freshnessValidator as any,
+      historyDownloadClient as any,
       syncMetrics as any,
     );
 
     return {
       service,
       securityRepository,
+      kRepository,
       collectorService,
       dataSourceSelectionService,
       timezoneService,

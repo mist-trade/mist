@@ -1,11 +1,21 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, In } from 'typeorm';
-import { DataSource, Period, Security, SecurityStatus } from '@app/shared-data';
+import { Between, Repository, In } from 'typeorm';
+import {
+  K,
+  DataSource,
+  Period,
+  Security,
+  SecurityStatus,
+} from '@app/shared-data';
 import { TimezoneService } from '@app/timezone';
 import { DataSourceSelectionService } from '@app/utils';
 import { CollectorService } from './collector.service';
 import { DataFreshnessValidator } from './helpers/data-freshness.validator';
+import {
+  HistoryDownloadClient,
+  DownloadSource,
+} from './history-download.client';
 import { PostCloseSyncMetrics } from './observability/post-close-sync-metrics';
 import {
   DataFreshnessStatus,
@@ -28,12 +38,137 @@ export class PostCloseSyncService {
   constructor(
     @InjectRepository(Security)
     private readonly securityRepository: Repository<Security>,
+    @InjectRepository(K)
+    private readonly kRepository: Repository<K>,
     private readonly collectorService: CollectorService,
     private readonly dataSourceSelectionService: DataSourceSelectionService,
     private readonly timezoneService: TimezoneService,
     private readonly freshnessValidator: DataFreshnessValidator,
+    private readonly historyDownloadClient: HistoryDownloadClient,
     private readonly syncMetrics: PostCloseSyncMetrics,
   ) {}
+
+  /**
+   * 三段前置（design D1）：统计缺失 → 提交下载 job → 轮询完成。
+   * 仅 QMT/TDX 源标的参与（TDX 的 refresh 由 datasource get_bars 内置——
+   * 本方法对其提交下载 job 以显式触发缺口回填）；缺口为空或预算超时 →
+   * 降级为既有路径（采集照跑，数据可能部分缺失，由重试/晨间兜底自愈）。
+   */
+  private async ensureHistoryDownloaded(
+    securities: Security[],
+    periods: Period[],
+    startWindow: Date,
+    endWindow: Date,
+    windowName: string,
+  ): Promise<void> {
+    const basePeriods = [
+      ...new Set(
+        periods
+          .map((p): string | null =>
+            p === Period.DAY
+              ? '1d'
+              : p === Period.ONE_MIN
+                ? '1m'
+                : p === Period.FIVE_MIN || p === Period.THIRTY_MIN
+                  ? '5m'
+                  : null,
+          )
+          .filter((p): p is string => p !== null),
+      ),
+    ];
+    if (basePeriods.length === 0) {
+      return;
+    }
+
+    const startStr = startWindow.toISOString().slice(0, 10).replace(/-/g, '');
+    const endStr = endWindow.toISOString().slice(0, 10).replace(/-/g, '');
+    const window = { start: startStr, end: endStr };
+
+    const gapSymbolsBySource: Record<DownloadSource, Security[]> = {
+      qmt: [],
+      tdx: [],
+    };
+    for (const security of securities) {
+      const source =
+        await this.dataSourceSelectionService.getDataSourceForSecurity(
+          security,
+        );
+      if (source === DataSource.QMT || source === DataSource.TDX) {
+        const hasAllBasePeriods = (
+          await Promise.all(
+            basePeriods.map(async (base) => {
+              const periodEnum: Period =
+                base === '1m'
+                  ? Period.ONE_MIN
+                  : base === '5m'
+                    ? Period.FIVE_MIN
+                    : Period.DAY;
+              const count = await this.kRepository.count({
+                where: {
+                  security: { id: security.id },
+                  period: periodEnum,
+                  timestamp: Between(startWindow, endWindow),
+                },
+              });
+              return count > 0;
+            }),
+          )
+        ).every(Boolean);
+        if (!hasAllBasePeriods) {
+          gapSymbolsBySource[source as DownloadSource].push(security);
+        }
+      }
+    }
+
+    const submissions: Array<{ source: DownloadSource; jobId: string }> = [];
+    for (const source of ['qmt', 'tdx'] as DownloadSource[]) {
+      const symbols = gapSymbolsBySource[source].map((s) => s.code);
+      if (symbols.length === 0) {
+        continue;
+      }
+      this.logger.log(
+        `[PostCloseSync] event=history_download_submit source=${source} ` +
+          `symbols=${symbols.join(',')} basePeriods=${basePeriods.join(',')} ` +
+          `window=${window.start}..${window.end} windowName=${windowName}`,
+      );
+      try {
+        const submission = await this.historyDownloadClient.submitDownloadJob(
+          source,
+          symbols,
+          basePeriods,
+          window,
+        );
+        submissions.push({ source, jobId: submission.jobId });
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `[PostCloseSync] event=history_download_submit_failed source=${source} ` +
+            `error="${message.slice(0, 200)}"`,
+        );
+      }
+    }
+    if (submissions.length === 0) {
+      return;
+    }
+
+    const budgetMs = HistoryDownloadClient.JOB_BUDGET_MS;
+    const deadline = Date.now() + budgetMs;
+    const outcomes = await Promise.all(
+      submissions.map(async ({ source, jobId }) => {
+        const outcome = await this.historyDownloadClient.pollUntilDone(
+          source,
+          jobId,
+          Math.max(deadline - Date.now(), 0),
+        );
+        return { source, jobId, outcome };
+      }),
+    );
+    for (const { source, outcome } of outcomes) {
+      this.logger.log(
+        `[PostCloseSync] event=history_download_poll source=${source} outcome=${outcome}`,
+      );
+    }
+  }
 
   /**
    * 执行收盘后权威 K 线数据同步
@@ -62,6 +197,16 @@ export class PostCloseSyncService {
     );
 
     const { startWindow, endWindow } = this.calculateDateWindow(targetDateStr);
+
+    // 三段前置（design D1）：统计缺失 → 提交下载 job → 轮询完成后采集。
+    // 仅 QMT/TDX 源标的参与；缺口为空或预算超时 → 降级为既有路径（采集照跑）。
+    await this.ensureHistoryDownloaded(
+      securities,
+      periods,
+      startWindow,
+      endWindow,
+      windowName,
+    );
 
     const concurrencyLimit = Math.max(1, criteria.concurrencyLimit ?? 5);
     const taskResults: SecuritySyncTaskResult[] = [];
