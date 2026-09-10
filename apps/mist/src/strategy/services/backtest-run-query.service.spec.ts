@@ -82,4 +82,60 @@ describe('BacktestRunQueryService', () => {
       expect(qb.take).toHaveBeenCalledWith(1);
     });
   });
+
+  describe('listSignals', () => {
+    it('returns signals with confidence, confidenceLevel, and decisionTrace', async () => {
+      runRepo.findOne.mockResolvedValue({
+        id: 1,
+        status: BacktestRunStatus.COMPLETED,
+      });
+
+      const mockResults = [
+        {
+          id: 101,
+          backtestRunId: 1,
+          securityCode: '600000.SH',
+          signalTime: new Date('2026-01-05T01:30:00Z'),
+          confidence: 85,
+          confidenceLevel: 'HIGH',
+          decisionTrace: { status: 'SIGNAL_EMITTED', signalTag: 'TEST' },
+          contextSnapshot: { price: 10.5 },
+          ruleSnapshot: { type: 'TERMINAL' },
+          createdAt: new Date('2026-01-05T01:30:01Z'),
+        },
+      ];
+
+      const qb: any = {
+        select: jest.fn().mockReturnThis(),
+        where: jest.fn().mockReturnThis(),
+        orderBy: jest.fn().mockReturnThis(),
+        addOrderBy: jest.fn().mockReturnThis(),
+        take: jest.fn().mockReturnThis(),
+        getMany: jest.fn().mockResolvedValue(mockResults),
+      };
+      resultRepo.createQueryBuilder.mockReturnValue(qb);
+
+      const page: any = await service.listSignals(1, { limit: 50 });
+      expect(page.items).toHaveLength(1);
+      expect(page.items[0]).toEqual({
+        id: 101,
+        backtestRunId: 1,
+        securityCode: '600000.SH',
+        signalTime: '2026-01-05T01:30:00.000Z',
+        confidence: 85,
+        confidenceLevel: 'HIGH',
+        decisionTrace: { status: 'SIGNAL_EMITTED', signalTag: 'TEST' },
+        contextSnapshot: { price: 10.5 },
+        ruleSnapshot: { type: 'TERMINAL' },
+        createdAt: '2026-01-05T01:30:01.000Z',
+      });
+      expect(qb.select).toHaveBeenCalledWith(
+        expect.arrayContaining([
+          'result.confidence',
+          'result.confidenceLevel',
+          'result.decisionTrace',
+        ]),
+      );
+    });
+  });
 });
