@@ -68,4 +68,21 @@ describe('VisualCommandService', () => {
 
     expect(result.commands.every((c) => c.layer === 'chan_bi')).toBe(true);
   });
+
+  it('generates fibonacci layer commands with TradingView styles', () => {
+    const klines = generateSampleKlines(60);
+    const result = service.generateCommands({
+      code: '000001',
+      period: 5,
+      source: 'tdx',
+      klines,
+      layers: ['fibonacci'],
+      fibOptions: { period: 50 },
+    });
+
+    expect(result.commands.length).toBeGreaterThan(0);
+    expect(result.commands.every((c) => c.layer === 'fibonacci')).toBe(true);
+    expect(result.commands.some((c) => c.type === 'band')).toBe(true);
+    expect(result.commands.some((c) => c.type === 'line')).toBe(true);
+  });
 });
