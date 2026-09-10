@@ -426,10 +426,13 @@ describe('ChannelCalculator.getAdjacentBoundedChannels', () => {
     const result = ChanCore.createAdjacentBoundedChannels(subBis, macroBis);
     expect(result.phaseB).toHaveLength(1);
     const zs = result.phaseB[0];
-    expect(zs.trend).toBe(TrendDirection.Up);
+    expect(zs.trend).toBe(TrendDirection.Down);
     expect(zs.zg).toBe(4140.23);
     expect(zs.zd).toBe(4101.83);
-    expect(zs.bis.length).toBeGreaterThanOrEqual(5);
-    expect(zs.bis[0].startTime.toISOString()).toBe('2026-01-15T05:30:00.000Z');
+    expect(zs.bis.length).toBe(7);
+    expect(zs.bis[0].startTime.toISOString()).toBe('2026-01-14T03:30:00.000Z');
+    expect(zs.bis[zs.bis.length - 1].endTime.toISOString()).toBe(
+      '2026-02-03T03:00:00.000Z',
+    );
   });
 });
