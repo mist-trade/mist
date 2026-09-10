@@ -4,6 +4,10 @@ import {
   ChanVisualAdapter,
   type ChanVisualOptions,
 } from './adapters/chan-visual.adapter';
+import {
+  FibonacciVisualAdapter,
+  type FibonacciVisualOptions,
+} from './adapters/fibonacci-visual.adapter';
 import type {
   VisualCommand,
   VisualCommandPayload,
@@ -16,6 +20,7 @@ export interface GenerateVisualCommandsInput {
   readonly klines: readonly ChanK[];
   readonly layers?: readonly string[];
   readonly chanOptions?: ChanVisualOptions;
+  readonly fibOptions?: FibonacciVisualOptions;
 }
 
 @Injectable()
@@ -31,6 +36,7 @@ export class VisualCommandService {
       klines,
       layers = ['chan'],
       chanOptions,
+      fibOptions,
     } = input;
 
     const layerSet = new Set(layers.map((l) => l.toLowerCase()));
@@ -57,6 +63,12 @@ export class VisualCommandService {
         includeBsp: !layerSet.has('chan') ? layerSet.has('chan_bsp') : true,
       });
       allCommands.push(...chanCmds);
+    }
+
+    // 2. Fibonacci Layer (TradingView Official Style)
+    if (layerSet.has('fibonacci')) {
+      const fibCmds = FibonacciVisualAdapter.convert(klines, fibOptions);
+      allCommands.push(...fibCmds);
     }
 
     return {

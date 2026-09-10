@@ -6,4 +6,5 @@ export * from './plugins/volume-breakout.plugin';
 export * from './plugins/financial-guard.plugin';
 export * from './plugins/northbound-capital.plugin';
 export * from './plugins/http-proxy.plugin';
+export * from './plugins/fibonacci.plugin';
 export * from './standard-plugins';

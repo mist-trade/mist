@@ -46,3 +46,25 @@ export type {
   TsRankOptions,
   RollingStdOptions,
 } from './time-series';
+
+export {
+  FIBONACCI_RETRACEMENT_RATIOS,
+  FIBONACCI_EXTENSION_RATIOS,
+  TRADINGVIEW_FIB_STYLES,
+  computeFibonacciSeries,
+  computeFibonacciObservation,
+  computeFibonacciLevels,
+  computeStaticSwingFibonacci,
+} from './fibonacci';
+export type {
+  FibonacciDirection,
+  FibonacciLevelItem,
+  FibonacciLevelsOptions,
+  FibonacciLevelsResult,
+  FibonacciObservation,
+  FibonacciParams,
+  FibonacciSeriesResult,
+  RetracementZone,
+  StaticSwingFibonacciResult,
+  TradingViewFibStyle,
+} from './fibonacci';

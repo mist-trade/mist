@@ -6,8 +6,22 @@ import { DataFreshnessStatus } from './types/post-close-sync.types';
 describe('PostCloseSyncService', () => {
   const createHarness = () => {
     const activeSecurities: Security[] = [
-      { id: 1, code: '600519', status: SecurityStatus.ACTIVE } as Security,
-      { id: 2, code: '300059', status: SecurityStatus.ACTIVE } as Security,
+      {
+        id: 1,
+        code: '600519',
+        status: SecurityStatus.ACTIVE,
+        sourceConfigs: [
+          { source: DataSource.QMT, enabled: true, formatCode: '600519.SH' },
+        ],
+      } as Security,
+      {
+        id: 2,
+        code: '300059',
+        status: SecurityStatus.ACTIVE,
+        sourceConfigs: [
+          { source: DataSource.TDX, enabled: true, formatCode: '300059.SZ' },
+        ],
+      } as Security,
     ];
 
     const securityRepository = {
@@ -207,8 +221,13 @@ describe('PostCloseSyncService', () => {
   });
 
   it('classifies 0 bars after completed download as suspected suspended, not notReady (D1 ④)', async () => {
-    const { service, kRepository, collectorService, syncMetrics } =
-      createHarness();
+    const {
+      service,
+      kRepository,
+      collectorService,
+      syncMetrics,
+      historyDownloadClient,
+    } = createHarness();
     // 300059（id=2，TDX 源）k 表缺数据 → 提交下载 → all_done → 采集仍 0 条
     kRepository.count.mockImplementation(async (args: any) =>
       args?.where?.security?.id === 1 ? 240 : 0,
@@ -227,6 +246,43 @@ describe('PostCloseSyncService', () => {
       'suspended',
       DataSource.TDX,
       Period.DAY,
+    );
+    // 提交的是 provider 全码（端点校验 ^\d{6}\.(SH|SZ|BJ)$），窗口为北京日历日
+    expect(historyDownloadClient.submitDownloadJob).toHaveBeenCalledWith(
+      'tdx',
+      ['300059.SZ'],
+      ['1d', '1m', '5m'],
+      { start: '20260824', end: '20260824' },
+    );
+  });
+
+  it('skips securities whose provider symbol cannot be resolved (warn, no submit for them)', async () => {
+    const {
+      service,
+      kRepository,
+      historyDownloadClient,
+      securityRepository,
+      activeSecurities,
+    } = createHarness();
+    kRepository.count.mockResolvedValue(0);
+    // 300059 清空 sourceConfigs → provider symbol 解析失败 → 跳过该标的，
+    // 600519 正常解析提交
+    const broken = {
+      id: 2,
+      code: '300059',
+      status: SecurityStatus.ACTIVE,
+      sourceConfigs: [],
+    } as unknown as Security;
+    securityRepository.find.mockResolvedValue([activeSecurities[0], broken]);
+
+    await service.syncPostClose();
+
+    expect(historyDownloadClient.submitDownloadJob).toHaveBeenCalledTimes(1);
+    expect(historyDownloadClient.submitDownloadJob).toHaveBeenCalledWith(
+      'qmt',
+      ['600519.SH'],
+      expect.anything(),
+      expect.anything(),
     );
   });
 

@@ -9,7 +9,7 @@ import {
   SecurityStatus,
 } from '@app/shared-data';
 import { TimezoneService } from '@app/timezone';
-import { DataSourceSelectionService } from '@app/utils';
+import { DataSourceSelectionService, getSecurityFormatCode } from '@app/utils';
 import { CollectorService } from './collector.service';
 import { DataFreshnessValidator } from './helpers/data-freshness.validator';
 import {
@@ -34,6 +34,9 @@ export class PostCloseSyncService {
     Period.FIVE_MIN,
     Period.THIRTY_MIN,
   ];
+
+  /** 下载端点单 job symbol 上限（QMT/TDX 路由校验一致）。 */
+  private static readonly MAX_SYMBOLS_PER_JOB = 64;
 
   constructor(
     @InjectRepository(Security)
@@ -63,16 +66,6 @@ export class PostCloseSyncService {
     endWindow: Date,
     windowName: string,
   ): Promise<Set<number>> {
-    // ② 真实数据判定：非交易日 → 无真实数据 → 跳过下载（不算缺口）。
-    // isTradingDay 失败时内部回退周末判断（fail-open 到交易日，不阻塞流程）。
-    if (!(await this.timezoneService.isTradingDay(startWindow))) {
-      this.logger.log(
-        `[PostCloseSync] event=history_download_skipped_non_trading_day ` +
-          `date=${startWindow.toISOString().slice(0, 10)} windowName=${windowName}`,
-      );
-      return new Set<number>();
-    }
-
     const basePeriods = [
       ...new Set(
         periods
@@ -92,80 +85,118 @@ export class PostCloseSyncService {
       return new Set<number>();
     }
 
-    const startStr = startWindow.toISOString().slice(0, 10).replace(/-/g, '');
-    const endStr = endWindow.toISOString().slice(0, 10).replace(/-/g, '');
+    // ② 真实数据判定：非交易日 → 无真实数据 → 跳过下载（不算缺口）。
+    // isTradingDay 失败时内部回退周末判断（fail-open 到交易日，不阻塞流程）。
+    if (!(await this.timezoneService.isTradingDay(startWindow))) {
+      this.logger.log(
+        `[PostCloseSync] event=history_download_skipped_non_trading_day ` +
+          `date=${this.formatDateString(startWindow)} windowName=${windowName}`,
+      );
+      return new Set<number>();
+    }
+
+    // 下载窗口日期串用北京日历日（YYYYMMDD）——toISOString 是 UTC，北京零点
+    // 会回退到前一日（off-by-one），端点校验与 QMT 原生 API 都按日历日理解。
+    const startStr = this.formatDateString(startWindow).replace(/-/g, '');
+    const endStr = this.formatDateString(endWindow).replace(/-/g, '');
     const window = { start: startStr, end: endStr };
 
-    const gapSymbolsBySource: Record<DownloadSource, Security[]> = {
-      qmt: [],
-      tdx: [],
-    };
+    // 下载端点要求 provider 全码（`^\d{6}\.(SH|SZ|BJ)$`），Security.code 是
+    // 裸码 → 经 SecuritySourceConfig.formatCode 解析；解析失败跳过该标的
+    // （warn 有界 reason），不阻塞其余标的。
+    const gapEntriesBySource: Record<
+      DownloadSource,
+      Array<{ security: Security; providerCode: string }>
+    > = { qmt: [], tdx: [] };
     for (const security of securities) {
       const source =
         await this.dataSourceSelectionService.getDataSourceForSecurity(
           security,
         );
-      if (source === DataSource.QMT || source === DataSource.TDX) {
-        const hasAllBasePeriods = (
-          await Promise.all(
-            basePeriods.map(async (base) => {
-              const periodEnum: Period =
-                base === '1m'
-                  ? Period.ONE_MIN
-                  : base === '5m'
-                    ? Period.FIVE_MIN
-                    : Period.DAY;
-              const count = await this.kRepository.count({
-                where: {
-                  security: { id: security.id },
-                  period: periodEnum,
-                  timestamp: Between(startWindow, endWindow),
-                },
-              });
-              return count > 0;
-            }),
-          )
-        ).every(Boolean);
-        if (!hasAllBasePeriods) {
-          gapSymbolsBySource[source as DownloadSource].push(security);
-        }
+      if (source !== DataSource.QMT && source !== DataSource.TDX) {
+        continue;
+      }
+      const downloadSource = source as DownloadSource;
+      let providerCode: string;
+      try {
+        providerCode = getSecurityFormatCode(security, source);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `[PostCloseSync] event=history_download_symbol_unresolved ` +
+            `securityCode=${security.code} source=${downloadSource} ` +
+            `error="${message.slice(0, 200)}"`,
+        );
+        continue;
+      }
+      const hasAllBasePeriods = (
+        await Promise.all(
+          basePeriods.map(async (base) => {
+            const periodEnum: Period =
+              base === '1m'
+                ? Period.ONE_MIN
+                : base === '5m'
+                  ? Period.FIVE_MIN
+                  : Period.DAY;
+            const count = await this.kRepository.count({
+              where: {
+                security: { id: security.id },
+                period: periodEnum,
+                timestamp: Between(startWindow, endWindow),
+              },
+            });
+            return count > 0;
+          }),
+        )
+      ).every(Boolean);
+      if (!hasAllBasePeriods) {
+        gapEntriesBySource[downloadSource].push({ security, providerCode });
       }
     }
 
+    // 端点单 job 上限 64 个 symbol → 按 64 分片提交（每片一个 job）。
     const submissions: Array<{
       source: DownloadSource;
       jobId: string;
       securityIds: number[];
     }> = [];
     for (const source of ['qmt', 'tdx'] as DownloadSource[]) {
-      const gapSecurities = gapSymbolsBySource[source];
-      if (gapSecurities.length === 0) {
-        continue;
-      }
-      const symbols = gapSecurities.map((s) => s.code);
-      this.logger.log(
-        `[PostCloseSync] event=history_download_submit source=${source} ` +
-          `symbols=${symbols.join(',')} basePeriods=${basePeriods.join(',')} ` +
-          `window=${window.start}..${window.end} windowName=${windowName}`,
-      );
-      try {
-        const submission = await this.historyDownloadClient.submitDownloadJob(
-          source,
-          symbols,
-          basePeriods,
-          window,
+      const entries = gapEntriesBySource[source];
+      for (
+        let i = 0;
+        i < entries.length;
+        i += PostCloseSyncService.MAX_SYMBOLS_PER_JOB
+      ) {
+        const chunk = entries.slice(
+          i,
+          i + PostCloseSyncService.MAX_SYMBOLS_PER_JOB,
         );
-        submissions.push({
-          source,
-          jobId: submission.jobId,
-          securityIds: gapSecurities.map((s) => s.id),
-        });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        this.logger.warn(
-          `[PostCloseSync] event=history_download_submit_failed source=${source} ` +
-            `error="${message.slice(0, 200)}"`,
+        const symbols = chunk.map((e) => e.providerCode);
+        this.logger.log(
+          `[PostCloseSync] event=history_download_submit source=${source} ` +
+            `symbols=${symbols.join(',')} basePeriods=${basePeriods.join(',')} ` +
+            `window=${window.start}..${window.end} windowName=${windowName}`,
         );
+        try {
+          const submission = await this.historyDownloadClient.submitDownloadJob(
+            source,
+            symbols,
+            basePeriods,
+            window,
+          );
+          submissions.push({
+            source,
+            jobId: submission.jobId,
+            securityIds: chunk.map((e) => e.security.id),
+          });
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          this.logger.warn(
+            `[PostCloseSync] event=history_download_submit_failed source=${source} ` +
+              `error="${message.slice(0, 200)}"`,
+          );
+        }
       }
     }
     if (submissions.length === 0) {
