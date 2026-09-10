@@ -119,6 +119,9 @@ export class BacktestRunQueryService {
         'result.backtestRunId',
         'result.securityCode',
         'result.signalTime',
+        'result.confidence',
+        'result.confidenceLevel',
+        'result.decisionTrace',
         'result.contextSnapshot',
         'result.ruleSnapshot',
         'result.createdAt',
@@ -196,7 +199,7 @@ function mapResult(result: BacktestSignalResult): BacktestSignalResultVo {
     decisionTrace: result.decisionTrace ?? null,
     contextSnapshot: result.contextSnapshot,
     ruleSnapshot: result.ruleSnapshot,
-    createdAt: result.createdAt.toISOString(),
+    createdAt: (result.createdAt ?? new Date()).toISOString(),
   };
 }
 
