@@ -3,6 +3,7 @@ import {
   factorPluginRegistry,
   type FactorPluginRegistry,
 } from '../factor/factor-plugin-registry';
+import { ensureStandardPluginsRegistered } from '../factor/standard-plugins';
 import type {
   ConfidenceLevel,
   ConsensusVoteBreakdown,
@@ -24,6 +25,7 @@ export class DecisionFlowEvaluator {
 
   constructor(options?: DecisionFlowEvaluatorOptions) {
     this.registry = options?.registry ?? factorPluginRegistry;
+    ensureStandardPluginsRegistered(this.registry);
   }
 
   public async evaluate(

@@ -613,4 +613,82 @@ describe('BacktestRunExecutor chan_bsp replay', () => {
       }),
     );
   });
+
+  it('replays a decision_flow plan and saves confidence and decisionTrace', async () => {
+    const fixture = executor();
+    const flowRun = {
+      ...fixture.current,
+      targetUniverse: ['600000.SH'],
+      period: 30,
+      startDate: new Date('2026-01-01T00:00:00.000Z'),
+      endDate: new Date('2026-01-31T00:00:00.000Z'),
+      kind: 'decision_flow',
+    };
+    fixture.dependencies.runRepository.findOne.mockResolvedValue(flowRun);
+    fixture.dependencies.versionRepository.findOne.mockResolvedValue({
+      id: 7,
+      rule: {
+        id: 'term_test',
+        type: 'TERMINAL',
+        action: 'BUY',
+        signalTag: 'TEST_FLOW',
+        reason: '测试决策流触发',
+        requiredBarCount: 5,
+      },
+      signalKind: 'entry',
+    });
+    fixture.dependencies.definitionRepository.findOne.mockResolvedValue({
+      id: 3,
+      periods: [30],
+    });
+    fixture.dependencies.securityRepository.find.mockResolvedValue([
+      { id: 9, code: '600000.SH' },
+    ]);
+    fixture.dependencies.marketData.loadReplayWindow.mockResolvedValue({
+      bars: [],
+    });
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars: [
+        {
+          securityId: 9,
+          source: 'tdx',
+          period: 30,
+          timestamp: new Date('2026-01-05T01:30:00.000Z'),
+          open: 10,
+          high: 12,
+          low: 9,
+          close: 11,
+          volume: '1000',
+          amount: '11000',
+          type: 'complete',
+        },
+      ],
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    expect(fixture.dependencies.resultRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backtestRunId: 41,
+        securityCode: '600000.SH',
+        confidence: 85,
+        confidenceLevel: 'HIGH',
+        decisionTrace: expect.objectContaining({
+          status: 'SIGNAL_EMITTED',
+          signalTag: 'TEST_FLOW',
+        }),
+      }),
+    );
+    expect(fixture.dependencies.resultRepository.insert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          backtestRunId: 41,
+          securityCode: '600000.SH',
+          confidence: 85,
+          confidenceLevel: 'HIGH',
+        }),
+      ]),
+    );
+  });
 });

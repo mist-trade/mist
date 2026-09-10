@@ -17,7 +17,10 @@ import {
   compileStoredStrategyRule,
   evaluateStrategyPlan,
   serializeStrategyContextSnapshot,
+  DecisionFlowEvaluator,
   type CompiledStrategyExecutionPlan,
+  type DecisionFlowNode,
+  type FactorContext,
   type StrategyMarketSource,
   type StrategyRealtimeSource,
 } from '@app/strategy';
@@ -45,7 +48,12 @@ const BACKTEST_RESULT_BATCH_SIZE = 100;
  */
 type ReplayPlan =
   | { kind: 'rule_dsl'; plan: CompiledStrategyExecutionPlan }
-  | { kind: 'chan_bsp'; plan: ChanBspPlan };
+  | { kind: 'chan_bsp'; plan: ChanBspPlan }
+  | {
+      kind: 'decision_flow';
+      flow: DecisionFlowNode;
+      requiredBarCount: number;
+    };
 
 const CHAN_BSP_REPLAY_LEVELS: readonly number[] = [1, 5, 15, 30, 60];
 
@@ -90,6 +98,7 @@ export class BacktestRunExecutor {
   private readonly logger = new Logger(BacktestRunExecutor.name);
   private readonly chanBspDetector = new ChanBspDetector();
   private readonly chanBspCursors = new Map<number, ChanBspEpisodeCursor>();
+  private readonly decisionFlowEvaluator = new DecisionFlowEvaluator();
 
   constructor(
     @InjectRepository(BacktestRun)
@@ -180,13 +189,22 @@ export class BacktestRunExecutor {
               definition.periods,
             ),
           }
-        : {
-            kind: 'rule_dsl',
-            plan: compileStoredStrategyRule(
-              version.rule,
-              version.signalKind as 'entry' | 'exit',
-            ),
-          };
+        : run.kind === StrategyKind.DECISION_FLOW
+          ? {
+              kind: 'decision_flow',
+              flow: version.rule as unknown as DecisionFlowNode,
+              requiredBarCount:
+                typeof (version.rule as any)?.requiredBarCount === 'number'
+                  ? (version.rule as any).requiredBarCount
+                  : 50,
+            }
+          : {
+              kind: 'rule_dsl',
+              plan: compileStoredStrategyRule(
+                version.rule,
+                version.signalKind as 'entry' | 'exit',
+              ),
+            };
     if (
       run.kind === StrategyKind.CHAN_BSP &&
       !CHAN_BSP_REPLAY_LEVELS.includes(run.period)
@@ -318,12 +336,17 @@ export class BacktestRunExecutor {
     //    只取开盘前的历史，与 ② 的 replay page（从 replayStart 起）天然不重叠；锚点
     //    全部 < replayStart，无 look-ahead。窗口不满时维持 insufficient_history
     //    （builder 现有逻辑）。
+    const requiredBarCount =
+      plan.kind === 'decision_flow'
+        ? plan.requiredBarCount
+        : plan.plan.requiredBarCount;
+
     const initial = await this.marketData.loadReplayWindow({
       securityId,
       source: run.source as StrategyRealtimeSource,
       period: run.period,
       endAt: replayStart,
-      requiredBars: plan.plan.requiredBarCount,
+      requiredBars: requiredBarCount,
     });
     for (let index = 0; index < initial.bars.length; index += 1) {
       budget.consume();
@@ -344,7 +367,7 @@ export class BacktestRunExecutor {
         budget.consume();
         if (bar.timestamp >= run.startDate) hasPublicBars = true;
         imputer.append(bar);
-        while (imputer.read().length > plan.plan.requiredBarCount) {
+        while (imputer.read().length > requiredBarCount) {
           imputer.trim();
         }
         if (bar.timestamp >= run.startDate) {
@@ -372,6 +395,17 @@ export class BacktestRunExecutor {
                   backtestRunId: run.id,
                   securityCode,
                   signalTime: event.time,
+                  confidence: event.type.startsWith('first_')
+                    ? 92.0
+                    : event.type.startsWith('third_')
+                      ? 90.0
+                      : 86.0,
+                  confidenceLevel: 'HIGH',
+                  decisionTrace: {
+                    eventType: event.type,
+                    units: plan.plan.units,
+                    price: event.price,
+                  },
                   contextSnapshot: serializeChanBspContextSnapshot(
                     event,
                     run.period,
@@ -387,6 +421,51 @@ export class BacktestRunExecutor {
               if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
                 await this.flushResults(results);
             }
+          } else if (plan.kind === 'decision_flow') {
+            const factorContext: FactorContext = {
+              securityId,
+              securityCode,
+              timestamp: bar.timestamp,
+              period: run.period,
+              bars: imputer.read(),
+              attributes: new Map(),
+            };
+            const outcome = await this.decisionFlowEvaluator.evaluate(
+              plan.flow,
+              factorContext,
+            );
+            if (outcome.status === 'SIGNAL_EMITTED') {
+              const timeKey = bar.timestamp.getTime();
+              if (!seenSignalTimes.has(timeKey)) {
+                seenSignalTimes.add(timeKey);
+                results.push(
+                  this.resultRepository.create({
+                    backtestRunId: run.id,
+                    securityCode,
+                    signalTime: bar.timestamp,
+                    confidence: outcome.confidence,
+                    confidenceLevel: outcome.confidenceLevel,
+                    decisionTrace: {
+                      status: outcome.status,
+                      signalTag: outcome.signalTag,
+                      reason: outcome.reason,
+                      trace: outcome.trace,
+                    },
+                    contextSnapshot: {
+                      action: outcome.action,
+                      confidence: outcome.confidence,
+                      signalTag: outcome.signalTag,
+                      reason: outcome.reason,
+                    },
+                    ruleSnapshot,
+                  }),
+                );
+                matchedCodes.add(securityCode);
+                onSignal();
+                if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
+                  await this.flushResults(results);
+              }
+            }
           } else {
             const evaluation = evaluateStrategyPlan(plan.plan, imputer.read());
             if (evaluation.status === 'evaluated' && evaluation.matched) {
@@ -398,6 +477,12 @@ export class BacktestRunExecutor {
                     backtestRunId: run.id,
                     securityCode,
                     signalTime: bar.timestamp,
+                    confidence: 80.0,
+                    confidenceLevel: 'HIGH',
+                    decisionTrace: {
+                      signalKind: plan.plan.signalKind,
+                      matched: true,
+                    },
                     contextSnapshot: serializeStrategyContextSnapshot(
                       plan.plan,
                       evaluation.context,
@@ -444,6 +529,9 @@ export class BacktestRunExecutor {
           backtestRunId: result.backtestRunId,
           securityCode: result.securityCode,
           signalTime: result.signalTime,
+          confidence: result.confidence,
+          confidenceLevel: result.confidenceLevel,
+          decisionTrace: result.decisionTrace,
           contextSnapshot: result.contextSnapshot,
           ruleSnapshot: result.ruleSnapshot,
         })) as never,
