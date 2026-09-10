@@ -56,7 +56,7 @@ export class PostCloseSyncMetrics implements OnModuleInit {
   }
 
   recordTask(
-    status: 'succeeded' | 'not_ready' | 'failed',
+    status: 'succeeded' | 'not_ready' | 'failed' | 'suspended',
     source: DataSource,
     period: Period,
   ): void {

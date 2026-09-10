@@ -34,6 +34,7 @@ describe('PostCloseSyncService', () => {
         (str: string) => new Date(str.replace(' ', 'T') + '+08:00'),
       ),
       formatDate: jest.fn((date: Date) => format(date, 'yyyy-MM-dd')),
+      isTradingDay: jest.fn().mockResolvedValue(true),
     };
 
     const freshnessValidator = {
@@ -84,6 +85,7 @@ describe('PostCloseSyncService', () => {
       dataSourceSelectionService,
       timezoneService,
       freshnessValidator,
+      historyDownloadClient,
       syncMetrics,
       activeSecurities,
     };
@@ -187,5 +189,72 @@ describe('PostCloseSyncService', () => {
 
     const report = await service.syncPostClose({ window: 'nightly_2230' });
     expect(report.targetDate).toBe('2026-08-24');
+  });
+
+  it('skips history download submission on non-trading days (D1 ②)', async () => {
+    const { service, kRepository, timezoneService, historyDownloadClient } =
+      createHarness();
+    timezoneService.isTradingDay.mockResolvedValue(false);
+    // 周末 k 表必然为空 → 若不判定交易日会全量判缺
+    kRepository.count.mockResolvedValue(0);
+
+    const report = await service.syncPostClose();
+
+    expect(historyDownloadClient.submitDownloadJob).not.toHaveBeenCalled();
+    expect(historyDownloadClient.pollUntilDone).not.toHaveBeenCalled();
+    // 采集照跑（既有路径），但下载侧零动作
+    expect(report.totalTasks).toBe(8);
+  });
+
+  it('classifies 0 bars after completed download as suspected suspended, not notReady (D1 ④)', async () => {
+    const { service, kRepository, collectorService, syncMetrics } =
+      createHarness();
+    // 300059（id=2，TDX 源）k 表缺数据 → 提交下载 → all_done → 采集仍 0 条
+    kRepository.count.mockImplementation(async (args: any) =>
+      args?.where?.security?.id === 1 ? 240 : 0,
+    );
+    collectorService.collectKForSource.mockImplementation((code: string) =>
+      code === '300059' ? Promise.resolve(0) : Promise.resolve(100),
+    );
+
+    const report = await service.syncPostClose();
+
+    // 300059 的 4 个 period 全部走 SUSPENDED
+    expect(report.suspendedTasks).toBe(4);
+    expect(report.notReadyTasks).toBe(0);
+    expect(report.failedTasks).toBe(0);
+    expect(syncMetrics.recordTask).toHaveBeenCalledWith(
+      'suspended',
+      DataSource.TDX,
+      Period.DAY,
+    );
+  });
+
+  it('keeps notReady classification when download job times out (D1 ④ guard)', async () => {
+    const {
+      service,
+      kRepository,
+      collectorService,
+      syncMetrics,
+      historyDownloadClient,
+    } = createHarness();
+    kRepository.count.mockImplementation(async (args: any) =>
+      args?.where?.security?.id === 1 ? 240 : 0,
+    );
+    historyDownloadClient.pollUntilDone.mockResolvedValue('timeout');
+    collectorService.collectKForSource.mockImplementation((code: string) =>
+      code === '300059' ? Promise.resolve(0) : Promise.resolve(100),
+    );
+
+    const report = await service.syncPostClose();
+
+    // 下载未完成 → 0 条仍按 notReady，不进停牌归类
+    expect(report.suspendedTasks).toBe(0);
+    expect(report.notReadyTasks).toBe(4);
+    expect(syncMetrics.recordTask).toHaveBeenCalledWith(
+      'not_ready',
+      DataSource.TDX,
+      Period.DAY,
+    );
   });
 });
