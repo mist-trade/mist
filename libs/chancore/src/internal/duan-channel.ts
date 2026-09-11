@@ -3,6 +3,7 @@ import {
   ChannelStatus,
   ChannelType,
   DuanStatus,
+  TrendDirection,
 } from '../contracts';
 import type {
   ChanDuan,
@@ -16,10 +17,10 @@ import { minMaxBy } from './min-max-by';
  * 段级中枢（Duan-level Channel）—— 以段为构成单元的中枢。缠论原典 17 课：
  * 中枢 = "至少三个连续次级别走势类型所重叠的部分"，是**无方向的区域**。
  *
- * 采用顺序确认生命周期状态机 + 缠论第 20 课中心定理二扩张归并：
+ * 采用顺序确认生命周期状态机 + 假定离开突破确认机制：
  * - 顺序确认扫描：从左至右顺序寻找 3 段基础中枢（趋势交替 + 对称重叠 zg > zd）。
- * - 缠论第 20 课触及延伸：后续段对触及 [ZD, ZG] 且保持公共交集有效则并入延伸。
- * - 第三类买卖点终结：离开且回抽不回中枢区间时立即密封（Seal）闭合当前中枢。
+ * - 动态区间延伸：内部震荡段保持动态公共交集更新 [ZD, ZG]。
+ * - 假定离开突破与 3买/3s 确认：出现顺势突破离开段后，后续 3买/3s 试探开启新结构，中枢确认闭合。
  * - 9 段结合扩展：持续震荡满 9 段时触发中枢扩展（expanded: true）并闭合。
  * - Phase C：相邻同级别独立中枢满足中心定理二时进行扩张归并。
  */
@@ -78,54 +79,98 @@ export class DuanChannelCalculator {
       let curDd = Math.min(...allLows);
       let isExpanded = false;
 
+      const firstDuan = candidateWindow[0];
+      const isUp = firstDuan.trend === TrendDirection.Up;
+
       let nextIdx = cursor + 3;
-      while (nextIdx + 1 < duanCount) {
-        const testWindow = [
-          ...channelDuans,
-          duans[nextIdx],
-          duans[nextIdx + 1],
-        ];
-        const allHighMinMax = minMaxBy(testWindow, (d) => d.high);
-        const allLowMinMax = minMaxBy(testWindow, (d) => d.low);
+      while (nextIdx < duanCount) {
+        const curr = duans[nextIdx];
+        const isTrendDir =
+          (isUp && curr.trend === TrendDirection.Up) ||
+          (!isUp && curr.trend === TrendDirection.Down);
+        const hasBrokenOut =
+          isTrendDir && (isUp ? curr.high > curZg : curr.low < curZd);
 
-        if (
-          allHighMinMax &&
-          allLowMinMax &&
-          allHighMinMax.min > allLowMinMax.max
-        ) {
-          channelDuans.push(duans[nextIdx], duans[nextIdx + 1]);
-          curZg = allHighMinMax.min;
-          curZd = allLowMinMax.max;
-          curGg = allHighMinMax.max;
-          curDd = allLowMinMax.min;
-          nextIdx += 2;
-
+        if (hasBrokenOut) {
+          // 假定离开段顺势突破吸纳入中枢
+          channelDuans.push(curr);
+          curGg = Math.max(curGg, curr.high);
+          curDd = Math.min(curDd, curr.low);
+          nextIdx++;
           if (channelDuans.length >= 9) {
             isExpanded = true;
           }
-          continue;
-        } else {
+          // 出现突破离开段，后续折返为 3买/3s 试探（作为新结构开启），中枢在此确认闭合
           break;
         }
-      }
 
-      // 处理末尾仅剩的单段（数据序列最后一段）
-      if (nextIdx === duanCount - 1) {
-        const single = duans[nextIdx];
-        if (single.high >= curZd && single.low <= curZg) {
-          const newZg = Math.min(curZg, single.high);
-          const newZd = Math.max(curZd, single.low);
-          if (newZg > newZd) {
-            channelDuans.push(single);
-            curZg = newZg;
-            curZd = newZd;
-            curGg = Math.max(curGg, single.high);
-            curDd = Math.min(curDd, single.low);
-            nextIdx++;
+        // curr 为内部震荡段，需与下一段配对 (curr, nextDuan) 检验延伸
+        if (nextIdx + 1 < duanCount) {
+          const nextDuan = duans[nextIdx + 1];
+          const nextIsTrendDir =
+            (isUp && nextDuan.trend === TrendDirection.Up) ||
+            (!isUp && nextDuan.trend === TrendDirection.Down);
+          const nextBrokenOut =
+            nextIsTrendDir &&
+            (isUp ? nextDuan.high > curZg : nextDuan.low < curZd);
+
+          if (nextBrokenOut) {
+            // curr 为内部回拉段，nextDuan 为顺势突破离开段
+            channelDuans.push(curr, nextDuan);
+            // 内部段动态更新中枢区间
+            curZg = Math.min(curZg, curr.high);
+            curZd = Math.max(curZd, curr.low);
+            curGg = Math.max(curGg, curr.high, nextDuan.high);
+            curDd = Math.min(curDd, curr.low, nextDuan.low);
+            nextIdx += 2;
             if (channelDuans.length >= 9) {
               isExpanded = true;
             }
+            break;
           }
+
+          // 两段均为内部震荡：检验动态公共交集
+          const testWindow = [...channelDuans, curr, nextDuan];
+          const allHighMinMax = minMaxBy(testWindow, (d) => d.high);
+          const allLowMinMax = minMaxBy(testWindow, (d) => d.low);
+
+          if (
+            allHighMinMax &&
+            allLowMinMax &&
+            allHighMinMax.min > allLowMinMax.max
+          ) {
+            channelDuans.push(curr, nextDuan);
+            curZg = allHighMinMax.min;
+            curZd = allLowMinMax.max;
+            curGg = allHighMinMax.max;
+            curDd = allLowMinMax.min;
+            nextIdx += 2;
+
+            if (channelDuans.length >= 9) {
+              isExpanded = true;
+            }
+            continue;
+          } else {
+            break;
+          }
+        } else {
+          // 处理末尾仅剩的单段（数据序列最后一段）
+          if (curr.high >= curZd && curr.low <= curZg) {
+            const newZg = Math.min(curZg, curr.high);
+            const newZd = Math.max(curZd, curr.low);
+            if (newZg > newZd) {
+              channelDuans.push(curr);
+              curZg = newZg;
+              curZd = newZd;
+              curGg = Math.max(curGg, curr.high);
+              curDd = Math.min(curDd, curr.low);
+              nextIdx++;
+              if (channelDuans.length >= 9) {
+                isExpanded = true;
+              }
+            }
+          }
+          break;
         }
       }
 
@@ -138,7 +183,8 @@ export class DuanChannelCalculator {
       );
       sequential.push(sealedChannel);
 
-      cursor = Math.max(cursor + 1, nextIdx);
+      // 指针后移至离开段（末段），使离开段作为下一个走势结构的起点
+      cursor = cursor + channelDuans.length - 1;
     }
 
     return { phaseA, sequential };
