@@ -136,6 +136,41 @@ describe('DuanChannelCalculator (段级中枢，对称重叠无方向)', () => {
     expect(second).toEqual(first);
     expect(duans.map((d) => d.high)).toEqual([10, 8, 9, 7, 8]);
   });
+
+  it('confirms departure segment on trend breakout and isolates subsequent 3-buy/3-sell into new structure', () => {
+    // 模拟 1月22日 5M 形态：
+    // d0..d2 形成基础中枢
+    // d3 为内部回拉段，d4 为顺势突破离开段（high 4160.99 > zg 4128.93）
+    // d5 为 3买试探回抽跌回中枢（3买转2卖），d6/d7 为后续二卖冲高与破位
+    const duans: ChanDuan[] = [
+      makeDuan('up', 4140.23, 4096.85, 0),
+      makeDuan('down', 4140.23, 4090.06, 1),
+      makeDuan('up', 4128.93, 4090.06, 2),
+      makeDuan('down', 4128.93, 4109.92, 3),
+      makeDuan('up', 4160.99, 4109.92, 4),
+      makeDuan('down', 4160.99, 4101.83, 5),
+      makeDuan('up', 4170.21, 4101.83, 6),
+      makeDuan('down', 4170.21, 4002.78, 7),
+    ];
+
+    const calc = new DuanChannelCalculator();
+    const result = calc.createDuanChannels(duans);
+
+    // 中枢 0 应包含 [d0..d4]，离开段为 d4，GG 必须等于离开段的高点 4160.99，杜绝 departure < GG 的倒挂
+    expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
+    const firstChannel = result.phaseB[0];
+    expect(firstChannel.duans).toHaveLength(5);
+    expect(firstChannel.gg).toBe(4160.99);
+    expect(firstChannel.zd).toBe(4109.92); // 内部段 d3 动态收敛中枢底
+    expect(firstChannel.zg).toBe(4128.93);
+
+    // 后续段（从 d4 起算）作为独立新结构推演，二卖高点 4170.21 不会反向污染中枢 0 的 GG
+    if (result.phaseB.length > 1) {
+      const secondChannel = result.phaseB[1];
+      expect(secondChannel.gg).toBe(4170.21);
+      expect(secondChannel.dd).toBe(4002.78);
+    }
+  });
 });
 
 /** 构造最小 ChanDuan（段级中枢只读 startTime/endTime/high/low/trend/originIds）。 */
