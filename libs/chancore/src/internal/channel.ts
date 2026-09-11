@@ -262,13 +262,16 @@ export class ChannelCalculator {
           const hasBrokenOut = isUp ? curr.high > curZg : curr.low < curZd;
 
           if (hasBrokenOut) {
-            // 顺势离开笔吸纳入中枢
+            // 假定离开笔顺势突破吸纳入中枢
             channelBis.push(curr);
+            curGg = Math.max(curGg, curr.high);
+            curDd = Math.min(curDd, curr.low);
             nextIdx++;
             if (channelBis.length >= 9) {
               isExpanded = true;
             }
-            continue;
+            // 出现突破离开笔，后续折返为 3买/3s 试探（作为新结构开启），中枢在此确认闭合
+            break;
           }
 
           // 未突破中枢区间：此笔为中枢内部震荡笔（延伸半环）
@@ -285,6 +288,9 @@ export class ChannelCalculator {
                 curGg = Math.max(curGg, curr.high);
                 curDd = Math.min(curDd, curr.low);
                 nextIdx++;
+                if (channelBis.length >= 9) {
+                  isExpanded = true;
+                }
               }
             }
             break;
@@ -326,49 +332,7 @@ export class ChannelCalculator {
             break;
           }
         } else {
-          // 当 channelBis.length 为奇数时（5, 7, 9...已包含顺势离开笔）
-          // 检查后续是否有回抽笔对 (p1, p2) 再次落入中枢维持公共重叠
-          if (nextIdx + 1 >= biCount) {
-            break;
-          }
-
-          const p1 = data[nextIdx];
-          const p2 = data[nextIdx + 1];
-
-          if (p1.trend === data[nextIdx - 1].trend || p2.trend === p1.trend) {
-            break;
-          }
-
-          // 极值破坏守卫
-          if (isUp && (p1.low < curDd || p2.low < curDd)) {
-            break;
-          }
-          if (!isUp && (p1.high > curGg || p2.high > curGg)) {
-            break;
-          }
-
-          const testWindow = [...channelBis, p1, p2];
-          const allHighMinMax = minMaxBy(testWindow, (b) => b.high);
-          const allLowMinMax = minMaxBy(testWindow, (b) => b.low);
-
-          if (
-            allHighMinMax &&
-            allLowMinMax &&
-            allHighMinMax.min > allLowMinMax.max
-          ) {
-            channelBis.push(p1, p2);
-            curZg = allHighMinMax.min;
-            curZd = allLowMinMax.max;
-            curGg = Math.max(curGg, p1.high, p2.high);
-            curDd = Math.min(curDd, p1.low, p2.low);
-            nextIdx += 2;
-            if (channelBis.length >= 9) {
-              isExpanded = true;
-            }
-            continue;
-          } else {
-            break;
-          }
+          break;
         }
       }
 

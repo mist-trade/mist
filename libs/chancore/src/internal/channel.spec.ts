@@ -56,6 +56,47 @@ function makeInvalidBi(trendIdx: number, base: number, range = 10): ChanBi {
   return { ...makeBi(trendIdx, base, range), status: BiStatus.Invalid };
 }
 
+function makeBiDirect(
+  trendIdx: number,
+  trend: TrendDirection,
+  low: number,
+  high: number,
+): ChanBi {
+  const isUp = trend === TrendDirection.Up;
+  return {
+    startTime: new Date(2024, 0, trendIdx + 1),
+    endTime: new Date(2024, 0, trendIdx + 2),
+    high,
+    low,
+    trend,
+    type: BiType.Complete,
+    status: BiStatus.Valid,
+    independentCount: 5,
+    originIds: [trendIdx * 2, trendIdx * 2 + 1],
+    originData: [],
+    startFenxing: {
+      type: isUp ? FenxingType.Bottom : FenxingType.Top,
+      high,
+      low,
+      leftIds: [trendIdx * 2 - 1],
+      middleIds: [trendIdx * 2],
+      rightIds: [trendIdx * 2 + 1],
+      middleIndex: trendIdx,
+      middleOriginId: trendIdx * 2,
+    },
+    endFenxing: {
+      type: isUp ? FenxingType.Top : FenxingType.Bottom,
+      high,
+      low,
+      leftIds: [trendIdx * 2],
+      middleIds: [trendIdx * 2 + 1],
+      rightIds: [trendIdx * 2 + 2],
+      middleIndex: trendIdx + 1,
+      middleOriginId: trendIdx * 2 + 1,
+    },
+  } as ChanBi;
+}
+
 describe('ChannelCalculator', () => {
   let service: ChannelCalculator;
 
@@ -189,16 +230,23 @@ describe('ChannelCalculator', () => {
 
   describe('Sequential confirmation lifecycle and touch extension', () => {
     it('extends a base channel by pairs of touching bis and updates to dynamic common intersection (zg/zd)', () => {
-      const valid = [100, 101, 102, 103, 104, 105, 106].map((base, index) =>
-        makeBi(index, base, 20),
-      );
-      const result = service.createChannels(valid);
+      // 构造在基础中枢区间 [104, 118] 内部震荡的笔序列，不触发顺势突破离开
+      const bis: ChanBi[] = [
+        makeBiDirect(0, TrendDirection.Up, 100, 120), // b0 向上进入
+        makeBiDirect(1, TrendDirection.Down, 102, 120), // b1
+        makeBiDirect(2, TrendDirection.Up, 102, 118), // b2
+        makeBiDirect(3, TrendDirection.Down, 104, 118), // b3 (zg=118, zd=104)
+        makeBiDirect(4, TrendDirection.Up, 105, 118), // b4 (high 118 <= zg 118，内部震荡)
+        makeBiDirect(5, TrendDirection.Down, 105, 117), // b5
+        makeBiDirect(6, TrendDirection.Up, 106, 117), // b6 (high 117 <= zg 118)
+      ];
+      const result = service.createChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const channel = result.phaseB[0];
       expect(channel.bis.length).toBeGreaterThanOrEqual(7);
-      expect(channel.zg).toBe(120);
+      expect(channel.zg).toBe(117);
       expect(channel.zd).toBe(106);
-      expect(channel.gg).toBe(126);
+      expect(channel.gg).toBe(120);
       expect(channel.dd).toBe(100);
       expect(channel.zg).toBeGreaterThan(channel.zd);
     });
@@ -239,15 +287,48 @@ describe('ChannelCalculator', () => {
     });
 
     it('enlarges channel to expanded when accumulation reaches 9 bis', () => {
-      const nineBis = [100, 101, 102, 103, 104, 105, 106, 107, 108].map(
-        (base, index) => makeBi(index, base, 20),
-      );
+      const nineBis: ChanBi[] = [
+        makeBiDirect(0, TrendDirection.Up, 100, 120),
+        makeBiDirect(1, TrendDirection.Down, 102, 120),
+        makeBiDirect(2, TrendDirection.Up, 102, 118),
+        makeBiDirect(3, TrendDirection.Down, 104, 118),
+        makeBiDirect(4, TrendDirection.Up, 105, 118),
+        makeBiDirect(5, TrendDirection.Down, 105, 117),
+        makeBiDirect(6, TrendDirection.Up, 106, 117),
+        makeBiDirect(7, TrendDirection.Down, 106, 116),
+        makeBiDirect(8, TrendDirection.Up, 107, 116),
+      ];
 
       const result = service.createChannels(nineBis);
 
       expect(result.phaseB).toHaveLength(1);
       expect(result.phaseB[0].bis.length).toBeGreaterThanOrEqual(9);
       expect(result.phaseB[0].expanded).toBe(true);
+    });
+
+    it('confirms departure bi on trend breakout and isolates subsequent 3-buy/3-sell into new structure', () => {
+      // 模拟 1月22日 5M 笔中枢形态：
+      // b0..b3 形成基础中枢 [4118.82, 4134.71]
+      // b4 为顺势突破离开笔（high 4140.84 > zg 4134.71）
+      // b5 为 3买试探回抽跌回中枢（3买转2卖），b6/b7 为后续二卖冲高与破位
+      const bis: ChanBi[] = [
+        makeBiDirect(0, TrendDirection.Up, 4100.36, 4135.96),
+        makeBiDirect(1, TrendDirection.Down, 4118.82, 4135.96),
+        makeBiDirect(2, TrendDirection.Up, 4118.82, 4134.71),
+        makeBiDirect(3, TrendDirection.Down, 4110.45, 4134.71),
+        makeBiDirect(4, TrendDirection.Up, 4110.45, 4140.84),
+        makeBiDirect(5, TrendDirection.Down, 4112.86, 4140.84),
+        makeBiDirect(6, TrendDirection.Up, 4112.86, 4127.82),
+        makeBiDirect(7, TrendDirection.Down, 4109.92, 4127.82),
+      ];
+
+      const result = service.createChannels(bis);
+      expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
+      const c0 = result.phaseB[0];
+      expect(c0.bis).toHaveLength(5);
+      expect(c0.gg).toBe(4140.84);
+      expect(c0.zg).toBe(4134.71);
+      expect(c0.zd).toBe(4118.82);
     });
   });
 });

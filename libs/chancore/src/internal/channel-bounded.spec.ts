@@ -601,25 +601,34 @@ describe('ChannelCalculator.getAdjacentBoundedChannels', () => {
     ];
 
     const result = ChanCore.createAdjacentBoundedChannels(subBis, macroBis);
-    expect(result.phaseB).toHaveLength(2);
+    expect(result.phaseB).toHaveLength(3);
 
-    const [c0, c1] = result.phaseB;
+    const [c0, c1, c2] = result.phaseB;
 
-    // Central 0 (starts 03-23, departure stroke is Bi 31 ending on 04-08)
+    // Central 0 (starts with Bi 23 at 03-23, departure stroke is Bi 27 ending on 03-31)
     expect(c0.zg).toBe(3924.11);
-    expect(c0.zd).toBe(3891.86);
-    expect(c0.bis).toHaveLength(9);
+    expect(c0.zd).toBe(3872.78);
+    expect(c0.bis).toHaveLength(5);
     expect(c0.bis[0].startTime.toISOString()).toBe('2026-03-23T07:00:00.000Z');
-    expect(c0.bis[c0.bis.length - 1].startTime.toISOString()).toBe(
-      '2026-04-03T05:30:00.000Z',
+    expect(c0.bis[c0.bis.length - 1].endTime.toISOString()).toBe(
+      '2026-03-31T02:00:00.000Z',
     );
 
-    // Central 1 (starts with Bi 31 at 2026-04-03 13:30, ending with Bi 35 on 04-15)
-    expect(c1.zg).toBe(3995.0);
-    expect(c1.zd).toBe(3966.2);
+    // Central 1 (starts with departure stroke of c0: Bi 27, ending with departure stroke Bi 31 on 04-08)
+    expect(c1.zg).toBe(3948.81);
+    expect(c1.zd).toBe(3891.86);
     expect(c1.bis).toHaveLength(5);
-    expect(c1.bis[0].startTime.toISOString()).toBe('2026-04-03T05:30:00.000Z');
+    expect(c1.bis[0].startTime.toISOString()).toBe('2026-03-30T02:00:00.000Z');
     expect(c1.bis[c1.bis.length - 1].endTime.toISOString()).toBe(
+      '2026-04-08T07:00:00.000Z',
+    );
+
+    // Central 2 (starts with departure stroke of c1: Bi 31, ending with departure stroke Bi 35 on 04-15)
+    expect(c2.zg).toBe(3995.0);
+    expect(c2.zd).toBe(3966.2);
+    expect(c2.bis).toHaveLength(5);
+    expect(c2.bis[0].startTime.toISOString()).toBe('2026-04-03T05:30:00.000Z');
+    expect(c2.bis[c2.bis.length - 1].endTime.toISOString()).toBe(
       '2026-04-15T02:30:00.000Z',
     );
   });
