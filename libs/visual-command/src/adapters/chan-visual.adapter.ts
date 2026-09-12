@@ -1,6 +1,7 @@
 import {
   BiStatus,
   ChanCore,
+  ChannelType,
   DuanStatus,
   ChanBspType,
   TrendDirection,
@@ -119,6 +120,7 @@ export class ChanVisualAdapter {
       biChannels.phaseB.forEach((zs, i) => {
         // 防御：中枢构成单元须全部确认且有效（chancore 已保证；防旧版本/外部数据）
         // 中枢真实区间：从启动笔终点（第1根构件笔起点）到离开笔起点（最后一根构件笔终点）
+        const isUncomplete = zs.type === ChannelType.UnComplete;
         const centralStartBi = zs.bis.length >= 2 ? zs.bis[1] : zs.bis[0];
         const centralExitBi = zs.bis[zs.bis.length - 1];
         if (!centralStartBi || !centralExitBi) return;
@@ -127,11 +129,21 @@ export class ChanVisualAdapter {
           centralStartBi.startTime,
           centralStartBi.originIds[0],
         );
-        const toIdx = getKIndex(
-          centralExitBi.startTime,
-          centralExitBi.originIds[0],
-        );
-        if (fromIdx === null || toIdx === null || toIdx <= fromIdx) return;
+        let toIdx: number | null;
+        let toTime: string;
+
+        if (isUncomplete) {
+          toIdx = klines.length - 1;
+          toTime = new Date(klines[klines.length - 1].time).toISOString();
+        } else {
+          toIdx = getKIndex(
+            centralExitBi.startTime,
+            centralExitBi.originIds[0],
+          );
+          toTime = new Date(centralExitBi.startTime).toISOString();
+        }
+
+        if (fromIdx === null || toIdx === null || toIdx < fromIdx) return;
 
         const bandCmd: BandVisualCommand = {
           id: `chan_zs_bi_${i}_${fromIdx}_${toIdx}`,
@@ -140,13 +152,15 @@ export class ChanVisualAdapter {
           fromIndex: fromIdx,
           toIndex: toIdx,
           fromTime: new Date(centralStartBi.startTime).toISOString(),
-          toTime: new Date(centralExitBi.startTime).toISOString(),
+          toTime,
           top: zs.zg,
           bottom: zs.zd,
           gg: zs.gg,
           dd: zs.dd,
           color: zhongshuBiColor,
           fill: true,
+          style: isUncomplete ? 'dashed' : 'solid',
+          status: isUncomplete ? 'uncomplete' : 'complete',
         };
         commands.push(bandCmd);
       });
@@ -213,9 +227,20 @@ export class ChanVisualAdapter {
         const last = zs.duans[zs.duans.length - 1];
         if (!first || !last) return;
 
+        const isUncomplete = zs.type === ChannelType.UnComplete;
         const fromIdx = getKIndex(first.startTime, zs.startId);
-        const toIdx = getKIndex(last.endTime, zs.endId);
-        if (fromIdx === null || toIdx === null) return;
+        let toIdx: number | null;
+        let toTime: string;
+
+        if (isUncomplete) {
+          toIdx = klines.length - 1;
+          toTime = new Date(klines[klines.length - 1].time).toISOString();
+        } else {
+          toIdx = getKIndex(last.endTime, zs.endId);
+          toTime = new Date(last.endTime).toISOString();
+        }
+
+        if (fromIdx === null || toIdx === null || toIdx < fromIdx) return;
 
         const bandCmd: BandVisualCommand = {
           id: `chan_zs_duan_${i}_${fromIdx}_${toIdx}`,
@@ -224,13 +249,15 @@ export class ChanVisualAdapter {
           fromIndex: fromIdx,
           toIndex: toIdx,
           fromTime: new Date(first.startTime).toISOString(),
-          toTime: new Date(last.endTime).toISOString(),
+          toTime,
           top: zs.zg,
           bottom: zs.zd,
           gg: zs.gg,
           dd: zs.dd,
           color: zhongshuDuanColor,
           fill: true,
+          style: isUncomplete ? 'dashed' : 'solid',
+          status: isUncomplete ? 'uncomplete' : 'complete',
         };
         commands.push(bandCmd);
       });

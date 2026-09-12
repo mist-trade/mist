@@ -330,5 +330,76 @@ describe('ChannelCalculator', () => {
       expect(c0.zg).toBe(4134.71);
       expect(c0.zd).toBe(4118.82);
     });
+
+    it('5M 实盘经典用例一：01-07~01-13 第 1 号中枢避免 b[10] 假突破过早封存，消除 0.86 微型中枢并封存于 9 笔健康中枢', () => {
+      // 真实 5M 走势：b[6] 虽高于 ZG(4088.01) 但未突破历史极值 GG(4098.78)，属于中枢内震荡
+      // b[8] 真正突破 GG(4098.78) 到达 4121.70
+      // b[9] 回踩 4093.01 站稳 ZG 之上确立 3B
+      // b[10] 冲高 4179.70 突破 4121.70 触发规则 1 封存
+      const bis: ChanBi[] = [
+        makeBiDirect(0, TrendDirection.Up, 4056.87, 4093.3),
+        makeBiDirect(1, TrendDirection.Down, 4075.7, 4093.3),
+        makeBiDirect(2, TrendDirection.Up, 4075.7, 4098.78),
+        makeBiDirect(3, TrendDirection.Down, 4069.44, 4098.78),
+        makeBiDirect(4, TrendDirection.Up, 4069.44, 4088.01),
+        makeBiDirect(5, TrendDirection.Down, 4072.39, 4088.01),
+        makeBiDirect(6, TrendDirection.Up, 4072.39, 4093.87), // 对应真实的 b[10]，未突破 GG 4098.78
+        makeBiDirect(7, TrendDirection.Down, 4067.12, 4093.87),
+        makeBiDirect(8, TrendDirection.Up, 4067.12, 4121.7), // 对应真实的 b[12]，突破 GG
+        makeBiDirect(9, TrendDirection.Down, 4093.01, 4121.7), // 对应真实的 b[13]，形成 3B
+        makeBiDirect(10, TrendDirection.Up, 4093.01, 4179.7), // 对应真实的 b[14]，突破 4121.70 触发规则 1
+      ];
+
+      const result = service.createChannels(bis);
+      expect(result.phaseB).toHaveLength(1);
+      const c = result.phaseB[0];
+      // 必须包含完整 9 笔，杜绝在 b[6](4093.87) 处过早封闭产生 0.86 微型中枢
+      expect(c.bis).toHaveLength(9);
+      expect(c.zg).toBe(4088.01);
+      expect(c.zd).toBe(4075.7);
+      expect(c.gg).toBe(4121.7);
+      expect(c.dd).toBe(4056.87);
+    });
+
+    it('5M 实盘经典用例二：01-21~01-26 1月22日中枢与后续高台阶中枢拆分，避免 11 笔贪婪吞噬与 departure < GG 倒挂', () => {
+      // 真实 5M 走势：
+      // b0..b3 形成 1月22日核心 [4112.86, 4127.82]
+      // 随后 b4(4139.95), b5(4120.20), b6(4143.75)
+      // 在 b6(4143.75) 处，后续走势自身已构成独立新中枢核心，触发规则 4 封存
+      // 杜绝 1月22日中枢无限吸附后续上涨至 4160.99 及二卖 4145.97，杜绝 departure(4145.97) < GG(4160.99) 的倒挂
+      const bis: ChanBi[] = [
+        makeBiDirect(0, TrendDirection.Up, 4110.45, 4140.84),
+        makeBiDirect(1, TrendDirection.Down, 4112.86, 4140.84),
+        makeBiDirect(2, TrendDirection.Up, 4112.86, 4127.82),
+        makeBiDirect(3, TrendDirection.Down, 4109.92, 4127.82),
+        makeBiDirect(4, TrendDirection.Up, 4109.92, 4139.95),
+        makeBiDirect(5, TrendDirection.Down, 4120.2, 4139.95),
+        makeBiDirect(6, TrendDirection.Up, 4120.2, 4143.75),
+        makeBiDirect(7, TrendDirection.Down, 4120.63, 4143.75),
+        makeBiDirect(8, TrendDirection.Up, 4120.63, 4160.99),
+        makeBiDirect(9, TrendDirection.Down, 4124.7, 4160.99),
+        makeBiDirect(10, TrendDirection.Up, 4124.7, 4145.97),
+        makeBiDirect(11, TrendDirection.Down, 4101.83, 4145.97),
+        makeBiDirect(12, TrendDirection.Up, 4101.83, 4158.8),
+        makeBiDirect(13, TrendDirection.Down, 4135.11, 4158.8),
+        makeBiDirect(14, TrendDirection.Up, 4135.11, 4161.8),
+        makeBiDirect(15, TrendDirection.Down, 4139.15, 4161.8),
+        makeBiDirect(16, TrendDirection.Up, 4139.15, 4170.15),
+      ];
+
+      const result = service.createChannels(bis);
+      expect(result.phaseB.length).toBeGreaterThanOrEqual(2);
+      const c1 = result.phaseB[0];
+      // 1月22日中枢在 b6(4143.75) 处顺利封存（7 笔），离开点高度 4143.75 严格等于其 GG 4143.75
+      expect(c1.bis).toHaveLength(7);
+      expect(c1.gg).toBe(4143.75);
+      expect(c1.zd).toBe(4120.2);
+      expect(c1.zg).toBe(4127.82);
+
+      const c2 = result.phaseB[1];
+      // 后续独立形成高台阶中枢，超越 4160.99 成为新中枢的高点，层次分明
+      expect(c2.gg).toBeGreaterThanOrEqual(4160.99);
+      expect(c2.zg).toBeGreaterThanOrEqual(4135);
+    });
   });
 });

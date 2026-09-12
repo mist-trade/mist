@@ -31,6 +31,8 @@ export interface BandVisualCommand extends BaseVisualCommand {
   readonly fill?: boolean;
   readonly gg?: number;
   readonly dd?: number;
+  readonly style?: 'solid' | 'dashed' | 'dotted';
+  readonly status?: 'complete' | 'uncomplete';
 }
 
 export interface TextVisualCommand extends BaseVisualCommand {
