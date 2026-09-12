@@ -31,12 +31,16 @@ import {
 export class DuanChannelCalculator {
   createDuanChannels(
     duans: readonly ChanDuan[],
+    options?: { allowUncomplete?: boolean },
   ): ChanDuanChannelTwoPhaseResult {
     // 仅确认且有效的段构成中枢（status !== Valid 的未确认尾段不参与：
     // 18 课"次级别前三个走势类型都是完成的才构成中枢"；统一 status 判据，
     // 现时 status=Unknown ⇔ endBi===null；数据层 createDuan 输出不变）。
     const confirmed = duans.filter((d) => d.status === DuanStatus.Valid);
-    const { phaseA, sequential } = this.sequentiallyConfirmChannels(confirmed);
+    const { phaseA, sequential } = this.sequentiallyConfirmChannels(
+      confirmed,
+      options,
+    );
 
     // Phase B：直接采用顺序生命周期确认的段中枢序列
     const phaseB = sequential;
@@ -46,13 +50,17 @@ export class DuanChannelCalculator {
   /**
    * 顺序确认扫描与生命周期状态机推进（委托至通用的 ChannelLifecycleEngine）
    */
-  private sequentiallyConfirmChannels(duans: readonly ChanDuan[]): {
+  private sequentiallyConfirmChannels(
+    duans: readonly ChanDuan[],
+    options?: { allowUncomplete?: boolean },
+  ): {
     phaseA: ChanDuanChannel[];
     sequential: ChanDuanChannel[];
   } {
     const strategy: ChannelLifecycleStrategy<ChanDuan, ChanDuanChannel> = {
       minCoreLength: 3,
       minSealedLength: 3,
+      allowUncomplete: options?.allowUncomplete,
       validateCore: (window) => {
         const geo = computeSymmetricGeometry(window);
         if (!geo) return null;

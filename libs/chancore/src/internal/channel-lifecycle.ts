@@ -99,6 +99,8 @@ export interface ChannelLifecycleStrategy<T extends ChannelElement, R> {
   readonly minCoreLength: number;
   /** 确认完成中枢的最小元素数门槛（笔中枢 >= 5；段中枢 >= 3） */
   readonly minSealedLength: number;
+  /** 是否允许末端未完成中枢（若为 false，则为历史走势切片，绝不产生 UnComplete 中枢） */
+  readonly allowUncomplete?: boolean;
   /** 验证初始核心的几何与进入约束，返回核心几何参数与基准趋势方向 */
   validateCore(
     window: readonly T[],
@@ -388,8 +390,9 @@ export class ChannelLifecycleEngine {
       }
 
       // 3. 门槛校验与结果记录
-      // 若达成顺势离开封存、满 9 元素扩展，或处于历史走势中且元素数达到封存门槛，中枢完结
-      const isAtDataEnd = nextIdx >= count || count - nextIdx <= 2;
+      const allowUncomplete = strategy.allowUncomplete ?? true;
+      const isAtDataEnd =
+        allowUncomplete && (nextIdx >= count || count - nextIdx <= 2);
       const isComplete =
         hasSealedDeparture ||
         isExpanded ||
