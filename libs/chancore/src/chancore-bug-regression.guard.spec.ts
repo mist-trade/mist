@@ -101,6 +101,16 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
       '【未完成中枢】末端未离开中枢赋予 UnComplete 标识并实时参与三类买卖点计算',
     ],
   },
+  {
+    id: 'BUG-CHAN-008',
+    name: '大笔切片拐点顺势终笔对齐与历史切片末端未完成中枢误标修复',
+    rootCause:
+      '向下大笔在极值底点因时间邻近误吸入后续反弹向上笔截断切片，导致中枢吞入反向笔变形且下一切片首笔丢失；同时历史切片因到达切片末端误触发 isAtDataEnd 标记为 UnComplete 虚线中枢并贯穿全局。',
+    specFile: 'internal/channel-bounded.spec.ts',
+    testCasePatterns: [
+      '【BUG-CHAN-008】向下大笔切片顺势极值终笔对齐与历史中枢完整闭合',
+    ],
+  },
 ];
 
 describe('缠论核心算法缺陷回归与测试集合门禁 (ChanCore Bug Fix Regression Guard)', () => {

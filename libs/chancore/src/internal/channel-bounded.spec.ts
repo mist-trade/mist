@@ -2,6 +2,7 @@ import {
   BiStatus,
   BiType,
   ChanCore,
+  ChannelType,
   TrendDirection,
   type ChanBi,
 } from '../index';
@@ -812,5 +813,144 @@ describe('ChannelCalculator.getAdjacentBoundedChannels', () => {
         new Date('2026-06-17T05:45:00Z').getTime(),
       );
     }
+  });
+
+  it('【BUG-CHAN-008】向下大笔切片顺势极值终笔对齐与历史中枢完整闭合', () => {
+    // 真实 5m 真实行情 (000001) 2026-01-14 ~ 2026-01-16 走势：
+    // Macro Bi #1: Down 4190.87 -> 4096.85 (01-14 03:30 ~ 01-15 05:30)
+    // Macro Bi #2: Up 4096.85 -> 4140.23 (01-15 05:30 ~ 01-16 02:00)
+    const macroBis = [
+      makeMockBi(
+        TrendDirection.Down,
+        4096.85,
+        4190.87,
+        '2026-01-14T03:30:00Z',
+        '2026-01-15T05:30:00Z',
+      ),
+      makeMockBi(
+        TrendDirection.Up,
+        4096.85,
+        4140.23,
+        '2026-01-15T05:30:00Z',
+        '2026-01-16T02:00:00Z',
+      ),
+    ];
+
+    const subBis = [
+      // Sub [21]: down 4103.62 -> 4190.87 (03:25 ~ 06:05) -> Entry bi
+      makeMockBi(
+        TrendDirection.Down,
+        4103.62,
+        4190.87,
+        '2026-01-14T03:25:00Z',
+        '2026-01-14T06:05:00Z',
+        358,
+        372,
+      ),
+      // Sub [22]: up 4103.62 -> 4138.55 (06:05 ~ 06:35) -> Core bi 1
+      makeMockBi(
+        TrendDirection.Up,
+        4103.62,
+        4138.55,
+        '2026-01-14T06:05:00Z',
+        '2026-01-14T06:35:00Z',
+        372,
+        378,
+      ),
+      // Sub [23]: down 4104.42 -> 4138.55 (06:35 ~ 01:35) -> Core bi 2
+      makeMockBi(
+        TrendDirection.Down,
+        4104.42,
+        4138.55,
+        '2026-01-14T06:35:00Z',
+        '2026-01-15T01:35:00Z',
+        378,
+        384,
+      ),
+      // Sub [24]: up 4104.42 -> 4133.07 (01:35 ~ 02:00) -> Core bi 3
+      makeMockBi(
+        TrendDirection.Up,
+        4104.42,
+        4133.07,
+        '2026-01-15T01:35:00Z',
+        '2026-01-15T02:00:00Z',
+        384,
+        389,
+      ),
+      // Sub [25]: down 4096.85 -> 4133.07 (02:00 ~ 05:05) -> Departure bi (reaches macro trough 4096.85)
+      makeMockBi(
+        TrendDirection.Down,
+        4096.85,
+        4133.07,
+        '2026-01-15T02:00:00Z',
+        '2026-01-15T05:05:00Z',
+        389,
+        408,
+      ),
+      // Sub [26]: up 4096.85 -> 4116.70 (05:05 ~ 05:50) -> Bounce bi in next macro move
+      makeMockBi(
+        TrendDirection.Up,
+        4096.85,
+        4116.7,
+        '2026-01-15T05:05:00Z',
+        '2026-01-15T05:50:00Z',
+        408,
+        417,
+      ),
+      // Sub [27]: down 4098.20 -> 4116.70 (05:50 ~ 06:15)
+      makeMockBi(
+        TrendDirection.Down,
+        4098.2,
+        4116.7,
+        '2026-01-15T05:50:00Z',
+        '2026-01-15T06:15:00Z',
+        417,
+        422,
+      ),
+      // Sub [28]: up 4098.20 -> 4140.23 (06:15 ~ 01:40)
+      makeMockBi(
+        TrendDirection.Up,
+        4098.2,
+        4140.23,
+        '2026-01-15T06:15:00Z',
+        '2026-01-16T01:40:00Z',
+        422,
+        433,
+      ),
+      // Sub [29]: down 4100.65 -> 4140.23 (01:40 ~ 02:15)
+      makeMockBi(
+        TrendDirection.Down,
+        4100.65,
+        4140.23,
+        '2026-01-16T01:40:00Z',
+        '2026-01-16T02:15:00Z',
+        433,
+        440,
+      ),
+    ];
+
+    const result = ChanCore.createAdjacentBoundedChannels(subBis, macroBis);
+
+    // 1. 验证第 1 个中枢在向下大笔切片内正常密封完成 (Complete)，绝非 UnComplete 虚线中枢
+    expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
+    const central1 = result.phaseB[0];
+    expect(central1.type).toBe(ChannelType.Complete);
+    expect(central1.expanded).toBe(false);
+    expect(central1.bis).toHaveLength(5);
+    expect(central1.zd).toBeCloseTo(4104.42, 2);
+    expect(central1.zg).toBeCloseTo(4133.07, 2);
+    expect(central1.dd).toBeCloseTo(4096.85, 2);
+    expect(central1.gg).toBeCloseTo(4190.87, 2);
+
+    // 2. 验证中枢终点时间停在离开笔 05:05，绝未错误吞入 05:50 的反弹笔
+    expect(central1.bis[central1.bis.length - 1].endTime.toISOString()).toBe(
+      '2026-01-15T05:05:00.000Z',
+    );
+
+    // 3. 验证历史切片中枢绝不产生 UnComplete 标识
+    const uncompletedCentrals = result.phaseB.filter(
+      (c) => c.type === ChannelType.UnComplete,
+    );
+    expect(uncompletedCentrals).toHaveLength(0);
   });
 });

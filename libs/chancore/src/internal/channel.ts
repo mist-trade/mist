@@ -31,13 +31,19 @@ export class ChannelCalculator {
    * @param data Phase B 笔序列
    * @returns 两阶段中枢结果 { phaseA, phaseB }
    */
-  createChannels(data: readonly ChanBi[]): ChanChannelTwoPhaseResult {
+  createChannels(
+    data: readonly ChanBi[],
+    options?: { allowUncomplete?: boolean },
+  ): ChanChannelTwoPhaseResult {
     // 仅确认且有效的笔构成中枢（status !== Valid 的 Invalid/Unknown 单元不参与：
     // 18 课"次级别前三个走势类型都是完成的才构成中枢"；统一 status 判据，
     // 数据层 createBi 输出不变）。
     const confirmed = data.filter((b) => b.status === BiStatus.Valid);
 
-    const { phaseA, sequential } = this.sequentiallyConfirmChannels(confirmed);
+    const { phaseA, sequential } = this.sequentiallyConfirmChannels(
+      confirmed,
+      options,
+    );
 
     // Phase B：直接采用顺序生命周期确认的中枢序列（保留独立性，避免贪婪级联吞并）
     const phaseB = sequential;
@@ -71,12 +77,16 @@ export class ChannelCalculator {
 
     const slices = this.partitionSubBisForMacroBis(validMacroBis, subBis);
 
-    for (const slice of slices) {
+    for (let sliceIdx = 0; sliceIdx < slices.length; sliceIdx++) {
+      const slice = slices[sliceIdx];
       if (slice.length < 5) {
         continue;
       }
 
-      const sliceResult = this.createChannels(slice);
+      const isLastSlice = sliceIdx === slices.length - 1;
+      const sliceResult = this.createChannels(slice, {
+        allowUncomplete: isLastSlice,
+      });
       allPhaseA.push(...sliceResult.phaseA);
       allPhaseB.push(...sliceResult.phaseB);
     }
@@ -106,6 +116,7 @@ export class ChannelCalculator {
       vertexTime: Date,
       targetPrice: number,
       isHigh: boolean,
+      expectedTrend: TrendDirection,
       searchStartIdx: number,
     ): number => {
       const isDaily = isDateOnlyTimestamp(vertexTime);
@@ -125,6 +136,7 @@ export class ChannelCalculator {
       let bestIdx = searchStartIdx;
       let bestPDiff = Infinity;
       let bestTimeDiff = Infinity;
+      let bestTrendMatch = false;
 
       for (let i = searchStartIdx; i < subBis.length; i++) {
         const sb = subBis[i];
@@ -135,11 +147,21 @@ export class ChannelCalculator {
           const p = isHigh ? sb.high : sb.low;
           const pDiff = Math.abs(p - targetPrice);
           const tDiff = Math.abs(eMs - vertexTime.getTime());
+          const trendMatch = sb.trend === expectedTrend;
 
-          if (
+          // 候选优劣判断：
+          // 1. 价格更接近 targetPrice（误差严格小于 bestPDiff - 1e-4）
+          // 2. 价格在 1e-4 误差内并列时：
+          //    2.1 顺势趋势匹配（如向上大笔起止为向上小笔，向下大笔起止为向下小笔）优先
+          //    2.2 趋势匹配相同时，时间距拐点更近者优先
+          const isBetter =
             pDiff < bestPDiff - 1e-4 ||
-            (Math.abs(pDiff - bestPDiff) <= 1e-4 && tDiff < bestTimeDiff)
-          ) {
+            (Math.abs(pDiff - bestPDiff) <= 1e-4 &&
+              ((!bestTrendMatch && trendMatch) ||
+                (bestTrendMatch === trendMatch && tDiff < bestTimeDiff)));
+
+          if (isBetter) {
+            bestTrendMatch = trendMatch;
             bestPDiff = pDiff;
             bestTimeDiff = tDiff;
             bestIdx = i;
@@ -174,6 +196,7 @@ export class ChannelCalculator {
       firstM.startTime,
       firstIsUp ? firstM.low : firstM.high,
       !firstIsUp,
+      firstM.trend,
       0,
     );
 
@@ -184,6 +207,7 @@ export class ChannelCalculator {
         mb.endTime,
         isUp ? mb.high : mb.low,
         isUp,
+        mb.trend,
         currentStartIdx,
       );
 
@@ -199,13 +223,17 @@ export class ChannelCalculator {
   /**
    * 顺序确认扫描与生命周期状态机推进（委托至通用的 ChannelLifecycleEngine）
    */
-  private sequentiallyConfirmChannels(data: readonly ChanBi[]): {
+  private sequentiallyConfirmChannels(
+    data: readonly ChanBi[],
+    options?: { allowUncomplete?: boolean },
+  ): {
     phaseA: ChanChannel[];
     sequential: ChanChannel[];
   } {
     const strategy: ChannelLifecycleStrategy<ChanBi, ChanChannel> = {
       minCoreLength: 4,
       minSealedLength: 5,
+      allowUncomplete: options?.allowUncomplete,
       validateCore: (window) => {
         const geo = this.validateCoreGeometry(window);
         if (!geo) return null;
