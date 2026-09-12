@@ -1,6 +1,7 @@
 import {
   ChanCore,
   ChanBspType,
+  ChannelType,
   type ChanBi,
   type ChanBspUnit,
   type ChanChannel,
@@ -322,10 +323,27 @@ function toZhongshu(
 ): ChanDivergenceZhongshu {
   const units = 'bis' in channel ? channel.bis : channel.duans;
   const first = units[0];
-  const last = units.at(-1);
-  if (!first || !last) {
+  if (!first) {
     throw new RangeError('chan channel must contain at least one unit');
   }
+
+  let last = units[units.length - 1];
+  if (channel.type === ChannelType.Complete && !channel.expanded) {
+    if (
+      'bis' in channel &&
+      channel.bis.length >= 5 &&
+      channel.bis.length % 2 === 1
+    ) {
+      last = channel.bis[channel.bis.length - 2];
+    } else if (
+      'duans' in channel &&
+      channel.duans.length >= 4 &&
+      channel.duans.length % 2 === 0
+    ) {
+      last = channel.duans[channel.duans.length - 2];
+    }
+  }
+
   return {
     firstUnitTime: first.startTime,
     lastUnitTime: last.endTime,

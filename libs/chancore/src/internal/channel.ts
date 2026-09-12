@@ -11,18 +11,22 @@ import type {
   ChanChannelTwoPhaseResult,
 } from '../contracts';
 
+import {
+  ChannelLifecycleEngine,
+  type ChannelLifecycleStrategy,
+  resolveChannelAnchorIds,
+} from './channel-lifecycle';
 import { minMaxBy } from './min-max-by';
 
 export class ChannelCalculator {
   /**
-   * 主函数：识别笔级中枢（顺序确认生命周期状态机 + 缠论第 20 课中心定理二扩张归并）
+   * 主函数：识别笔级中枢（顺序确认生命周期状态机 + 规则 1～4 完备封存）
    *
    * 算法流程：
-   * 1. 顺序确认扫描：从左至右顺序寻找 5 笔基础中枢，确立 [ZD, ZG]；
-   * 2. 缠论第 20 课触及延伸：后续笔对触及 [ZD, ZG] 且保持公共交集有效则并入延伸；
-   * 3. 第三类买卖点终结：离开且回抽不回中枢区间时立即密封（Seal）闭合当前中枢；
-   * 4. 9 笔结合扩展：持续震荡满 9 笔时触发中枢扩展（expanded: true）并闭合；
-   * 5. Phase C：相邻同级别独立中枢满足中心定理二时进行扩张归并（Pairwise Expansion）。
+   * 1. 顺序确认扫描：从左至右顺序寻找 4 笔基础中枢核心，确立 [ZD, ZG]；
+   * 2. 缠论触及延伸：后续笔对触及 [ZD, ZG] 且保持公共交集有效则并入延伸；
+   * 3. 离开突破与规则 1～4 封存：顺势突破极值后，通过 3买卖点顺势突破/反向击穿/新中枢确立等规则完备封存；
+   * 4. 9 笔结合扩展：持续震荡满 9 笔时触发中枢扩展（expanded: true）并闭合。
    *
    * @param data Phase B 笔序列
    * @returns 两阶段中枢结果 { phaseA, phaseB }
@@ -193,205 +197,56 @@ export class ChannelCalculator {
   }
 
   /**
-   * 顺序确认扫描与生命周期状态机推进
-   *
-   * 算法契约（3 笔核心 + 触及延伸 + 顺势离开，最终确认严格执行 >= 5 笔门槛）：
-   * 1. 核心确立：以 3 笔构件 (+ 进入笔 b0 = 4 笔) 确立基础中枢核心 [ZD, ZG]；
-   * 2. 状态机推进：
-   *    - 顺势突破（离开笔）：若出现顺势突破中枢区间 (isUp: high > curZg, !isUp: low < curZd)，
-   *      作为离开笔吸纳；若后续无回抽维持重叠则密封终结；
-   *    - 触及延伸（内部震荡）：若未突破，则需成对 (curr, nextBi) 检验极值守卫与公共重叠交集；
-   * 3. 最终门槛：中枢必须满足 channelBis.length >= 5 且满足极值结构守卫等条件才可确认为完成中枢；
-   * 4. 9 笔结合扩展：持续震荡满 9 笔时触发中枢扩展（expanded: true）并闭合。
+   * 顺序确认扫描与生命周期状态机推进（委托至通用的 ChannelLifecycleEngine）
    */
   private sequentiallyConfirmChannels(data: readonly ChanBi[]): {
     phaseA: ChanChannel[];
     sequential: ChanChannel[];
   } {
-    const phaseA: ChanChannel[] = [];
-    const sequential: ChanChannel[] = [];
-    const biCount = data.length;
+    const strategy: ChannelLifecycleStrategy<ChanBi, ChanChannel> = {
+      minCoreLength: 4,
+      minSealedLength: 5,
+      validateCore: (window) => {
+        const geo = this.validateCoreGeometry(window);
+        if (!geo) return null;
+        const firstBi = window[0];
+        const gg = Math.max(firstBi.high, geo.gg);
+        const dd = Math.min(firstBi.low, geo.dd);
+        return {
+          geometry: { ...geo, gg, dd },
+          isUp: firstBi.trend === TrendDirection.Up,
+        };
+      },
+      buildPhaseAChannel: (elements, original, startIndex, coreGeometry) => {
+        const baseFive = elements.slice(0, 5);
+        return this.buildChannelFromBis(
+          baseFive,
+          original,
+          startIndex,
+          coreGeometry,
+          false,
+        );
+      },
+      buildSealedChannel: (
+        elements,
+        original,
+        startIndex,
+        geometry,
+        expanded,
+        isComplete = true,
+      ) => {
+        return this.buildChannelFromBis(
+          elements,
+          original,
+          startIndex,
+          geometry,
+          expanded,
+          isComplete,
+        );
+      },
+    };
 
-    if (biCount < 5) {
-      return { phaseA, sequential };
-    }
-
-    let cursor = 0;
-    while (cursor <= biCount - 5) {
-      // 1. 尝试从 cursor 开始确立 3 笔构件 (+ 进入笔 b0 = 4 笔) 的中枢核心
-      const candidateCore = data.slice(cursor, cursor + 4);
-      if (!this.validateTrendAlternating(candidateCore)) {
-        cursor++;
-        continue;
-      }
-
-      const coreGeometry = this.validateCoreGeometry(candidateCore);
-      if (!coreGeometry) {
-        cursor++;
-        continue;
-      }
-
-      const firstBi = candidateCore[0];
-      const isUp = firstBi.trend === TrendDirection.Up;
-
-      // 核心确立，进入生命周期延伸与顺势离开状态机
-      const channelBis = [...candidateCore];
-      let curZg = coreGeometry.zg;
-      let curZd = coreGeometry.zd;
-      let curGg = Math.max(firstBi.high, coreGeometry.gg);
-      let curDd = Math.min(firstBi.low, coreGeometry.dd);
-      let isExpanded = false;
-
-      let nextIdx = cursor + 4;
-      while (nextIdx < biCount) {
-        // 当 channelBis.length 为偶数时（4, 6, 8...），nextIdx 处的笔与进入笔 firstBi 同向
-        if (channelBis.length % 2 === 0) {
-          const curr = data[nextIdx];
-          if (curr.trend === data[nextIdx - 1].trend) {
-            break;
-          }
-
-          // 极值破坏守卫：顺势笔不得跌破向上起点 DD 或冲破向下起点 GG
-          if (isUp && curr.low < curDd) {
-            break;
-          }
-          if (!isUp && curr.high > curGg) {
-            break;
-          }
-
-          const hasBrokenOut = isUp ? curr.high > curZg : curr.low < curZd;
-
-          if (hasBrokenOut) {
-            // 假定离开笔顺势突破吸纳入中枢
-            channelBis.push(curr);
-            curGg = Math.max(curGg, curr.high);
-            curDd = Math.min(curDd, curr.low);
-            nextIdx++;
-            if (channelBis.length >= 9) {
-              isExpanded = true;
-            }
-            // 出现突破离开笔，后续折返为 3买/3s 试探（作为新结构开启），中枢在此确认闭合
-            break;
-          }
-
-          // 未突破中枢区间：此笔为中枢内部震荡笔（延伸半环）
-          // 需与下一笔配对 (curr, nextBi) 作为延伸环检验
-          if (nextIdx + 1 >= biCount) {
-            // 序列末尾单笔：若触及重叠区间且有效则吸纳
-            if (curr.high >= curZd && curr.low <= curZg) {
-              const newZg = Math.min(curZg, curr.high);
-              const newZd = Math.max(curZd, curr.low);
-              if (newZg > newZd) {
-                channelBis.push(curr);
-                curZg = newZg;
-                curZd = newZd;
-                curGg = Math.max(curGg, curr.high);
-                curDd = Math.min(curDd, curr.low);
-                nextIdx++;
-                if (channelBis.length >= 9) {
-                  isExpanded = true;
-                }
-              }
-            }
-            break;
-          }
-
-          const nextBi = data[nextIdx + 1];
-          if (nextBi.trend === curr.trend) {
-            break;
-          }
-
-          // 极值守卫
-          if (isUp && (curr.low < curDd || nextBi.low < curDd)) {
-            break;
-          }
-          if (!isUp && (curr.high > curGg || nextBi.high > curGg)) {
-            break;
-          }
-
-          const testWindow = [...channelBis, curr, nextBi];
-          const allHighMinMax = minMaxBy(testWindow, (b) => b.high);
-          const allLowMinMax = minMaxBy(testWindow, (b) => b.low);
-
-          if (
-            allHighMinMax &&
-            allLowMinMax &&
-            allHighMinMax.min > allLowMinMax.max
-          ) {
-            channelBis.push(curr, nextBi);
-            curZg = allHighMinMax.min;
-            curZd = allLowMinMax.max;
-            curGg = Math.max(curGg, curr.high, nextBi.high);
-            curDd = Math.min(curDd, curr.low, nextBi.low);
-            nextIdx += 2;
-            if (channelBis.length >= 9) {
-              isExpanded = true;
-            }
-            continue;
-          } else {
-            break;
-          }
-        } else {
-          break;
-        }
-      }
-
-      // 末尾单笔保底检查（当 channelBis 停在倒数第1笔且已达成延伸）
-      if (nextIdx === biCount - 1) {
-        const single = data[nextIdx];
-        if (
-          single.trend !== data[nextIdx - 1].trend &&
-          single.high >= curZd &&
-          single.low <= curZg
-        ) {
-          const newZg = Math.min(curZg, single.high);
-          const newZd = Math.max(curZd, single.low);
-          if (newZg > newZd) {
-            channelBis.push(single);
-            curZg = newZg;
-            curZd = newZd;
-            curGg = Math.max(curGg, single.high);
-            curDd = Math.min(curDd, single.low);
-            nextIdx++;
-            if (channelBis.length >= 9) {
-              isExpanded = true;
-            }
-          }
-        }
-      }
-
-      // 硬性门槛：最终确认中枢必须大于等于 5 笔且满足其他条件
-      if (channelBis.length < 5) {
-        cursor++;
-        continue;
-      }
-
-      // Phase A 记录前 5 笔基础中枢
-      const baseFive = channelBis.slice(0, 5);
-      const baseChannel = this.buildChannelFromBis(
-        baseFive,
-        data,
-        cursor,
-        { zg: coreGeometry.zg, zd: coreGeometry.zd, gg: curGg, dd: curDd },
-        false,
-      );
-      phaseA.push(baseChannel);
-
-      // Phase B 记录已密封的最终确认中枢
-      const sealedChannel = this.buildChannelFromBis(
-        channelBis,
-        data,
-        cursor,
-        { zg: curZg, zd: curZd, gg: curGg, dd: curDd },
-        isExpanded,
-      );
-      sequential.push(sealedChannel);
-
-      // 指针后移至当前中枢的离开笔（尾笔），使离开笔作为下一个中枢的进入笔参与计算
-      cursor = cursor + channelBis.length - 1;
-    }
-
-    return { phaseA, sequential };
+    return ChannelLifecycleEngine.runSequentialLifecycle(data, strategy);
   }
 
   /**
@@ -403,15 +258,11 @@ export class ChannelCalculator {
     startIndex: number,
     geometry: { zg: number; zd: number; gg: number; dd: number },
     expanded = false,
+    isComplete = true,
   ): ChanChannel {
     const endIndex = startIndex + bis.length - 1;
-    const firstBi = originalBis[startIndex];
-    const firstBiMiddleIndex = Math.floor(firstBi.originIds.length / 2);
-    const displayStartId = firstBi.originIds[firstBiMiddleIndex];
-
-    const lastBi = originalBis[endIndex];
-    const lastBiMiddleIndex = Math.floor(lastBi.originIds.length / 2);
-    const displayEndId = lastBi.originIds[lastBiMiddleIndex];
+    const { startId, endId, displayStartId, displayEndId } =
+      resolveChannelAnchorIds(originalBis, startIndex, endIndex);
 
     return {
       bis: [...bis],
@@ -420,10 +271,10 @@ export class ChannelCalculator {
       gg: geometry.gg,
       dd: geometry.dd,
       level: ChannelLevel.Bi,
-      type: ChannelType.Complete,
+      type: isComplete ? ChannelType.Complete : ChannelType.UnComplete,
       status: ChannelStatus.Valid,
-      startId: originalBis[startIndex].originIds[0],
-      endId: lastBi.originIds[lastBi.originIds.length - 1],
+      startId,
+      endId,
       trend: bis[0].trend,
       expanded,
       displayStartId,
@@ -509,18 +360,6 @@ export class ChannelCalculator {
     }
 
     return { zg, zd, gg, dd };
-  }
-
-  /**
-   * 验证笔的趋势是否交替
-   */
-  private validateTrendAlternating(bis: readonly ChanBi[]): boolean {
-    for (let i = 0; i < bis.length - 1; i++) {
-      if (bis[i].trend === bis[i + 1].trend) {
-        return false;
-      }
-    }
-    return true;
   }
 }
 

@@ -1,4 +1,10 @@
-import { ChanCore, TrendDirection, BiStatus, BiType } from '@app/chancore';
+import {
+  ChanCore,
+  TrendDirection,
+  BiStatus,
+  BiType,
+  ChannelType,
+} from '@app/chancore';
 import type { ChanK } from '@app/chancore';
 import { ChanVisualAdapter } from './chan-visual.adapter';
 
@@ -411,10 +417,19 @@ describe('ChanVisualAdapter', () => {
       expect(firstCmd.fromTime).toBe(
         new Date(firstZs.bis[1].startTime).toISOString(),
       );
-      // toTime must equal bis[last].startTime (exit bi start), not bis[last].endTime
-      expect(firstCmd.toTime).toBe(
-        new Date(firstZs.bis[firstZs.bis.length - 1].startTime).toISOString(),
-      );
+      // If central is uncomplete, it extends to the latest K-line; otherwise to exit bi start
+      if (firstZs.type === ChannelType.UnComplete) {
+        expect(firstCmd.toTime).toBe(
+          new Date(klines[klines.length - 1].time).toISOString(),
+        );
+        expect(firstCmd.style).toBe('dashed');
+        expect(firstCmd.status).toBe('uncomplete');
+      } else {
+        expect(firstCmd.toTime).toBe(
+          new Date(firstZs.bis[firstZs.bis.length - 1].startTime).toISOString(),
+        );
+        expect(firstCmd.style).toBe('solid');
+      }
     }
   });
 });

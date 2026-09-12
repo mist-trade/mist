@@ -37,7 +37,7 @@ describe('DuanChannelCalculator (段级中枢，对称重叠无方向)', () => {
     expect(result.phaseB).toHaveLength(1);
     const channel = result.phaseB[0];
     expect(channel.level).toBe(ChannelLevel.Duan); // 接线 ChannelLevel.Duan
-    expect(channel.type).toBe(ChannelType.Complete);
+    expect(channel.type).toBe(ChannelType.UnComplete);
     expect(channel.status).toBe(ChannelStatus.Valid);
     expect(channel.expanded).toBe(false); // 普通同级中枢，非扩张合并产物
     expect(channel.zg).toBe(8); // min(10,8,9)

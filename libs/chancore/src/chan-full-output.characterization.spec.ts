@@ -246,7 +246,7 @@ describe('ChanCore full-output differential characterization', () => {
 
 /** Duan-level central-extension fingerprint（add-chan-central-extension 新增）。 */
 const EXPECTED_DUAN_EXPANSION_SHA256 =
-  'e8436bbd4754b0f69b44f1ffbaea1a20ab10ec64725ffa5dafb721b3ad80ec6b';
+  '44a43b29c9cfda8f4f7776c6b569953565a125dd32e81acf8a8ac3826bae8d65';
 
 /** Duan lesson-65 minimum 3-bi axiom fingerprint（restore-chan-duan-three-bi-axiom 更新）。 */
 const EXPECTED_DUAN_71_SHA256 =
