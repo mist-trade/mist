@@ -361,6 +361,65 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         false,
       );
     });
+
+    it('向上走势核心形成后，后续震荡笔跌破进入笔起点(low < firstBi.low) → 严禁吸纳为中枢延伸，候选中枢失效作废', () => {
+      // 模拟实盘第6中枢形态：b0(120->145), b1(145->125), b2(125->160), b3(160->125)
+      // 核心构件 ZG=145, ZD=125, DD=125 >= b0.low(120) 合法；
+      // 但随后 b4(125->145), b5(145->100) 暴跌跌破 b0.low(120)；
+      // 严禁将 b4/b5 吸收为中枢延伸，杜绝 DD < b0.low
+      const bis: ChanBi[] = [
+        makeBi(0, TrendDirection.Up, 120, 145),
+        makeBi(1, TrendDirection.Down, 125, 145),
+        makeBi(2, TrendDirection.Up, 125, 160),
+        makeBi(3, TrendDirection.Down, 125, 160),
+        makeBi(4, TrendDirection.Up, 125, 145),
+        makeBi(5, TrendDirection.Down, 100, 145), // 暴跌至 100，打穿 b0.low(120)
+        makeBi(6, TrendDirection.Up, 100, 150),
+        makeBi(7, TrendDirection.Down, 130, 150),
+        makeBi(8, TrendDirection.Up, 130, 155),
+        makeBi(9, TrendDirection.Down, 130, 155),
+      ];
+
+      const result = biService.createChannels(bis);
+      // 包含 b0 的向上候选中枢必须失效作废，绝不能产出 DD(100) < b0.low(120) 的中枢
+      const invalidCentral = result.phaseB.find(
+        (c) => c.trend === TrendDirection.Up && c.bis[0].low === 120,
+      );
+      expect(invalidCentral).toBeUndefined();
+      // 所有输出的上涨中枢 DD 必须 >= 起笔 b0.low
+      for (const c of result.phaseB) {
+        if (c.trend === TrendDirection.Up) {
+          expect(c.dd).toBeGreaterThanOrEqual(c.bis[0].low);
+        }
+      }
+    });
+
+    it('向下走势核心形成后，后续震荡笔突破进入笔起点(high > firstBi.high) → 严禁吸纳为中枢延伸，候选中枢失效作废', () => {
+      // 严格对偶：下跌中枢起笔高点 200，随后反弹冲破 200，严禁吸纳为延伸，杜绝 GG > b0.high
+      const bis: ChanBi[] = [
+        makeBi(0, TrendDirection.Down, 155, 200),
+        makeBi(1, TrendDirection.Up, 155, 175),
+        makeBi(2, TrendDirection.Down, 140, 175),
+        makeBi(3, TrendDirection.Up, 140, 175),
+        makeBi(4, TrendDirection.Down, 155, 175),
+        makeBi(5, TrendDirection.Up, 155, 220), // 暴涨至 220，冲破 b0.high(200)
+        makeBi(6, TrendDirection.Down, 160, 220),
+        makeBi(7, TrendDirection.Up, 160, 190),
+        makeBi(8, TrendDirection.Down, 150, 190),
+        makeBi(9, TrendDirection.Up, 150, 185),
+      ];
+
+      const result = biService.createChannels(bis);
+      const invalidCentral = result.phaseB.find(
+        (c) => c.trend === TrendDirection.Down && c.bis[0].high === 200,
+      );
+      expect(invalidCentral).toBeUndefined();
+      for (const c of result.phaseB) {
+        if (c.trend === TrendDirection.Down) {
+          expect(c.gg).toBeLessThanOrEqual(c.bis[0].high);
+        }
+      }
+    });
   });
 
   // -------------------------------------------------------------------------
