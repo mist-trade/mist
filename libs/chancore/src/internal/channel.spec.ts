@@ -361,12 +361,12 @@ describe('ChannelCalculator', () => {
       expect(c.dd).toBe(4056.87);
     });
 
-    it('5M 实盘经典用例二：01-21~01-26 1月22日中枢与后续高台阶中枢拆分，避免 11 笔贪婪吞噬与 departure < GG 倒挂', () => {
+    it('5M 实盘经典用例二：01-21~01-26 1月22日中枢与后续高台阶中枢拆分，延伸至 01-26 14:35 (11 笔) 顺利封存，后续独立形成高台阶扩展中枢', () => {
       // 真实 5M 走势：
       // b0..b3 形成 1月22日核心 [4112.86, 4127.82]
-      // 随后 b4(4139.95), b5(4120.20), b6(4143.75)
-      // 在 b6(4143.75) 处，后续走势自身已构成独立新中枢核心，触发规则 4 封存
-      // 杜绝 1月22日中枢无限吸附后续上涨至 4160.99 及二卖 4145.97，杜绝 departure(4145.97) < GG(4160.99) 的倒挂
+      // 随后震荡延伸，虽然在 b6(4143.75) 处形成台阶上移，但因区间重叠，属于同级别中枢延伸
+      // 中枢延伸持续至 01-26 14:35 (b10, 4145.97) 封存（11 笔），DD/GG 扩展，ZD/ZG 取全量公共交集
+      // 随后 b11(4101.83) 击穿中枢下沿完成离开，b12..b16 独立形成无价格区间重叠的高台阶新中枢
       const bis: ChanBi[] = [
         makeBiDirect(0, TrendDirection.Up, 4109.92, 4140.84),
         makeBiDirect(1, TrendDirection.Down, 4112.86, 4140.84),
@@ -390,14 +390,14 @@ describe('ChannelCalculator', () => {
       const result = service.createChannels(bis);
       expect(result.phaseB.length).toBeGreaterThanOrEqual(2);
       const c1 = result.phaseB[0];
-      // 1月22日中枢在 b6(4143.75) 处顺利封存（7 笔），离开点高度 4143.75 严格等于其 GG 4143.75
-      expect(c1.bis).toHaveLength(7);
-      expect(c1.gg).toBe(4143.75);
-      expect(c1.zd).toBe(4120.2);
+      // 1月22日中枢延伸至 b10(4145.97) 顺利封存（11 笔），包含 4160.99 极值与 4124.70 交集
+      expect(c1.bis).toHaveLength(11);
+      expect(c1.gg).toBe(4160.99);
+      expect(c1.zd).toBe(4124.7);
       expect(c1.zg).toBe(4127.82);
 
       const c2 = result.phaseB[1];
-      // 后续独立形成高台阶中枢，超越 4160.99 成为新中枢的高点，层次分明
+      // 后续独立形成高台阶扩展中枢，与前置中枢 ZD/ZG 无重叠，层次分明
       expect(c2.gg).toBeGreaterThanOrEqual(4160.99);
       expect(c2.zg).toBeGreaterThanOrEqual(4135);
     });
