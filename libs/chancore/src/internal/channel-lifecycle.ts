@@ -287,6 +287,7 @@ export class ChannelLifecycleEngine {
       const channelElements = [...candidateCore];
       let isExpanded = false;
       let hasSealedDeparture = false;
+      let hasCollapsed = false;
       let nextIdx = cursor + strategy.minCoreLength;
 
       // 2. 状态机推进：顺势离开突破（规则 1~4 封存）与触及震荡延伸
@@ -305,6 +306,16 @@ export class ChannelLifecycleEngine {
             isTrendDir && (isUp ? curr.high > curZg : curr.low < curZd);
 
           if (hasBrokenOut) {
+            if (strategy.minCoreLength > 3) {
+              const firstElem = channelElements[0];
+              const violatesOrigin = isUp
+                ? curr.low < firstElem.low
+                : curr.high > firstElem.high;
+              if (violatesOrigin) {
+                hasCollapsed = true;
+                break;
+              }
+            }
             const newGg = isUp ? Math.max(curGg, curr.high) : curGg;
             const newDd = !isUp ? Math.min(curDd, curr.low) : curDd;
 
@@ -340,6 +351,16 @@ export class ChannelLifecycleEngine {
               (isUp ? nextElem.high > curZg : nextElem.low < curZd);
 
             if (nextBrokenOut) {
+              if (strategy.minCoreLength > 3) {
+                const firstElem = channelElements[0];
+                const violatesOrigin = isUp
+                  ? Math.min(curr.low, nextElem.low) < firstElem.low
+                  : Math.max(curr.high, nextElem.high) > firstElem.high;
+                if (violatesOrigin) {
+                  hasCollapsed = true;
+                  break;
+                }
+              }
               const tempZd = Math.max(curZd, curr.low);
               const tempZg = Math.min(curZg, curr.high);
               let testZg = curZg;
@@ -384,6 +405,18 @@ export class ChannelLifecycleEngine {
             break;
           }
 
+          // 核心延伸极值守卫：笔中枢震荡延伸绝不可打穿进入笔起笔极值（上涨不得跌破起笔低点，下跌不得突破起笔高点）
+          if (strategy.minCoreLength > 3) {
+            const firstElem = channelElements[0];
+            const violatesOrigin = isUp
+              ? Math.min(curr.low, nextElem.low) < firstElem.low
+              : Math.max(curr.high, nextElem.high) > firstElem.high;
+            if (violatesOrigin) {
+              hasCollapsed = true;
+              break;
+            }
+          }
+
           const testWindow = [...channelElements, curr, nextElem];
           const allHighMinMax = minMaxBy(testWindow, (e) => e.high);
           const allLowMinMax = minMaxBy(testWindow, (e) => e.low);
@@ -409,6 +442,16 @@ export class ChannelLifecycleEngine {
         } else {
           // 序列末尾单元素触及吸纳
           if (curr.high >= curZd && curr.low <= curZg) {
+            if (strategy.minCoreLength > 3) {
+              const firstElem = channelElements[0];
+              const violatesOrigin = isUp
+                ? curr.low < firstElem.low
+                : curr.high > firstElem.high;
+              if (violatesOrigin) {
+                hasCollapsed = true;
+                break;
+              }
+            }
             const newZg = Math.min(curZg, curr.high);
             const newZd = Math.max(curZd, curr.low);
             if (newZg > newZd) {
@@ -428,6 +471,11 @@ export class ChannelLifecycleEngine {
       }
 
       // 3. 门槛校验与结果记录
+      if (hasCollapsed) {
+        cursor++;
+        continue;
+      }
+
       const allowUncomplete = strategy.allowUncomplete ?? true;
       const isAtDataEnd =
         allowUncomplete && (nextIdx >= count || count - nextIdx <= 2);
