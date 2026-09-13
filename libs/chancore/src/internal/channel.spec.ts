@@ -368,7 +368,7 @@ describe('ChannelCalculator', () => {
       // 在 b6(4143.75) 处，后续走势自身已构成独立新中枢核心，触发规则 4 封存
       // 杜绝 1月22日中枢无限吸附后续上涨至 4160.99 及二卖 4145.97，杜绝 departure(4145.97) < GG(4160.99) 的倒挂
       const bis: ChanBi[] = [
-        makeBiDirect(0, TrendDirection.Up, 4110.45, 4140.84),
+        makeBiDirect(0, TrendDirection.Up, 4109.92, 4140.84),
         makeBiDirect(1, TrendDirection.Down, 4112.86, 4140.84),
         makeBiDirect(2, TrendDirection.Up, 4112.86, 4127.82),
         makeBiDirect(3, TrendDirection.Down, 4109.92, 4127.82),
