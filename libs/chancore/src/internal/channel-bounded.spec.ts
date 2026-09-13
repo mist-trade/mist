@@ -602,36 +602,31 @@ describe('ChannelCalculator.getAdjacentBoundedChannels', () => {
     ];
 
     const result = ChanCore.createAdjacentBoundedChannels(subBis, macroBis);
-    expect(result.phaseB).toHaveLength(3);
+    // 方案 1：原前两个区间重叠的同向中枢被吸收合并为 9 笔大中枢，最终产出 2 个独立趋势中枢
+    expect(result.phaseB).toHaveLength(2);
 
-    const [c0, c1, c2] = result.phaseB;
+    const [c0, c1] = result.phaseB;
 
-    // Central 0 (starts with Bi 23 at 03-23, departure stroke is Bi 27 ending on 03-31)
+    // Central 0（原 C0 与 C1 区间重叠吸收合并，9 笔，延伸扩展，离开笔为 Bi 31）
     expect(c0.zg).toBe(3924.11);
-    expect(c0.zd).toBe(3872.78);
-    expect(c0.bis).toHaveLength(5);
+    expect(c0.zd).toBe(3891.86);
+    expect(c0.expanded).toBe(true);
+    expect(c0.bis).toHaveLength(9);
     expect(c0.bis[0].startTime.toISOString()).toBe('2026-03-23T07:00:00.000Z');
     expect(c0.bis[c0.bis.length - 1].endTime.toISOString()).toBe(
-      '2026-03-31T02:00:00.000Z',
-    );
-
-    // Central 1 (starts with departure stroke of c0: Bi 27, ending with departure stroke Bi 31 on 04-08)
-    expect(c1.zg).toBe(3948.81);
-    expect(c1.zd).toBe(3891.86);
-    expect(c1.bis).toHaveLength(5);
-    expect(c1.bis[0].startTime.toISOString()).toBe('2026-03-30T02:00:00.000Z');
-    expect(c1.bis[c1.bis.length - 1].endTime.toISOString()).toBe(
       '2026-04-08T07:00:00.000Z',
     );
 
-    // Central 2 (starts with departure stroke of c1: Bi 31, ending with departure stroke Bi 35 on 04-15)
-    expect(c2.zg).toBe(3995.0);
-    expect(c2.zd).toBe(3966.2);
-    expect(c2.bis).toHaveLength(5);
-    expect(c2.bis[0].startTime.toISOString()).toBe('2026-04-03T05:30:00.000Z');
-    expect(c2.bis[c2.bis.length - 1].endTime.toISOString()).toBe(
+    // Central 1（以 c0 的离开笔 Bi 31 作为进入笔，首尾相接，无价格重叠）
+    expect(c1.zg).toBe(3995.0);
+    expect(c1.zd).toBe(3966.2);
+    expect(c1.bis).toHaveLength(5);
+    expect(c1.bis[0].startTime.toISOString()).toBe('2026-04-03T05:30:00.000Z');
+    expect(c1.bis[c1.bis.length - 1].endTime.toISOString()).toBe(
       '2026-04-15T02:30:00.000Z',
     );
+    // 验证严格首尾相接拓扑契约
+    expect(c0.bis[c0.bis.length - 1]).toBe(c1.bis[0]);
   });
 
   it('partitions sequential 30m macro strokes and 5m sub-bis without cross-stroke penetration or duplicate centrals', () => {
