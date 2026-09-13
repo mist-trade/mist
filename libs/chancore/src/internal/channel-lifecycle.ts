@@ -156,37 +156,30 @@ function checkDepartureRules<T extends ChannelElement, R>(
     return true;
   }
 
-  // 若无 3买/3卖，离开笔必须至少突破中枢极值 GG/DD，杜绝中枢内部震荡误判为离开
-  const curr = data[candidateIdx];
-  const hasBrokenExtreme = isUp ? curr.high > curGg : curr.low < curDd;
-  if (!hasBrokenExtreme) {
-    return false;
-  }
-
-  // 2. 规则 2：反向一笔物理反转打穿对侧极值（暴跌打穿 DD / 暴涨打穿 GG）：
-  // 走势结构被物理反转彻底破坏，绝不可能再给 3 买/3 卖，直接在离开极值端点封存
-  const piercesOppositeExtreme = isUp
-    ? pullback.low < curDd
-    : pullback.high > curGg;
-  if (piercesOppositeExtreme) {
-    return true;
-  }
-
-  // 3. 规则 3（仅限 Duan 级别段中枢）：无 3买/3卖，离开后反向单段直接打穿中枢对向沿 (ZD/ZG)
-  if (strategy.minCoreLength <= 3) {
-    const pbPiercesBoundary = isUp
-      ? pullback.low < curZd
-      : pullback.high > curZg;
-    if (pbPiercesBoundary) {
-      return true;
-    }
-  }
-
-  // 4. 规则 4：顺势离开后，后续独立构成新中枢核心
-  const checkNewCore = (startIdx: number): boolean => {
+  // 2. 规则 4：后续走势自身已独立构成完全不重叠的新中枢核心
+  // 无论离开笔是否超越历史极值 GG/DD，只要后续已在当前中枢之外确立新中枢核心，前置中枢必然在此封存
+  const checkNewCore = (startIdx: number, offset: number): boolean => {
     if (startIdx + strategy.minCoreLength > count) {
       return false;
     }
+    // 当 offset === 2 时（离开笔 -> 反向折返笔 -> 同向新中枢起点）：
+    // 反向折返笔必须跌破对向沿 (curZd) 或冲破对向沿 (curZg)，证明走势已物理脱离当前中枢；
+    // 若折返笔仍停留在当前中枢 [ZD, ZG] 之内，说明当前走势仍在内部震荡，不得提前封存
+    if (offset === 2) {
+      const pb = data[candidateIdx + 1];
+      const pbBrokeThrough = isUp ? pb.low < curZd : pb.high > curZg;
+      if (!pbBrokeThrough) {
+        return false;
+      }
+      const nextStroke = data[candidateIdx + 2];
+      const nextBreaksExtreme = isUp
+        ? nextStroke.high > Math.max(curGg, data[candidateIdx].high)
+        : nextStroke.low < Math.min(curDd, data[candidateIdx].low);
+      if (nextBreaksExtreme) {
+        return false;
+      }
+    }
+
     const newCoreCandidate = data.slice(
       startIdx,
       startIdx + strategy.minCoreLength,
@@ -197,39 +190,65 @@ function checkDepartureRules<T extends ChannelElement, R>(
     ) {
       const newCore = strategy.validateCore(newCoreCandidate);
       if (newCore) {
-        // a. 完全不重叠的新中枢（同向或反向）
+        // 规则 4 准则：仅当后续走势独立构成完全不重叠的新中枢（同向或反向）时，方确立离开
+        // 若新核心与当前中枢 [ZD, ZG] 存在重叠，属于同级别中枢延伸，严禁作为脱离当前中枢的判据
         const isHigher = newCore.geometry.zd >= curZg;
         const isLower = newCore.geometry.zg <= curZd;
         if (isHigher || isLower) {
           return true;
-        }
-
-        // b. 同向阶梯递进新中枢（后置中枢整体向上/向下抬升）
-        if (newCore.isUp === isUp) {
-          const isStepped = isUp
-            ? newCore.geometry.zd > curZd && newCore.geometry.zg > curZg
-            : newCore.geometry.zg < curZg && newCore.geometry.zd < curZd;
-          if (isStepped) {
-            return true;
-          }
         }
       }
     }
     return false;
   };
 
-  for (let offset = 0; offset <= 1; offset++) {
-    if (checkNewCore(candidateIdx + offset)) {
+  for (let offset = 0; offset <= 2; offset++) {
+    if (checkNewCore(candidateIdx + offset, offset)) {
+      return true;
+    }
+  }
+
+  // 若无 3买/3卖 且 无独立新中枢确立，离开笔必须至少突破中枢极值 GG/DD，杜绝中枢内部震荡误判为离开
+  const curr = data[candidateIdx];
+  const hasBrokenExtreme = isUp ? curr.high > curGg : curr.low < curDd;
+  if (!hasBrokenExtreme) {
+    return false;
+  }
+
+  // 3. 规则 2：反向一笔物理反转打穿对侧极值（暴跌打穿 DD / 暴涨打穿 GG）：
+  // 走势结构被物理反转彻底破坏，绝不可能再给 3 买/3 卖，直接在离开极值端点封存
+  const piercesOppositeExtreme = isUp
+    ? pullback.low < curDd
+    : pullback.high > curGg;
+  if (piercesOppositeExtreme) {
+    return true;
+  }
+
+  // 4. 规则 3（仅限 Duan 级别段中枢）：无 3买/3卖，离开后反向单段直接打穿中枢对向沿 (ZD/ZG)
+  if (strategy.minCoreLength <= 3) {
+    const pbPiercesBoundary = isUp
+      ? pullback.low < curZd
+      : pullback.high > curZg;
+    if (pbPiercesBoundary) {
       return true;
     }
   }
 
   // 5. 规则 5：突破极值离开后，反向第 2 笔冲破中枢对侧极值 (curGg / curDd)
+  // 若离开笔的反向折返笔 (pullback) 已经重新跌回/升回中枢 [ZD, ZG]，说明离开笔仅为中枢内部震荡触及延伸，
+  // 结构尚未真正脱离中枢，严禁因后续更远笔的打穿而将当前内部笔错误判定为离开端点
   if (candidateIdx + 3 < count) {
-    const stroke2 = data[candidateIdx + 3];
-    const s2PiercesExtreme = isUp ? stroke2.low < curDd : stroke2.high > curGg;
-    if (s2PiercesExtreme) {
-      return true;
+    const pbReturnedIntoZone = isUp
+      ? pullback.low <= curZg && pullback.high >= curZd
+      : pullback.high >= curZd && pullback.low <= curZg;
+    if (!pbReturnedIntoZone) {
+      const stroke2 = data[candidateIdx + 3];
+      const s2PiercesExtreme = isUp
+        ? stroke2.low < curDd
+        : stroke2.high > curGg;
+      if (s2PiercesExtreme) {
+        return true;
+      }
     }
   }
 
@@ -535,7 +554,7 @@ export class ChannelLifecycleEngine {
         data,
         cursor,
         { zg: curZg, zd: curZd, gg: curGg, dd: curDd },
-        isExpanded,
+        isExpanded || channelElements.length >= 9,
         isComplete,
       );
       sequential.push(outputChannel);
