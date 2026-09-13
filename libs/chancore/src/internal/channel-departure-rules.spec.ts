@@ -242,7 +242,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(2, TrendDirection.Up, 120, 140),
         makeBi(3, TrendDirection.Down, 115, 140), // 核心 [120, 140]
         makeBi(4, TrendDirection.Up, 115, 160), // 突破离开到 160
-        makeBi(5, TrendDirection.Down, 110, 160), // 反向单笔直接暴跌至 110 < ZD(120)，无 3B，触发规则 3 封存
+        makeBi(5, TrendDirection.Down, 95, 160), // 反向单笔直接暴跌至 95 < DD(100)，无 3B，触发规则 3 封存
       ];
 
       const result = biService.createChannels(bis);
@@ -261,7 +261,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(2, TrendDirection.Down, 160, 180),
         makeBi(3, TrendDirection.Up, 160, 185), // 核心 [160, 180]
         makeBi(4, TrendDirection.Down, 140, 185), // 跌破离开到 140
-        makeBi(5, TrendDirection.Up, 140, 190), // 反向单笔直接暴力拉升至 190 > ZG(180)，无 3S，触发规则 3 封存
+        makeBi(5, TrendDirection.Up, 140, 205), // 反向单笔直接暴力拉升至 205 > GG(200)，无 3S，触发规则 3 封存
       ];
 
       const result = biService.createChannels(bis);
@@ -388,7 +388,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       expect(c.dd).toBe(100);
     });
 
-    it('向上走势突破离开后回踩 3B 形成当下：中枢保持 UnComplete，实时产出 ThirdBuy', () => {
+    it('向上走势突破离开后回踩 3B 形成当下：中枢封存为 Complete，实时产出 ThirdBuy', () => {
       const bis: ChanBi[] = [
         makeBi(0, TrendDirection.Up, 100, 150),
         makeBi(1, TrendDirection.Down, 120, 150),
@@ -398,16 +398,16 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(5, TrendDirection.Down, 145, 160), // 回踩 145 > ZG(140) 成立 3B
       ];
 
-      // 1. 中枢计算：处于演化中未封存
+      // 1. 中枢计算：3B 确立后中枢封存
       const result = biService.createChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
-      expect(c.type).toBe(ChannelType.UnComplete);
-      expect(c.bis).toHaveLength(4); // 核心构件 4 笔
+      expect(c.type).toBe(ChannelType.Complete);
+      expect(c.bis).toHaveLength(5); // 核心构件与离开笔共 5 笔
       expect(c.zg).toBe(140);
       expect(c.zd).toBe(120);
 
-      // 2. 买卖点实时求值：传入未完成中枢
+      // 2. 买卖点实时求值：传入已封存中枢
       const units: readonly ChanBspUnit[] = bis.map((b) => ({
         startTime: b.startTime,
         endTime: b.endTime,
@@ -432,7 +432,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       });
     });
 
-    it('向下走势跌破离开后反抽 3S 形成当下：中枢保持 UnComplete，实时产出 ThirdSell', () => {
+    it('向下走势跌破离开后反抽 3S 形成当下：中枢封存为 Complete，实时产出 ThirdSell', () => {
       const bis: ChanBi[] = [
         makeBi(0, TrendDirection.Down, 150, 200),
         makeBi(1, TrendDirection.Up, 150, 180),
@@ -445,8 +445,8 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       const result = biService.createChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
-      expect(c.type).toBe(ChannelType.UnComplete);
-      expect(c.bis).toHaveLength(4);
+      expect(c.type).toBe(ChannelType.Complete);
+      expect(c.bis).toHaveLength(5);
       expect(c.zg).toBe(180);
       expect(c.zd).toBe(160);
 

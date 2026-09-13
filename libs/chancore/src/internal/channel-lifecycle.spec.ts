@@ -117,15 +117,15 @@ describe('ChannelLifecycle Utilities & Engine', () => {
     };
 
     it('Down Central: Rule 1 seals when 3S forms and stroke1 breaks below DD', () => {
-      // Core: d0 Down (100 -> 80), d1 Up (85 -> 95), d2 Down (75 -> 90) -> zg=90, zd=85, dd=75, gg=100
+      // Core: d0 Down (100 -> 85), d1 Up (85 -> 95), d2 Down (75 -> 90) -> zg=90, zd=85, dd=75, gg=100
       // d3 Up (75 -> 88) retracement
       // d4 Down (60 -> 88) breakout below DD(75) to 60!
       // d5 Up (60 -> 82) pullback stays below ZD(85) -> 3S!
       // d6 Down (50 -> 82) stroke1 after 3S breaks below 60 to 50 -> Rule 1!
       const duans = [
-        makeElem(0, TrendDirection.Down, 80, 100),
-        makeElem(1, TrendDirection.Up, 80, 95),
-        makeElem(2, TrendDirection.Down, 75, 95),
+        makeElem(0, TrendDirection.Down, 85, 100),
+        makeElem(1, TrendDirection.Up, 85, 95),
+        makeElem(2, TrendDirection.Down, 75, 90),
         makeElem(3, TrendDirection.Up, 75, 88),
         makeElem(4, TrendDirection.Down, 60, 88),
         makeElem(5, TrendDirection.Up, 60, 82),
@@ -144,7 +144,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
 
     it('Down Central: Rule 2 seals when 3S forms and stroke2 pierces ZG (90)', () => {
       // d4 Down to 60 (breakout)
-      // d5 Up to 82 (3S)
+      // d5 Up to 78 (3S)
       // d6 Down to 65 (fails to make new low)
       // d7 Up to 95 (pierces ZG=90) -> Rule 2!
       const duans = [
@@ -153,8 +153,8 @@ describe('ChannelLifecycle Utilities & Engine', () => {
         makeElem(2, TrendDirection.Down, 75, 95),
         makeElem(3, TrendDirection.Up, 75, 88),
         makeElem(4, TrendDirection.Down, 60, 88),
-        makeElem(5, TrendDirection.Up, 60, 82),
-        makeElem(6, TrendDirection.Down, 65, 82),
+        makeElem(5, TrendDirection.Up, 60, 78),
+        makeElem(6, TrendDirection.Down, 65, 78),
         makeElem(7, TrendDirection.Up, 65, 95),
       ];
 
@@ -170,14 +170,14 @@ describe('ChannelLifecycle Utilities & Engine', () => {
 
     it('Down Central: Rule 3 seals when No 3S and pullback pierces ZG (90)', () => {
       // d4 Down to 60 (breakout)
-      // d5 Up to 95 (no 3S, directly pierces ZG=90!) -> Rule 3!
+      // d5 Up to 105 (no 3S, directly pierces GG=100!) -> Rule 3!
       const duans = [
         makeElem(0, TrendDirection.Down, 80, 100),
         makeElem(1, TrendDirection.Up, 80, 95),
         makeElem(2, TrendDirection.Down, 75, 95),
         makeElem(3, TrendDirection.Up, 75, 88),
         makeElem(4, TrendDirection.Down, 60, 88),
-        makeElem(5, TrendDirection.Up, 60, 95),
+        makeElem(5, TrendDirection.Up, 60, 105),
       ];
 
       const res = ChannelLifecycleEngine.runSequentialLifecycle(
