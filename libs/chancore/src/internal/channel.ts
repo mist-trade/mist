@@ -436,8 +436,8 @@ export class ChannelCalculator {
       if (firstBi.low >= zd) {
         return null;
       }
-      // 约束3：上涨中枢内部构件首笔回调不得跌破进入笔最低起点（不得打漏底）
-      if (fourBis[1].low < firstBi.low) {
+      // 约束3：上涨中枢进入笔起点必须是最低点（内部构件最低不得跌破进入笔最低起点，与下跌中枢严格对偶）
+      if (dd < firstBi.low) {
         return null;
       }
     } else {
