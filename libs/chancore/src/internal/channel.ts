@@ -45,10 +45,65 @@ export class ChannelCalculator {
       options,
     );
 
-    // Phase B：直接采用顺序生命周期确认的中枢序列（保留独立性，避免贪婪级联吞并）
-    const phaseB = sequential;
+    // Phase B：采用顺序生命周期确认的中枢序列，并对相邻同向且区间重叠的中枢执行延伸合并（方案 1：吸收为延伸）
+    const phaseB = this.mergeAdjacentOverlappingChannels(sequential);
 
     return { phaseA, phaseB };
+  }
+
+  /**
+   * 合并相邻同向且价格区间重叠的笔中枢（方案 1：吸收为延伸）
+   *
+   * 契约公理：
+   * 1. 同向：前置中枢与后置中枢趋势方向相同（同为 Up 或同为 Down）；
+   * 2. 首尾相接：前置中枢的离开笔恰好是后置中枢的进入笔；
+   * 3. 区间重叠：两个中枢的价格区间 [ZD, ZG] 存在非空交集（即 Math.min(prev.zg, curr.zg) >= Math.max(prev.zd, curr.zd)）；
+   * 4. 吸收合并：将后置中枢吸收并入前置中枢作为延伸，更新全量公共交集区间 [ZD, ZG] 与极值 [DD, GG]。
+   */
+  private mergeAdjacentOverlappingChannels(
+    channels: readonly ChanChannel[],
+  ): ChanChannel[] {
+    if (channels.length <= 1) {
+      return [...channels];
+    }
+
+    const result: ChanChannel[] = [channels[0]];
+
+    for (let i = 1; i < channels.length; i++) {
+      const prev = result[result.length - 1];
+      const curr = channels[i];
+
+      const sameTrend = prev.trend === curr.trend;
+      const isConnected =
+        prev.bis.length > 0 &&
+        curr.bis.length > 0 &&
+        prev.bis[prev.bis.length - 1] === curr.bis[0];
+      const overlapZg = Math.min(prev.zg, curr.zg);
+      const overlapZd = Math.max(prev.zd, curr.zd);
+      const hasOverlap = overlapZg >= overlapZd;
+
+      if (sameTrend && isConnected && hasOverlap) {
+        const mergedBis = [...prev.bis, ...curr.bis.slice(1)];
+        const mergedChannel: ChanChannel = {
+          ...prev,
+          bis: mergedBis,
+          zg: overlapZg,
+          zd: overlapZd,
+          gg: Math.max(prev.gg, curr.gg),
+          dd: Math.min(prev.dd, curr.dd),
+          expanded:
+            mergedBis.length >= 9 ? true : prev.expanded || curr.expanded,
+          type: curr.type,
+          endId: curr.endId,
+          displayEndId: curr.displayEndId,
+        };
+        result[result.length - 1] = mergedChannel;
+      } else {
+        result.push(curr);
+      }
+    }
+
+    return result;
   }
 
   /**
