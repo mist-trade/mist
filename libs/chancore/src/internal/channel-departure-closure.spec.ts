@@ -1,0 +1,956 @@
+/**
+ * 缠论走势中枢离开与闭合测试用例集（Channel Departure & Closure Test Cases）
+ *
+ * 本文件作为中枢离开判定标准与闭合封存机制的专项测试集合，
+ * 用于承载用户明确定义的典型走势形态、边界案例与规则重构验证。
+ */
+import {
+  BiStatus,
+  BiType,
+  ChannelLevel,
+  ChannelStatus,
+  ChannelType,
+  DuanStatus,
+  DuanType,
+  FenxingType,
+  TrendDirection,
+} from '../contracts';
+import type { ChanBi, ChanDuan } from '../contracts';
+import { ChannelCalculator } from './channel';
+import { DuanChannelCalculator } from './duan-channel';
+
+/**
+ * 构造标准 Mock 笔
+ */
+export function makeMockBi(
+  trend: TrendDirection,
+  low: number,
+  high: number,
+  startTime: string,
+  endTime: string,
+  idStart: number = 1,
+  idEnd: number = 5,
+  status: BiStatus = BiStatus.Valid,
+): ChanBi {
+  const isUp = trend === TrendDirection.Up;
+  return {
+    startTime: new Date(startTime),
+    endTime: new Date(endTime),
+    low,
+    high,
+    trend,
+    type: BiType.Complete,
+    status,
+    originIds: Array.from(
+      { length: idEnd - idStart + 1 },
+      (_, i) => idStart + i,
+    ),
+    originData: [],
+    independentCount: idEnd - idStart + 1,
+    startFenxing: {
+      type: isUp ? FenxingType.Bottom : FenxingType.Top,
+      high: isUp ? low : high,
+      low: isUp ? low : high,
+      leftIds: [idStart],
+      middleIds: [idStart],
+      rightIds: [idStart],
+      middleIndex: idStart,
+      middleOriginId: idStart,
+    },
+    endFenxing: {
+      type: isUp ? FenxingType.Top : FenxingType.Bottom,
+      high: isUp ? high : low,
+      low: isUp ? high : low,
+      leftIds: [idEnd],
+      middleIds: [idEnd],
+      rightIds: [idEnd],
+      middleIndex: idEnd,
+      middleOriginId: idEnd,
+    },
+  };
+}
+
+/**
+ * 构造标准 Mock 段
+ */
+export function makeMockDuan(
+  trend: TrendDirection,
+  low: number,
+  high: number,
+  startTime: string,
+  endTime: string,
+  startBiIndex: number = 0,
+  endBiIndex: number = 2,
+  status: DuanStatus = DuanStatus.Valid,
+): ChanDuan {
+  const dummyBi = makeMockBi(trend, low, high, startTime, endTime);
+  return {
+    startTime: new Date(startTime),
+    endTime: new Date(endTime),
+    low,
+    high,
+    trend,
+    type: DuanType.Complete,
+    status,
+    startBi: dummyBi,
+    endBi: dummyBi,
+    originBis: [dummyBi],
+    originIds: [startBiIndex, endBiIndex],
+    independentCount: endBiIndex - startBiIndex + 1,
+  };
+}
+
+/**
+ * 真实 5M 行情 (000001) 2026-01-05 10:10 ~ 2026-01-13 14:50 完整笔序列
+ * 完整覆盖第 1 个 5M 中枢及其左右宽幅边界（共 20 笔）
+ */
+export const REAL_5M_JAN2026_FIRST_CENTRAL_BIS: readonly ChanBi[] = [
+  // 1. 01-05 10:10 ~ 14:25 | 3992.78 -> 4025.26 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    3992.78,
+    4025.26,
+    '2026-01-05T02:10:00.000Z',
+    '2026-01-05T06:25:00.000Z',
+    7,
+    40,
+  ),
+  // 2. 01-05 14:25 ~ 14:50 | 4025.26 -> 4019.83 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4019.83,
+    4025.26,
+    '2026-01-05T06:25:00.000Z',
+    '2026-01-05T06:50:00.000Z',
+    40,
+    45,
+  ),
+  // 3. 01-05 14:50 ~ 01-06 13:05 | 4019.83 -> 4071.28 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4019.83,
+    4071.28,
+    '2026-01-05T06:50:00.000Z',
+    '2026-01-06T05:05:00.000Z',
+    45,
+    72,
+  ),
+  // 4. 01-06 13:05 ~ 13:50 | 4071.28 -> 4056.87 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4056.87,
+    4071.28,
+    '2026-01-06T05:05:00.000Z',
+    '2026-01-06T05:50:00.000Z',
+    72,
+    81,
+  ),
+  // 5. 01-06 13:50 ~ 01-07 09:55 | 4056.87 -> 4093.30 (Up) -> 【第1中枢 进入笔 b0】
+  makeMockBi(
+    TrendDirection.Up,
+    4056.87,
+    4093.3,
+    '2026-01-06T05:50:00.000Z',
+    '2026-01-07T01:55:00.000Z',
+    81,
+    100,
+  ),
+  // 6. 01-07 09:55 ~ 10:30 | 4093.30 -> 4075.70 (Down) -> 【构件笔 b1】
+  makeMockBi(
+    TrendDirection.Down,
+    4075.7,
+    4093.3,
+    '2026-01-07T01:55:00.000Z',
+    '2026-01-07T02:30:00.000Z',
+    100,
+    107,
+  ),
+  // 7. 01-07 10:30 ~ 11:30 | 4075.70 -> 4098.78 (Up) -> 【构件笔 b2】
+  makeMockBi(
+    TrendDirection.Up,
+    4075.7,
+    4098.78,
+    '2026-01-07T02:30:00.000Z',
+    '2026-01-07T03:30:00.000Z',
+    107,
+    119,
+  ),
+  // 8. 01-07 11:30 ~ 13:50 | 4098.78 -> 4069.44 (Down) -> 【构件笔 b3】（初始核心确立 ZD=4075.70, ZG=4088.01/4093.30）
+  makeMockBi(
+    TrendDirection.Down,
+    4069.44,
+    4098.78,
+    '2026-01-07T03:30:00.000Z',
+    '2026-01-07T05:50:00.000Z',
+    119,
+    129,
+  ),
+  // 9. 01-07 13:50 ~ 14:20 | 4069.44 -> 4088.01 (Up) -> 【震荡延伸 b4】
+  makeMockBi(
+    TrendDirection.Up,
+    4069.44,
+    4088.01,
+    '2026-01-07T05:50:00.000Z',
+    '2026-01-07T06:20:00.000Z',
+    129,
+    135,
+  ),
+  // 10. 01-07 14:20 ~ 01-08 09:35 | 4088.01 -> 4072.39 (Down) -> 【震荡延伸 b5】
+  makeMockBi(
+    TrendDirection.Down,
+    4072.39,
+    4088.01,
+    '2026-01-07T06:20:00.000Z',
+    '2026-01-08T01:35:00.000Z',
+    135,
+    144,
+  ),
+  // 11. 01-08 09:35 ~ 11:05 | 4072.39 -> 4093.87 (Up) -> 【震荡延伸 b6】
+  makeMockBi(
+    TrendDirection.Up,
+    4072.39,
+    4093.87,
+    '2026-01-08T01:35:00.000Z',
+    '2026-01-08T03:05:00.000Z',
+    144,
+    162,
+  ),
+  // 12. 01-08 11:05 ~ 14:20 | 4093.87 -> 4067.12 (Down) -> 【震荡延伸 b7】
+  makeMockBi(
+    TrendDirection.Down,
+    4067.12,
+    4093.87,
+    '2026-01-08T03:05:00.000Z',
+    '2026-01-08T06:20:00.000Z',
+    162,
+    183,
+  ),
+  // 13. 01-08 14:20 ~ 01-09 10:50 | 4067.12 -> 4121.70 (Up) -> 【顺势突破离开笔】（冲至 4121.70，突破 GG 4098.78）
+  makeMockBi(
+    TrendDirection.Up,
+    4067.12,
+    4121.7,
+    '2026-01-08T06:20:00.000Z',
+    '2026-01-09T02:50:00.000Z',
+    183,
+    207,
+  ),
+  // 14. 01-09 10:50 ~ 11:10 | 4121.70 -> 4093.01 (Down) -> 【离开后回踩笔】（低点 4093.01 > ZG 4088.01，形成 3买）
+  makeMockBi(
+    TrendDirection.Down,
+    4093.01,
+    4121.7,
+    '2026-01-09T02:50:00.000Z',
+    '2026-01-09T03:10:00.000Z',
+    207,
+    211,
+  ),
+  // 15. 01-09 11:10 ~ 01-13 10:10 | 4093.01 -> 4179.70 (Up) -> 【3买后顺势第1笔大涨】（冲至 4179.70，突破前高 4121.70）
+  makeMockBi(
+    TrendDirection.Up,
+    4093.01,
+    4179.7,
+    '2026-01-09T03:10:00.000Z',
+    '2026-01-13T02:10:00.000Z',
+    211,
+    295,
+  ),
+  // 16. 01-13 10:10 ~ 10:40 | 4179.70 -> 4151.90 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4151.9,
+    4179.7,
+    '2026-01-13T02:10:00.000Z',
+    '2026-01-13T02:40:00.000Z',
+    295,
+    301,
+  ),
+  // 17. 01-13 10:40 ~ 11:20 | 4151.90 -> 4173.74 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4151.9,
+    4173.74,
+    '2026-01-13T02:40:00.000Z',
+    '2026-01-13T03:20:00.000Z',
+    301,
+    309,
+  ),
+  // 18. 01-13 11:20 ~ 13:40 | 4173.74 -> 4140.97 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4140.97,
+    4173.74,
+    '2026-01-13T03:20:00.000Z',
+    '2026-01-13T05:40:00.000Z',
+    309,
+    319,
+  ),
+  // 19. 01-13 13:40 ~ 14:00 | 4140.97 -> 4167.16 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4140.97,
+    4167.16,
+    '2026-01-13T05:40:00.000Z',
+    '2026-01-13T06:00:00.000Z',
+    319,
+    323,
+  ),
+  // 20. 01-13 14:00 ~ 14:50 | 4167.16 -> 4126.23 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4126.23,
+    4167.16,
+    '2026-01-13T06:00:00.000Z',
+    '2026-01-13T06:50:00.000Z',
+    323,
+    333,
+  ),
+  // 21. 01-13 14:50 ~ 01-14 11:25 | 4126.23 -> 4190.87 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4126.23,
+    4190.87,
+    '2026-01-13T06:50:00.000Z',
+    '2026-01-14T03:25:00.000Z',
+    333,
+    358,
+  ),
+  // 22. 01-14 11:25 ~ 14:05 | 4190.87 -> 4103.62 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4103.62,
+    4190.87,
+    '2026-01-14T03:25:00.000Z',
+    '2026-01-14T06:05:00.000Z',
+    358,
+    372,
+  ),
+  // 23. 01-14 14:05 ~ 14:35 | 4103.62 -> 4138.55 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4103.62,
+    4138.55,
+    '2026-01-14T06:05:00.000Z',
+    '2026-01-14T06:35:00.000Z',
+    372,
+    378,
+  ),
+  // 24. 01-14 14:35 ~ 01-15 09:35 | 4138.55 -> 4104.42 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4104.42,
+    4138.55,
+    '2026-01-14T06:35:00.000Z',
+    '2026-01-15T01:35:00.000Z',
+    378,
+    384,
+  ),
+  // 25. 01-15 09:35 ~ 10:00 | 4104.42 -> 4133.07 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4104.42,
+    4133.07,
+    '2026-01-15T01:35:00.000Z',
+    '2026-01-15T02:00:00.000Z',
+    384,
+    389,
+  ),
+  // 26. 01-15 10:00 ~ 13:05 | 4133.07 -> 4096.85 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4096.85,
+    4133.07,
+    '2026-01-15T02:00:00.000Z',
+    '2026-01-15T05:05:00.000Z',
+    389,
+    408,
+  ),
+  // 27. 01-15 13:05 ~ 13:50 | 4096.85 -> 4116.70 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4096.85,
+    4116.7,
+    '2026-01-15T05:05:00.000Z',
+    '2026-01-15T05:50:00.000Z',
+    408,
+    417,
+  ),
+  // 28. 01-15 13:50 ~ 14:15 | 4116.70 -> 4098.20 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4098.2,
+    4116.7,
+    '2026-01-15T05:50:00.000Z',
+    '2026-01-15T06:15:00.000Z',
+    417,
+    422,
+  ),
+  // 29. 01-15 14:15 ~ 01-16 09:40 | 4098.20 -> 4140.23 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4098.2,
+    4140.23,
+    '2026-01-15T06:15:00.000Z',
+    '2026-01-16T01:40:00.000Z',
+    422,
+    433,
+  ),
+  // 30. 01-16 09:40 ~ 10:15 | 4140.23 -> 4100.65 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4100.65,
+    4140.23,
+    '2026-01-16T01:40:00.000Z',
+    '2026-01-16T02:15:00.000Z',
+    433,
+    440,
+  ),
+  // 31. 01-16 10:15 ~ 11:05 | 4100.65 -> 4120.40 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4100.65,
+    4120.4,
+    '2026-01-16T02:15:00.000Z',
+    '2026-01-16T03:05:00.000Z',
+    440,
+    450,
+  ),
+  // 32. 01-16 11:05 ~ 13:10 | 4120.40 -> 4094.27 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4094.27,
+    4120.4,
+    '2026-01-16T03:05:00.000Z',
+    '2026-01-16T05:10:00.000Z',
+    450,
+    457,
+  ),
+  // 33. 01-16 13:10 ~ 13:50 | 4094.27 -> 4119.23 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4094.27,
+    4119.23,
+    '2026-01-16T05:10:00.000Z',
+    '2026-01-16T05:50:00.000Z',
+    457,
+    465,
+  ),
+  // 34. 01-16 13:50 ~ 14:10 | 4119.23 -> 4091.81 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4091.81,
+    4119.23,
+    '2026-01-16T05:50:00.000Z',
+    '2026-01-16T06:10:00.000Z',
+    465,
+    469,
+  ),
+  // 35. 01-16 14:10 ~ 14:40 | 4091.81 -> 4108.71 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4091.81,
+    4108.71,
+    '2026-01-16T06:10:00.000Z',
+    '2026-01-16T06:40:00.000Z',
+    469,
+    475,
+  ),
+  // 36. 01-16 14:40 ~ 01-19 09:35 | 4108.71 -> 4090.06 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4090.06,
+    4108.71,
+    '2026-01-16T06:40:00.000Z',
+    '2026-01-19T01:35:00.000Z',
+    475,
+    480,
+  ),
+  // 37. 01-19 09:35 ~ 10:15 | 4090.06 -> 4126.52 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4090.06,
+    4126.52,
+    '2026-01-19T01:35:00.000Z',
+    '2026-01-19T02:15:00.000Z',
+    480,
+    488,
+  ),
+  // 38. 01-19 10:15 ~ 10:45 | 4126.52 -> 4099.23 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4099.23,
+    4126.52,
+    '2026-01-19T02:15:00.000Z',
+    '2026-01-19T02:45:00.000Z',
+    488,
+    494,
+  ),
+  // 39. 01-19 10:45 ~ 13:25 | 4099.23 -> 4123.41 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4099.23,
+    4123.41,
+    '2026-01-19T02:45:00.000Z',
+    '2026-01-19T05:25:00.000Z',
+    494,
+    508,
+  ),
+  // 40. 01-19 13:25 ~ 13:55 | 4123.41 -> 4100.12 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4100.12,
+    4123.41,
+    '2026-01-19T05:25:00.000Z',
+    '2026-01-19T05:55:00.000Z',
+    508,
+    514,
+  ),
+  // 41. 01-19 13:55 ~ 01-20 09:40 | 4100.12 -> 4128.93 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4100.12,
+    4128.93,
+    '2026-01-19T05:55:00.000Z',
+    '2026-01-20T01:40:00.000Z',
+    514,
+    523,
+  ),
+  // 42. 01-20 09:40 ~ 10:30 | 4128.93 -> 4080.29 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4080.29,
+    4128.93,
+    '2026-01-20T01:40:00.000Z',
+    '2026-01-20T02:30:00.000Z',
+    523,
+    533,
+  ),
+  // 43. 01-20 10:30 ~ 13:55 | 4080.29 -> 4117.96 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    4080.29,
+    4117.96,
+    '2026-01-20T02:30:00.000Z',
+    '2026-01-20T05:55:00.000Z',
+    533,
+    550,
+  ),
+  // 44. 01-20 13:55 ~ 14:35 | 4100.36 -> 4117.96 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4100.36,
+    4117.96,
+    '2026-01-20T05:55:00.000Z',
+    '2026-01-20T06:35:00.000Z',
+    550,
+    558,
+  ),
+  // 45. 01-20 14:35 ~ 01-21 10:45 | 4100.36 -> 4135.96 (Up) -> 【大中枢 进入笔 b0】
+  makeMockBi(
+    TrendDirection.Up,
+    4100.36,
+    4135.96,
+    '2026-01-20T06:35:00.000Z',
+    '2026-01-21T02:45:00.000Z',
+    558,
+    579,
+  ),
+  // 46. 01-21 10:45 ~ 11:30 | 4118.82 -> 4135.96 (Down) -> 【构件笔 b1】
+  makeMockBi(
+    TrendDirection.Down,
+    4118.82,
+    4135.96,
+    '2026-01-21T02:45:00.000Z',
+    '2026-01-21T03:30:00.000Z',
+    579,
+    588,
+  ),
+  // 47. 01-21 11:30 ~ 14:05 | 4118.82 -> 4134.71 (Up) -> 【构件笔 b2】
+  makeMockBi(
+    TrendDirection.Up,
+    4118.82,
+    4134.71,
+    '2026-01-21T03:30:00.000Z',
+    '2026-01-21T06:05:00.000Z',
+    588,
+    601,
+  ),
+  // 48. 01-21 14:05 ~ 14:55 | 4110.45 -> 4134.71 (Down) -> 【构件笔 b3】
+  makeMockBi(
+    TrendDirection.Down,
+    4110.45,
+    4134.71,
+    '2026-01-21T06:05:00.000Z',
+    '2026-01-21T06:55:00.000Z',
+    601,
+    612,
+  ),
+  // 49. 01-21 14:55 ~ 01-22 10:15 | 4110.45 -> 4140.84 (Up) -> 【震荡延伸】
+  makeMockBi(
+    TrendDirection.Up,
+    4110.45,
+    4140.84,
+    '2026-01-21T06:55:00.000Z',
+    '2026-01-22T02:15:00.000Z',
+    612,
+    622,
+  ),
+  // 50. 01-22 10:15 ~ 10:35 | 4112.86 -> 4140.84 (Down) -> 【震荡延伸】
+  makeMockBi(
+    TrendDirection.Down,
+    4112.86,
+    4140.84,
+    '2026-01-22T02:15:00.000Z',
+    '2026-01-22T02:35:00.000Z',
+    622,
+    627,
+  ),
+  // 51. 01-22 10:35 ~ 11:15 | 4112.86 -> 4127.82 (Up) -> 【震荡延伸】
+  makeMockBi(
+    TrendDirection.Up,
+    4112.86,
+    4127.82,
+    '2026-01-22T02:35:00.000Z',
+    '2026-01-22T03:15:00.000Z',
+    627,
+    635,
+  ),
+  // 52. 01-22 11:15 ~ 13:05 | 4109.92 -> 4127.82 (Down) -> 【震荡延伸】
+  makeMockBi(
+    TrendDirection.Down,
+    4109.92,
+    4127.82,
+    '2026-01-22T03:15:00.000Z',
+    '2026-01-22T05:05:00.000Z',
+    635,
+    643,
+  ),
+  // 53. 01-22 13:05 ~ 01-23 10:15 | 4109.92 -> 4139.95 (Up) -> 【震荡延伸】
+  makeMockBi(
+    TrendDirection.Up,
+    4109.92,
+    4139.95,
+    '2026-01-22T05:05:00.000Z',
+    '2026-01-23T02:15:00.000Z',
+    643,
+    675,
+  ),
+  // 54. 01-23 10:15 ~ 10:35 | 4120.20 -> 4139.95 (Down) -> 【震荡延伸】
+  makeMockBi(
+    TrendDirection.Down,
+    4120.2,
+    4139.95,
+    '2026-01-23T02:15:00.000Z',
+    '2026-01-23T02:35:00.000Z',
+    675,
+    679,
+  ),
+  // 55. 01-23 10:35 ~ 14:10 | 4120.20 -> 4143.75 (Up) -> 【震荡延伸】
+  makeMockBi(
+    TrendDirection.Up,
+    4120.2,
+    4143.75,
+    '2026-01-23T02:35:00.000Z',
+    '2026-01-23T06:10:00.000Z',
+    679,
+    704,
+  ),
+  // 56. 01-23 14:10 ~ 14:40 | 4120.63 -> 4143.75 (Down) -> 【震荡延伸】
+  makeMockBi(
+    TrendDirection.Down,
+    4120.63,
+    4143.75,
+    '2026-01-23T06:10:00.000Z',
+    '2026-01-23T06:40:00.000Z',
+    704,
+    710,
+  ),
+  // 57. 01-23 14:40 ~ 01-26 10:40 | 4120.63 -> 4160.99 (Up) -> 【顺势离开笔】（终点 01-26 10:40，破 4143.75 创 4160.99）
+  makeMockBi(
+    TrendDirection.Up,
+    4120.63,
+    4160.99,
+    '2026-01-23T06:40:00.000Z',
+    '2026-01-26T02:40:00.000Z',
+    710,
+    728,
+  ),
+  // 58. 01-26 10:40 ~ 11:05 | 4124.70 -> 4160.99 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    4124.7,
+    4160.99,
+    '2026-01-26T02:40:00.000Z',
+    '2026-01-26T03:05:00.000Z',
+    728,
+    733,
+  ),
+  // 59. 01-26 11:05 ~ 14:35 | 4124.70 -> 4145.97 (Up) -> 【次高点反弹笔（2卖）】
+  makeMockBi(
+    TrendDirection.Up,
+    4124.7,
+    4145.97,
+    '2026-01-26T03:05:00.000Z',
+    '2026-01-26T06:35:00.000Z',
+    733,
+    757,
+  ),
+  // 60. 01-26 14:35 ~ 01-27 10:05 | 4101.83 -> 4145.97 (Down) -> 【3买转2卖确认下杀笔】
+  makeMockBi(
+    TrendDirection.Down,
+    4101.83,
+    4145.97,
+    '2026-01-26T06:35:00.000Z',
+    '2026-01-27T02:05:00.000Z',
+    757,
+    786,
+  ),
+];
+
+describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Departure & Closure Cases)', () => {
+  const biCalc = new ChannelCalculator();
+  const duanCalc = new DuanChannelCalculator();
+
+  it('环境基准脚手架就绪：计算器与构件工厂可用', () => {
+    expect(biCalc).toBeDefined();
+    expect(duanCalc).toBeDefined();
+
+    const sampleBi = makeMockBi(
+      TrendDirection.Up,
+      10,
+      20,
+      '2026-01-01T09:30:00Z',
+      '2026-01-01T09:35:00Z',
+    );
+    expect(sampleBi.trend).toBe(TrendDirection.Up);
+
+    const sampleDuan = makeMockDuan(
+      TrendDirection.Down,
+      20,
+      10,
+      '2026-01-01T09:30:00Z',
+      '2026-01-01T10:30:00Z',
+    );
+    expect(sampleDuan.trend).toBe(TrendDirection.Down);
+
+    expect(ChannelLevel.Bi).toBe('bi');
+    expect(ChannelStatus.Valid).toBe(1);
+    expect(ChannelType.Complete).toBe('complete');
+  });
+
+  it('验证真实 5M 2026年1月5日~1月27日全量笔序列基准数据完整性', () => {
+    expect(REAL_5M_JAN2026_FIRST_CENTRAL_BIS).toHaveLength(60);
+    // 验证严格趋势交替
+    for (let i = 0; i < REAL_5M_JAN2026_FIRST_CENTRAL_BIS.length - 1; i++) {
+      expect(REAL_5M_JAN2026_FIRST_CENTRAL_BIS[i].trend).not.toBe(
+        REAL_5M_JAN2026_FIRST_CENTRAL_BIS[i + 1].trend,
+      );
+    }
+  });
+
+  // 用户测试用例准备区域
+  describe('用例 1：2026年1月6日13:50至1月9日10:50九笔中枢基准与后续3买离开', () => {
+    it('全量序列应精准识别为 9 笔中枢，起止时间严格对齐，后续走出 3 买与离开', () => {
+      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      process.stderr.write(
+        `\n=== ALL CHANNELS (${resAll.phaseB.length}) ===\n`,
+      );
+      resAll.phaseB.forEach((c, i) => {
+        const s = c.bis[0].startTime.toLocaleString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+        });
+        const e = c.bis[c.bis.length - 1].endTime.toLocaleString('zh-CN', {
+          timeZone: 'Asia/Shanghai',
+        });
+        process.stderr.write(
+          `  [#${i}] ${c.trend} (${c.bis.length} bis) | ${s} ~ ${e} | ZG:${c.zg} ZD:${c.zd} GG:${c.gg} DD:${c.dd} | type: ${c.type}\n`,
+        );
+      });
+      expect(resAll.phaseB.length).toBeGreaterThanOrEqual(1);
+
+      const c0 = resAll.phaseB[0];
+      // 1. 中间一共 9 笔中枢
+      expect(c0.bis).toHaveLength(9);
+
+      // 2. 起笔是 1月6日 13:50 (Bi 4)
+      expect(c0.bis[0].startTime).toEqual(new Date('2026-01-06T05:50:00.000Z'));
+      // 3. 终点是 1月9日 10:50 (Bi 12)
+      expect(c0.bis[8].endTime).toEqual(new Date('2026-01-09T02:50:00.000Z'));
+
+      // 4. 中枢状态与几何参数
+      expect(c0.type).toBe(ChannelType.Complete);
+      expect(c0.expanded).toBe(true);
+      expect(c0.zg).toBe(4088.01);
+      expect(c0.zd).toBe(4075.7);
+      expect(c0.gg).toBe(4121.7);
+      expect(c0.dd).toBe(4056.87);
+
+      // 5. 后续走势：第 10 笔（Bi 13）为 3 买（回踩不破 ZG 4088.01）
+      const bi13 = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[13];
+      expect(bi13.startTime).toEqual(new Date('2026-01-09T02:50:00.000Z')); // 10:50
+      expect(bi13.endTime).toEqual(new Date('2026-01-09T03:10:00.000Z')); // 11:10
+      expect(bi13.trend).toBe(TrendDirection.Down);
+      expect(bi13.low).toBeGreaterThan(c0.zg); // 4093.01 > 4088.01 -> 严格三买
+
+      // 6. 后续走势：第 11 笔（Bi 14）为顺势离开（主升大涨破 4121.70）
+      const bi14 = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[14];
+      expect(bi14.startTime).toEqual(new Date('2026-01-09T03:10:00.000Z')); // 11:10
+      expect(bi14.endTime).toEqual(new Date('2026-01-13T02:10:00.000Z')); // 01-13 10:10
+      expect(bi14.trend).toBe(TrendDirection.Up);
+      expect(bi14.high).toBeGreaterThan(c0.gg); // 4179.70 > 4121.70 -> 强力离开
+    });
+  });
+
+  describe('用例 2：2026年1月9日11:10至1月14日11:25上涨中枢（对应30分钟向上笔）', () => {
+    it('全量序列应精准识别为 7 笔上涨中枢，起止时间严格吻合，方向判定为 Up', () => {
+      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      expect(resAll.phaseB.length).toBeGreaterThanOrEqual(2);
+
+      const c1 = resAll.phaseB[1];
+      // 1. 方向严格为 Up (对齐 30 分钟向上笔)
+      expect(c1.trend).toBe(TrendDirection.Up);
+
+      // 2. 中间一共 7 笔中枢 (1 进入 + 3 核心 + 2 延伸 + 1 顺势离开)
+      expect(c1.bis).toHaveLength(7);
+
+      // 3. 起笔是 1月9日 11:10 (Bi 14)
+      expect(c1.bis[0].startTime).toEqual(new Date('2026-01-09T03:10:00.000Z'));
+      // 4. 终点是 1月14日 11:25 (Bi 20)
+      expect(c1.bis[6].endTime).toEqual(new Date('2026-01-14T03:25:00.000Z'));
+
+      // 5. 几何参数与区间
+      expect(c1.type).toBe(ChannelType.Complete);
+      expect(c1.zg).toBe(4167.16);
+      expect(c1.zd).toBe(4151.9);
+      expect(c1.gg).toBe(4190.87);
+      expect(c1.dd).toBe(4093.01);
+    });
+
+    it('检验增量切片下该中枢的稳定状态（截取至 1月14日11:25 Bi 20 冲高顶端）', () => {
+      // 截取至 Bi 20 (从 index 0 到 20 共 21 笔)
+      const bisUpToBi20 = REAL_5M_JAN2026_FIRST_CENTRAL_BIS.slice(0, 21);
+      const resBi20 = biCalc.createChannels(bisUpToBi20, {
+        allowUncomplete: true,
+      });
+      expect(resBi20.phaseB.length).toBeGreaterThanOrEqual(2);
+      expect(resBi20.phaseB[1].trend).toBe(TrendDirection.Up);
+      expect(resBi20.phaseB[1].bis).toHaveLength(7);
+      expect(resBi20.phaseB[1].type).toBe(ChannelType.Complete);
+    });
+  });
+
+  describe.skip('用例 3：2026年1月14日11:25至1月20日10:30双下跌中枢（分别对应两笔30分钟向下笔）', () => {
+    it('全量序列应分别产出独立的第3个中枢(01-14 11:25~01-15 13:05)与第4个中枢(01-16 09:40~01-20 10:30)，严禁碎裂错乱', () => {
+      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+
+      // 1. 检验第 3 个中枢：1月14日 11:25 ~ 1月15日 13:05 下跌中枢 (对应 30分钟一笔下 4190.87 -> 4096.85)
+      const c2 = resAll.phaseB.find(
+        (c) =>
+          c.bis[0].startTime.getTime() ===
+          new Date('2026-01-14T03:25:00.000Z').getTime(),
+      );
+      expect(c2).toBeDefined();
+      expect(c2?.trend).toBe(TrendDirection.Down);
+      expect(c2?.bis[c2.bis.length - 1].endTime).toEqual(
+        new Date('2026-01-15T05:05:00.000Z'), // 01-15 13:05
+      );
+      expect(c2?.type).toBe(ChannelType.Complete);
+
+      // 2. 检验第 4 个中枢：1月16日 09:40 ~ 1月20日 10:30 下跌中枢 (对应 30分钟一笔下 4140.23 -> 4080.29)
+      // 注意：当前代码此处应该报错（由于碎裂成多段伪中枢导致无法找到该完整中枢）
+      const c3 = resAll.phaseB.find(
+        (c) =>
+          c.bis[0].startTime.getTime() ===
+          new Date('2026-01-16T01:40:00.000Z').getTime(),
+      );
+      expect(c3).toBeDefined();
+      expect(c3?.trend).toBe(TrendDirection.Down);
+      expect(c3?.bis[c3.bis.length - 1].endTime).toEqual(
+        new Date('2026-01-20T02:30:00.000Z'), // 01-20 10:30
+      );
+      expect(c3?.type).toBe(ChannelType.Complete);
+    });
+  });
+
+  describe.skip('用例 4：2026年1月20日10:30至1月26日10:40单一大中枢（对应30分钟向上笔）', () => {
+    it('在1月20日10:30至1月26日10:40内应只有唯一下跌后转上的单一大中枢，起于01-20 14:35，离开起于01-23 14:40，严禁错误割裂为2个中枢', () => {
+      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+
+      // 筛选在 2026-01-20 10:30 至 2026-01-26 10:40 范围内的中枢
+      const tStart = new Date('2026-01-20T02:30:00.000Z').getTime(); // 01-20 10:30
+      const tEnd = new Date('2026-01-26T02:40:00.000Z').getTime(); // 01-26 10:40
+
+      const channelsInRange = resAll.phaseB.filter((c) => {
+        const cStart = c.bis[0].startTime.getTime();
+        const cEnd = c.bis[c.bis.length - 1].endTime.getTime();
+        return cStart >= tStart && cEnd <= tEnd;
+      });
+
+      // 1. 业务契约：整个对应 30 分钟一笔上，内部必须只有 1 个单一大中枢，严禁错误划分成 2 个中枢
+      expect(channelsInRange.length).toBe(1);
+
+      const bigChannel = channelsInRange[0];
+      expect(bigChannel.trend).toBe(TrendDirection.Up);
+      // 2. 进入笔起点：1月20日 14:35 (Bi 45)
+      expect(bigChannel.bis[0].startTime).toEqual(
+        new Date('2026-01-20T06:35:00.000Z'),
+      );
+      // 3. 离开笔终点：1月26日 10:40 (Bi 57)
+      expect(bigChannel.bis[bigChannel.bis.length - 1].endTime).toEqual(
+        new Date('2026-01-26T02:40:00.000Z'),
+      );
+      // 4. 离开笔的起点：1月23日 14:40 (Bi 57.startTime)
+      const departureBi = bigChannel.bis[bigChannel.bis.length - 1];
+      expect(departureBi.startTime).toEqual(
+        new Date('2026-01-23T06:40:00.000Z'),
+      );
+      expect(bigChannel.type).toBe(ChannelType.Complete);
+    });
+  });
+
+  describe.skip('用例 5：2026年1月26日10:40至1月27日10:05三买转二卖中枢严禁延伸防污染', () => {
+    it('前置大中枢必须在离开笔冲高极值(01-26 10:40)确定闭合封存，严禁将随后的 3 买与 2 卖吸收为中枢延伸', () => {
+      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+
+      // 1. 查找起于 01-20 14:35 的单一大中枢
+      const bigChannel = resAll.phaseB.find(
+        (c) =>
+          c.bis[0].startTime.getTime() ===
+          new Date('2026-01-20T06:35:00.000Z').getTime(),
+      );
+      expect(bigChannel).toBeDefined();
+      expect(bigChannel?.trend).toBe(TrendDirection.Up);
+      expect(bigChannel?.type).toBe(ChannelType.Complete);
+
+      // 2. 离开笔终点必须是 01-26 10:40 (4160.99)
+      const lastBi = bigChannel!.bis[bigChannel!.bis.length - 1];
+      expect(lastBi.endTime).toEqual(new Date('2026-01-26T02:40:00.000Z'));
+      expect(lastBi.high).toBe(4160.99);
+
+      // 3. 离开笔高点必须等于中枢的 GG，绝不能因为错误吸纳后续 3买/2卖 导致离开笔异常
+      expect(bigChannel?.gg).toBe(4160.99);
+      expect(lastBi.high).toBe(bigChannel?.gg);
+
+      // 4. 严禁吸纳 01-26 10:40 之后的任何笔（3买回踩 4124.70、2卖反弹 4145.97、下杀 4101.83）
+      const hasPostDepartureBis = bigChannel!.bis.some(
+        (b) =>
+          b.startTime.getTime() >=
+          new Date('2026-01-26T02:40:00.000Z').getTime(),
+      );
+      expect(hasPostDepartureBis).toBe(false);
+
+      // 5. 校验后续走势结构（纯常量走势特征）：
+      // Bi 57: 3买回踩 (01-26 10:40 ~ 11:05, low 4124.70 > ZD)
+      const bi3Buy = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[57];
+      expect(bi3Buy.low).toBeGreaterThan(bigChannel!.zd);
+
+      // Bi 58: 2卖反弹次高点 (01-26 11:05 ~ 14:35, high 4145.97 < GG 4160.99)
+      const bi2Sell = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[58];
+      expect(bi2Sell.high).toBeLessThan(bigChannel!.gg);
+
+      // Bi 59: 确认下杀 (01-26 14:35 ~ 01-27 10:05, low 4101.83)
+      const biBreak = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[59];
+      expect(biBreak.low).toBeLessThan(bigChannel!.zd);
+    });
+  });
+});

@@ -132,58 +132,105 @@ function checkDepartureRules<T extends ChannelElement, R>(
   isUp: boolean,
   curZg: number,
   curZd: number,
-  newGg: number,
-  newDd: number,
+  curGg: number,
+  curDd: number,
   strategy: ChannelLifecycleStrategy<T, R>,
 ): boolean {
   const count = data.length;
-  // 若已至序列末尾，或下一笔未保持趋势交替，直接封存
+  // 若已至序列末尾，或下一笔未保持趋势交替，或末尾不足以构成后续独立新走势，直接封存
   if (
     candidateIdx + 1 >= count ||
-    data[candidateIdx + 1].trend === data[candidateIdx].trend
+    data[candidateIdx + 1].trend === data[candidateIdx].trend ||
+    (strategy.minCoreLength > 3 &&
+      candidateIdx + strategy.minCoreLength >= count)
   ) {
     return true;
   }
 
   const pullback = data[candidateIdx + 1];
+
+  // 1. 规则 1：成立第 3 类买卖点（回抽不跌回/升回中枢 [ZD, ZG]）：
+  // 无论是否突破 GG/DD，离开必然确立，前置中枢立即封存
   const is3rdPoint = isUp ? pullback.low > curZg : pullback.high < curZd;
-
   if (is3rdPoint) {
-    // 规则 1：第 3 类买卖点后顺势第 1 笔/段突破离开极值
-    if (candidateIdx + 2 < count) {
-      const stroke1 = data[candidateIdx + 2];
-      const s1Exceeds = isUp ? stroke1.high > newGg : stroke1.low < newDd;
-      if (s1Exceeds) {
-        return true;
-      }
-    }
+    return true;
+  }
 
-    // 规则 2：第 3 类买卖点后反向第 2 笔/段击穿中枢反向沿 (ZD/ZG)
-    if (candidateIdx + 3 < count) {
-      const stroke2 = data[candidateIdx + 3];
-      const s2Pierces = isUp ? stroke2.low < curZd : stroke2.high > curZg;
-      if (s2Pierces) {
-        return true;
-      }
-    }
-  } else {
-    // 规则 3：无第 3 类买卖点，离开后反向折返直接打穿中枢反向沿 (ZD/ZG)
-    const pbPierces = isUp ? pullback.low < curZd : pullback.high > curZg;
-    if (pbPierces) {
+  // 若无 3买/3卖，离开笔必须至少突破中枢极值 GG/DD，杜绝中枢内部震荡误判为离开
+  const curr = data[candidateIdx];
+  const hasBrokenExtreme = isUp ? curr.high > curGg : curr.low < curDd;
+  if (!hasBrokenExtreme) {
+    return false;
+  }
+
+  // 2. 规则 2：反向一笔物理反转打穿对侧极值（暴跌打穿 DD / 暴涨打穿 GG）：
+  // 走势结构被物理反转彻底破坏，绝不可能再给 3 买/3 卖，直接在离开极值端点封存
+  const piercesOppositeExtreme = isUp
+    ? pullback.low < curDd
+    : pullback.high > curGg;
+  if (piercesOppositeExtreme) {
+    return true;
+  }
+
+  // 3. 规则 3（仅限 Duan 级别段中枢）：无 3买/3卖，离开后反向单段直接打穿中枢对向沿 (ZD/ZG)
+  if (strategy.minCoreLength <= 3) {
+    const pbPiercesBoundary = isUp
+      ? pullback.low < curZd
+      : pullback.high > curZg;
+    if (pbPiercesBoundary) {
       return true;
     }
   }
 
-  // 规则 4：突破极值后，无论是否形成 3 类买卖点，若后续自身已构成新中枢核心，旧中枢封存
-  const newCoreCandidate = data.slice(
-    candidateIdx,
-    candidateIdx + strategy.minCoreLength,
-  );
-  if (
-    validateTrendAlternating(newCoreCandidate) &&
-    strategy.validateCore(newCoreCandidate)
-  ) {
-    return true;
+  // 4. 规则 4：顺势离开后，后续独立构成新中枢核心
+  const checkNewCore = (startIdx: number): boolean => {
+    if (startIdx + strategy.minCoreLength > count) {
+      return false;
+    }
+    const newCoreCandidate = data.slice(
+      startIdx,
+      startIdx + strategy.minCoreLength,
+    );
+    if (
+      validateTrendAlternating(newCoreCandidate) &&
+      newCoreCandidate.length === strategy.minCoreLength
+    ) {
+      const newCore = strategy.validateCore(newCoreCandidate);
+      if (newCore) {
+        // a. 完全不重叠的新中枢（同向或反向）
+        const isHigher = newCore.geometry.zd >= curZg;
+        const isLower = newCore.geometry.zg <= curZd;
+        if (isHigher || isLower) {
+          return true;
+        }
+
+        // b. 同向阶梯递进新中枢（后置中枢整体向上/向下抬升）
+        if (newCore.isUp === isUp) {
+          const isStepped = isUp
+            ? newCore.geometry.zd > curZd && newCore.geometry.zg > curZg
+            : newCore.geometry.zg < curZg && newCore.geometry.zd < curZd;
+          if (isStepped) {
+            return true;
+          }
+        }
+      }
+    }
+    return false;
+  };
+
+  for (let offset = 0; offset <= 1; offset++) {
+    if (checkNewCore(candidateIdx + offset)) {
+      return true;
+    }
+  }
+
+  // 5. 规则 5：突破极值离开后，反向第 2 笔冲破中枢对侧极值 (curGg / curDd)
+  if (candidateIdx + 3 < count) {
+    const stroke2 = data[candidateIdx + 3];
+    const s2PiercesExtreme = isUp ? stroke2.low < curDd : stroke2.high > curGg;
+    if (s2PiercesExtreme) {
+      return true;
+    }
   }
 
   return false;
@@ -251,36 +298,27 @@ export class ChannelLifecycleEngine {
 
         // 当 channelElements.length 为偶数时（如笔中枢 4, 6, 8...），curr 与进入笔同向
         if (channelElements.length % 2 === 0) {
-          // 极值破坏守卫：顺势笔/段不得击穿向上起点 DD 或冲破向下起点 GG
-          if (isUp && curr.low < curDd) {
-            break;
-          }
-          if (!isUp && curr.high > curGg) {
-            break;
-          }
-
           const isTrendDir =
             (isUp && curr.trend === TrendDirection.Up) ||
             (!isUp && curr.trend === TrendDirection.Down);
           const hasBrokenOut =
-            isTrendDir && (isUp ? curr.high > curGg : curr.low < curDd);
+            isTrendDir && (isUp ? curr.high > curZg : curr.low < curZd);
 
           if (hasBrokenOut) {
             const newGg = isUp ? Math.max(curGg, curr.high) : curGg;
             const newDd = !isUp ? Math.min(curDd, curr.low) : curDd;
 
-            if (
-              checkDepartureRules(
-                data,
-                nextIdx,
-                isUp,
-                curZg,
-                curZd,
-                newGg,
-                newDd,
-                strategy,
-              )
-            ) {
+            const departureOk = checkDepartureRules(
+              data,
+              nextIdx,
+              isUp,
+              curZg,
+              curZd,
+              curGg,
+              curDd,
+              strategy,
+            );
+            if (departureOk) {
               channelElements.push(curr);
               curGg = newGg;
               curDd = newDd;
@@ -299,7 +337,7 @@ export class ChannelLifecycleEngine {
               (!isUp && nextElem.trend === TrendDirection.Down);
             const nextBrokenOut =
               nextIsTrendDir &&
-              (isUp ? nextElem.high > curGg : nextElem.low < curDd);
+              (isUp ? nextElem.high > curZg : nextElem.low < curZd);
 
             if (nextBrokenOut) {
               const tempZd = Math.max(curZd, curr.low);
@@ -320,8 +358,8 @@ export class ChannelLifecycleEngine {
                   isUp,
                   testZg,
                   testZd,
-                  newGg,
-                  newDd,
+                  curGg,
+                  curDd,
                   strategy,
                 )
               ) {
@@ -395,8 +433,9 @@ export class ChannelLifecycleEngine {
         allowUncomplete && (nextIdx >= count || count - nextIdx <= 2);
       const isComplete =
         hasSealedDeparture ||
-        isExpanded ||
-        (!isAtDataEnd && channelElements.length >= strategy.minSealedLength);
+        (!isAtDataEnd &&
+          strategy.minSealedLength <= 3 &&
+          channelElements.length >= 3);
 
       // 未完结中枢若未处在数据末端，说明已属于历史走势中未成型的结构，丢弃不输出
       if (!isComplete && !isAtDataEnd) {
