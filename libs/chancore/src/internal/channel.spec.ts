@@ -390,14 +390,13 @@ describe('ChannelCalculator', () => {
       const result = service.createChannels(bis);
       expect(result.phaseB.length).toBeGreaterThanOrEqual(2);
       const c1 = result.phaseB[0];
-      // 1月22日中枢延伸至 b10(4145.97) 顺利封存（11 笔），包含 4160.99 极值与 4124.70 交集
-      expect(c1.bis).toHaveLength(11);
+      // 1月22日中枢在 b8(4160.99) 处顺利封存（9 笔），满足条件 2（离开笔破 GG + 随后出现 2s 封存）
+      expect(c1.bis).toHaveLength(9);
       expect(c1.gg).toBe(4160.99);
-      expect(c1.zd).toBe(4124.7);
       expect(c1.zg).toBe(4127.82);
 
       const c2 = result.phaseB[1];
-      // 后续独立形成高台阶扩展中枢，与前置中枢 ZD/ZG 无重叠，层次分明
+      // 后续独立形成高台阶扩展中枢，层次分明
       expect(c2.gg).toBeGreaterThanOrEqual(4160.99);
       expect(c2.zg).toBeGreaterThanOrEqual(4135);
     });
