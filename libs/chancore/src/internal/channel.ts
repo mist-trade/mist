@@ -385,6 +385,10 @@ export class ChannelCalculator {
       if (firstBi.high <= zg) {
         return null;
       }
+      // 约束3：下跌中枢进入笔起点必须是最高点（内部构件最高不得突破进入笔最高起点）
+      if (gg > firstBi.high) {
+        return null;
+      }
     }
 
     return { zg, zd, gg, dd };
