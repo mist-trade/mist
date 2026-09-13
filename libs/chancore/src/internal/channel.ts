@@ -436,6 +436,10 @@ export class ChannelCalculator {
       if (firstBi.low >= zd) {
         return null;
       }
+      // 约束3：上涨中枢内部构件首笔回调不得跌破进入笔最低起点（不得打漏底）
+      if (fourBis[1].low < firstBi.low) {
+        return null;
+      }
     } else {
       if (firstBi.high <= zg) {
         return null;
