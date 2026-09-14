@@ -140,54 +140,19 @@ export interface CandidateDeparture<T> {
 }
 
 /**
- * 中枢状态机快照与内部状态契约（严格对齐用户指定之 4 核心要素）：
- * 1. 到当前笔的 [gg, dd, zg, zd]
- * 2. 开始笔的下标 startIndex
- * 3. 当前候选结束笔的下标 candidateEndIndex
- * 4. 是否是完整中枢 isComplete
- */
-export interface CentralStateMachineContext<T extends ChannelElement> {
-  /** 1. 到当前笔/段的动态极值与核心重叠区间 [gg, dd, zg, zd] */
-  zg: number;
-  zd: number;
-  gg: number;
-  dd: number;
-  /** 2. 开始笔的下标 (在原始 data 中的索引) */
-  readonly startIndex: number;
-  /** 3. 当前候选结束笔的下标 (在原始 data 中的索引，若当前未突破则为 null) */
-  candidateEndIndex: number | null;
-  /** 4. 是否是完整封存中枢 (是否已触发离开封存规则) */
-  isComplete: boolean;
-  /** 当前中枢吸纳的全部构件元素 */
-  readonly elements: T[];
-  /** 中枢基准方向 (true 为向上中枢，false 为向下中枢) */
-  readonly isUp: boolean;
-  /** 是否发生中枢扩展 (9 笔以上或失去全量交集) */
-  isExpanded: boolean;
-  /** 是否发生反向崩塌失效 (反向击穿进入笔起点等) */
-  hasCollapsed: boolean;
-  /** 历史候选离开构件列表 */
-  readonly candidateDepartures: readonly CandidateDeparture<T>[];
-}
-
-/**
  * 显式走势中枢状态机（Central State Machine）
  *
  * 维护中枢生长全生命周期（形成、震荡吸纳、候选离开列表记录、真实离开决断、反向破坏回退）：
- * - 核心状态包含用户指定的 4 大要素：
+ * - 核心状态包含：
  *   1. 到当前笔的动态极值与重叠几何参数 [gg, dd, zg, zd]
  *   2. 开始笔在原始序列中的全局下标 startIndex
- *   3. 当前候选结束笔下标 candidateEndIndex
- *   4. 是否为完整中枢 isComplete 标志
+ *   3. 是否为完整中枢 isComplete 标志
  * - 维护候选离开笔列表 candidateDepartures：每次顺势突破极值均完整记录；
  * - 最终封存决断时，从候选列表中筛选最符合缠论极值定义的真实离开笔（上涨 high===GG，下跌 low===DD），
  *   严禁离开笔最低点/最高点与 DD/GG 发生脱节。
  */
-export class CentralStateMachine<T extends ChannelElement>
-  implements CentralStateMachineContext<T>
-{
+export class CentralStateMachine<T extends ChannelElement> {
   readonly startIndex: number;
-  candidateEndIndex: number | null = null;
   isComplete = false;
   zg: number;
   zd: number;
@@ -224,7 +189,6 @@ export class CentralStateMachine<T extends ChannelElement>
     candidateGg: number,
     candidateDd: number,
   ): void {
-    this.candidateEndIndex = index;
     const extremePrice = this.isUp ? curr.high : curr.low;
     const candidate: CandidateDeparture<T> = {
       departureIndex: index,
@@ -279,7 +243,6 @@ export class CentralStateMachine<T extends ChannelElement>
     this.elements.push(curr);
     this.gg = finalGg;
     this.dd = finalDd;
-    this.candidateEndIndex = this.startIndex + this.elements.length - 1;
     this.isComplete = true;
     if (this.elements.length >= 9) {
       this.isExpanded = true;
@@ -296,7 +259,6 @@ export class CentralStateMachine<T extends ChannelElement>
     }
     this.gg = candidate.geometry.gg;
     this.dd = candidate.geometry.dd;
-    this.candidateEndIndex = candidate.departureIndex;
     this.isComplete = true;
     if (this.elements.length >= 9) {
       this.isExpanded = true;
@@ -336,13 +298,6 @@ export class CentralStateMachine<T extends ChannelElement>
       this.dd,
       strategy,
     );
-  }
-
-  /**
-   * 兼容保留旧式 rollbackAndSeal 接口，委托给真实离开笔决断
-   */
-  rollbackAndSeal(): boolean {
-    return this.resolveFinalDepartureOnReversal();
   }
 
   /**
@@ -570,7 +525,7 @@ export class ChannelLifecycleEngine {
       // 2. 状态机推进：
       if (strategy.minCoreLength > 3) {
         // =====================================================================
-        // 笔级中枢专属推进引擎（严格区分 5 笔基本中枢与超过 5 笔的扩展阶段）
+        // 笔级中枢专属推进引擎（统一驱动 5 笔基础与扩展阶段，严格杜绝逻辑重复）
         // =====================================================================
         while (nextIdx < count) {
           const curr = data[nextIdx];
@@ -578,108 +533,25 @@ export class ChannelLifecycleEngine {
             break;
           }
 
-          // -------------------------------------------------------------------
-          // 阶段一：5 笔基本中枢阶段（当前 stateMachine 包含 4 笔核心，curr 为第 5 笔）
-          // -------------------------------------------------------------------
-          if (stateMachine.elements.length === 4) {
-            const pullback = nextIdx + 1 < count ? data[nextIdx + 1] : null;
-
-            // 离开笔必须突破中枢区间（若未突破则属于内部震荡）
-            const hasBrokenOut = stateMachine.isUp
-              ? curr.high > stateMachine.zg
-              : curr.low < stateMachine.zd;
-
-            const piercesOrigin =
-              pullback !== null &&
-              (stateMachine.isUp
-                ? pullback.low < firstElem.low
-                : pullback.high > firstElem.high);
-
-            // 离开笔必须突破前期极值 GG/DD（下跌低于 DD，上涨高于 GG）
-            const breaksExtreme = stateMachine.isUp
-              ? curr.high > stateMachine.gg
-              : curr.low < stateMachine.dd;
-
-            if (breaksExtreme) {
-              const candidateGg = stateMachine.isUp
-                ? Math.max(stateMachine.gg, curr.high)
-                : stateMachine.gg;
-              const candidateDd = !stateMachine.isUp
-                ? Math.min(stateMachine.dd, curr.low)
-                : stateMachine.dd;
-              stateMachine.recordCandidateDeparture(
-                curr,
-                nextIdx,
-                candidateGg,
-                candidateDd,
-              );
-            }
-
-            // 检验 5 笔中枢离开决断
-            const departureDecision = hasBrokenOut
-              ? stateMachine.checkDepartureRules(data, nextIdx, strategy)
-              : DepartureCheckResult.None;
-
-            // 情况 1: 顺势直接离开（出 3买/3卖 或 破GG/DD后2s）
-            if (departureDecision === DepartureCheckResult.Direct) {
-              const finalGg = stateMachine.isUp
-                ? Math.max(stateMachine.gg, curr.high)
-                : stateMachine.gg;
-              const finalDd = !stateMachine.isUp
-                ? Math.min(stateMachine.dd, curr.low)
-                : stateMachine.dd;
-              stateMachine.sealAtCurrent(curr, finalGg, finalDd);
-              nextIdx++;
-              break;
-            }
-
-            // 情况 2: 旁枝判定终结（外部破坏反转或后续构成独立新核心）
-            // 用户铁律：必须回到候选离开笔列表，确认真正的离开笔是哪一笔并重新计算！
-            if (departureDecision === DepartureCheckResult.BranchReversal) {
-              if (stateMachine.resolveFinalDepartureOnReversal()) {
-                break;
-              }
-              // 若列表为空（从未走出过破GG/DD的真正离开笔），中枢崩塌失效
-              stateMachine.collapse();
-              break;
-            }
-
-            // 规则 1.3: 若未曾满足离开封存便反向击穿进入笔起点，说明非本向中枢，候选中枢崩塌失效
-            if (piercesOrigin) {
-              stateMachine.collapse();
-              break;
-            }
-
-            // 未能直接封存且后一笔未击穿起点：吸纳 curr 与 pullback 进入中枢扩展阶段
-            if (pullback !== null) {
-              stateMachine.absorb(curr, pullback);
-              nextIdx += 2;
-              continue;
-            } else {
-              stateMachine.absorb(curr);
-              nextIdx++;
-              break;
-            }
-          }
-
-          // -------------------------------------------------------------------
-          // 阶段二：超过 5 笔的中枢扩展阶段（stateMachine.elements.length >= 6）
-          // -------------------------------------------------------------------
           const pullback = nextIdx + 1 < count ? data[nextIdx + 1] : null;
+          const isBaseCoreStage = stateMachine.elements.length === 4;
 
-          // A. 备选离开笔判定：扩展阶段离开笔最高点必须高于 GG（下跌最低点低于 DD）
+          // 1. 突破判定与候选离开笔登记
+          const hasBrokenOut = stateMachine.isUp
+            ? curr.high > stateMachine.zg
+            : curr.low < stateMachine.zd;
           const breaksExtreme = stateMachine.isUp
             ? curr.high > stateMachine.gg
             : curr.low < stateMachine.dd;
-          if (breaksExtreme) {
-            const candidateGg = stateMachine.isUp
-              ? Math.max(stateMachine.gg, curr.high)
-              : stateMachine.gg;
-            const candidateDd = !stateMachine.isUp
-              ? Math.min(stateMachine.dd, curr.low)
-              : stateMachine.dd;
 
-            // 每次顺势打破极值，立即记录候选离开笔进入列表
+          const candidateGg = stateMachine.isUp
+            ? Math.max(stateMachine.gg, curr.high)
+            : stateMachine.gg;
+          const candidateDd = !stateMachine.isUp
+            ? Math.min(stateMachine.dd, curr.low)
+            : stateMachine.dd;
+
+          if (breaksExtreme) {
             stateMachine.recordCandidateDeparture(
               curr,
               nextIdx,
@@ -688,29 +560,27 @@ export class ChannelLifecycleEngine {
             );
           }
 
-          const departureDecision = stateMachine.checkDepartureRules(
-            data,
-            nextIdx,
-            strategy,
-          );
+          // 2. 离开决断求值
+          const canCheckDeparture = isBaseCoreStage ? hasBrokenOut : true;
+          const departureDecision = canCheckDeparture
+            ? stateMachine.checkDepartureRules(data, nextIdx, strategy)
+            : DepartureCheckResult.None;
 
-          if (
-            breaksExtreme &&
-            departureDecision === DepartureCheckResult.Direct
-          ) {
-            const candidateGg = stateMachine.isUp
-              ? Math.max(stateMachine.gg, curr.high)
-              : stateMachine.gg;
-            const candidateDd = !stateMachine.isUp
-              ? Math.min(stateMachine.dd, curr.low)
-              : stateMachine.dd;
+          // A. 顺势直接离开（出 3买/3卖 或 破GG/DD后确认2s/2b）
+          const directOk = isBaseCoreStage
+            ? departureDecision === DepartureCheckResult.Direct
+            : breaksExtreme &&
+              departureDecision === DepartureCheckResult.Direct;
+
+          if (directOk) {
             stateMachine.sealAtCurrent(curr, candidateGg, candidateDd);
             nextIdx++;
             break;
           }
 
+          // B. 旁枝终结信号（外部反向破坏或后续独立构成新核心）
+          // 用户铁律：必须回到候选离开笔列表确认真实离开笔并重新计算！
           if (departureDecision === DepartureCheckResult.BranchReversal) {
-            // 旁枝判定终结：回到候选离开笔列表确认真实离开笔并重新计算
             if (stateMachine.resolveFinalDepartureOnReversal()) {
               break;
             }
@@ -718,8 +588,8 @@ export class ChannelLifecycleEngine {
             break;
           }
 
-          // B. 反向 3 卖 / 3 买 封存（中枢下方 3 卖或上方 3 买，说明反向行情已确立）
-          if (pullback !== null && nextIdx + 2 < count) {
+          // C. 扩展阶段反向 3 卖 / 3 买 确立
+          if (!isBaseCoreStage && pullback !== null && nextIdx + 2 < count) {
             const bounce = data[nextIdx + 2];
             if (bounce.trend === curr.trend) {
               const isOpposite3rd = stateMachine.isUp
@@ -728,7 +598,6 @@ export class ChannelLifecycleEngine {
                 : pullback.high > stateMachine.zg &&
                   bounce.low > stateMachine.zg;
               if (isOpposite3rd) {
-                // 从历史候选离开笔列表中选择真实极值离开笔回退封存
                 if (stateMachine.resolveFinalDepartureOnReversal()) {
                   break;
                 }
@@ -738,29 +607,29 @@ export class ChannelLifecycleEngine {
             }
           }
 
-          // C. 反向击穿起笔极值守卫与细节 2
+          // D. 反向击穿起笔极值守卫
           const violatesOrigin = stateMachine.isUp
-            ? curr.low < firstElem.low ||
+            ? (isBaseCoreStage ? false : curr.low < firstElem.low) ||
               (pullback !== null && pullback.low < firstElem.low)
-            : curr.high > firstElem.high ||
+            : (isBaseCoreStage ? false : curr.high > firstElem.high) ||
               (pullback !== null && pullback.high > firstElem.high);
 
           if (violatesOrigin) {
-            if (stateMachine.resolveFinalDepartureOnReversal()) {
-              break;
-            } else {
-              // 细节 2：扩展阶段从未走出新高/新低，直接击穿起笔点，说明非本向中枢，第二笔实际上是反向中枢起点
-              stateMachine.collapse();
+            if (
+              !isBaseCoreStage &&
+              stateMachine.resolveFinalDepartureOnReversal()
+            ) {
               break;
             }
+            stateMachine.collapse();
+            break;
           }
 
-          // D. 震荡吸纳与全量公共交集动态更新（方式 A）
+          // E. 未能离开且未击穿起点：成对吸纳进入扩展，或末端单元素触及吸纳
           if (pullback !== null) {
             stateMachine.absorb(curr, pullback);
             nextIdx += 2;
           } else {
-            // 数据末端单元素触及吸纳
             stateMachine.absorb(curr);
             nextIdx++;
             break;
@@ -824,7 +693,6 @@ export class ChannelLifecycleEngine {
                 stateMachine.gg = newGg;
                 stateMachine.dd = newDd;
                 stateMachine.isComplete = true;
-                stateMachine.candidateEndIndex = nextIdx + 1;
                 nextIdx += 2;
                 if (stateMachine.elements.length >= 9) {
                   stateMachine.isExpanded = true;
