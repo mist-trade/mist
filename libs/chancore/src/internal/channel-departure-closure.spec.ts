@@ -738,6 +738,538 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
     expect(ChannelType.Complete).toBe('complete');
   });
 
+  interface ExpectedBiContract {
+    readonly centralBiIndex: number;
+    readonly globalBiIndex: number;
+    readonly trend: TrendDirection;
+    readonly low: number;
+    readonly high: number;
+    readonly startTime: string;
+    readonly endTime: string;
+  }
+
+  interface ExpectedCentralContract {
+    readonly index: number;
+    readonly trend: TrendDirection;
+    readonly count: number;
+    readonly zg: number;
+    readonly zd: number;
+    readonly gg: number;
+    readonly dd: number;
+    readonly expanded: boolean;
+    readonly type: ChannelType;
+    readonly bis: readonly ExpectedBiContract[];
+  }
+
+  /**
+   * 5分钟级别前5个中枢端到端全量数据契约：每一笔均由实盘走势严格固化，错一笔即熔断
+   */
+  const EXPECTED_5M_FIRST_5_CENTRALS: readonly ExpectedCentralContract[] = [
+    // ==========================================
+    // 中枢 #0：9笔上涨中枢 (2026-01-06 13:50 ~ 2026-01-09 10:50)
+    // ==========================================
+    {
+      index: 0,
+      trend: TrendDirection.Up,
+      count: 9,
+      zg: 4088.01,
+      zd: 4075.7,
+      gg: 4121.7,
+      dd: 4056.87,
+      expanded: true,
+      type: ChannelType.Complete,
+      bis: [
+        {
+          centralBiIndex: 0,
+          globalBiIndex: 4,
+          trend: TrendDirection.Up,
+          low: 4056.87,
+          high: 4093.3,
+          startTime: '2026-01-06T05:50:00.000Z',
+          endTime: '2026-01-07T01:55:00.000Z',
+        },
+        {
+          centralBiIndex: 1,
+          globalBiIndex: 5,
+          trend: TrendDirection.Down,
+          low: 4075.7,
+          high: 4093.3,
+          startTime: '2026-01-07T01:55:00.000Z',
+          endTime: '2026-01-07T02:30:00.000Z',
+        },
+        {
+          centralBiIndex: 2,
+          globalBiIndex: 6,
+          trend: TrendDirection.Up,
+          low: 4075.7,
+          high: 4098.78,
+          startTime: '2026-01-07T02:30:00.000Z',
+          endTime: '2026-01-07T03:30:00.000Z',
+        },
+        {
+          centralBiIndex: 3,
+          globalBiIndex: 7,
+          trend: TrendDirection.Down,
+          low: 4069.44,
+          high: 4098.78,
+          startTime: '2026-01-07T03:30:00.000Z',
+          endTime: '2026-01-07T05:50:00.000Z',
+        },
+        {
+          centralBiIndex: 4,
+          globalBiIndex: 8,
+          trend: TrendDirection.Up,
+          low: 4069.44,
+          high: 4088.01,
+          startTime: '2026-01-07T05:50:00.000Z',
+          endTime: '2026-01-07T06:20:00.000Z',
+        },
+        {
+          centralBiIndex: 5,
+          globalBiIndex: 9,
+          trend: TrendDirection.Down,
+          low: 4072.39,
+          high: 4088.01,
+          startTime: '2026-01-07T06:20:00.000Z',
+          endTime: '2026-01-08T01:35:00.000Z',
+        },
+        {
+          centralBiIndex: 6,
+          globalBiIndex: 10,
+          trend: TrendDirection.Up,
+          low: 4072.39,
+          high: 4093.87,
+          startTime: '2026-01-08T01:35:00.000Z',
+          endTime: '2026-01-08T03:05:00.000Z',
+        },
+        {
+          centralBiIndex: 7,
+          globalBiIndex: 11,
+          trend: TrendDirection.Down,
+          low: 4067.12,
+          high: 4093.87,
+          startTime: '2026-01-08T03:05:00.000Z',
+          endTime: '2026-01-08T06:20:00.000Z',
+        },
+        {
+          centralBiIndex: 8,
+          globalBiIndex: 12,
+          trend: TrendDirection.Up,
+          low: 4067.12,
+          high: 4121.7,
+          startTime: '2026-01-08T06:20:00.000Z',
+          endTime: '2026-01-09T02:50:00.000Z',
+        },
+      ],
+    },
+    // ==========================================
+    // 中枢 #1：7笔上涨中枢 (2026-01-09 11:10 ~ 2026-01-14 11:25)
+    // ==========================================
+    {
+      index: 1,
+      trend: TrendDirection.Up,
+      count: 7,
+      zg: 4167.16,
+      zd: 4151.9,
+      gg: 4190.87,
+      dd: 4093.01,
+      expanded: false,
+      type: ChannelType.Complete,
+      bis: [
+        {
+          centralBiIndex: 0,
+          globalBiIndex: 14,
+          trend: TrendDirection.Up,
+          low: 4093.01,
+          high: 4179.7,
+          startTime: '2026-01-09T03:10:00.000Z',
+          endTime: '2026-01-13T02:10:00.000Z',
+        },
+        {
+          centralBiIndex: 1,
+          globalBiIndex: 15,
+          trend: TrendDirection.Down,
+          low: 4151.9,
+          high: 4179.7,
+          startTime: '2026-01-13T02:10:00.000Z',
+          endTime: '2026-01-13T02:40:00.000Z',
+        },
+        {
+          centralBiIndex: 2,
+          globalBiIndex: 16,
+          trend: TrendDirection.Up,
+          low: 4151.9,
+          high: 4173.74,
+          startTime: '2026-01-13T02:40:00.000Z',
+          endTime: '2026-01-13T03:20:00.000Z',
+        },
+        {
+          centralBiIndex: 3,
+          globalBiIndex: 17,
+          trend: TrendDirection.Down,
+          low: 4140.97,
+          high: 4173.74,
+          startTime: '2026-01-13T03:20:00.000Z',
+          endTime: '2026-01-13T05:40:00.000Z',
+        },
+        {
+          centralBiIndex: 4,
+          globalBiIndex: 18,
+          trend: TrendDirection.Up,
+          low: 4140.97,
+          high: 4167.16,
+          startTime: '2026-01-13T05:40:00.000Z',
+          endTime: '2026-01-13T06:00:00.000Z',
+        },
+        {
+          centralBiIndex: 5,
+          globalBiIndex: 19,
+          trend: TrendDirection.Down,
+          low: 4126.23,
+          high: 4167.16,
+          startTime: '2026-01-13T06:00:00.000Z',
+          endTime: '2026-01-13T06:50:00.000Z',
+        },
+        {
+          centralBiIndex: 6,
+          globalBiIndex: 20,
+          trend: TrendDirection.Up,
+          low: 4126.23,
+          high: 4190.87,
+          startTime: '2026-01-13T06:50:00.000Z',
+          endTime: '2026-01-14T03:25:00.000Z',
+        },
+      ],
+    },
+    // ==========================================
+    // 中枢 #2：5笔下跌中枢 (2026-01-14 11:25 ~ 2026-01-15 13:05)
+    // ==========================================
+    {
+      index: 2,
+      trend: TrendDirection.Down,
+      count: 5,
+      zg: 4133.07,
+      zd: 4104.42,
+      gg: 4190.87,
+      dd: 4096.85,
+      expanded: false,
+      type: ChannelType.Complete,
+      bis: [
+        {
+          centralBiIndex: 0,
+          globalBiIndex: 21,
+          trend: TrendDirection.Down,
+          low: 4103.62,
+          high: 4190.87,
+          startTime: '2026-01-14T03:25:00.000Z',
+          endTime: '2026-01-14T06:05:00.000Z',
+        },
+        {
+          centralBiIndex: 1,
+          globalBiIndex: 22,
+          trend: TrendDirection.Up,
+          low: 4103.62,
+          high: 4138.55,
+          startTime: '2026-01-14T06:05:00.000Z',
+          endTime: '2026-01-14T06:35:00.000Z',
+        },
+        {
+          centralBiIndex: 2,
+          globalBiIndex: 23,
+          trend: TrendDirection.Down,
+          low: 4104.42,
+          high: 4138.55,
+          startTime: '2026-01-14T06:35:00.000Z',
+          endTime: '2026-01-15T01:35:00.000Z',
+        },
+        {
+          centralBiIndex: 3,
+          globalBiIndex: 24,
+          trend: TrendDirection.Up,
+          low: 4104.42,
+          high: 4133.07,
+          startTime: '2026-01-15T01:35:00.000Z',
+          endTime: '2026-01-15T02:00:00.000Z',
+        },
+        {
+          centralBiIndex: 4,
+          globalBiIndex: 25,
+          trend: TrendDirection.Down,
+          low: 4096.85,
+          high: 4133.07,
+          startTime: '2026-01-15T02:00:00.000Z',
+          endTime: '2026-01-15T05:05:00.000Z',
+        },
+      ],
+    },
+    // ==========================================
+    // 中枢 #3：13笔下跌中枢 (2026-01-16 09:40 ~ 2026-01-20 10:30)
+    // ==========================================
+    {
+      index: 3,
+      trend: TrendDirection.Down,
+      count: 13,
+      zg: 4108.71,
+      zd: 4100.65,
+      gg: 4140.23,
+      dd: 4080.29,
+      expanded: true,
+      type: ChannelType.Complete,
+      bis: [
+        {
+          centralBiIndex: 0,
+          globalBiIndex: 29,
+          trend: TrendDirection.Down,
+          low: 4100.65,
+          high: 4140.23,
+          startTime: '2026-01-16T01:40:00.000Z',
+          endTime: '2026-01-16T02:15:00.000Z',
+        },
+        {
+          centralBiIndex: 1,
+          globalBiIndex: 30,
+          trend: TrendDirection.Up,
+          low: 4100.65,
+          high: 4120.4,
+          startTime: '2026-01-16T02:15:00.000Z',
+          endTime: '2026-01-16T03:05:00.000Z',
+        },
+        {
+          centralBiIndex: 2,
+          globalBiIndex: 31,
+          trend: TrendDirection.Down,
+          low: 4094.27,
+          high: 4120.4,
+          startTime: '2026-01-16T03:05:00.000Z',
+          endTime: '2026-01-16T05:10:00.000Z',
+        },
+        {
+          centralBiIndex: 3,
+          globalBiIndex: 32,
+          trend: TrendDirection.Up,
+          low: 4094.27,
+          high: 4119.23,
+          startTime: '2026-01-16T05:10:00.000Z',
+          endTime: '2026-01-16T05:50:00.000Z',
+        },
+        {
+          centralBiIndex: 4,
+          globalBiIndex: 33,
+          trend: TrendDirection.Down,
+          low: 4091.81,
+          high: 4119.23,
+          startTime: '2026-01-16T05:50:00.000Z',
+          endTime: '2026-01-16T06:10:00.000Z',
+        },
+        {
+          centralBiIndex: 5,
+          globalBiIndex: 34,
+          trend: TrendDirection.Up,
+          low: 4091.81,
+          high: 4108.71,
+          startTime: '2026-01-16T06:10:00.000Z',
+          endTime: '2026-01-16T06:40:00.000Z',
+        },
+        {
+          centralBiIndex: 6,
+          globalBiIndex: 35,
+          trend: TrendDirection.Down,
+          low: 4090.06,
+          high: 4108.71,
+          startTime: '2026-01-16T06:40:00.000Z',
+          endTime: '2026-01-19T01:35:00.000Z',
+        },
+        {
+          centralBiIndex: 7,
+          globalBiIndex: 36,
+          trend: TrendDirection.Up,
+          low: 4090.06,
+          high: 4126.52,
+          startTime: '2026-01-19T01:35:00.000Z',
+          endTime: '2026-01-19T02:15:00.000Z',
+        },
+        {
+          centralBiIndex: 8,
+          globalBiIndex: 37,
+          trend: TrendDirection.Down,
+          low: 4099.23,
+          high: 4126.52,
+          startTime: '2026-01-19T02:15:00.000Z',
+          endTime: '2026-01-19T02:45:00.000Z',
+        },
+        {
+          centralBiIndex: 9,
+          globalBiIndex: 38,
+          trend: TrendDirection.Up,
+          low: 4099.23,
+          high: 4123.41,
+          startTime: '2026-01-19T02:45:00.000Z',
+          endTime: '2026-01-19T05:25:00.000Z',
+        },
+        {
+          centralBiIndex: 10,
+          globalBiIndex: 39,
+          trend: TrendDirection.Down,
+          low: 4100.12,
+          high: 4123.41,
+          startTime: '2026-01-19T05:25:00.000Z',
+          endTime: '2026-01-19T05:55:00.000Z',
+        },
+        {
+          centralBiIndex: 11,
+          globalBiIndex: 40,
+          trend: TrendDirection.Up,
+          low: 4100.12,
+          high: 4128.93,
+          startTime: '2026-01-19T05:55:00.000Z',
+          endTime: '2026-01-20T01:40:00.000Z',
+        },
+        {
+          centralBiIndex: 12,
+          globalBiIndex: 41,
+          trend: TrendDirection.Down,
+          low: 4080.29,
+          high: 4128.93,
+          startTime: '2026-01-20T01:40:00.000Z',
+          endTime: '2026-01-20T02:30:00.000Z',
+        },
+      ],
+    },
+    // ==========================================
+    // 中枢 #4：13笔上涨中枢 (2026-01-20 14:35 ~ 2026-01-26 10:40)
+    // ==========================================
+    {
+      index: 4,
+      trend: TrendDirection.Up,
+      count: 13,
+      zg: 4127.82,
+      zd: 4120.63,
+      gg: 4160.99,
+      dd: 4100.36,
+      expanded: true,
+      type: ChannelType.Complete,
+      bis: [
+        {
+          centralBiIndex: 0,
+          globalBiIndex: 44,
+          trend: TrendDirection.Up,
+          low: 4100.36,
+          high: 4135.96,
+          startTime: '2026-01-20T06:35:00.000Z',
+          endTime: '2026-01-21T02:45:00.000Z',
+        },
+        {
+          centralBiIndex: 1,
+          globalBiIndex: 45,
+          trend: TrendDirection.Down,
+          low: 4118.82,
+          high: 4135.96,
+          startTime: '2026-01-21T02:45:00.000Z',
+          endTime: '2026-01-21T03:30:00.000Z',
+        },
+        {
+          centralBiIndex: 2,
+          globalBiIndex: 46,
+          trend: TrendDirection.Up,
+          low: 4118.82,
+          high: 4134.71,
+          startTime: '2026-01-21T03:30:00.000Z',
+          endTime: '2026-01-21T06:05:00.000Z',
+        },
+        {
+          centralBiIndex: 3,
+          globalBiIndex: 47,
+          trend: TrendDirection.Down,
+          low: 4110.45,
+          high: 4134.71,
+          startTime: '2026-01-21T06:05:00.000Z',
+          endTime: '2026-01-21T06:55:00.000Z',
+        },
+        {
+          centralBiIndex: 4,
+          globalBiIndex: 48,
+          trend: TrendDirection.Up,
+          low: 4110.45,
+          high: 4140.84,
+          startTime: '2026-01-21T06:55:00.000Z',
+          endTime: '2026-01-22T02:15:00.000Z',
+        },
+        {
+          centralBiIndex: 5,
+          globalBiIndex: 49,
+          trend: TrendDirection.Down,
+          low: 4112.86,
+          high: 4140.84,
+          startTime: '2026-01-22T02:15:00.000Z',
+          endTime: '2026-01-22T02:35:00.000Z',
+        },
+        {
+          centralBiIndex: 6,
+          globalBiIndex: 50,
+          trend: TrendDirection.Up,
+          low: 4112.86,
+          high: 4127.82,
+          startTime: '2026-01-22T02:35:00.000Z',
+          endTime: '2026-01-22T03:15:00.000Z',
+        },
+        {
+          centralBiIndex: 7,
+          globalBiIndex: 51,
+          trend: TrendDirection.Down,
+          low: 4109.92,
+          high: 4127.82,
+          startTime: '2026-01-22T03:15:00.000Z',
+          endTime: '2026-01-22T05:05:00.000Z',
+        },
+        {
+          centralBiIndex: 8,
+          globalBiIndex: 52,
+          trend: TrendDirection.Up,
+          low: 4109.92,
+          high: 4139.95,
+          startTime: '2026-01-22T05:05:00.000Z',
+          endTime: '2026-01-23T02:15:00.000Z',
+        },
+        {
+          centralBiIndex: 9,
+          globalBiIndex: 53,
+          trend: TrendDirection.Down,
+          low: 4120.2,
+          high: 4139.95,
+          startTime: '2026-01-23T02:15:00.000Z',
+          endTime: '2026-01-23T02:35:00.000Z',
+        },
+        {
+          centralBiIndex: 10,
+          globalBiIndex: 54,
+          trend: TrendDirection.Up,
+          low: 4120.2,
+          high: 4143.75,
+          startTime: '2026-01-23T02:35:00.000Z',
+          endTime: '2026-01-23T06:10:00.000Z',
+        },
+        {
+          centralBiIndex: 11,
+          globalBiIndex: 55,
+          trend: TrendDirection.Down,
+          low: 4120.63,
+          high: 4143.75,
+          startTime: '2026-01-23T06:10:00.000Z',
+          endTime: '2026-01-23T06:40:00.000Z',
+        },
+        {
+          centralBiIndex: 12,
+          globalBiIndex: 56,
+          trend: TrendDirection.Up,
+          low: 4120.63,
+          high: 4160.99,
+          startTime: '2026-01-23T06:40:00.000Z',
+          endTime: '2026-01-26T02:40:00.000Z',
+        },
+      ],
+    },
+  ];
+
   it('验证真实 5M 2026年1月5日~1月27日全量笔序列基准数据完整性', () => {
     expect(REAL_5M_JAN2026_FIRST_CENTRAL_BIS).toHaveLength(60);
     // 验证严格趋势交替
@@ -746,26 +1278,49 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
         REAL_5M_JAN2026_FIRST_CENTRAL_BIS[i + 1].trend,
       );
     }
+  });
 
-    const allRes = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
-    console.log('=== DETAILED AUDIT OF CHANNELS ===');
-    allRes.phaseB.forEach((c, idx) => {
-      const depBi = c.bis[c.bis.length - 1];
-      const minLow = Math.min(...c.bis.map((b) => b.low));
-      const maxHigh = Math.max(...c.bis.map((b) => b.high));
-      console.log(
-        `Channel #${idx}: trend=${c.trend}, count=${c.bis.length}, ZG=${c.zg}, ZD=${c.zd}, GG=${c.gg}, DD=${c.dd}`,
-      );
-      console.log(`  minLow in bis=${minLow}, maxHigh in bis=${maxHigh}`);
-      console.log(
-        `  DepartureBi: trend=${depBi.trend}, low=${depBi.low}, high=${depBi.high}, startTime=${depBi.startTime.toISOString()}, endTime=${depBi.endTime.toISOString()}`,
-      );
-      console.log(
-        `  DepartureBi.low < DD: ${depBi.low < c.dd}, DepartureBi.low > DD: ${depBi.low > c.dd}`,
-      );
-      console.log(
-        `  DepartureBi.high > GG: ${depBi.high > c.gg}, DepartureBi.high < GG: ${depBi.high < c.gg}`,
-      );
+  describe('5分钟级别前5个中枢端到端全量锁定门禁 (E2E Contract Guard)', () => {
+    it('端到端全量锁定：前5个中枢总数严格为5，每一笔（共47笔）的方向、高低点、起止时间与全局引用严格完全一致，错一笔即不通过', () => {
+      const allRes = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      expect(allRes.phaseB).toHaveLength(EXPECTED_5M_FIRST_5_CENTRALS.length);
+
+      EXPECTED_5M_FIRST_5_CENTRALS.forEach((expected, cIdx) => {
+        const actual = allRes.phaseB[cIdx];
+        expect(actual).toBeDefined();
+        // 1. 中枢级别全局参数严格断言
+        expect(actual.trend).toBe(expected.trend);
+        expect(actual.bis).toHaveLength(expected.count);
+        expect(actual.zg).toBe(expected.zg);
+        expect(actual.zd).toBe(expected.zd);
+        expect(actual.gg).toBe(expected.gg);
+        expect(actual.dd).toBe(expected.dd);
+        expect(actual.expanded).toBe(expected.expanded);
+        expect(actual.type).toBe(expected.type);
+
+        // 2. 中枢内每一笔的全部参数严格逐笔断言（每一笔都不能错）
+        expected.bis.forEach((expBi, bIdx) => {
+          const actBi = actual.bis[bIdx];
+          expect(actBi).toBeDefined();
+          // 局部与全局索引对齐
+          expect(bIdx).toBe(expBi.centralBiIndex);
+          const globalIdx = REAL_5M_JAN2026_FIRST_CENTRAL_BIS.indexOf(actBi);
+          expect(globalIdx).toBe(expBi.globalBiIndex);
+          // 笔对象真源引用同一性（确认消费的是全局序列中的同一物理笔）
+          expect(actBi).toBe(
+            REAL_5M_JAN2026_FIRST_CENTRAL_BIS[expBi.globalBiIndex],
+          );
+
+          // 笔方向与高低点绝对一致
+          expect(actBi.trend).toBe(expBi.trend);
+          expect(actBi.low).toBe(expBi.low);
+          expect(actBi.high).toBe(expBi.high);
+
+          // 笔时间戳毫秒级精确对齐
+          expect(actBi.startTime.toISOString()).toBe(expBi.startTime);
+          expect(actBi.endTime.toISOString()).toBe(expBi.endTime);
+        });
+      });
     });
   });
 
