@@ -325,7 +325,7 @@ export class CentralStateMachine<T extends ChannelElement>
     data: readonly T[],
     candidateIdx: number,
     strategy: ChannelLifecycleStrategy<T, unknown>,
-  ): boolean {
+  ): DepartureCheckResult {
     return checkDepartureRules(
       data,
       candidateIdx,
@@ -388,6 +388,15 @@ export class CentralStateMachine<T extends ChannelElement>
   }
 }
 
+export enum DepartureCheckResult {
+  /** 未满足任何离开条件，继续中枢生命周期 */
+  None = 'none',
+  /** 顺势直接离开：出 3买/3卖，或破 GG/DD 后走出 2s/2b */
+  Direct = 'direct',
+  /** 旁枝终结信号：后续反向击穿对侧、段中枢单段反穿、或后续走出独立新核心 */
+  BranchReversal = 'branch_reversal',
+}
+
 /**
  * 检验顺势突破离开笔/段是否满足规则 1～4 封存条件（双向严格对称）
  */
@@ -400,24 +409,26 @@ function checkDepartureRules<T extends ChannelElement, R>(
   curGg: number,
   curDd: number,
   strategy: ChannelLifecycleStrategy<T, R>,
-): boolean {
+): DepartureCheckResult {
   const count = data.length;
   // 若已至序列末尾，或下一笔未保持趋势交替，直接封存
   if (
     candidateIdx + 1 >= count ||
     data[candidateIdx + 1].trend === data[candidateIdx].trend
   ) {
-    return true;
+    return DepartureCheckResult.Direct;
   }
 
   const pullback = data[candidateIdx + 1];
   const curr = data[candidateIdx];
 
-  // 离开笔封存核心准则：
+  // -------------------------------------------------------------------------
+  // 正规离开条件（Direct Departure）：
+  // -------------------------------------------------------------------------
   // 条件 1：后续笔出现 3 买 / 3 卖（回抽不跌回/升回中枢 [ZD, ZG]）：
   const is3rdPoint = isUp ? pullback.low > curZg : pullback.high < curZd;
   if (is3rdPoint) {
-    return true;
+    return DepartureCheckResult.Direct;
   }
 
   // 条件 2：后续笔没有出现 3买/3卖，但是出现了满足 3买/3卖 前提的 2s/2b
@@ -440,33 +451,38 @@ function checkDepartureRules<T extends ChannelElement, R>(
             candidateIdx + 3 >= count ||
             data[candidateIdx + 3].trend !== bounce.trend
           ) {
-            return true;
+            return DepartureCheckResult.Direct;
           }
         }
       }
     }
-
-    // 规则 2：反向一笔物理反转打穿对侧极值（暴跌打穿 DD / 暴涨打穿 GG）：
-    // 走势结构被物理反转彻底破坏，绝不可能再给 3 买/3 卖或 2s/2b，直接在离开极值端点封存
-    const piercesOppositeExtreme = isUp
-      ? pullback.low < curDd
-      : pullback.high > curGg;
-    if (piercesOppositeExtreme) {
-      return true;
-    }
   }
 
-  // 3. 规则 3（仅限 Duan 级别段中枢）：无 3买/3卖，离开后反向单段直接打穿中枢对向沿 (ZD/ZG)
+  // -------------------------------------------------------------------------
+  // 旁枝终结判定（Branch Reversal / External Termination）：
+  // 注意：旁枝判定只表明走势发生外部破坏或新中枢独立，中枢必须终结；
+  // 但决不能把当前候选笔盲目扣为离开笔，而必须回到 candidateDepartures 列表中
+  // 确认真正的极值离开笔并重新计算；若候选列表为空，则中枢崩塌失效。
+  // -------------------------------------------------------------------------
+  // 规则 2：反向一笔物理反转打穿对侧极值（暴跌打穿 DD / 暴涨打穿 GG）：
+  const piercesOppositeExtreme = isUp
+    ? pullback.low < curDd
+    : pullback.high > curGg;
+  if (piercesOppositeExtreme) {
+    return DepartureCheckResult.BranchReversal;
+  }
+
+  // 规则 3（仅限 Duan 级别段中枢）：无 3买/3卖，离开后反向单段直接打穿中枢对向沿 (ZD/ZG)
   if (strategy.minCoreLength <= 3) {
     const pbPiercesBoundary = isUp
       ? pullback.low < curZd
       : pullback.high > curZg;
     if (pbPiercesBoundary) {
-      return true;
+      return DepartureCheckResult.BranchReversal;
     }
   }
 
-  // 4. 规则 4：后续走势自身已独立构成完全不重叠的新中枢核心
+  // 规则 4：后续走势自身已独立构成完全不重叠的新中枢核心
   const checkNewCore = (startIdx: number): boolean => {
     if (startIdx + strategy.minCoreLength > count) {
       return false;
@@ -493,11 +509,11 @@ function checkDepartureRules<T extends ChannelElement, R>(
 
   for (let offset = 0; offset <= 1; offset++) {
     if (checkNewCore(candidateIdx + offset)) {
-      return true;
+      return DepartureCheckResult.BranchReversal;
     }
   }
 
-  return false;
+  return DepartureCheckResult.None;
 }
 
 /**
@@ -599,13 +615,13 @@ export class ChannelLifecycleEngine {
               );
             }
 
-            // 规则 1.1: 检验 5 笔中枢离开封存
-            const departureOk =
-              hasBrokenOut &&
-              stateMachine.checkDepartureRules(data, nextIdx, strategy);
+            // 检验 5 笔中枢离开决断
+            const departureDecision = hasBrokenOut
+              ? stateMachine.checkDepartureRules(data, nextIdx, strategy)
+              : DepartureCheckResult.None;
 
-            // 规则 1.2: 离开封存判定
-            if (departureOk) {
+            // 情况 1: 顺势直接离开（出 3买/3卖 或 破GG/DD后2s）
+            if (departureDecision === DepartureCheckResult.Direct) {
               const finalGg = stateMachine.isUp
                 ? Math.max(stateMachine.gg, curr.high)
                 : stateMachine.gg;
@@ -614,6 +630,17 @@ export class ChannelLifecycleEngine {
                 : stateMachine.dd;
               stateMachine.sealAtCurrent(curr, finalGg, finalDd);
               nextIdx++;
+              break;
+            }
+
+            // 情况 2: 旁枝判定终结（外部破坏反转或后续构成独立新核心）
+            // 用户铁律：必须回到候选离开笔列表，确认真正的离开笔是哪一笔并重新计算！
+            if (departureDecision === DepartureCheckResult.BranchReversal) {
+              if (stateMachine.resolveFinalDepartureOnReversal()) {
+                break;
+              }
+              // 若列表为空（从未走出过破GG/DD的真正离开笔），中枢崩塌失效
+              stateMachine.collapse();
               break;
             }
 
@@ -659,18 +686,36 @@ export class ChannelLifecycleEngine {
               candidateGg,
               candidateDd,
             );
+          }
 
-            const departureOk = stateMachine.checkDepartureRules(
-              data,
-              nextIdx,
-              strategy,
-            );
+          const departureDecision = stateMachine.checkDepartureRules(
+            data,
+            nextIdx,
+            strategy,
+          );
 
-            if (departureOk) {
-              stateMachine.sealAtCurrent(curr, candidateGg, candidateDd);
-              nextIdx++;
+          if (
+            breaksExtreme &&
+            departureDecision === DepartureCheckResult.Direct
+          ) {
+            const candidateGg = stateMachine.isUp
+              ? Math.max(stateMachine.gg, curr.high)
+              : stateMachine.gg;
+            const candidateDd = !stateMachine.isUp
+              ? Math.min(stateMachine.dd, curr.low)
+              : stateMachine.dd;
+            stateMachine.sealAtCurrent(curr, candidateGg, candidateDd);
+            nextIdx++;
+            break;
+          }
+
+          if (departureDecision === DepartureCheckResult.BranchReversal) {
+            // 旁枝判定终结：回到候选离开笔列表确认真实离开笔并重新计算
+            if (stateMachine.resolveFinalDepartureOnReversal()) {
               break;
             }
+            stateMachine.collapse();
+            break;
           }
 
           // B. 反向 3 卖 / 3 买 封存（中枢下方 3 卖或上方 3 买，说明反向行情已确立）
@@ -758,17 +803,20 @@ export class ChannelLifecycleEngine {
                 ? Math.min(stateMachine.dd, nextElem.low)
                 : stateMachine.dd;
 
+              const decision = checkDepartureRules(
+                data,
+                nextIdx + 1,
+                stateMachine.isUp,
+                testZg,
+                testZd,
+                stateMachine.gg,
+                stateMachine.dd,
+                strategy,
+              );
+
               if (
-                checkDepartureRules(
-                  data,
-                  nextIdx + 1,
-                  stateMachine.isUp,
-                  testZg,
-                  testZd,
-                  stateMachine.gg,
-                  stateMachine.dd,
-                  strategy,
-                )
+                decision === DepartureCheckResult.Direct ||
+                decision === DepartureCheckResult.BranchReversal
               ) {
                 stateMachine.elements.push(curr, nextElem);
                 stateMachine.zg = testZg;
