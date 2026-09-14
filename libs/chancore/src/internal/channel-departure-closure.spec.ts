@@ -746,6 +746,27 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
         REAL_5M_JAN2026_FIRST_CENTRAL_BIS[i + 1].trend,
       );
     }
+
+    const allRes = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+    console.log('=== DETAILED AUDIT OF CHANNELS ===');
+    allRes.phaseB.forEach((c, idx) => {
+      const depBi = c.bis[c.bis.length - 1];
+      const minLow = Math.min(...c.bis.map((b) => b.low));
+      const maxHigh = Math.max(...c.bis.map((b) => b.high));
+      console.log(
+        `Channel #${idx}: trend=${c.trend}, count=${c.bis.length}, ZG=${c.zg}, ZD=${c.zd}, GG=${c.gg}, DD=${c.dd}`,
+      );
+      console.log(`  minLow in bis=${minLow}, maxHigh in bis=${maxHigh}`);
+      console.log(
+        `  DepartureBi: trend=${depBi.trend}, low=${depBi.low}, high=${depBi.high}, startTime=${depBi.startTime.toISOString()}, endTime=${depBi.endTime.toISOString()}`,
+      );
+      console.log(
+        `  DepartureBi.low < DD: ${depBi.low < c.dd}, DepartureBi.low > DD: ${depBi.low > c.dd}`,
+      );
+      console.log(
+        `  DepartureBi.high > GG: ${depBi.high > c.gg}, DepartureBi.high < GG: ${depBi.high < c.gg}`,
+      );
+    });
   });
 
   // 用户测试用例准备区域
@@ -839,8 +860,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
     });
   });
 
-  describe('用例 3：2026年1月14日11:25至1月20日14:35双下跌中枢（分别对应两笔30分钟向下笔）', () => {
-    it('全量序列应分别产出独立的第3个中枢(01-14 11:25~01-15 13:05)与第4个中枢(01-16 09:40~01-20 14:35)，严禁碎裂错乱', () => {
+  describe('用例 3：2026年1月14日11:25至1月20日10:30双下跌中枢（分别对应两笔30分钟向下笔）', () => {
+    it('全量序列应分别产出独立的第3个中枢(01-14 11:25~01-15 13:05)与第4个中枢(01-16 09:40~01-20 10:30)，严禁碎裂错乱', () => {
       const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
 
       // 1. 检验第 3 个中枢：1月14日 11:25 ~ 1月15日 13:05 下跌中枢 (对应 30分钟一笔下 4190.87 -> 4096.85)
@@ -856,7 +877,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       );
       expect(c2?.type).toBe(ChannelType.Complete);
 
-      // 2. 检验第 4 个中枢：1月16日 09:40 ~ 1月20日 14:35 下跌中枢 (对应 30分钟一笔下 4140.23 -> 4080.29)
+      // 2. 检验第 4 个中枢：1月16日 09:40 ~ 1月20日 10:30 下跌中枢 (对应 30分钟一笔下 4140.23 -> 4080.29)
       const c3 = resAll.phaseB.find(
         (c) =>
           c.bis[0].startTime.getTime() ===
@@ -865,7 +886,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(c3).toBeDefined();
       expect(c3?.trend).toBe(TrendDirection.Down);
       expect(c3?.bis[c3.bis.length - 1].endTime).toEqual(
-        new Date('2026-01-20T06:35:00.000Z'), // 01-20 14:35
+        new Date('2026-01-20T02:30:00.000Z'), // 01-20 10:30
       );
       expect(c3?.type).toBe(ChannelType.Complete);
     });
