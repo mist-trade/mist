@@ -135,7 +135,6 @@ function checkDepartureRules<T extends ChannelElement, R>(
   curGg: number,
   curDd: number,
   strategy: ChannelLifecycleStrategy<T, R>,
-  isExtensionPhase = false,
 ): boolean {
   const count = data.length;
   // 若已至序列末尾，或下一笔未保持趋势交替，直接封存
@@ -158,9 +157,9 @@ function checkDepartureRules<T extends ChannelElement, R>(
   }
 
   // 条件 2：后续笔没有出现 3买/3卖，但是出现了 2s（下跌对称出现 2b）
-  // 用户特别规则：扩展阶段备选离开笔最高点必须高于 GG（下跌低于 DD）；非扩展阶段（5 笔基本中枢）不需要突破 GG 限制
+  // 用户铁律：即使是 5 笔基础中枢，如果在没有出现 3b/3s 的情况下，离开笔的最大值必须高于 GG（下跌低于 DD）
   const hasBrokenExtreme = isUp ? curr.high > curGg : curr.low < curDd;
-  if (!isExtensionPhase || hasBrokenExtreme) {
+  if (hasBrokenExtreme) {
     // 检查是否出现 2s（二卖，次高点）/ 2b（二买，次低点）：
     if (candidateIdx + 2 < count) {
       const bounce = data[candidateIdx + 2];
@@ -321,7 +320,7 @@ export class ChannelLifecycleEngine {
                 ? pullback.low < firstElem.low
                 : pullback.high > firstElem.high);
 
-            // 规则 1.1: 检验 5 笔中枢离开封存（非扩展阶段，不强制要求突破 GG/DD）
+            // 规则 1.1: 检验 5 笔中枢离开封存（在无 3b/3s 时必须突破前期极值 GG/DD）
             const departureOk =
               hasBrokenOut &&
               checkDepartureRules(
@@ -333,11 +332,10 @@ export class ChannelLifecycleEngine {
                 curGg,
                 curDd,
                 strategy,
-                false,
               );
 
-            // 规则 1.2: 若为离开笔(hasBrokenOut)，后续一笔直接击穿进入笔起点，强制在离开笔封存
-            if (departureOk || (hasBrokenOut && piercesOrigin)) {
+            // 规则 1.2: 离开封存判定
+            if (departureOk) {
               channelElements.push(curr);
               curGg = isUp ? Math.max(curGg, curr.high) : curGg;
               curDd = !isUp ? Math.min(curDd, curr.low) : curDd;
@@ -346,8 +344,8 @@ export class ChannelLifecycleEngine {
               break;
             }
 
-            // 规则 1.3: 若未曾离开(!hasBrokenOut)便反向击穿进入笔起点，说明非本向中枢（细节 2，重新评估反向走势）
-            if (!hasBrokenOut && piercesOrigin) {
+            // 规则 1.3: 若未曾满足离开封存便反向击穿进入笔起点，说明非本向中枢（细节 2，重新评估反向走势）
+            if (piercesOrigin) {
               hasCollapsed = true;
               break;
             }
@@ -409,7 +407,6 @@ export class ChannelLifecycleEngine {
               curGg,
               curDd,
               strategy,
-              true, // 扩展阶段必须突破前期极值
             );
 
             if (departureOk) {
