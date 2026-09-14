@@ -124,6 +124,172 @@ export interface ChannelLifecycleStrategy<T extends ChannelElement, R> {
 }
 
 /**
+ * 中枢状态机快照与内部状态契约（严格对齐用户指定之 4 核心要素）：
+ * 1. 到当前笔的 [gg, dd, zg, zd]
+ * 2. 开始笔的下标 startIndex
+ * 3. 当前候选结束笔的下标 candidateEndIndex
+ * 4. 是否是完整中枢 isComplete
+ */
+export interface CentralStateMachineContext<T extends ChannelElement> {
+  /** 1. 到当前笔/段的动态极值与核心重叠区间 [gg, dd, zg, zd] */
+  zg: number;
+  zd: number;
+  gg: number;
+  dd: number;
+  /** 2. 开始笔的下标 (在原始 data 中的索引) */
+  readonly startIndex: number;
+  /** 3. 当前候选结束笔的下标 (在原始 data 中的索引，若当前未突破则为 null) */
+  candidateEndIndex: number | null;
+  /** 4. 是否是完整封存中枢 (是否已触发离开封存规则) */
+  isComplete: boolean;
+  /** 当前中枢吸纳的全部构件元素 */
+  readonly elements: T[];
+  /** 中枢基准方向 (true 为向上中枢，false 为向下中枢) */
+  readonly isUp: boolean;
+  /** 是否发生中枢扩展 (9 笔以上或失去全量交集) */
+  isExpanded: boolean;
+  /** 是否发生反向崩塌失效 (反向击穿进入笔起点等) */
+  hasCollapsed: boolean;
+}
+
+/**
+ * 显式走势中枢状态机（Central State Machine）
+ *
+ * 维护中枢生长全生命周期（形成、震荡吸纳、候选离开、确认封存、反向破坏回退）：
+ * - 核心状态包含用户指定的 4 大要素：
+ *   1. 到当前笔的动态极值与重叠几何参数 [gg, dd, zg, zd]
+ *   2. 开始笔在原始序列中的全局下标 startIndex
+ *   3. 当前候选结束笔下标 candidateEndIndex
+ *   4. 是否为完整中枢 isComplete 标志
+ * - 严格剔除脱离 3买/3卖 的机械伪 2s/2b 提前关门逻辑；
+ * - 仅在满足离开确认规则（3B/3S、反向暴力击穿对侧极值、满足前提的真 2S/2B、或独立新核心）时封存，
+ *   否则回归震荡延伸态（Oscillating），成对吸纳走势构件。
+ */
+export class CentralStateMachine<T extends ChannelElement>
+  implements CentralStateMachineContext<T>
+{
+  readonly startIndex: number;
+  candidateEndIndex: number | null = null;
+  isComplete = false;
+  zg: number;
+  zd: number;
+  gg: number;
+  dd: number;
+  readonly elements: T[];
+  readonly isUp: boolean;
+  isExpanded = false;
+  hasCollapsed = false;
+
+  private lastCandidateDeparture: {
+    elementCount: number;
+    newGg: number;
+    newDd: number;
+    departureIndex: number;
+  } | null = null;
+
+  constructor(
+    startIndex: number,
+    initialCore: readonly T[],
+    coreInfo: { geometry: ChannelGeometry; isUp: boolean },
+  ) {
+    this.startIndex = startIndex;
+    this.elements = [...initialCore];
+    this.isUp = coreInfo.isUp;
+    this.zg = coreInfo.geometry.zg;
+    this.zd = coreInfo.geometry.zd;
+    this.gg = coreInfo.geometry.gg;
+    this.dd = coreInfo.geometry.dd;
+  }
+
+  /**
+   * 记录候选离开笔
+   */
+  recordCandidateDeparture(index: number, newGg: number, newDd: number): void {
+    this.candidateEndIndex = index;
+    this.lastCandidateDeparture = {
+      elementCount: this.elements.length + 1,
+      newGg,
+      newDd,
+      departureIndex: index,
+    };
+  }
+
+  /**
+   * 直接在当前离开笔封存中枢
+   */
+  sealAtCurrent(curr: T, finalGg: number, finalDd: number): void {
+    this.elements.push(curr);
+    this.gg = finalGg;
+    this.dd = finalDd;
+    this.candidateEndIndex = this.startIndex + this.elements.length - 1;
+    this.isComplete = true;
+    if (this.elements.length >= 9) {
+      this.isExpanded = true;
+    }
+  }
+
+  /**
+   * 回退至此前记录的有效候选离开笔处封存
+   */
+  rollbackAndSeal(): boolean {
+    if (!this.lastCandidateDeparture) {
+      return false;
+    }
+    this.elements.splice(this.lastCandidateDeparture.elementCount);
+    this.gg = this.lastCandidateDeparture.newGg;
+    this.dd = this.lastCandidateDeparture.newDd;
+    this.candidateEndIndex = this.lastCandidateDeparture.departureIndex;
+    this.isComplete = true;
+    if (this.elements.length >= 9) {
+      this.isExpanded = true;
+    }
+    return true;
+  }
+
+  /**
+   * 标记中枢结构崩塌失效
+   */
+  collapse(): void {
+    this.hasCollapsed = true;
+  }
+
+  /**
+   * 吸纳走势构件并动态更新全量公共交集（方式 A）与极值
+   */
+  absorb(curr: T, pullback?: T | null): void {
+    if (pullback) {
+      this.elements.push(curr, pullback);
+      this.gg = Math.max(this.gg, curr.high, pullback.high);
+      this.dd = Math.min(this.dd, curr.low, pullback.low);
+    } else {
+      this.elements.push(curr);
+      this.gg = Math.max(this.gg, curr.high);
+      this.dd = Math.min(this.dd, curr.low);
+    }
+
+    const allHigh = minMaxBy(this.elements, (e) => e.high);
+    const allLow = minMaxBy(this.elements, (e) => e.low);
+    if (allHigh && allLow && allHigh.min > allLow.max) {
+      this.zg = allHigh.min;
+      this.zd = allLow.max;
+    } else {
+      this.isExpanded = true;
+    }
+
+    if (this.elements.length >= 9) {
+      this.isExpanded = true;
+    }
+  }
+
+  /**
+   * 提取当前中枢几何快照
+   */
+  get geometry(): ChannelGeometry {
+    return { zg: this.zg, zd: this.zd, gg: this.gg, dd: this.dd };
+  }
+}
+
+/**
  * 检验顺势突破离开笔/段是否满足规则 1～4 封存条件（双向严格对称）
  */
 function checkDepartureRules<T extends ChannelElement, R>(
@@ -146,22 +312,24 @@ function checkDepartureRules<T extends ChannelElement, R>(
   }
 
   const pullback = data[candidateIdx + 1];
-
   const curr = data[candidateIdx];
 
-  // 离开笔封存核心准则（2 选 1）：
+  // 离开笔封存核心准则：
   // 条件 1：后续笔出现 3 买 / 3 卖（回抽不跌回/升回中枢 [ZD, ZG]）：
   const is3rdPoint = isUp ? pullback.low > curZg : pullback.high < curZd;
   if (is3rdPoint) {
     return true;
   }
 
-  // 条件 2：后续笔没有出现 3买/3卖，但是出现了 2s（下跌对称出现 2b）
-  // 用户铁律：即使是 5 笔基础中枢，如果在没有出现 3b/3s 的情况下，离开笔的最大值必须高于 GG（下跌低于 DD）
+  // 条件 2：后续笔没有出现 3买/3卖，但是出现了满足 3买/3卖 前提的 2s/2b
+  // 用户铁律 1：即使是 5 笔基础中枢，如果在没有出现 3b/3s 的情况下，离开笔的最大值必须高于 GG（下跌低于 DD）
+  // 用户铁律 2：2s/2b 出现的前提是不能跌破对侧中枢边界（向上中枢回踩不能破 ZD，向下中枢反弹不能破 ZG）；
+  //            若反向一笔跌破 ZD（或未打穿 DD），属于中枢内部震荡，严禁机械当成 2s 提前关门！
   const hasBrokenExtreme = isUp ? curr.high > curGg : curr.low < curDd;
   if (hasBrokenExtreme) {
-    // 检查是否出现 2s（二卖，次高点）/ 2b（二买，次低点）：
-    if (candidateIdx + 2 < count) {
+    // 检查 2s/2b 前提：
+    const has2ndPremise = isUp ? pullback.low >= curZd : pullback.high <= curZg;
+    if (has2ndPremise && candidateIdx + 2 < count) {
       const bounce = data[candidateIdx + 2];
       if (bounce.trend === curr.trend) {
         const isSecondClassPoint = isUp
@@ -237,7 +405,7 @@ function checkDepartureRules<T extends ChannelElement, R>(
  * 中枢生命周期引擎（Channel Lifecycle Engine）
  *
  * 统一驱动笔中枢与段中枢的生命周期推进：
- * 1. 核心确立：按策略识别初始构件并确立 [ZD, ZG]；
+ * 1. 核心确立：按策略识别初始构件并确立 CentralStateMachine；
  * 2. 极值守卫：防止顺势突破穿越起点极值；
  * 3. 离开突破与规则 1～4 状态机封存（双向对称支持）：
  *    - 规则 1：3买/3卖 顺势突破 GG/DD 封存；
@@ -275,17 +443,13 @@ export class ChannelLifecycleEngine {
         continue;
       }
 
-      const { isUp } = coreInfo;
-      let curZg = coreInfo.geometry.zg;
-      let curZd = coreInfo.geometry.zd;
-      let curGg = coreInfo.geometry.gg;
-      let curDd = coreInfo.geometry.dd;
-
-      const channelElements = [...candidateCore];
-      const firstElem = channelElements[0];
-      let isExpanded = false;
-      let hasSealedDeparture = false;
-      let hasCollapsed = false;
+      // 实例化显式中枢状态机
+      const stateMachine = new CentralStateMachine<T>(
+        cursor,
+        candidateCore,
+        coreInfo,
+      );
+      const firstElem = stateMachine.elements[0];
       let nextIdx = cursor + strategy.minCoreLength;
 
       // 2. 状态机推进：
@@ -293,12 +457,6 @@ export class ChannelLifecycleEngine {
         // =====================================================================
         // 笔级中枢专属推进引擎（严格区分 5 笔基本中枢与超过 5 笔的扩展阶段）
         // =====================================================================
-        let lastCandidateDeparture: {
-          elementCount: number;
-          newGg: number;
-          newDd: number;
-        } | null = null;
-
         while (nextIdx < count) {
           const curr = data[nextIdx];
           if (curr.trend === data[nextIdx - 1].trend) {
@@ -306,17 +464,19 @@ export class ChannelLifecycleEngine {
           }
 
           // -------------------------------------------------------------------
-          // 阶段一：5 笔基本中枢阶段（当前 channelElements 包含 4 笔核心，curr 为第 5 笔）
+          // 阶段一：5 笔基本中枢阶段（当前 stateMachine 包含 4 笔核心，curr 为第 5 笔）
           // -------------------------------------------------------------------
-          if (channelElements.length === 4) {
+          if (stateMachine.elements.length === 4) {
             const pullback = nextIdx + 1 < count ? data[nextIdx + 1] : null;
 
             // 离开笔必须突破中枢区间（若未突破则属于内部震荡）
-            const hasBrokenOut = isUp ? curr.high > curZg : curr.low < curZd;
+            const hasBrokenOut = stateMachine.isUp
+              ? curr.high > stateMachine.zg
+              : curr.low < stateMachine.zd;
 
             const piercesOrigin =
               pullback !== null &&
-              (isUp
+              (stateMachine.isUp
                 ? pullback.low < firstElem.low
                 : pullback.high > firstElem.high);
 
@@ -326,180 +486,131 @@ export class ChannelLifecycleEngine {
               checkDepartureRules(
                 data,
                 nextIdx,
-                isUp,
-                curZg,
-                curZd,
-                curGg,
-                curDd,
+                stateMachine.isUp,
+                stateMachine.zg,
+                stateMachine.zd,
+                stateMachine.gg,
+                stateMachine.dd,
                 strategy,
               );
 
             // 规则 1.2: 离开封存判定
             if (departureOk) {
-              channelElements.push(curr);
-              curGg = isUp ? Math.max(curGg, curr.high) : curGg;
-              curDd = !isUp ? Math.min(curDd, curr.low) : curDd;
+              const finalGg = stateMachine.isUp
+                ? Math.max(stateMachine.gg, curr.high)
+                : stateMachine.gg;
+              const finalDd = !stateMachine.isUp
+                ? Math.min(stateMachine.dd, curr.low)
+                : stateMachine.dd;
+              stateMachine.sealAtCurrent(curr, finalGg, finalDd);
               nextIdx++;
-              hasSealedDeparture = true;
               break;
             }
 
             // 规则 1.3: 若未曾满足离开封存便反向击穿进入笔起点，说明非本向中枢（细节 2，重新评估反向走势）
             if (piercesOrigin) {
-              hasCollapsed = true;
+              stateMachine.collapse();
               break;
             }
 
             // 未能直接封存且后一笔未击穿起点：吸纳 curr 与 pullback 进入中枢扩展阶段
             if (pullback !== null) {
-              channelElements.push(curr, pullback);
+              stateMachine.absorb(curr, pullback);
               nextIdx += 2;
-              // 方式 A：全量公共交集动态更新
-              const allHigh = minMaxBy(channelElements, (e) => e.high);
-              const allLow = minMaxBy(channelElements, (e) => e.low);
-              if (allHigh && allLow && allHigh.min > allLow.max) {
-                curZg = allHigh.min;
-                curZd = allLow.max;
-              } else {
-                isExpanded = true;
-              }
-              curGg = Math.max(curGg, curr.high, pullback.high);
-              curDd = Math.min(curDd, curr.low, pullback.low);
               continue;
             } else {
-              // 数据末端单元素触及吸纳
-              const allHigh = minMaxBy(
-                [...channelElements, curr],
-                (e) => e.high,
-              );
-              const allLow = minMaxBy([...channelElements, curr], (e) => e.low);
-              if (allHigh && allLow && allHigh.min > allLow.max) {
-                curZg = allHigh.min;
-                curZd = allLow.max;
-              } else {
-                isExpanded = true;
-              }
-              curGg = Math.max(curGg, curr.high);
-              curDd = Math.min(curDd, curr.low);
-              channelElements.push(curr);
+              stateMachine.absorb(curr);
               nextIdx++;
               break;
             }
           }
 
           // -------------------------------------------------------------------
-          // 阶段二：超过 5 笔的中枢扩展阶段（channelElements.length >= 6）
+          // 阶段二：超过 5 笔的中枢扩展阶段（stateMachine.elements.length >= 6）
           // -------------------------------------------------------------------
           const pullback = nextIdx + 1 < count ? data[nextIdx + 1] : null;
 
           // A. 备选离开笔判定：扩展阶段离开笔最高点必须高于 GG（下跌最低点低于 DD）
-          const breaksExtreme = isUp ? curr.high > curGg : curr.low < curDd;
+          const breaksExtreme = stateMachine.isUp
+            ? curr.high > stateMachine.gg
+            : curr.low < stateMachine.dd;
           if (breaksExtreme) {
-            const candidateGg = isUp ? Math.max(curGg, curr.high) : curGg;
-            const candidateDd = !isUp ? Math.min(curDd, curr.low) : curDd;
+            const candidateGg = stateMachine.isUp
+              ? Math.max(stateMachine.gg, curr.high)
+              : stateMachine.gg;
+            const candidateDd = !stateMachine.isUp
+              ? Math.min(stateMachine.dd, curr.low)
+              : stateMachine.dd;
 
             const departureOk = checkDepartureRules(
               data,
               nextIdx,
-              isUp,
-              curZg,
-              curZd,
-              curGg,
-              curDd,
+              stateMachine.isUp,
+              stateMachine.zg,
+              stateMachine.zd,
+              stateMachine.gg,
+              stateMachine.dd,
               strategy,
             );
 
             if (departureOk) {
-              channelElements.push(curr);
-              curGg = candidateGg;
-              curDd = candidateDd;
+              stateMachine.sealAtCurrent(curr, candidateGg, candidateDd);
               nextIdx++;
-              hasSealedDeparture = true;
-              if (channelElements.length >= 9) isExpanded = true;
               break;
             }
 
             // 记录有效备选离开笔
-            lastCandidateDeparture = {
-              elementCount: channelElements.length + 1,
-              newGg: candidateGg,
-              newDd: candidateDd,
-            };
+            stateMachine.recordCandidateDeparture(
+              nextIdx,
+              candidateGg,
+              candidateDd,
+            );
           }
 
           // B. 反向 3 卖 / 3 买 封存（中枢下方 3 卖或上方 3 买，封存 2 笔前）
           if (pullback !== null && nextIdx + 2 < count) {
             const bounce = data[nextIdx + 2];
             if (bounce.trend === curr.trend) {
-              const isOpposite3rd = isUp
-                ? pullback.low < curZd && bounce.high < curZd
-                : pullback.high > curZg && bounce.low > curZg;
+              const isOpposite3rd = stateMachine.isUp
+                ? pullback.low < stateMachine.zd &&
+                  bounce.high < stateMachine.zd
+                : pullback.high > stateMachine.zg &&
+                  bounce.low > stateMachine.zg;
               if (isOpposite3rd) {
-                channelElements.push(curr);
-                curGg = Math.max(curGg, curr.high);
-                curDd = Math.min(curDd, curr.low);
+                const finalGg = Math.max(stateMachine.gg, curr.high);
+                const finalDd = Math.min(stateMachine.dd, curr.low);
+                stateMachine.sealAtCurrent(curr, finalGg, finalDd);
                 nextIdx++;
-                hasSealedDeparture = true;
-                if (channelElements.length >= 9) isExpanded = true;
                 break;
               }
             }
           }
 
           // C. 反向击穿起笔极值守卫与细节 2
-          const violatesOrigin = isUp
+          const violatesOrigin = stateMachine.isUp
             ? curr.low < firstElem.low ||
               (pullback !== null && pullback.low < firstElem.low)
             : curr.high > firstElem.high ||
               (pullback !== null && pullback.high > firstElem.high);
 
           if (violatesOrigin) {
-            if (lastCandidateDeparture) {
-              // 存在有效备选离开笔：回退封存在该离开笔
-              channelElements.push(curr);
-              channelElements.splice(lastCandidateDeparture.elementCount);
-              curGg = lastCandidateDeparture.newGg;
-              curDd = lastCandidateDeparture.newDd;
-              hasSealedDeparture = true;
-              if (channelElements.length >= 9) isExpanded = true;
+            if (stateMachine.rollbackAndSeal()) {
               break;
             } else {
               // 细节 2：扩展阶段从未走出新高，直接击穿起笔点，说明非本向中枢，第二笔实际上是反向中枢起点
-              hasCollapsed = true;
+              stateMachine.collapse();
               break;
             }
           }
 
           // D. 震荡吸纳与全量公共交集动态更新（方式 A）
           if (pullback !== null) {
-            channelElements.push(curr, pullback);
+            stateMachine.absorb(curr, pullback);
             nextIdx += 2;
-            const allHigh = minMaxBy(channelElements, (e) => e.high);
-            const allLow = minMaxBy(channelElements, (e) => e.low);
-            if (allHigh && allLow && allHigh.min > allLow.max) {
-              curZg = allHigh.min;
-              curZd = allLow.max;
-            } else {
-              isExpanded = true;
-            }
-            curGg = Math.max(curGg, curr.high, pullback.high);
-            curDd = Math.min(curDd, curr.low, pullback.low);
-            if (channelElements.length >= 9) isExpanded = true;
           } else {
             // 数据末端单元素触及吸纳
-            const allHigh = minMaxBy([...channelElements, curr], (e) => e.high);
-            const allLow = minMaxBy([...channelElements, curr], (e) => e.low);
-            if (allHigh && allLow && allHigh.min > allLow.max) {
-              curZg = allHigh.min;
-              curZd = allLow.max;
-            } else {
-              isExpanded = true;
-            }
-            curGg = Math.max(curGg, curr.high);
-            curDd = Math.min(curDd, curr.low);
-            channelElements.push(curr);
+            stateMachine.absorb(curr);
             nextIdx++;
-            if (channelElements.length >= 9) isExpanded = true;
             break;
           }
         }
@@ -516,44 +627,53 @@ export class ChannelLifecycleEngine {
           if (nextIdx + 1 < count) {
             const nextElem = data[nextIdx + 1];
             const nextIsTrendDir =
-              (isUp && nextElem.trend === TrendDirection.Up) ||
-              (!isUp && nextElem.trend === TrendDirection.Down);
+              (stateMachine.isUp && nextElem.trend === TrendDirection.Up) ||
+              (!stateMachine.isUp && nextElem.trend === TrendDirection.Down);
             const nextBrokenOut =
               nextIsTrendDir &&
-              (isUp ? nextElem.high > curZg : nextElem.low < curZd);
+              (stateMachine.isUp
+                ? nextElem.high > stateMachine.zg
+                : nextElem.low < stateMachine.zd);
 
             if (nextBrokenOut) {
-              const tempZd = Math.max(curZd, curr.low);
-              const tempZg = Math.min(curZg, curr.high);
-              let testZg = curZg;
-              let testZd = curZd;
+              const tempZd = Math.max(stateMachine.zd, curr.low);
+              const tempZg = Math.min(stateMachine.zg, curr.high);
+              let testZg = stateMachine.zg;
+              let testZd = stateMachine.zd;
               if (tempZg > tempZd) {
                 testZg = tempZg;
                 testZd = tempZd;
               }
-              const newGg = isUp ? Math.max(curGg, nextElem.high) : curGg;
-              const newDd = !isUp ? Math.min(curDd, nextElem.low) : curDd;
+              const newGg = stateMachine.isUp
+                ? Math.max(stateMachine.gg, nextElem.high)
+                : stateMachine.gg;
+              const newDd = !stateMachine.isUp
+                ? Math.min(stateMachine.dd, nextElem.low)
+                : stateMachine.dd;
 
               if (
                 checkDepartureRules(
                   data,
                   nextIdx + 1,
-                  isUp,
+                  stateMachine.isUp,
                   testZg,
                   testZd,
-                  curGg,
-                  curDd,
+                  stateMachine.gg,
+                  stateMachine.dd,
                   strategy,
                 )
               ) {
-                channelElements.push(curr, nextElem);
-                curZg = testZg;
-                curZd = testZd;
-                curGg = newGg;
-                curDd = newDd;
+                stateMachine.elements.push(curr, nextElem);
+                stateMachine.zg = testZg;
+                stateMachine.zd = testZd;
+                stateMachine.gg = newGg;
+                stateMachine.dd = newDd;
+                stateMachine.isComplete = true;
+                stateMachine.candidateEndIndex = nextIdx + 1;
                 nextIdx += 2;
-                hasSealedDeparture = true;
-                if (channelElements.length >= 9) isExpanded = true;
+                if (stateMachine.elements.length >= 9) {
+                  stateMachine.isExpanded = true;
+                }
                 break;
               }
             }
@@ -566,7 +686,7 @@ export class ChannelLifecycleEngine {
               break;
             }
 
-            const testWindow = [...channelElements, curr, nextElem];
+            const testWindow = [...stateMachine.elements, curr, nextElem];
             const allHighMinMax = minMaxBy(testWindow, (e) => e.high);
             const allLowMinMax = minMaxBy(testWindow, (e) => e.low);
 
@@ -575,34 +695,22 @@ export class ChannelLifecycleEngine {
               allLowMinMax &&
               allHighMinMax.min > allLowMinMax.max
             ) {
-              channelElements.push(curr, nextElem);
-              curZg = allHighMinMax.min;
-              curZd = allLowMinMax.max;
-              curGg = Math.max(curGg, curr.high, nextElem.high);
-              curDd = Math.min(curDd, curr.low, nextElem.low);
+              stateMachine.absorb(curr, nextElem);
               nextIdx += 2;
-              if (channelElements.length >= 9) {
-                isExpanded = true;
-              }
               continue;
             } else {
               break;
             }
           } else {
             // 序列末尾单元素触及吸纳
-            if (curr.high >= curZd && curr.low <= curZg) {
-              const newZg = Math.min(curZg, curr.high);
-              const newZd = Math.max(curZd, curr.low);
+            if (curr.high >= stateMachine.zd && curr.low <= stateMachine.zg) {
+              const newZg = Math.min(stateMachine.zg, curr.high);
+              const newZd = Math.max(stateMachine.zd, curr.low);
               if (newZg > newZd) {
-                channelElements.push(curr);
-                curZg = newZg;
-                curZd = newZd;
-                curGg = Math.max(curGg, curr.high);
-                curDd = Math.min(curDd, curr.low);
+                stateMachine.absorb(curr);
+                stateMachine.zg = newZg;
+                stateMachine.zd = newZd;
                 nextIdx++;
-                if (channelElements.length >= 9) {
-                  isExpanded = true;
-                }
               }
             }
             break;
@@ -611,7 +719,7 @@ export class ChannelLifecycleEngine {
       }
 
       // 3. 门槛校验与结果记录
-      if (hasCollapsed) {
+      if (stateMachine.hasCollapsed) {
         cursor++;
         continue;
       }
@@ -620,10 +728,10 @@ export class ChannelLifecycleEngine {
       const isAtDataEnd =
         allowUncomplete && (nextIdx >= count || count - nextIdx <= 2);
       const isComplete =
-        hasSealedDeparture ||
+        stateMachine.isComplete ||
         (!isAtDataEnd &&
           strategy.minSealedLength <= 3 &&
-          channelElements.length >= 3);
+          stateMachine.elements.length >= 3);
 
       // 未完结中枢若未处在数据末端，说明已属于历史走势中未成型的结构，丢弃不输出
       if (!isComplete && !isAtDataEnd) {
@@ -635,7 +743,7 @@ export class ChannelLifecycleEngine {
         ? strategy.minSealedLength
         : strategy.minCoreLength;
 
-      if (channelElements.length < minRequiredLength) {
+      if (stateMachine.elements.length < minRequiredLength) {
         cursor++;
         continue;
       }
@@ -643,15 +751,11 @@ export class ChannelLifecycleEngine {
       // 未触发离开封存且未达成 9 元素扩展时（处于未完成状态）：
       // 检查反向崩塌守卫：若末尾元素已破坏结构（核心笔打穿进入笔起点，或延伸笔打穿反向沿），候选中枢失效作废
       if (!isComplete) {
-        const lastElem = channelElements[channelElements.length - 1];
-        const hasCollapsedAtEnd =
-          channelElements.length > strategy.minCoreLength
-            ? isUp
-              ? lastElem.low < curZd
-              : lastElem.high > curZg
-            : isUp
-              ? lastElem.low < firstElem.low
-              : lastElem.high > firstElem.high;
+        const lastElem =
+          stateMachine.elements[stateMachine.elements.length - 1];
+        const hasCollapsedAtEnd = stateMachine.isUp
+          ? lastElem.low < firstElem.low
+          : lastElem.high > firstElem.high;
 
         if (hasCollapsedAtEnd) {
           cursor++;
@@ -660,7 +764,7 @@ export class ChannelLifecycleEngine {
       }
 
       const phaseAChannel = strategy.buildPhaseAChannel(
-        channelElements,
+        stateMachine.elements,
         data,
         cursor,
         coreInfo.geometry,
@@ -670,17 +774,17 @@ export class ChannelLifecycleEngine {
       }
 
       const outputChannel = strategy.buildSealedChannel(
-        channelElements,
+        stateMachine.elements,
         data,
         cursor,
-        { zg: curZg, zd: curZd, gg: curGg, dd: curDd },
-        isExpanded || channelElements.length >= 9,
+        stateMachine.geometry,
+        stateMachine.isExpanded || stateMachine.elements.length >= 9,
         isComplete,
       );
       sequential.push(outputChannel);
 
       // 推进游标至离开单元继续寻找后续中枢
-      cursor = cursor + channelElements.length - 1;
+      cursor = cursor + stateMachine.elements.length - 1;
     }
 
     return { phaseA, sequential };

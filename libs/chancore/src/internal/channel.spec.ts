@@ -2,6 +2,7 @@ import {
   BiStatus,
   BiType,
   ChannelStatus,
+  ChannelType,
   FenxingType,
   TrendDirection,
 } from '../contracts';
@@ -306,11 +307,11 @@ describe('ChannelCalculator', () => {
       expect(result.phaseB[0].expanded).toBe(true);
     });
 
-    it('confirms departure bi on trend breakout and isolates subsequent 3-buy/3-sell into new structure', () => {
+    it('中枢状态机吸纳内部震荡：反向笔未打穿 DD 且无 3B 时，严禁机械伪 2s 提前关门，维持延伸态吸纳构件', () => {
       // 模拟 1月22日 5M 笔中枢形态：
-      // b0..b3 形成基础中枢 [4118.82, 4134.71]
-      // b4 为顺势突破离开笔（high 4140.84 > zg 4134.71）
-      // b5 为 3买试探回抽跌回中枢（3买转2卖），b6/b7 为后续二卖冲高与破位
+      // b0..b3 形成基础中枢 [4118.82, 4134.71], DD=4100.36
+      // b4 虽顺势冲高至 4140.84，但 b5 反向回抽 4112.86 未破 DD(4100.36) 且无 3B
+      // 状态机判定为中枢内部震荡，吸纳 b4/b5 与后续 b6/b7，严禁将其机械误判为 5 笔封存 2s
       const bis: ChanBi[] = [
         makeBiDirect(0, TrendDirection.Up, 4100.36, 4135.96),
         makeBiDirect(1, TrendDirection.Down, 4118.82, 4135.96),
@@ -322,13 +323,22 @@ describe('ChannelCalculator', () => {
         makeBiDirect(7, TrendDirection.Down, 4109.92, 4127.82),
       ];
 
+      // 1. 默认切片下，由于未完成真正离开封存，严禁输出过早切断的 5 笔伪中枢
       const result = service.createChannels(bis);
-      expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
-      const c0 = result.phaseB[0];
-      expect(c0.bis).toHaveLength(5);
-      expect(c0.gg).toBe(4140.84);
-      expect(c0.zg).toBe(4134.71);
-      expect(c0.zd).toBe(4118.82);
+      const prematureFiveBi = result.phaseB.find(
+        (c) => c.bis.length === 5 && c.gg === 4140.84,
+      );
+      expect(prematureFiveBi).toBeUndefined();
+
+      // 2. 在末端允许未完成中枢下，完整吸纳为 8 笔生长态中枢
+      const resUncomplete = service.createChannels(bis, {
+        allowUncomplete: true,
+      });
+      expect(resUncomplete.phaseB).toHaveLength(1);
+      const c0 = resUncomplete.phaseB[0];
+      expect(c0.bis).toHaveLength(8);
+      expect(c0.type).toBe(ChannelType.UnComplete);
+      expect(c0.dd).toBe(4100.36);
     });
 
     it('5M 实盘经典用例一：01-07~01-13 第 1 号中枢避免 b[10] 假突破过早封存，消除 0.86 微型中枢并封存于 9 笔健康中枢', () => {
