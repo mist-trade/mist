@@ -707,6 +707,153 @@ export const REAL_5M_JAN2026_FIRST_CENTRAL_BIS: readonly ChanBi[] = [
   ),
 ];
 
+/**
+ * 真实 5M 行情 (000001) 2026-04-01 09:40 ~ 2026-04-09 14:45 完整笔序列
+ * 完整覆盖 4月3日 极值低点（DD 3871.30）与 4月2日~4月7日 五笔下跌中枢（含 3买转2买 离开笔）
+ */
+export const REAL_5M_APR2026_CENTRAL_BIS: readonly ChanBi[] = [
+  // 0. 04-01 09:40 ~ 13:35 | 3929.92 -> 3955.94 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    3929.92,
+    3955.94,
+    '2026-04-01T01:40:00.000Z',
+    '2026-04-01T05:35:00.000Z',
+    1,
+    30,
+  ),
+  // 1. 04-01 13:35 ~ 04-02 14:05 | 3955.94 -> 3900.12 (Down) -> 中枢进入笔 (Bi #1)
+  makeMockBi(
+    TrendDirection.Down,
+    3900.12,
+    3955.94,
+    '2026-04-01T05:35:00.000Z',
+    '2026-04-02T06:05:00.000Z',
+    30,
+    84,
+  ),
+  // 2. 04-02 14:05 ~ 04-03 09:35 | 3900.12 -> 3929.53 (Up) -> 核心构件笔 1 (Bi #2)
+  makeMockBi(
+    TrendDirection.Up,
+    3900.12,
+    3929.53,
+    '2026-04-02T06:05:00.000Z',
+    '2026-04-03T01:35:00.000Z',
+    84,
+    96,
+  ),
+  // 3. 04-03 09:35 ~ 04-03 13:25 | 3929.53 -> 3871.30 (Down) -> 核心构件笔 2 (Bi #3，4月3日打出 DD 3871.30)
+  makeMockBi(
+    TrendDirection.Down,
+    3871.3,
+    3929.53,
+    '2026-04-03T01:35:00.000Z',
+    '2026-04-03T05:25:00.000Z',
+    96,
+    124,
+  ),
+  // 4. 04-03 13:25 ~ 04-07 09:55 | 3871.30 -> 3902.61 (Up) -> 核心构件笔 3 (Bi #4，反弹定出 ZG 3902.61)
+  makeMockBi(
+    TrendDirection.Up,
+    3871.3,
+    3902.61,
+    '2026-04-03T05:25:00.000Z',
+    '2026-04-07T01:55:00.000Z',
+    124,
+    148,
+  ),
+  // 5. 04-07 09:55 ~ 04-07 13:20 | 3902.61 -> 3876.98 (Down) -> 顺势离开笔 (Bi #5，3买转2买成立离开笔)
+  makeMockBi(
+    TrendDirection.Down,
+    3876.98,
+    3902.61,
+    '2026-04-07T01:55:00.000Z',
+    '2026-04-07T05:20:00.000Z',
+    148,
+    171,
+  ),
+  // 6. 04-07 13:20 ~ 04-07 14:05 | 3876.98 -> 3890.43 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    3876.98,
+    3890.43,
+    '2026-04-07T05:20:00.000Z',
+    '2026-04-07T06:05:00.000Z',
+    171,
+    180,
+  ),
+  // 7. 04-07 14:05 ~ 04-07 14:40 | 3890.43 -> 3882.53 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    3882.53,
+    3890.43,
+    '2026-04-07T06:05:00.000Z',
+    '2026-04-07T06:40:00.000Z',
+    180,
+    187,
+  ),
+  // 8. 04-07 14:40 ~ 04-08 15:00 | 3882.53 -> 3995.00 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    3882.53,
+    3995,
+    '2026-04-07T06:40:00.000Z',
+    '2026-04-08T07:00:00.000Z',
+    187,
+    239,
+  ),
+  // 9. 04-08 15:00 ~ 04-09 09:50 | 3995.00 -> 3961.77 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    3961.77,
+    3995,
+    '2026-04-08T07:00:00.000Z',
+    '2026-04-09T01:50:00.000Z',
+    239,
+    243,
+  ),
+  // 10. 04-09 09:50 ~ 04-09 10:25 | 3961.77 -> 3979.13 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    3961.77,
+    3979.13,
+    '2026-04-09T01:50:00.000Z',
+    '2026-04-09T02:25:00.000Z',
+    243,
+    250,
+  ),
+  // 11. 04-09 10:25 ~ 04-09 13:25 | 3979.13 -> 3955.25 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    3955.25,
+    3979.13,
+    '2026-04-09T02:25:00.000Z',
+    '2026-04-09T05:25:00.000Z',
+    250,
+    268,
+  ),
+  // 12. 04-09 13:25 ~ 04-09 14:10 | 3955.25 -> 3970.15 (Up)
+  makeMockBi(
+    TrendDirection.Up,
+    3955.25,
+    3970.15,
+    '2026-04-09T05:25:00.000Z',
+    '2026-04-09T06:10:00.000Z',
+    268,
+    277,
+  ),
+  // 13. 04-09 14:10 ~ 04-09 14:45 | 3970.15 -> 3962.33 (Down)
+  makeMockBi(
+    TrendDirection.Down,
+    3962.33,
+    3970.15,
+    '2026-04-09T06:10:00.000Z',
+    '2026-04-09T06:45:00.000Z',
+    277,
+    284,
+  ),
+];
+
 describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Departure & Closure Cases)', () => {
   const biCalc = new ChannelCalculator();
   const duanCalc = new DuanChannelCalculator();
@@ -1280,6 +1427,16 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
     }
   });
 
+  it('验证真实 5M 2026年4月1日~4月9日全量笔序列基准数据完整性', () => {
+    expect(REAL_5M_APR2026_CENTRAL_BIS).toHaveLength(14);
+    // 验证严格趋势交替
+    for (let i = 0; i < REAL_5M_APR2026_CENTRAL_BIS.length - 1; i++) {
+      expect(REAL_5M_APR2026_CENTRAL_BIS[i].trend).not.toBe(
+        REAL_5M_APR2026_CENTRAL_BIS[i + 1].trend,
+      );
+    }
+  });
+
   describe('5分钟级别前5个中枢端到端全量锁定门禁 (E2E Contract Guard)', () => {
     it('端到端全量锁定：前5个中枢总数严格为5，每一笔（共47笔）的方向、高低点、起止时间与全局引用严格完全一致，错一笔即不通过', () => {
       const allRes = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
@@ -1526,6 +1683,69 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       // Bi 59: 确认下杀 (01-26 14:35 ~ 01-27 10:05, low 4101.83)
       const biBreak = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[59];
       expect(biBreak.low).toBeLessThan(bigChannel!.zd);
+    });
+  });
+
+  describe('用例 6：2026年4月1日13:35至4月7日13:20五笔下跌中枢（4月3日极值3871.30与3买转2买成立离开）', () => {
+    it('在2026年4月全量序列上精准识别出5笔下跌中枢，中枢极值DD(3871.30)对齐4月3日低点，第5笔离开笔为3买转2买成立并闭合', () => {
+      const resAll = biCalc.createChannels(REAL_5M_APR2026_CENTRAL_BIS, {
+        allowUncomplete: true,
+      });
+
+      expect(resAll.phaseB.length).toBeGreaterThanOrEqual(1);
+
+      // 查找起于 04-01 13:35 (Bi #1) 的首个已封存下跌中枢
+      const central = resAll.phaseB[0];
+      expect(central).toBeDefined();
+      expect(central.trend).toBe(TrendDirection.Down);
+      expect(central.type).toBe(ChannelType.Complete);
+      expect(central.expanded).toBe(false);
+
+      // 1. 构件总数为 5 笔（奇偶同向公理：1 进入笔 + 3 核心构件 + 1 顺势离开笔）
+      expect(central.bis).toHaveLength(5);
+
+      // 2. 起止时间严格对齐
+      // 进入笔起点：4月1日 13:35 (UTC 05:35)
+      expect(central.bis[0].startTime).toEqual(
+        new Date('2026-04-01T05:35:00.000Z'),
+      );
+      // 离开笔终点：4月7日 13:20 (UTC 05:20)
+      expect(central.bis[4].endTime).toEqual(
+        new Date('2026-04-07T05:20:00.000Z'),
+      );
+
+      // 3. 中枢核心几何区间 [ZD, ZG] 与全局极值 [DD, GG]
+      // ZG = min(high(bi2), high(bi4)) = min(3929.53, 3902.61) = 3902.61
+      // ZD = max(low(bi2), low(bi4)) = max(3900.12, 3871.30) = 3900.12
+      // GG = max(high) = 3955.94 (Bi #1 进入笔高点)
+      // DD = min(low) = 3871.30 (Bi #3 于 4月3日 13:25 探底创下的全局极低点)
+      expect(central.zg).toBe(3902.61);
+      expect(central.zd).toBe(3900.12);
+      expect(central.gg).toBe(3955.94);
+      expect(central.dd).toBe(3871.3);
+
+      // 4. 4月3日核心构件验证 (Bi #3)
+      const biApril3 = central.bis[2];
+      expect(biApril3.trend).toBe(TrendDirection.Down);
+      expect(biApril3.low).toBe(3871.3);
+      expect(biApril3.low).toBe(central.dd);
+      expect(biApril3.endTime).toEqual(new Date('2026-04-03T05:25:00.000Z')); // 4月3日 13:25
+
+      // 5. 第 5 笔顺势离开笔（Bi #5）：3买转2买成立离开笔
+      const departureBi = central.bis[4];
+      expect(departureBi.trend).toBe(TrendDirection.Down);
+      expect(departureBi.trend).toBe(central.bis[0].trend); // 离开笔与进入笔严格同向
+      expect(departureBi.high).toBe(3902.61); // 触碰 ZG (3902.61)
+      expect(departureBi.low).toBe(3876.98); // 脱离中枢核心区间 [ZD, ZG] (3876.98 < ZD 3900.12)
+      expect(departureBi.low).toBeGreaterThan(central.dd); // 回踩不破前低 3871.30 (3买转2买/2B买点成立)
+
+      // 6. 验证中枢在该离开笔后成功闭合封存，后方大级别反弹笔（Bi #8 冲高 3995.00）不会被错误回溯污染
+      const hasPostApril7Bis = central.bis.some(
+        (b) =>
+          b.startTime.getTime() >=
+          new Date('2026-04-07T05:20:00.000Z').getTime(),
+      );
+      expect(hasPostApril7Bis).toBe(false);
     });
   });
 });
