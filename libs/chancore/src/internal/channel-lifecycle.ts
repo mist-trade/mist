@@ -1,5 +1,28 @@
+/**
+ * 缠论走势中枢生命周期状态机引擎（Central Lifecycle State Machine Engine）
+ *
+ * ======================================================================================
+ * 核心架构与职责定位（第一性原理）：
+ * ======================================================================================
+ * 1. 纯数学核心库契约：无副作用纯状态机，严禁引入任何 I/O、持久化、Redis 或 NestJS 依赖；
+ * 2. 状态驱动生命周期：
+ *    - 核心构建（Forming）：初始构件趋势交替与几何重叠校验；
+ *    - 候选离开登记（Candidate List）：顺势冲破 ZG/ZD 或 GG/DD 时记录完整快照；
+ *    - 离开决断与封存（Sealing）：3买/3卖确认、2s/2b 次级别背驰衰竭转折确认、反向打穿进入笔起点、序列末端顺势突破封存；
+ *    - 严格重叠门禁（Strict Overlap Guard）：No Overlap, No Entry，脱离区间的走势严禁机械吸纳；
+ *    - 断裂脱离收口：无法吸纳且不在中枢内时，在历史最佳离开笔处收口最佳中枢。
+ * 3. 级别对齐：
+ *    - 笔级中枢（Bi Channel）：有方向（由进入笔 b0 趋势决定），4 笔核心（1 进入 + 3 构件），5 笔完成封存门槛；
+ *    - 段级中枢（Duan Channel）：无方向，3 段对称重叠核心。
+ * ======================================================================================
+ */
+
 import { TrendDirection } from '../contracts';
 import { minMaxBy } from './min-max-by';
+
+// ============================================================================
+// 一、通用接口与几何辅助函数
+// ============================================================================
 
 /**
  * 通用中枢几何构件元素契约（ChanBi 与 ChanDuan 的统一几何接口）
@@ -91,28 +114,46 @@ export function resolveChannelAnchorIds<
   };
 }
 
+// ============================================================================
+// 二、笔级走势中枢有限状态机（CentralStateMachine）
+// ============================================================================
+
 /**
- * 中枢生命周期策略适配器：注入笔级与段级的特化核心识别与中枢组装
+ * 中枢有限状态机状态枚举
  */
-export interface ChannelLifecycleStrategy<T extends ChannelElement, R> {
-  /** 初始核心构件所需最小元素数（笔中枢为 4 笔：1进入+3构件；段中枢为 3 段：3构件） */
-  readonly minCoreLength: number;
-  /** 确认完成中枢的最小元素数门槛（笔中枢 >= 5；段中枢 >= 3） */
-  readonly minSealedLength: number;
-  /** 是否允许末端未完成中枢（若为 false，则为历史走势切片，绝不产生 UnComplete 中枢） */
+export enum CentralLifecycleState {
+  /** 初始 4 笔基础核心形成中 */
+  Forming = 'forming',
+  /** 核心确立，内部延伸震荡吸纳中 */
+  Oscillating = 'oscillating',
+  /** 已出现顺势突破极值笔，处于候选离开监测与确认期 */
+  CandidateDeparting = 'candidate_departing',
+  /** 已通过 3买/3卖 / 2s/2b / 末端顺势突破确认完满封存 */
+  Sealed = 'sealed',
+  /** 反向极端打穿进入笔起点，结构崩塌失效作废 */
+  Collapsed = 'collapsed',
+}
+
+/** 笔中枢基础核心构件长度：进入笔 b0 + 3 笔内部构件 = 4 笔 */
+export const BI_CENTRAL_CORE_LENGTH = 4;
+
+/** 笔中枢确认完满封存最小元素数：进入笔 b0 + 3 笔内部构件 + 1 笔离开笔 b = 5 笔 */
+export const BI_CENTRAL_MIN_SEALED_LENGTH = 5;
+
+/**
+ * 笔级中枢生命周期策略适配器
+ */
+export interface BiChannelLifecycleStrategy<T extends ChannelElement, R> {
   readonly allowUncomplete?: boolean;
-  /** 验证初始核心的几何与进入约束，返回核心几何参数与基准趋势方向 */
   validateCore(
     window: readonly T[],
   ): { geometry: ChannelGeometry; isUp: boolean } | null;
-  /** 构建 Phase A 基础中枢 */
   buildPhaseAChannel(
     elements: readonly T[],
     original: readonly T[],
     startIndex: number,
     coreGeometry: ChannelGeometry,
   ): R | null;
-  /** 构建 Phase B 密封完成中枢或未完成中枢 */
   buildSealedChannel(
     elements: readonly T[],
     original: readonly T[],
@@ -124,46 +165,44 @@ export interface ChannelLifecycleStrategy<T extends ChannelElement, R> {
 }
 
 /**
- * 候选离开笔/段快照记录
+ * 候选离开笔快照记录
  */
 export interface CandidateDeparture<T> {
-  /** 候选离开构件在全局数据序列中的绝对下标 */
   readonly departureIndex: number;
-  /** 候选离开构件对象 */
   readonly element: T;
-  /** 包含该候选离开构件时的中枢构件总数 */
   readonly elementCount: number;
-  /** 突破时的极值价格（上涨为 high，下跌为 low） */
   readonly extremePrice: number;
-  /** 此时的几何快照（包含当时的 [zg, zd, gg, dd]） */
   readonly geometry: ChannelGeometry;
 }
 
 /**
- * 显式走势中枢状态机（Central State Machine）
+ * 走势中枢有限状态机（Central State Machine）
  *
- * 维护中枢生长全生命周期（形成、震荡吸纳、候选离开列表记录、真实离开决断、反向破坏回退）：
+ * 维护单中枢生长全生命周期（形成、震荡吸纳、候选离开列表记录、真实离开决断、反向破坏回退）：
  * - 核心状态包含：
  *   1. 到当前笔的动态极值与重叠几何参数 [gg, dd, zg, zd]
  *   2. 开始笔在原始序列中的全局下标 startIndex
  *   3. 是否为完整中枢 isComplete 标志
  * - 维护候选离开笔列表 candidateDepartures：每次顺势突破极值均完整记录；
- * - 最终封存决断时，从候选列表中筛选最符合缠论极值定义的真实离开笔（上涨 high===GG，下跌 low===DD），
- *   严禁离开笔最低点/最高点与 DD/GG 发生脱节。
+ * - 最终封存决断时，从候选列表中筛选最符合缠论极值定义的真实离开笔（上涨 high===GG，下跌 low===DD）。
  */
 export class CentralStateMachine<T extends ChannelElement> {
   readonly startIndex: number;
-  isComplete = false;
+  readonly elements: T[];
+  readonly firstElem: T;
+  readonly isUp: boolean;
+
   zg: number;
   zd: number;
   gg: number;
   dd: number;
-  readonly elements: T[];
-  readonly isUp: boolean;
+
+  isComplete = false;
   isExpanded = false;
   hasCollapsed = false;
+  state: CentralLifecycleState = CentralLifecycleState.Forming;
 
-  /** 候选离开笔历史列表 */
+  /** 候选离开笔历史快照列表 */
   readonly candidateDepartures: CandidateDeparture<T>[] = [];
 
   constructor(
@@ -173,22 +212,33 @@ export class CentralStateMachine<T extends ChannelElement> {
   ) {
     this.startIndex = startIndex;
     this.elements = [...initialCore];
+    this.firstElem = initialCore[0];
     this.isUp = coreInfo.isUp;
     this.zg = coreInfo.geometry.zg;
     this.zd = coreInfo.geometry.zd;
     this.gg = coreInfo.geometry.gg;
     this.dd = coreInfo.geometry.dd;
+    this.state = CentralLifecycleState.Forming;
   }
 
   /**
-   * 记录候选离开笔进入历史候选列表
+   * 记录候选离开笔快照
+   *
+   * 契约守卫：
+   * 1. 首尾同向公理：只有与进入笔 b0 趋势严格一致的同向笔，才有资格作为潜在离开笔；
+   * 2. 只有创出新高（上涨破 GG）或新低（下跌破 DD）时登记快照；
+   * 3. 包含该候选笔时，构件总数必定是奇数笔（5, 7, 9...）。
    */
   recordCandidateDeparture(
     curr: T,
     index: number,
     candidateGg: number,
     candidateDd: number,
-  ): void {
+  ): CandidateDeparture<T> | null {
+    if (curr.trend !== this.firstElem.trend) {
+      return null;
+    }
+
     const extremePrice = this.isUp ? curr.high : curr.low;
     const candidate: CandidateDeparture<T> = {
       departureIndex: index,
@@ -203,10 +253,13 @@ export class CentralStateMachine<T extends ChannelElement> {
       },
     };
     this.candidateDepartures.push(candidate);
+    return candidate;
   }
 
   /**
-   * 从候选离开列表中决断出最符合缠论定义的真实离开笔：
+   * 从候选离开列表中决断出最符合缠论定义的历史真实离开笔
+   *
+   * 缠论离开定义：离开中枢的走势必须是顺势极值突破。
    * - 上涨中枢：选取最高点等于全局 GG 的那一笔（顺势冲至最高极值）；
    * - 下跌中枢：选取最低点等于全局 DD 的那一笔（顺势跌至最低极值）；
    * - 若存在多笔同达极值，取最后一次确认极值者。
@@ -215,6 +268,7 @@ export class CentralStateMachine<T extends ChannelElement> {
     if (this.candidateDepartures.length === 0) {
       return null;
     }
+
     if (this.isUp) {
       let best = this.candidateDepartures[0];
       for (let i = 1; i < this.candidateDepartures.length; i++) {
@@ -237,21 +291,571 @@ export class CentralStateMachine<T extends ChannelElement> {
   }
 
   /**
-   * 直接在当前离开笔封存中枢
+   * 封存于最新的候选离开笔
    */
-  sealAtCurrent(curr: T, finalGg: number, finalDd: number): void {
-    this.elements.push(curr);
-    this.gg = finalGg;
-    this.dd = finalDd;
+  sealAtLatestCandidate(): void {
+    if (this.candidateDepartures.length === 0) {
+      return;
+    }
+    const latest =
+      this.candidateDepartures[this.candidateDepartures.length - 1];
+    this.sealAtCandidate(latest);
+  }
+
+  /**
+   * 封存在指定的候选离开笔处，截断多余元素并同步极值与密封状态
+   */
+  sealAtCandidate(candidate: CandidateDeparture<T>): void {
+    this.elements.splice(candidate.elementCount);
+    if (this.elements.length < candidate.elementCount) {
+      this.elements.push(candidate.element);
+    }
+    this.gg = candidate.geometry.gg;
+    this.dd = candidate.geometry.dd;
     this.isComplete = true;
+    this.state = CentralLifecycleState.Sealed;
     if (this.elements.length >= 9) {
       this.isExpanded = true;
     }
   }
 
   /**
-   * 回退并封存在指定的真实离开笔处
+   * 出现异常或走势反转时，决断候选列表中最佳离开笔；若无候选离开笔则判定中枢崩塌
    */
+  sealOrCollapseAtBestCandidate(): boolean {
+    const best = this.findBestCandidateDeparture();
+    if (best) {
+      this.sealAtCandidate(best);
+      return true;
+    }
+    this.collapse();
+    return false;
+  }
+
+  /**
+   * 检验反向回抽笔是否形成第 3 类买卖点（回抽不跌回 ZG / 升回 ZD）
+   */
+  isThirdBuyOrSellPoint(pullback: T | null): boolean {
+    if (!pullback) return false;
+    return this.isUp ? pullback.low > this.zg : pullback.high < this.zd;
+  }
+
+  /**
+   * 检验反向一笔是否物理反转打穿进入笔起点（上涨暴跌打穿 b0.low / 下跌暴涨打穿 b0.high）
+   */
+  piercesOppositeExtreme(bi: T | null): boolean {
+    if (!bi) return false;
+    return this.isUp
+      ? bi.low < this.firstElem.low
+      : bi.high > this.firstElem.high;
+  }
+
+  /**
+   * 检验是否满足 2s/2b 次级别背驰衰竭转折离开
+   *
+   * 冲破极值（Up 破 GG / Down 破 DD）后，回抽不破对向沿且紧随的同向反弹/回踩走出次级别不创新高/低转折。
+   */
+  isSecondClassReversal(
+    candidate: CandidateDeparture<T>,
+    data: readonly T[],
+    currIdx: number,
+  ): boolean {
+    if (currIdx + 2 >= data.length) return false;
+
+    const pullback = data[currIdx + 1];
+    const bounce = data[currIdx + 2];
+
+    const pullbackGuarded = this.isUp
+      ? pullback.low >= this.zd
+      : pullback.high <= this.zg;
+    if (!pullbackGuarded) return false;
+
+    return this.isUp
+      ? bounce.high < candidate.element.high
+      : bounce.low > candidate.element.low;
+  }
+
+  /**
+   * 标记中枢结构崩塌失效（Collapsed）
+   * 该候选中枢彻底作废，不向外部输出任何伪中枢对象。
+   */
+  collapse(): void {
+    this.hasCollapsed = true;
+    this.state = CentralLifecycleState.Collapsed;
+  }
+
+  /**
+   * 【Strict Overlap Guard 严格重叠门禁】
+   *
+   * 缠论第一性原理：No Overlap, No Entry。
+   * 走势中枢的延伸，由所有围绕该中枢产生波动的走势类型所构成，这些走势类型必须触及中枢区间 [ZD, ZG]。
+   * 若走势回拉完全脱离区间，属于离开走势，严禁吸收为内部构件！
+   *
+   * 校验条件：
+   * 1. 价格重叠：curr.high >= zd 且 curr.low <= zg；
+   * 2. 若有配对回抽笔 pullback，pullback 同样必须触及中枢区间；
+   * 3. 起点极值守卫：内部震荡构件的极值绝对不得打穿进入笔起点（上涨不破 b0.low，下跌不破 b0.high）。
+   */
+  canAbsorbExtension(curr: T, pullback?: T | null): boolean {
+    // 1. curr 必须触及中枢区间 [zd, zg]（产生价格重叠）
+    const currTouches = curr.high >= this.zd && curr.low <= this.zg;
+    if (!currTouches) {
+      return false;
+    }
+
+    // 2. 若存在配对的 pullback，pullback 也必须触及中枢区间
+    if (pullback) {
+      const pbTouches = pullback.high >= this.zd && pullback.low <= this.zg;
+      if (!pbTouches) {
+        return false;
+      }
+    }
+
+    // 3. 进入笔起点极值守卫：内部震荡构件绝对不得跌破/升破进入笔起点
+    if (this.isUp) {
+      if (curr.low < this.firstElem.low) return false;
+      if (pullback && pullback.low < this.firstElem.low) return false;
+    } else {
+      if (curr.high > this.firstElem.high) return false;
+      if (pullback && pullback.high > this.firstElem.high) return false;
+    }
+
+    return true;
+  }
+
+  /**
+   * 吸纳延伸构件并动态收敛全量公共重叠区间 [ZD, ZG]
+   */
+  absorb(curr: T, pullback?: T | null): void {
+    if (pullback) {
+      this.elements.push(curr, pullback);
+      this.gg = Math.max(this.gg, curr.high, pullback.high);
+      this.dd = Math.min(this.dd, curr.low, pullback.low);
+    } else {
+      this.elements.push(curr);
+      this.gg = Math.max(this.gg, curr.high);
+      this.dd = Math.min(this.dd, curr.low);
+    }
+
+    const coreElements = this.elements.slice(1);
+    const allHigh = minMaxBy(coreElements, (e) => e.high);
+    const allLow = minMaxBy(coreElements, (e) => e.low);
+    if (allHigh && allLow && allHigh.min > allLow.max) {
+      this.zg = allHigh.min;
+      this.zd = allLow.max;
+    } else {
+      this.isExpanded = true;
+    }
+
+    if (this.elements.length >= 9) {
+      this.isExpanded = true;
+    }
+
+    this.state = CentralLifecycleState.Oscillating;
+  }
+
+  get geometry(): ChannelGeometry {
+    return { zg: this.zg, zd: this.zd, gg: this.gg, dd: this.dd };
+  }
+}
+
+// ============================================================================
+// 三、笔级中枢生命周期引擎（ChannelLifecycleEngine）
+// ============================================================================
+
+/**
+ * 笔级中枢生命周期引擎（ChannelLifecycleEngine）
+ *
+ * 核心驱动逻辑：
+ * 1. 寻找候选核心：顺序滑动寻找符合交替性与四笔几何有效性的中枢核心；
+ * 2. 状态机推进：驱动 CentralStateMachine 进行延伸吸纳、脱离尝试与离开确认；
+ * 3. 结果组装：产出 phaseA 与顺序确认的 sequential 中枢序列。
+ */
+export class ChannelLifecycleEngine {
+  static runSequentialLifecycle<T extends ChannelElement, R>(
+    data: readonly T[],
+    strategy: BiChannelLifecycleStrategy<T, R>,
+  ): { phaseA: R[]; sequential: R[] } {
+    const phaseA: R[] = [];
+    const sequential: R[] = [];
+    const count = data.length;
+
+    if (count < BI_CENTRAL_CORE_LENGTH) {
+      return { phaseA, sequential };
+    }
+
+    let cursor = 0;
+    while (cursor <= count - BI_CENTRAL_CORE_LENGTH) {
+      // 1. 检验趋势交替与初始 4 笔基础核心构件
+      const candidateCore = data.slice(cursor, cursor + BI_CENTRAL_CORE_LENGTH);
+      if (!validateTrendAlternating(candidateCore)) {
+        cursor++;
+        continue;
+      }
+
+      const coreInfo = strategy.validateCore(candidateCore);
+      if (!coreInfo) {
+        cursor++;
+        continue;
+      }
+
+      // 实例化有限状态机
+      const stateMachine = new CentralStateMachine<T>(
+        cursor,
+        candidateCore,
+        coreInfo,
+      );
+      const firstElem = stateMachine.elements[0];
+      let nextIdx = cursor + BI_CENTRAL_CORE_LENGTH;
+
+      // 2. 有限状态机顺序推进循环
+      while (nextIdx < count) {
+        const curr = data[nextIdx];
+        if (curr.trend === data[nextIdx - 1].trend) {
+          break;
+        }
+
+        const pullback = nextIdx + 1 < count ? data[nextIdx + 1] : null;
+
+        // 【核心公理】：中枢离开笔必须与进入笔首尾同向！
+        const isTrendAlignedWithEntry = curr.trend === firstElem.trend;
+
+        // 突破判定与候选离开笔登记（同向冲破 ZG/ZD 或 破 GG/DD）
+        const hasBrokenOut = stateMachine.isUp
+          ? curr.high > stateMachine.zg
+          : curr.low < stateMachine.zd;
+        const breaksExtreme = stateMachine.isUp
+          ? curr.high > stateMachine.gg
+          : curr.low < stateMachine.dd;
+
+        const candidateGg = stateMachine.isUp
+          ? Math.max(stateMachine.gg, curr.high)
+          : stateMachine.gg;
+        const candidateDd = !stateMachine.isUp
+          ? Math.min(stateMachine.dd, curr.low)
+          : stateMachine.dd;
+
+        // 1. 同向刷新极值，登记入 Candidate List 备选列表
+        let latestCandidate: CandidateDeparture<T> | null = null;
+        if (isTrendAlignedWithEntry && breaksExtreme) {
+          latestCandidate = stateMachine.recordCandidateDeparture(
+            curr,
+            nextIdx,
+            candidateGg,
+            candidateDd,
+          );
+        }
+
+        // 2. 核心离开确认：
+        // 形式 A：3买 / 3卖确认（离开笔就是 3 买笔前面的那一笔）
+        if (
+          isTrendAlignedWithEntry &&
+          hasBrokenOut &&
+          pullback &&
+          stateMachine.isThirdBuyOrSellPoint(pullback)
+        ) {
+          if (!latestCandidate) {
+            latestCandidate = stateMachine.recordCandidateDeparture(
+              curr,
+              nextIdx,
+              candidateGg,
+              candidateDd,
+            );
+          }
+          stateMachine.sealAtLatestCandidate();
+          break;
+        }
+
+        // 形式 B：2s / 2b 次级别背驰衰竭转折确认（冲破极值后走出次高点转折）
+        if (
+          latestCandidate &&
+          stateMachine.isSecondClassReversal(latestCandidate, data, nextIdx)
+        ) {
+          stateMachine.sealAtCandidate(latestCandidate);
+          break;
+        }
+
+        // 3. 【极端反转】：反向一笔物理打穿进入笔起点（上涨打穿 b0.low / 下跌打穿 b0.high）
+        if (pullback && stateMachine.piercesOppositeExtreme(pullback)) {
+          stateMachine.sealOrCollapseAtBestCandidate();
+          break;
+        }
+
+        // 4. 【序列末端顺势离开笔封存守卫】：
+        // 当走势到达序列末尾（!pullback）时：
+        // A. 封闭历史切片（allowUncomplete === false）：当前笔顺势冲破 ZG/ZD 即可封存；
+        // B. 增量/全量数据末端：当前笔顺势冲破全局极值（breaksExtreme），即为有效离开终笔，封存为 Complete。
+        const shouldSealAtEnd =
+          !pullback &&
+          isTrendAlignedWithEntry &&
+          (strategy.allowUncomplete === false ? hasBrokenOut : breaksExtreme);
+
+        if (shouldSealAtEnd) {
+          if (!latestCandidate) {
+            latestCandidate = stateMachine.recordCandidateDeparture(
+              curr,
+              nextIdx,
+              candidateGg,
+              candidateDd,
+            );
+          }
+          stateMachine.sealAtLatestCandidate();
+          break;
+        }
+
+        // 5. 【内部延伸震荡阶段】（Strict Overlap Guard 严格重叠门禁）
+        if (stateMachine.canAbsorbExtension(curr, pullback)) {
+          if (pullback && stateMachine.canAbsorbExtension(pullback)) {
+            stateMachine.absorb(curr, pullback);
+            nextIdx += 2;
+          } else {
+            stateMachine.absorb(curr);
+            nextIdx++;
+            break;
+          }
+        } else {
+          // 6. 【断裂脱离】：无法吸纳延伸且不在中枢内，在备选离开笔中收口最佳中枢
+          stateMachine.sealOrCollapseAtBestCandidate();
+          break;
+        }
+      }
+
+      // 3. 门槛校验与结果记录
+      if (stateMachine.hasCollapsed) {
+        cursor++;
+        continue;
+      }
+
+      const allowUncomplete = strategy.allowUncomplete ?? true;
+      const isAtDataEnd =
+        allowUncomplete && (nextIdx >= count || count - nextIdx <= 2);
+      const isComplete = stateMachine.isComplete;
+
+      // 未完结中枢若未处在数据末端，说明已属于历史走势中未成型的结构，丢弃不输出
+      if (!isComplete && !isAtDataEnd) {
+        cursor++;
+        continue;
+      }
+
+      const minRequiredLength = isComplete
+        ? BI_CENTRAL_MIN_SEALED_LENGTH
+        : BI_CENTRAL_CORE_LENGTH;
+
+      if (stateMachine.elements.length < minRequiredLength) {
+        cursor++;
+        continue;
+      }
+
+      // Phase A 中枢
+      const phaseAChannel = strategy.buildPhaseAChannel(
+        stateMachine.elements,
+        data,
+        cursor,
+        coreInfo.geometry,
+      );
+      if (phaseAChannel) {
+        phaseA.push(phaseAChannel);
+      }
+
+      // Phase B 中枢
+      const outputChannel = strategy.buildSealedChannel(
+        stateMachine.elements,
+        data,
+        cursor,
+        stateMachine.geometry,
+        stateMachine.isExpanded || stateMachine.elements.length >= 9,
+        isComplete,
+      );
+      sequential.push(outputChannel);
+
+      // 推进游标至离开笔
+      cursor = cursor + stateMachine.elements.length - 1;
+    }
+
+    return { phaseA, sequential };
+  }
+}
+
+// ============================================================================
+// 四、段级走势中枢生命周期引擎（DuanChannelLifecycleEngine）
+// ============================================================================
+
+export enum DepartureCheckResult {
+  /** 未满足任何离开条件，继续中枢生命周期 */
+  None = 'none',
+  /** 顺势直接离开：出 3买/3卖，或破 GG/DD 后走出 2s/2b */
+  Direct = 'direct',
+  /** 旁枝终结信号：后续反向击穿对侧、段中枢单段反穿、或后续走出独立新核心 */
+  BranchReversal = 'branch_reversal',
+}
+
+/**
+ * 检验顺势突破离开段是否满足规则 1～4 封存条件（双向严格对称）
+ */
+export function checkDepartureRules<T extends ChannelElement, R>(
+  data: readonly T[],
+  candidateIdx: number,
+  isUp: boolean,
+  curZg: number,
+  curZd: number,
+  curGg: number,
+  curDd: number,
+  strategy: DuanChannelLifecycleStrategy<T, R>,
+): DepartureCheckResult {
+  const count = data.length;
+  if (
+    candidateIdx + 1 >= count ||
+    data[candidateIdx + 1].trend === data[candidateIdx].trend
+  ) {
+    return DepartureCheckResult.Direct;
+  }
+
+  const pullback = data[candidateIdx + 1];
+  const curr = data[candidateIdx];
+
+  // 条件 1：后续段出现 3 买 / 3 卖（回抽不跌回/升回中枢 [ZD, ZG]）
+  const is3rdPoint = isUp ? pullback.low > curZg : pullback.high < curZd;
+  if (is3rdPoint) {
+    return DepartureCheckResult.Direct;
+  }
+
+  // 条件 2：2s / 2b
+  const hasBrokenExtreme = isUp ? curr.high > curGg : curr.low < curDd;
+  if (hasBrokenExtreme) {
+    const has2ndPremise = isUp ? pullback.low >= curZd : pullback.high <= curZg;
+    if (has2ndPremise && candidateIdx + 2 < count) {
+      const bounce = data[candidateIdx + 2];
+      if (bounce.trend === curr.trend) {
+        const isSecondClassPoint = isUp
+          ? bounce.high < curr.high
+          : bounce.low > curr.low;
+        if (isSecondClassPoint) {
+          return DepartureCheckResult.Direct;
+        }
+      }
+    }
+  }
+
+  // 条件 3：反向单段物理反穿中枢对向边界（暴跌穿透 ZD / 暴涨穿透 ZG）
+  const piercesOppositeBoundary = isUp
+    ? pullback.low < curZd
+    : pullback.high > curZg;
+  if (piercesOppositeBoundary) {
+    return DepartureCheckResult.BranchReversal;
+  }
+
+  // 条件 4：后续段直接走出全新合法基础中枢核心
+  if (candidateIdx + 1 + strategy.minCoreLength <= count) {
+    const nextCoreWindow = data.slice(
+      candidateIdx + 1,
+      candidateIdx + 1 + strategy.minCoreLength,
+    );
+    if (validateTrendAlternating(nextCoreWindow)) {
+      const nextCore = strategy.validateCore(nextCoreWindow);
+      if (nextCore) {
+        return DepartureCheckResult.BranchReversal;
+      }
+    }
+  }
+
+  return DepartureCheckResult.None;
+}
+
+export interface DuanChannelLifecycleStrategy<T extends ChannelElement, R> {
+  readonly minCoreLength: number;
+  readonly minSealedLength: number;
+  readonly allowUncomplete?: boolean;
+  validateCore(
+    window: readonly T[],
+  ): { geometry: ChannelGeometry; isUp: boolean } | null;
+  buildPhaseAChannel(
+    elements: readonly T[],
+    original: readonly T[],
+    startIndex: number,
+    coreGeometry: ChannelGeometry,
+  ): R | null;
+  buildSealedChannel(
+    elements: readonly T[],
+    original: readonly T[],
+    startIndex: number,
+    geometry: ChannelGeometry,
+    expanded: boolean,
+    isComplete?: boolean,
+  ): R;
+}
+
+/** 段中枢状态机专用辅助类 */
+class DuanStateMachine<T extends ChannelElement> {
+  readonly startIndex: number;
+  readonly elements: T[];
+  readonly isUp: boolean;
+
+  zg: number;
+  zd: number;
+  gg: number;
+  dd: number;
+
+  isComplete = false;
+  isExpanded = false;
+  hasCollapsed = false;
+
+  readonly candidateDepartures: CandidateDeparture<T>[] = [];
+
+  constructor(
+    startIndex: number,
+    initialCore: readonly T[],
+    coreInfo: { geometry: ChannelGeometry; isUp: boolean },
+  ) {
+    this.startIndex = startIndex;
+    this.elements = [...initialCore];
+    this.isUp = coreInfo.isUp;
+    this.zg = coreInfo.geometry.zg;
+    this.zd = coreInfo.geometry.zd;
+    this.gg = coreInfo.geometry.gg;
+    this.dd = coreInfo.geometry.dd;
+  }
+
+  recordCandidateDeparture(
+    curr: T,
+    index: number,
+    candidateGg: number,
+    candidateDd: number,
+  ): void {
+    const extremePrice = this.isUp ? curr.high : curr.low;
+    const candidate: CandidateDeparture<T> = {
+      departureIndex: index,
+      element: curr,
+      elementCount: this.elements.length + 1,
+      extremePrice,
+      geometry: {
+        zg: this.zg,
+        zd: this.zd,
+        gg: candidateGg,
+        dd: candidateDd,
+      },
+    };
+    this.candidateDepartures.push(candidate);
+  }
+
+  findBestCandidateDeparture(): CandidateDeparture<T> | null {
+    if (this.candidateDepartures.length === 0) return null;
+    if (this.isUp) {
+      let best = this.candidateDepartures[0];
+      for (let i = 1; i < this.candidateDepartures.length; i++) {
+        const c = this.candidateDepartures[i];
+        if (c.extremePrice >= best.extremePrice) best = c;
+      }
+      return best;
+    } else {
+      let best = this.candidateDepartures[0];
+      for (let i = 1; i < this.candidateDepartures.length; i++) {
+        const c = this.candidateDepartures[i];
+        if (c.extremePrice <= best.extremePrice) best = c;
+      }
+      return best;
+    }
+  }
+
   sealAtCandidate(candidate: CandidateDeparture<T>): void {
     this.elements.splice(candidate.elementCount);
     if (this.elements.length < candidate.elementCount) {
@@ -265,51 +869,20 @@ export class CentralStateMachine<T extends ChannelElement> {
     }
   }
 
-  /**
-   * 当走势发生反向破坏、反向 3买/3卖、或形成新核心时，决断真实的离开笔并闭合封存：
-   * - 若存在候选离开笔列表，回退并封存于最符合极值定义的真实离开笔；
-   * - 若从未走出过顺势极值突破（候选列表为空），判定中枢结构崩塌（collapse）。
-   */
   resolveFinalDepartureOnReversal(): boolean {
-    const bestCandidate = this.findBestCandidateDeparture();
-    if (bestCandidate) {
-      this.sealAtCandidate(bestCandidate);
+    const best = this.findBestCandidateDeparture();
+    if (best) {
+      this.sealAtCandidate(best);
       return true;
     }
     this.collapse();
     return false;
   }
 
-  /**
-   * 检验顺势突破候选离开笔是否满足规则 1～4 封存条件（基于自身状态求值）
-   */
-  checkDepartureRules(
-    data: readonly T[],
-    candidateIdx: number,
-    strategy: ChannelLifecycleStrategy<T, unknown>,
-  ): DepartureCheckResult {
-    return checkDepartureRules(
-      data,
-      candidateIdx,
-      this.isUp,
-      this.zg,
-      this.zd,
-      this.gg,
-      this.dd,
-      strategy,
-    );
-  }
-
-  /**
-   * 标记中枢结构崩塌失效
-   */
   collapse(): void {
     this.hasCollapsed = true;
   }
 
-  /**
-   * 吸纳走势构件并动态更新全量公共交集（方式 A）与极值
-   */
   absorb(curr: T, pullback?: T | null): void {
     if (pullback) {
       this.elements.push(curr, pullback);
@@ -335,160 +908,18 @@ export class CentralStateMachine<T extends ChannelElement> {
     }
   }
 
-  /**
-   * 提取当前中枢几何快照
-   */
   get geometry(): ChannelGeometry {
     return { zg: this.zg, zd: this.zd, gg: this.gg, dd: this.dd };
   }
 }
 
-export enum DepartureCheckResult {
-  /** 未满足任何离开条件，继续中枢生命周期 */
-  None = 'none',
-  /** 顺势直接离开：出 3买/3卖，或破 GG/DD 后走出 2s/2b */
-  Direct = 'direct',
-  /** 旁枝终结信号：后续反向击穿对侧、段中枢单段反穿、或后续走出独立新核心 */
-  BranchReversal = 'branch_reversal',
-}
-
 /**
- * 检验顺势突破离开笔/段是否满足规则 1～4 封存条件（双向严格对称）
+ * 段级走势中枢生命周期引擎
  */
-function checkDepartureRules<T extends ChannelElement, R>(
-  data: readonly T[],
-  candidateIdx: number,
-  isUp: boolean,
-  curZg: number,
-  curZd: number,
-  curGg: number,
-  curDd: number,
-  strategy: ChannelLifecycleStrategy<T, R>,
-): DepartureCheckResult {
-  const count = data.length;
-  // 若已至序列末尾，或下一笔未保持趋势交替，直接封存
-  if (
-    candidateIdx + 1 >= count ||
-    data[candidateIdx + 1].trend === data[candidateIdx].trend
-  ) {
-    return DepartureCheckResult.Direct;
-  }
-
-  const pullback = data[candidateIdx + 1];
-  const curr = data[candidateIdx];
-
-  // -------------------------------------------------------------------------
-  // 正规离开条件（Direct Departure）：
-  // -------------------------------------------------------------------------
-  // 条件 1：后续笔出现 3 买 / 3 卖（回抽不跌回/升回中枢 [ZD, ZG]）：
-  const is3rdPoint = isUp ? pullback.low > curZg : pullback.high < curZd;
-  if (is3rdPoint) {
-    return DepartureCheckResult.Direct;
-  }
-
-  // 条件 2：后续笔没有出现 3买/3卖，但是出现了满足 3买/3卖 前提的 2s/2b
-  // 用户铁律 1：即使是 5 笔基础中枢，如果在没有出现 3b/3s 的情况下，离开笔的最大值必须高于 GG（下跌低于 DD）
-  // 用户铁律 2：2s/2b 出现的前提是不能跌破对侧中枢边界（向上中枢回踩不能破 ZD，向下中枢反弹不能破 ZG）；
-  //            若反向一笔跌破 ZD（或未打穿 DD），属于中枢内部震荡，严禁机械当成 2s 提前关门！
-  const hasBrokenExtreme = isUp ? curr.high > curGg : curr.low < curDd;
-  if (hasBrokenExtreme) {
-    // 检查 2s/2b 前提：
-    const has2ndPremise = isUp ? pullback.low >= curZd : pullback.high <= curZg;
-    if (has2ndPremise && candidateIdx + 2 < count) {
-      const bounce = data[candidateIdx + 2];
-      if (bounce.trend === curr.trend) {
-        const isSecondClassPoint = isUp
-          ? bounce.high < curr.high
-          : bounce.low > curr.low;
-        if (isSecondClassPoint) {
-          // 确认 2s/2b 已经转折成型（后续已转向，或已到达数据末端）
-          if (
-            candidateIdx + 3 >= count ||
-            data[candidateIdx + 3].trend !== bounce.trend
-          ) {
-            return DepartureCheckResult.Direct;
-          }
-        }
-      }
-    }
-  }
-
-  // -------------------------------------------------------------------------
-  // 旁枝终结判定（Branch Reversal / External Termination）：
-  // 注意：旁枝判定只表明走势发生外部破坏或新中枢独立，中枢必须终结；
-  // 但决不能把当前候选笔盲目扣为离开笔，而必须回到 candidateDepartures 列表中
-  // 确认真正的极值离开笔并重新计算；若候选列表为空，则中枢崩塌失效。
-  // -------------------------------------------------------------------------
-  // 规则 2：反向一笔物理反转打穿对侧极值（暴跌打穿 DD / 暴涨打穿 GG）：
-  const piercesOppositeExtreme = isUp
-    ? pullback.low < curDd
-    : pullback.high > curGg;
-  if (piercesOppositeExtreme) {
-    return DepartureCheckResult.BranchReversal;
-  }
-
-  // 规则 3（仅限 Duan 级别段中枢）：无 3买/3卖，离开后反向单段直接打穿中枢对向沿 (ZD/ZG)
-  if (strategy.minCoreLength <= 3) {
-    const pbPiercesBoundary = isUp
-      ? pullback.low < curZd
-      : pullback.high > curZg;
-    if (pbPiercesBoundary) {
-      return DepartureCheckResult.BranchReversal;
-    }
-  }
-
-  // 规则 4：后续走势自身已独立构成完全不重叠的新中枢核心
-  const checkNewCore = (startIdx: number): boolean => {
-    if (startIdx + strategy.minCoreLength > count) {
-      return false;
-    }
-    const newCoreCandidate = data.slice(
-      startIdx,
-      startIdx + strategy.minCoreLength,
-    );
-    if (
-      validateTrendAlternating(newCoreCandidate) &&
-      newCoreCandidate.length === strategy.minCoreLength
-    ) {
-      const newCore = strategy.validateCore(newCoreCandidate);
-      if (newCore) {
-        const isHigher = newCore.geometry.zd >= curZg;
-        const isLower = newCore.geometry.zg <= curZd;
-        if (isHigher || isLower) {
-          return true;
-        }
-      }
-    }
-    return false;
-  };
-
-  for (let offset = 0; offset <= 1; offset++) {
-    if (checkNewCore(candidateIdx + offset)) {
-      return DepartureCheckResult.BranchReversal;
-    }
-  }
-
-  return DepartureCheckResult.None;
-}
-
-/**
- * 中枢生命周期引擎（Channel Lifecycle Engine）
- *
- * 统一驱动笔中枢与段中枢的生命周期推进：
- * 1. 核心确立：按策略识别初始构件并确立 CentralStateMachine；
- * 2. 极值守卫：防止顺势突破穿越起点极值；
- * 3. 离开突破与规则 1～4 状态机封存（双向对称支持）：
- *    - 规则 1：3买/3卖 顺势突破 GG/DD 封存；
- *    - 规则 2：3买/3卖 逆势反转向下击穿 ZD（或向上击穿 ZG）封存；
- *    - 规则 3：无 3买/3卖，离开后单笔反向直接打穿 ZD/ZG 封存；
- *    - 规则 4：离开极值后，后续走势已独立构成合法新中枢核心，旧中枢在离开端点封存；
- * 4. 内部震荡成对触及延伸（维持动态公共重叠交集）；
- * 5. 序列末尾单元素触及保底吸纳。
- */
-export class ChannelLifecycleEngine {
+export class DuanChannelLifecycleEngine {
   static runSequentialLifecycle<T extends ChannelElement, R>(
     data: readonly T[],
-    strategy: ChannelLifecycleStrategy<T, R>,
+    strategy: DuanChannelLifecycleStrategy<T, R>,
   ): { phaseA: R[]; sequential: R[] } {
     const phaseA: R[] = [];
     const sequential: R[] = [];
@@ -500,7 +931,6 @@ export class ChannelLifecycleEngine {
 
     let cursor = 0;
     while (cursor <= count - strategy.minCoreLength) {
-      // 1. 检验趋势交替与初始核心构件
       const candidateCore = data.slice(cursor, cursor + strategy.minCoreLength);
       if (!validateTrendAlternating(candidateCore)) {
         cursor++;
@@ -513,8 +943,7 @@ export class ChannelLifecycleEngine {
         continue;
       }
 
-      // 实例化显式中枢状态机
-      const stateMachine = new CentralStateMachine<T>(
+      const stateMachine = new DuanStateMachine<T>(
         cursor,
         candidateCore,
         coreInfo,
@@ -522,7 +951,6 @@ export class ChannelLifecycleEngine {
       const firstElem = stateMachine.elements[0];
       let nextIdx = cursor + strategy.minCoreLength;
 
-      // 2. 状态机推进（段级走势中枢生命周期状态机推进）
       while (nextIdx < count) {
         const curr = data[nextIdx];
         if (curr.trend === data[nextIdx - 1].trend) {
@@ -586,7 +1014,6 @@ export class ChannelLifecycleEngine {
           }
         }
 
-        // 触及震荡延伸检验：配对 (curr, nextElem)
         if (nextIdx + 1 < count) {
           const nextElem = data[nextIdx + 1];
           if (nextElem.trend === curr.trend) {
@@ -609,7 +1036,6 @@ export class ChannelLifecycleEngine {
             break;
           }
         } else {
-          // 序列末尾单元素触及吸纳
           if (curr.high >= stateMachine.zd && curr.low <= stateMachine.zg) {
             const newZg = Math.min(stateMachine.zg, curr.high);
             const newZd = Math.max(stateMachine.zd, curr.low);
@@ -624,7 +1050,6 @@ export class ChannelLifecycleEngine {
         }
       }
 
-      // 3. 门槛校验与结果记录
       if (stateMachine.hasCollapsed) {
         cursor++;
         continue;
@@ -639,7 +1064,6 @@ export class ChannelLifecycleEngine {
           strategy.minSealedLength <= 3 &&
           stateMachine.elements.length >= 3);
 
-      // 未完结中枢若未处在数据末端，说明已属于历史走势中未成型的结构，丢弃不输出
       if (!isComplete && !isAtDataEnd) {
         cursor++;
         continue;
@@ -654,8 +1078,6 @@ export class ChannelLifecycleEngine {
         continue;
       }
 
-      // 未触发离开封存且未达成 9 元素扩展时（处于未完成状态）：
-      // 检查反向崩塌守卫：若末尾元素已破坏结构（核心笔打穿进入笔起点，或延伸笔打穿反向沿），候选中枢失效作废
       if (!isComplete) {
         const lastElem =
           stateMachine.elements[stateMachine.elements.length - 1];
@@ -689,10 +1111,15 @@ export class ChannelLifecycleEngine {
       );
       sequential.push(outputChannel);
 
-      // 推进游标至离开单元继续寻找后续中枢
       cursor = cursor + stateMachine.elements.length - 1;
     }
 
     return { phaseA, sequential };
   }
 }
+
+/** 兼容别名 */
+export type ChannelLifecycleStrategy<
+  T extends ChannelElement,
+  R,
+> = DuanChannelLifecycleStrategy<T, R>;
