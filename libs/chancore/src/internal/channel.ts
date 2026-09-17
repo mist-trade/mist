@@ -1,3 +1,19 @@
+/**
+ * 缠论走势中枢计算引擎（ChannelCalculator）
+ *
+ * ======================================================================================
+ * 核心架构与职责定位（基于状态机 V2 第一性原理）：
+ * ======================================================================================
+ * 1. 本模块是笔级走势中枢构建与生命周期状态机的统一核心门面；
+ * 2. 彻底废除 V1 外层拼接缝合补丁（mergeAdjacentOverlappingChannels），由 CentralStateMachineV2 内生推进；
+ * 3. 严格遵循缠论走势中枢定义：
+ *    - 进入笔与离开笔严格同向（奇偶性公理：5, 7, 9, 11, 13...）；
+ *    - 离开笔 Candidate List 备选列表与 3买/3卖 / 2s/2b 离开决断；
+ *    - Strict Overlap Guard（No Overlap, No Entry）严格重叠门禁；
+ *    - 跨级别宏观大笔切片支持与封闭切片末端离开守卫。
+ * ======================================================================================
+ */
+
 import {
   BiStatus,
   ChannelLevel,
@@ -12,111 +28,19 @@ import type {
 } from '../contracts';
 
 import {
-  ChannelLifecycleEngine,
-  type ChannelLifecycleStrategy,
+  type BiChannelLifecycleStrategy,
+  ChannelLifecycleEngineV2,
   resolveChannelAnchorIds,
-} from './channel-lifecycle';
+} from './channel-lifecycle-v2';
+import { partitionSubBisForMacroBis } from './channel-partition';
 import { minMaxBy } from './min-max-by';
 
 export class ChannelCalculator {
   /**
-   * 主函数：识别笔级中枢（顺序确认生命周期状态机 + 规则 1～4 完备封存）
+   * 跨级别邻近笔约束中枢求值（Adjacent Timeframe Pair Bounded Channels）
    *
-   * 算法流程：
-   * 1. 顺序确认扫描：从左至右顺序寻找 4 笔基础中枢核心，确立 [ZD, ZG]；
-   * 2. 缠论触及延伸：后续笔对触及 [ZD, ZG] 且保持公共交集有效则并入延伸；
-   * 3. 离开突破与规则 1～4 封存：顺势突破极值后，通过 3买卖点顺势突破/反向击穿/新中枢确立等规则完备封存；
-   * 4. 9 笔结合扩展：持续震荡满 9 笔时触发中枢扩展（expanded: true）并闭合。
-   *
-   * @param data Phase B 笔序列
-   * @returns 两阶段中枢结果 { phaseA, phaseB }
-   */
-  createChannels(
-    data: readonly ChanBi[],
-    options?: { allowUncomplete?: boolean },
-  ): ChanChannelTwoPhaseResult {
-    // 仅确认且有效的笔构成中枢（status !== Valid 的 Invalid/Unknown 单元不参与：
-    // 18 课"次级别前三个走势类型都是完成的才构成中枢"；统一 status 判据，
-    // 数据层 createBi 输出不变）。
-    const confirmed = data.filter((b) => b.status === BiStatus.Valid);
-
-    const { phaseA, sequential } = this.sequentiallyConfirmChannels(
-      confirmed,
-      options,
-    );
-
-    // Phase B：采用顺序生命周期确认的中枢序列，并对相邻同向且区间重叠的中枢执行延伸合并（方案 1：吸收为延伸）
-    const phaseB = this.mergeAdjacentOverlappingChannels(sequential);
-
-    return { phaseA, phaseB };
-  }
-
-  /**
-   * 合并相邻同向且价格区间重叠的笔中枢（方案 1：吸收为延伸）
-   *
-   * 契约公理：
-   * 1. 同向：前置中枢与后置中枢趋势方向相同（同为 Up 或同为 Down）；
-   * 2. 首尾相接：前置中枢的离开笔恰好是后置中枢的进入笔；
-   * 3. 区间重叠：两个中枢的价格区间 [ZD, ZG] 存在非空交集（即 Math.min(prev.zg, curr.zg) >= Math.max(prev.zd, curr.zd)）；
-   * 4. 吸收合并：将后置中枢吸收并入前置中枢作为延伸，更新全量公共交集区间 [ZD, ZG] 与极值 [DD, GG]。
-   */
-  private mergeAdjacentOverlappingChannels(
-    channels: readonly ChanChannel[],
-  ): ChanChannel[] {
-    if (channels.length <= 1) {
-      return [...channels];
-    }
-
-    const result: ChanChannel[] = [channels[0]];
-
-    for (let i = 1; i < channels.length; i++) {
-      const prev = result[result.length - 1];
-      const curr = channels[i];
-
-      const sameTrend = prev.trend === curr.trend;
-      const isConnected =
-        prev.bis.length > 0 &&
-        curr.bis.length > 0 &&
-        prev.bis[prev.bis.length - 1] === curr.bis[0];
-      const overlapZg = Math.min(prev.zg, curr.zg);
-      const overlapZd = Math.max(prev.zd, curr.zd);
-      const hasOverlap = overlapZg >= overlapZd;
-
-      if (sameTrend && isConnected && hasOverlap) {
-        const mergedBis = [...prev.bis, ...curr.bis.slice(1)];
-        const mergedChannel: ChanChannel = {
-          ...prev,
-          bis: mergedBis,
-          zg: overlapZg,
-          zd: overlapZd,
-          gg: Math.max(prev.gg, curr.gg),
-          dd: Math.min(prev.dd, curr.dd),
-          expanded:
-            mergedBis.length >= 9 ? true : prev.expanded || curr.expanded,
-          type: curr.type,
-          endId: curr.endId,
-          displayEndId: curr.displayEndId,
-        };
-        result[result.length - 1] = mergedChannel;
-      } else {
-        result.push(curr);
-      }
-    }
-
-    return result;
-  }
-
-  /**
-   * 跨级别邻近笔约束中枢求值（Adjacent Timeframe Pair Bounded Central）
-   *
-   * 算法契约：
-   * 1. 过滤出已确认且有效的父级别大笔序列（macroBis）；
-   * 2. 依据大级别起止分型窗口（顶/底分型时段），在次级别中精确锚定大级别极值发生时的起止笔：
-   *    - 向上大笔：在起点分型时段找次级别最低点（低点向上笔），在终点分型时段找次级别最高点（高点向上笔）；
-   *    - 向下大笔：在起点分型时段找次级别最高点（高点向下笔），在终点分型时段找次级别最低点（低点向下笔）；
-   *    消除周期离散化（如 30m 封盘与 5m 极值相差 5~25 分钟）带来的边缘次级别笔被误伤切除问题；
-   * 3. 在每个切片内部独立运行状态机求值中枢，保证次级别中枢的生长与闭合完全封闭于大笔内；
-   * 4. 汇总各切片结果，按时序输出。
+   * @param subBis 次级别笔序列（构成中枢的构件）
+   * @param macroBis 父级别笔序列（提供时空边界）
    */
   getAdjacentBoundedChannels(
     subBis: readonly ChanBi[],
@@ -130,7 +54,7 @@ export class ChannelCalculator {
     const allPhaseA: ChanChannel[] = [];
     const allPhaseB: ChanChannel[] = [];
 
-    const slices = this.partitionSubBisForMacroBis(validMacroBis, subBis);
+    const slices = partitionSubBisForMacroBis(validMacroBis, subBis);
 
     for (let sliceIdx = 0; sliceIdx < slices.length; sliceIdx++) {
       const slice = slices[sliceIdx];
@@ -153,130 +77,33 @@ export class ChannelCalculator {
   }
 
   /**
-   * 基于宏观拐点首尾相接拓扑对齐，将次级别笔序列无缝划分（Partition）给各宏观大笔
+   * 主函数：识别笔级中枢（纯基于笔序列几何与状态机推进）
    *
-   * 算法契约：
-   * 1. 首尾相接无缝切片：大笔是连续折线链条 M0 -> M1 -> M2 ...，相邻宏观笔在拐点处首尾相接；
-   * 2. 拐点极值对齐：每个宏观拐点（分型极值）在次级别小笔中唯一对应一个极值拐点笔索引；
-   * 3. 杜绝时间窗口渗透：彻底抛弃 72 小时等跨多日的大窗口，按宏观 K 线分型窗口精准锚定，单调推进；
-   * 4. 消除包不住与包多了：切片覆盖整个序列（不漏包），且每个切片封闭于宏观大笔（不越界、不重复）。
+   * @param data Phase B 笔序列
+   * @param options.allowUncomplete 是否允许输出末端未完成中枢（默认为 true）
+   * @returns 两阶段中枢结果 { phaseA, phaseB }
    */
-  private partitionSubBisForMacroBis(
-    macroBis: readonly ChanBi[],
-    subBis: readonly ChanBi[],
-  ): (readonly ChanBi[])[] {
-    if (macroBis.length === 0 || subBis.length === 0) return [];
+  createChannels(
+    data: readonly ChanBi[],
+    options?: { allowUncomplete?: boolean },
+  ): ChanChannelTwoPhaseResult {
+    // 缠论第 18 课："次级别前三个走势类型都是完成的才构成中枢"
+    // 仅确认且有效的笔参与中枢运算
+    const confirmed = data.filter((b) => b.status === BiStatus.Valid);
 
-    const findVertexIndex = (
-      vertexTime: Date,
-      targetPrice: number,
-      isHigh: boolean,
-      expectedTrend: TrendDirection,
-      searchStartIdx: number,
-    ): number => {
-      const isDaily = isDateOnlyTimestamp(vertexTime);
-      let winStart: number;
-      let winEnd: number;
-
-      if (isDaily) {
-        winStart = getBarStartTimeMs(vertexTime) - 4 * 3600 * 1000;
-        winEnd = getBarEndTimeMs(vertexTime) + 4 * 3600 * 1000;
-      } else {
-        const vMs = vertexTime.getTime();
-        // 分时级别：90 分钟（即 3 根 30m K 线分型窗口）足以覆盖 5m 极值笔时间偏移
-        winStart = vMs - 90 * 60 * 1000;
-        winEnd = vMs + 90 * 60 * 1000;
-      }
-
-      let bestIdx = searchStartIdx;
-      let bestPDiff = Infinity;
-      let bestTimeDiff = Infinity;
-      let bestTrendMatch = false;
-
-      for (let i = searchStartIdx; i < subBis.length; i++) {
-        const sb = subBis[i];
-        const sMs = sb.startTime.getTime();
-        const eMs = sb.endTime.getTime();
-
-        if (eMs >= winStart && sMs <= winEnd) {
-          const p = isHigh ? sb.high : sb.low;
-          const pDiff = Math.abs(p - targetPrice);
-          const tDiff = Math.abs(eMs - vertexTime.getTime());
-          const trendMatch = sb.trend === expectedTrend;
-
-          // 候选优劣判断：
-          // 1. 价格更接近 targetPrice（误差严格小于 bestPDiff - 1e-4）
-          // 2. 价格在 1e-4 误差内并列时：
-          //    2.1 顺势趋势匹配（如向上大笔起止为向上小笔，向下大笔起止为向下小笔）优先
-          //    2.2 趋势匹配相同时，时间距拐点更近者优先
-          const isBetter =
-            pDiff < bestPDiff - 1e-4 ||
-            (Math.abs(pDiff - bestPDiff) <= 1e-4 &&
-              ((!bestTrendMatch && trendMatch) ||
-                (bestTrendMatch === trendMatch && tDiff < bestTimeDiff)));
-
-          if (isBetter) {
-            bestTrendMatch = trendMatch;
-            bestPDiff = pDiff;
-            bestTimeDiff = tDiff;
-            bestIdx = i;
-          }
-        } else if (sMs > winEnd && bestPDiff < Infinity) {
-          break;
-        }
-      }
-
-      if (bestPDiff === Infinity) {
-        let minT = Infinity;
-        for (let i = searchStartIdx; i < subBis.length; i++) {
-          const diff = Math.abs(
-            subBis[i].endTime.getTime() - vertexTime.getTime(),
-          );
-          if (diff < minT) {
-            minT = diff;
-            bestIdx = i;
-          }
-        }
-      }
-
-      return bestIdx;
-    };
-
-    const slices: (readonly ChanBi[])[] = [];
-    let currentStartIdx = 0;
-
-    const firstM = macroBis[0];
-    const firstIsUp = firstM.trend === TrendDirection.Up;
-    currentStartIdx = findVertexIndex(
-      firstM.startTime,
-      firstIsUp ? firstM.low : firstM.high,
-      !firstIsUp,
-      firstM.trend,
-      0,
+    const { phaseA, sequential } = this.sequentiallyConfirmChannels(
+      confirmed,
+      options,
     );
 
-    for (let m = 0; m < macroBis.length; m++) {
-      const mb = macroBis[m];
-      const isUp = mb.trend === TrendDirection.Up;
-      const endVertexIdx = findVertexIndex(
-        mb.endTime,
-        isUp ? mb.high : mb.low,
-        isUp,
-        mb.trend,
-        currentStartIdx,
-      );
+    // Phase B：直接采用状态机全生命周期自洽确认的中枢序列（彻底消除外层缝合补丁）
+    const phaseB = sequential;
 
-      const sliceEnd = Math.max(currentStartIdx, endVertexIdx);
-      const slice = subBis.slice(currentStartIdx, sliceEnd + 1);
-      slices.push(slice);
-      currentStartIdx = sliceEnd;
-    }
-
-    return slices;
+    return { phaseA, phaseB };
   }
 
   /**
-   * 顺序确认扫描与生命周期状态机推进（委托至通用的 ChannelLifecycleEngine）
+   * 顺序确认扫描与生命周期状态机推进（委托至通用的 ChannelLifecycleEngineV2）
    */
   private sequentiallyConfirmChannels(
     data: readonly ChanBi[],
@@ -285,9 +112,7 @@ export class ChannelCalculator {
     phaseA: ChanChannel[];
     sequential: ChanChannel[];
   } {
-    const strategy: ChannelLifecycleStrategy<ChanBi, ChanChannel> = {
-      minCoreLength: 4,
-      minSealedLength: 5,
+    const strategy: BiChannelLifecycleStrategy<ChanBi, ChanChannel> = {
       allowUncomplete: options?.allowUncomplete,
       validateCore: (window) => {
         const geo = this.validateCoreGeometry(window);
@@ -323,17 +148,17 @@ export class ChannelCalculator {
           original,
           startIndex,
           geometry,
-          expanded,
+          expanded || elements.length >= 9,
           isComplete,
         );
       },
     };
 
-    return ChannelLifecycleEngine.runSequentialLifecycle(data, strategy);
+    return ChannelLifecycleEngineV2.runSequentialLifecycle(data, strategy);
   }
 
   /**
-   * 从 N 笔序列和已算好的几何参数构建中枢对象。
+   * 从 N 笔构件序列和几何参数构建输出标准的 ChanChannel 对象
    */
   private buildChannelFromBis(
     bis: readonly ChanBi[],
@@ -366,33 +191,15 @@ export class ChannelCalculator {
   }
 
   /**
-   * 验证候选中枢是否有效（标准缠论定义）。
+   * 验证候选中枢是否有效
    */
   isCandidateChannelValid(channel: ChanChannel): boolean {
-    return channel.bis.length >= 3 && channel.zg > channel.zd;
+    const minLength = channel.type === ChannelType.UnComplete ? 4 : 5;
+    return channel.bis.length >= minLength && channel.zg > channel.zd;
   }
 
   /**
-   * 计算并验证 3 笔核心 (+ 进入笔 b0 = 4 笔) 的几何参数（zg/zd/gg/dd）与进入笔约束。
-   *
-   * 缠论标准定义：走势中枢由连续 3 个次级别走势类型（构件笔 b1, b2, b3）的重叠部分构成。
-   * - 向上走势（b0 向上进入）：
-   *   b0 (Up, low < zd), b1 (Down), b2 (Up), b3 (Down)
-   *   zg = min(b0.high, b2.high)
-   *   zd = max(b1.low, b3.low)
-   *   gg = max(b0.high, b2.high)
-   *   dd = min(b1.low, b3.low)
-   *   约束：zg > zd 且 b0.low < zd
-   * - 向下走势（b0 向下进入）：
-   *   b0 (Down, high > zg), b1 (Up), b2 (Down), b3 (Up)
-   *   zg = min(b1.high, b3.high)
-   *   zd = max(b0.low, b2.low)
-   *   gg = max(b1.high, b3.high)
-   *   dd = min(b0.low, b2.low)
-   *   约束：zg > zd 且 b0.high > zg
-   *
-   * @param fourBis 4 笔序列 [b0, b1, b2, b3]（已保证趋势交替）
-   * @returns 合法时返回几何参数，否则返回 null
+   * 计算并验证 3 笔核心 (+ 进入笔 b0 = 4 笔) 的几何参数与进入笔约束
    */
   private validateCoreGeometry(fourBis: readonly ChanBi[]): {
     zg: number;
@@ -426,17 +233,17 @@ export class ChannelCalculator {
       dd = frontLow.min;
     }
 
-    // 约束1：zg > zd（中枢核心必须存在有效重叠区间）
+    // 约束1：zg > zd（中枢核心必须存在真实价格重叠区间）
     if (zg <= zd) {
       return null;
     }
 
-    // 约束2：进入笔外部端点必须在中枢 [ZD, ZG] 之外（即进入笔确实从外部进入）
+    // 约束2：进入笔外部端点必须在中枢 [ZD, ZG] 之外（即进入笔确实从外部进入中枢）
     if (isUp) {
       if (firstBi.low >= zd) {
         return null;
       }
-      // 约束3：上涨中枢进入笔起点必须是最低点（内部构件最低不得跌破进入笔最低起点，与下跌中枢严格对偶）
+      // 约束3：上涨中枢进入笔起点必须是最低点（内部构件最低不得跌破进入笔起点）
       if (dd < firstBi.low) {
         return null;
       }
@@ -444,7 +251,7 @@ export class ChannelCalculator {
       if (firstBi.high <= zg) {
         return null;
       }
-      // 约束3：下跌中枢进入笔起点必须是最高点（内部构件最高不得突破进入笔最高起点）
+      // 约束3：下跌中枢进入笔起点必须是最高点（内部构件最高不得突破进入笔起点）
       if (gg > firstBi.high) {
         return null;
       }
@@ -454,53 +261,4 @@ export class ChannelCalculator {
   }
 }
 
-/**
- * 提取北京时间（UTC+8）的年、月、日、时、分、秒分量
- */
-function getShanghaiDateComponents(d: Date): {
-  year: number;
-  month: number;
-  date: number;
-  hours: number;
-  minutes: number;
-  seconds: number;
-} {
-  const ms = d.getTime();
-  const shanghaiMs = ms + 8 * 3600 * 1000;
-  const sDate = new Date(shanghaiMs);
-  return {
-    year: sDate.getUTCFullYear(),
-    month: sDate.getUTCMonth(),
-    date: sDate.getUTCDate(),
-    hours: sDate.getUTCHours(),
-    minutes: sDate.getUTCMinutes(),
-    seconds: sDate.getUTCSeconds(),
-  };
-}
-
-/**
- * 判断是否为日期型时间戳（即北京时间下的时、分、秒均为 0，如日线、周线、月线）
- */
-function isDateOnlyTimestamp(d: Date): boolean {
-  const comp = getShanghaiDateComponents(d);
-  return comp.hours === 0 && comp.minutes === 0 && comp.seconds === 0;
-}
-
-/**
- * 获取该时间戳在物理时间上对应的开盘时刻/起始时刻（毫秒）
- */
-function getBarStartTimeMs(d: Date): number {
-  return d.getTime();
-}
-
-/**
- * 获取该时间戳在物理时间上对应的闭市时刻/结束时刻（毫秒）
- * 若为日线/周线等日期型时间戳（00:00:00），其代表的是该交易日全天，闭市时刻为当天 23:59:59.999
- */
-function getBarEndTimeMs(d: Date): number {
-  const ms = d.getTime();
-  if (isDateOnlyTimestamp(d)) {
-    return ms + 24 * 3600 * 1000 - 1;
-  }
-  return ms;
-}
+export { ChannelCalculator as ChannelCalculatorV2 };

@@ -607,10 +607,10 @@ describe('ChannelCalculator.getAdjacentBoundedChannels', () => {
 
     const [c0, c1] = result.phaseB;
 
-    // Central 0（9 笔延伸中枢，根据 V2 契约维持 expanded: false，离开笔为 Bi 31）
+    // Central 0（9 笔延伸中枢，满 9 笔结合扩展 expanded 为 true，离开笔为 Bi 31）
     expect(c0.zg).toBe(3924.11);
     expect(c0.zd).toBe(3891.86);
-    expect(c0.expanded).toBe(false);
+    expect(c0.expanded).toBe(true);
     expect(c0.bis).toHaveLength(9);
     expect(c0.bis[0].startTime.toISOString()).toBe('2026-03-23T07:00:00.000Z');
     expect(c0.bis[c0.bis.length - 1].endTime.toISOString()).toBe(

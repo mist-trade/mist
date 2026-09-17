@@ -447,6 +447,11 @@ export class CentralStateMachineV2<T extends ChannelElement> {
 
     this.state = CentralLifecycleState.Oscillating;
 
+    // 4. 扩展标记：构件总数累积满 9 笔时触发 isExpanded = true（中枢级别扩展升级）
+    if (this.elements.length >= 9) {
+      this.isExpanded = true;
+    }
+
     // 动态维护全量公共交集（所有构成笔的公共重叠区间）
     const allHigh = minMaxBy(this.elements, (e) => e.high);
     const allLow = minMaxBy(this.elements, (e) => e.low);
@@ -582,16 +587,16 @@ export class ChannelLifecycleEngineV2 {
           break;
         }
 
-        // 4. 【封闭历史切片末端顺势离开笔封存守卫】：
-        // 在跨级别宏观大笔切片中，次级别笔在宏观拐点处截断；
-        // 若当前笔顺应进入笔方向冲破 ZG/ZD，到达切片末端无后续笔，
-        // 则该笔即为大笔内部次级别走势的离开终笔，直接封存为 Complete。
-        if (
+        // 4. 【序列末端顺势离开笔封存守卫】：
+        // 当走势到达序列末尾（!pullback）时：
+        // A. 封闭历史切片（allowUncomplete === false）：当前笔顺势冲破 ZG/ZD 即可封存；
+        // B. 增量/全量数据末端：当前笔顺势冲破全局极值（breaksExtreme），即为有效离开终笔，封存为 Complete。
+        const shouldSealAtEnd =
           !pullback &&
-          strategy.allowUncomplete === false &&
           isTrendAlignedWithEntry &&
-          hasBrokenOut
-        ) {
+          (strategy.allowUncomplete === false ? hasBrokenOut : breaksExtreme);
+
+        if (shouldSealAtEnd) {
           if (!latestCandidate) {
             latestCandidate = stateMachine.recordCandidateDeparture(
               curr,

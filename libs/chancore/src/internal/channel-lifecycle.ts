@@ -522,222 +522,105 @@ export class ChannelLifecycleEngine {
       const firstElem = stateMachine.elements[0];
       let nextIdx = cursor + strategy.minCoreLength;
 
-      // 2. 状态机推进：
-      if (strategy.minCoreLength > 3) {
-        // =====================================================================
-        // 笔级中枢专属推进引擎（统一驱动 5 笔基础与扩展阶段，严格杜绝逻辑重复）
-        // =====================================================================
-        while (nextIdx < count) {
-          const curr = data[nextIdx];
-          if (curr.trend === data[nextIdx - 1].trend) {
-            break;
-          }
+      // 2. 状态机推进（段级走势中枢生命周期状态机推进）
+      while (nextIdx < count) {
+        const curr = data[nextIdx];
+        if (curr.trend === data[nextIdx - 1].trend) {
+          break;
+        }
 
-          const pullback = nextIdx + 1 < count ? data[nextIdx + 1] : null;
-          const isBaseCoreStage = stateMachine.elements.length === 4;
+        if (nextIdx + 1 < count) {
+          const nextElem = data[nextIdx + 1];
+          const nextIsTrendDir =
+            (stateMachine.isUp && nextElem.trend === TrendDirection.Up) ||
+            (!stateMachine.isUp && nextElem.trend === TrendDirection.Down);
+          const nextBrokenOut =
+            nextIsTrendDir &&
+            (stateMachine.isUp
+              ? nextElem.high > stateMachine.zg
+              : nextElem.low < stateMachine.zd);
 
-          // 1. 突破判定与候选离开笔登记
-          const hasBrokenOut = stateMachine.isUp
-            ? curr.high > stateMachine.zg
-            : curr.low < stateMachine.zd;
-          const breaksExtreme = stateMachine.isUp
-            ? curr.high > stateMachine.gg
-            : curr.low < stateMachine.dd;
+          if (nextBrokenOut) {
+            const tempZd = Math.max(stateMachine.zd, curr.low);
+            const tempZg = Math.min(stateMachine.zg, curr.high);
+            let testZg = stateMachine.zg;
+            let testZd = stateMachine.zd;
+            if (tempZg > tempZd) {
+              testZg = tempZg;
+              testZd = tempZd;
+            }
+            const newGg = stateMachine.isUp
+              ? Math.max(stateMachine.gg, nextElem.high)
+              : stateMachine.gg;
+            const newDd = !stateMachine.isUp
+              ? Math.min(stateMachine.dd, nextElem.low)
+              : stateMachine.dd;
 
-          const candidateGg = stateMachine.isUp
-            ? Math.max(stateMachine.gg, curr.high)
-            : stateMachine.gg;
-          const candidateDd = !stateMachine.isUp
-            ? Math.min(stateMachine.dd, curr.low)
-            : stateMachine.dd;
-
-          if (breaksExtreme) {
-            stateMachine.recordCandidateDeparture(
-              curr,
-              nextIdx,
-              candidateGg,
-              candidateDd,
+            const decision = checkDepartureRules(
+              data,
+              nextIdx + 1,
+              stateMachine.isUp,
+              testZg,
+              testZd,
+              stateMachine.gg,
+              stateMachine.dd,
+              strategy,
             );
-          }
 
-          // 2. 离开决断求值
-          const canCheckDeparture = isBaseCoreStage ? hasBrokenOut : true;
-          const departureDecision = canCheckDeparture
-            ? stateMachine.checkDepartureRules(data, nextIdx, strategy)
-            : DepartureCheckResult.None;
-
-          // A. 顺势直接离开（出 3买/3卖 或 破GG/DD后确认2s/2b）
-          const directOk = isBaseCoreStage
-            ? departureDecision === DepartureCheckResult.Direct
-            : breaksExtreme &&
-              departureDecision === DepartureCheckResult.Direct;
-
-          if (directOk) {
-            stateMachine.sealAtCurrent(curr, candidateGg, candidateDd);
-            nextIdx++;
-            break;
-          }
-
-          // B. 旁枝终结信号（外部反向破坏或后续独立构成新核心）
-          // 用户铁律：必须回到候选离开笔列表确认真实离开笔并重新计算！
-          if (departureDecision === DepartureCheckResult.BranchReversal) {
-            if (stateMachine.resolveFinalDepartureOnReversal()) {
-              break;
-            }
-            stateMachine.collapse();
-            break;
-          }
-
-          // C. 扩展阶段反向 3 卖 / 3 买 确立
-          if (!isBaseCoreStage && pullback !== null && nextIdx + 2 < count) {
-            const bounce = data[nextIdx + 2];
-            if (bounce.trend === curr.trend) {
-              const isOpposite3rd = stateMachine.isUp
-                ? pullback.low < stateMachine.zd &&
-                  bounce.high < stateMachine.zd
-                : pullback.high > stateMachine.zg &&
-                  bounce.low > stateMachine.zg;
-              if (isOpposite3rd) {
-                if (stateMachine.resolveFinalDepartureOnReversal()) {
-                  break;
-                }
-                stateMachine.collapse();
-                break;
-              }
-            }
-          }
-
-          // D. 反向击穿起笔极值守卫
-          const violatesOrigin = stateMachine.isUp
-            ? (isBaseCoreStage ? false : curr.low < firstElem.low) ||
-              (pullback !== null && pullback.low < firstElem.low)
-            : (isBaseCoreStage ? false : curr.high > firstElem.high) ||
-              (pullback !== null && pullback.high > firstElem.high);
-
-          if (violatesOrigin) {
             if (
-              !isBaseCoreStage &&
-              stateMachine.resolveFinalDepartureOnReversal()
+              decision === DepartureCheckResult.Direct ||
+              decision === DepartureCheckResult.BranchReversal
             ) {
+              stateMachine.elements.push(curr, nextElem);
+              stateMachine.zg = testZg;
+              stateMachine.zd = testZd;
+              stateMachine.gg = newGg;
+              stateMachine.dd = newDd;
+              stateMachine.isComplete = true;
+              nextIdx += 2;
+              if (stateMachine.elements.length >= 9) {
+                stateMachine.isExpanded = true;
+              }
               break;
             }
-            stateMachine.collapse();
-            break;
-          }
-
-          // E. 未能离开且未击穿起点：成对吸纳进入扩展，或末端单元素触及吸纳
-          if (pullback !== null) {
-            stateMachine.absorb(curr, pullback);
-            nextIdx += 2;
-          } else {
-            stateMachine.absorb(curr);
-            nextIdx++;
-            break;
           }
         }
-      } else {
-        // =====================================================================
-        // 段级中枢推进引擎（保持原有对称生命周期推进）
-        // =====================================================================
-        while (nextIdx < count) {
-          const curr = data[nextIdx];
-          if (curr.trend === data[nextIdx - 1].trend) {
+
+        // 触及震荡延伸检验：配对 (curr, nextElem)
+        if (nextIdx + 1 < count) {
+          const nextElem = data[nextIdx + 1];
+          if (nextElem.trend === curr.trend) {
             break;
           }
 
-          if (nextIdx + 1 < count) {
-            const nextElem = data[nextIdx + 1];
-            const nextIsTrendDir =
-              (stateMachine.isUp && nextElem.trend === TrendDirection.Up) ||
-              (!stateMachine.isUp && nextElem.trend === TrendDirection.Down);
-            const nextBrokenOut =
-              nextIsTrendDir &&
-              (stateMachine.isUp
-                ? nextElem.high > stateMachine.zg
-                : nextElem.low < stateMachine.zd);
+          const testWindow = [...stateMachine.elements, curr, nextElem];
+          const allHighMinMax = minMaxBy(testWindow, (e) => e.high);
+          const allLowMinMax = minMaxBy(testWindow, (e) => e.low);
 
-            if (nextBrokenOut) {
-              const tempZd = Math.max(stateMachine.zd, curr.low);
-              const tempZg = Math.min(stateMachine.zg, curr.high);
-              let testZg = stateMachine.zg;
-              let testZd = stateMachine.zd;
-              if (tempZg > tempZd) {
-                testZg = tempZg;
-                testZd = tempZd;
-              }
-              const newGg = stateMachine.isUp
-                ? Math.max(stateMachine.gg, nextElem.high)
-                : stateMachine.gg;
-              const newDd = !stateMachine.isUp
-                ? Math.min(stateMachine.dd, nextElem.low)
-                : stateMachine.dd;
-
-              const decision = checkDepartureRules(
-                data,
-                nextIdx + 1,
-                stateMachine.isUp,
-                testZg,
-                testZd,
-                stateMachine.gg,
-                stateMachine.dd,
-                strategy,
-              );
-
-              if (
-                decision === DepartureCheckResult.Direct ||
-                decision === DepartureCheckResult.BranchReversal
-              ) {
-                stateMachine.elements.push(curr, nextElem);
-                stateMachine.zg = testZg;
-                stateMachine.zd = testZd;
-                stateMachine.gg = newGg;
-                stateMachine.dd = newDd;
-                stateMachine.isComplete = true;
-                nextIdx += 2;
-                if (stateMachine.elements.length >= 9) {
-                  stateMachine.isExpanded = true;
-                }
-                break;
-              }
-            }
-          }
-
-          // 触及震荡延伸检验：配对 (curr, nextElem)
-          if (nextIdx + 1 < count) {
-            const nextElem = data[nextIdx + 1];
-            if (nextElem.trend === curr.trend) {
-              break;
-            }
-
-            const testWindow = [...stateMachine.elements, curr, nextElem];
-            const allHighMinMax = minMaxBy(testWindow, (e) => e.high);
-            const allLowMinMax = minMaxBy(testWindow, (e) => e.low);
-
-            if (
-              allHighMinMax &&
-              allLowMinMax &&
-              allHighMinMax.min > allLowMinMax.max
-            ) {
-              stateMachine.absorb(curr, nextElem);
-              nextIdx += 2;
-              continue;
-            } else {
-              break;
-            }
+          if (
+            allHighMinMax &&
+            allLowMinMax &&
+            allHighMinMax.min > allLowMinMax.max
+          ) {
+            stateMachine.absorb(curr, nextElem);
+            nextIdx += 2;
+            continue;
           } else {
-            // 序列末尾单元素触及吸纳
-            if (curr.high >= stateMachine.zd && curr.low <= stateMachine.zg) {
-              const newZg = Math.min(stateMachine.zg, curr.high);
-              const newZd = Math.max(stateMachine.zd, curr.low);
-              if (newZg > newZd) {
-                stateMachine.absorb(curr);
-                stateMachine.zg = newZg;
-                stateMachine.zd = newZd;
-                nextIdx++;
-              }
-            }
             break;
           }
+        } else {
+          // 序列末尾单元素触及吸纳
+          if (curr.high >= stateMachine.zd && curr.low <= stateMachine.zg) {
+            const newZg = Math.min(stateMachine.zg, curr.high);
+            const newZd = Math.max(stateMachine.zd, curr.low);
+            if (newZg > newZd) {
+              stateMachine.absorb(curr);
+              stateMachine.zg = newZg;
+              stateMachine.zd = newZd;
+              nextIdx++;
+            }
+          }
+          break;
         }
       }
 
