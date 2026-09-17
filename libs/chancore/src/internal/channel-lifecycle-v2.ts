@@ -582,7 +582,29 @@ export class ChannelLifecycleEngineV2 {
           break;
         }
 
-        // 4. 【内部延伸震荡阶段】（Strict Overlap Guard 严格重叠门禁）
+        // 4. 【封闭历史切片末端顺势离开笔封存守卫】：
+        // 在跨级别宏观大笔切片中，次级别笔在宏观拐点处截断；
+        // 若当前笔顺应进入笔方向冲破 ZG/ZD，到达切片末端无后续笔，
+        // 则该笔即为大笔内部次级别走势的离开终笔，直接封存为 Complete。
+        if (
+          !pullback &&
+          strategy.allowUncomplete === false &&
+          isTrendAlignedWithEntry &&
+          hasBrokenOut
+        ) {
+          if (!latestCandidate) {
+            latestCandidate = stateMachine.recordCandidateDeparture(
+              curr,
+              nextIdx,
+              candidateGg,
+              candidateDd,
+            );
+          }
+          stateMachine.sealAtLatestCandidate();
+          break;
+        }
+
+        // 5. 【内部延伸震荡阶段】（Strict Overlap Guard 严格重叠门禁）
         if (stateMachine.canAbsorbExtension(curr, pullback)) {
           // 若有配对回抽笔且满足条件，成对吸纳以保持奇偶结构；否则单笔吸纳
           if (pullback && stateMachine.canAbsorbExtension(pullback)) {
@@ -594,7 +616,7 @@ export class ChannelLifecycleEngineV2 {
             break;
           }
         } else {
-          // 5. 【断裂脱离】：无法吸纳延伸且不在中枢内，在备选离开笔中收口最佳中枢
+          // 6. 【断裂脱离】：无法吸纳延伸且不在中枢内，在备选离开笔中收口最佳中枢
           stateMachine.sealOrCollapseAtBestCandidate();
           break;
         }

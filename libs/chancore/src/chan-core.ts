@@ -15,7 +15,7 @@ import type {
 import { assertChanKSeries } from './internal/assert-chan-k-series';
 import { BiCalculator } from './internal/bi';
 import { BuySellPointDetector } from './internal/buy-sell-point';
-import { ChannelCalculator } from './internal/channel';
+import { ChannelCalculatorV2 } from './internal/channel-v2';
 import { DivergenceDetector } from './internal/divergence';
 import { DuanCalculator } from './internal/duan';
 import { DuanChannelCalculator } from './internal/duan-channel';
@@ -59,7 +59,7 @@ export class ChanCore {
     assertChanKSeries(orderedK);
     const mergedK = new KMergeCalculator().merge(orderedK);
     const bis = new BiCalculator().getBi(mergedK);
-    return new ChannelCalculator().createChannels(bis.phaseB);
+    return new ChannelCalculatorV2().createChannels(bis.phaseB);
   }
 
   /**
@@ -72,7 +72,10 @@ export class ChanCore {
     subBis: readonly ChanBi[],
     macroBis: readonly ChanBi[],
   ): ChanChannelTwoPhaseResult {
-    return new ChannelCalculator().getAdjacentBoundedChannels(subBis, macroBis);
+    return new ChannelCalculatorV2().getAdjacentBoundedChannels(
+      subBis,
+      macroBis,
+    );
   }
 
   /**
