@@ -146,20 +146,6 @@ export interface CandidateDeparture<T> {
 }
 
 /**
- * 离开判决求值结果（Departure Check Result）
- */
-export enum DepartureCheckResult {
-  /** 未满足任何离开条件，走势继续维持中枢生命周期 */
-  None = 'none',
-
-  /** 顺势直接离开确认：后续出现 3买/3卖，或破 GG/DD 后走出次级别 2s/2b 转折成型 */
-  Direct = 'direct',
-
-  /** 旁枝终结信号：后续反向击穿对侧极值、单段反穿边界、或后续走势已独立构成新中枢核心 */
-  BranchReversal = 'branch_reversal',
-}
-
-/**
  * 走势中枢有限状态机 V2（Central State Machine V2）
  *
  * 维护单个走势中枢的完整生命周期内部状态与行为转换：
@@ -354,73 +340,38 @@ export class CentralStateMachineV2<T extends ChannelElement> {
   }
 
   /**
-   * 检验反向一笔是否物理反转打穿对侧极值（暴跌打穿 DD / 暴涨打穿 GG）
+   * 检验反向一笔是否物理反转打穿进入笔起点（上涨暴跌打穿 b0.low / 下跌暴涨打穿 b0.high）
    */
   piercesOppositeExtreme(bi: T | null): boolean {
     if (!bi) return false;
-    return this.isUp ? bi.low < this.dd : bi.high > this.gg;
+    return this.isUp
+      ? bi.low < this.firstElem.low
+      : bi.high > this.firstElem.high;
   }
 
   /**
    * 检验是否满足 2s/2b 次级别背驰衰竭转折离开
    *
-   * 冲破极值（Up 破 GG / Down 破 DD）后，回抽不破对向沿且走出次级别不创新高/低转折成型。
+   * 冲破极值（Up 破 GG / Down 破 DD）后，回抽不破对向沿且紧随的同向反弹/回踩走出次级别不创新高/低转折。
    */
   isSecondClassReversal(
     candidate: CandidateDeparture<T>,
     data: readonly T[],
     currIdx: number,
   ): boolean {
-    const count = data.length;
-    if (currIdx + 1 >= count) return false;
+    if (currIdx + 2 >= data.length) return false;
 
     const pullback = data[currIdx + 1];
-    const hasBrokenExtreme = this.isUp
-      ? candidate.element.high > this.gg || candidate.geometry.gg > this.gg
-      : candidate.element.low < this.dd || candidate.geometry.dd < this.dd;
-
-    if (!hasBrokenExtreme) return false;
+    const bounce = data[currIdx + 2];
 
     const pullbackGuarded = this.isUp
       ? pullback.low >= this.zd
       : pullback.high <= this.zg;
     if (!pullbackGuarded) return false;
 
-    if (currIdx + 2 < count) {
-      const bounce = data[currIdx + 2];
-      if (bounce.trend === candidate.element.trend) {
-        const isSecondClassPoint = this.isUp
-          ? bounce.high < candidate.element.high
-          : bounce.low > candidate.element.low;
-        if (isSecondClassPoint) {
-          if (
-            currIdx + 3 >= count ||
-            data[currIdx + 3].trend !== bounce.trend
-          ) {
-            return true;
-          }
-        }
-      }
-    }
-    return false;
-  }
-
-  /**
-   * 兼容保留：直接在当前离开笔处封存中枢
-   */
-  sealAtCurrent(curr: T, finalGg: number, finalDd: number): void {
-    this.elements.push(curr);
-    this.gg = finalGg;
-    this.dd = finalDd;
-    this.isComplete = true;
-    this.state = CentralLifecycleState.Sealed;
-  }
-
-  /**
-   * 兼容保留：当发生反向破坏、或脱离中枢时收口中枢
-   */
-  resolveFinalDepartureOnReversal(): boolean {
-    return this.sealOrCollapseAtBestCandidate();
+    return this.isUp
+      ? bounce.high < candidate.element.high
+      : bounce.low > candidate.element.low;
   }
 
   /**
@@ -625,7 +576,7 @@ export class ChannelLifecycleEngineV2 {
           break;
         }
 
-        // 3. 【极端反转】：反向一笔物理打穿对侧极值（暴跌打穿 DD / 暴涨打穿 GG）
+        // 3. 【极端反转】：反向一笔物理打穿进入笔起点（上涨打穿 b0.low / 下跌打穿 b0.high）
         if (pullback && stateMachine.piercesOppositeExtreme(pullback)) {
           stateMachine.sealOrCollapseAtBestCandidate();
           break;
