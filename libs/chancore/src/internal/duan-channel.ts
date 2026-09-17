@@ -12,8 +12,8 @@ import type {
 } from '../contracts';
 
 import {
-  ChannelLifecycleEngine,
-  type ChannelLifecycleStrategy,
+  DuanChannelLifecycleEngine,
+  type DuanChannelLifecycleStrategy,
   computeSymmetricGeometry,
   resolveChannelAnchorIds,
 } from './channel-lifecycle';
@@ -57,7 +57,7 @@ export class DuanChannelCalculator {
     phaseA: ChanDuanChannel[];
     sequential: ChanDuanChannel[];
   } {
-    const strategy: ChannelLifecycleStrategy<ChanDuan, ChanDuanChannel> = {
+    const strategy: DuanChannelLifecycleStrategy<ChanDuan, ChanDuanChannel> = {
       minCoreLength: 3,
       minSealedLength: 3,
       allowUncomplete: options?.allowUncomplete,
@@ -98,7 +98,7 @@ export class DuanChannelCalculator {
       },
     };
 
-    return ChannelLifecycleEngine.runSequentialLifecycle(duans, strategy);
+    return DuanChannelLifecycleEngine.runSequentialLifecycle(duans, strategy);
   }
 
   /**

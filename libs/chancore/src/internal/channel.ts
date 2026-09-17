@@ -2,10 +2,10 @@
  * 缠论走势中枢计算引擎（ChannelCalculator）
  *
  * ======================================================================================
- * 核心架构与职责定位（基于状态机 V2 第一性原理）：
+ * 核心架构与职责定位（第一性原理）：
  * ======================================================================================
  * 1. 本模块是笔级走势中枢构建与生命周期状态机的统一核心门面；
- * 2. 彻底废除 V1 外层拼接缝合补丁（mergeAdjacentOverlappingChannels），由 CentralStateMachineV2 内生推进；
+ * 2. 状态机内生推进全生命周期管理，消除外层缝合补丁；
  * 3. 严格遵循缠论走势中枢定义：
  *    - 进入笔与离开笔严格同向（奇偶性公理：5, 7, 9, 11, 13...）；
  *    - 离开笔 Candidate List 备选列表与 3买/3卖 / 2s/2b 离开决断；
@@ -29,9 +29,9 @@ import type {
 
 import {
   type BiChannelLifecycleStrategy,
-  ChannelLifecycleEngineV2,
+  ChannelLifecycleEngine,
   resolveChannelAnchorIds,
-} from './channel-lifecycle-v2';
+} from './channel-lifecycle';
 import { partitionSubBisForMacroBis } from './channel-partition';
 import { minMaxBy } from './min-max-by';
 
@@ -103,7 +103,7 @@ export class ChannelCalculator {
   }
 
   /**
-   * 顺序确认扫描与生命周期状态机推进（委托至通用的 ChannelLifecycleEngineV2）
+   * 顺序确认扫描与生命周期状态机推进（委托至通用的 ChannelLifecycleEngine）
    */
   private sequentiallyConfirmChannels(
     data: readonly ChanBi[],
@@ -154,7 +154,7 @@ export class ChannelCalculator {
       },
     };
 
-    return ChannelLifecycleEngineV2.runSequentialLifecycle(data, strategy);
+    return ChannelLifecycleEngine.runSequentialLifecycle(data, strategy);
   }
 
   /**
@@ -260,5 +260,3 @@ export class ChannelCalculator {
     return { zg, zd, gg, dd };
   }
 }
-
-export { ChannelCalculator as ChannelCalculatorV2 };

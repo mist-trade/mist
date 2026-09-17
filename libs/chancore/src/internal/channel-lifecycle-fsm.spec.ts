@@ -7,9 +7,8 @@ import {
 } from '../contracts';
 import type { ChanBi } from '../contracts';
 import { ChannelCalculator } from './channel';
-import { ChannelCalculatorV2 } from './channel-v2';
 import { REAL_5M_JAN2026_FIRST_CENTRAL_BIS } from './channel-departure-closure.spec';
-import { CentralStateMachineV2 } from './channel-lifecycle-v2';
+import { CentralStateMachine } from './channel-lifecycle';
 
 function makeBi(
   idx: number,
@@ -52,33 +51,14 @@ function makeBi(
   } as ChanBi;
 }
 
-describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
-  const v1 = new ChannelCalculator();
-  const v2 = new ChannelCalculatorV2();
+describe('ChannelCalculator 有限状态机算法套件', () => {
+  const calculator = new ChannelCalculator();
 
-  describe('一、5分钟级别前5个中枢（47笔真实构件）全量回归与V1双轨对齐门禁', () => {
-    it('V2 在真实 5M 全量序列上输出 5 个中枢，各中枢几何与包含的 47 笔与 V1 毫秒级完全一致，并纠正了 V1 伪扩张标记', () => {
-      const resV1 = v1.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
-      const resV2 = v2.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+  describe('一、5分钟级别前5个中枢（47笔真实构件）全量回归门禁', () => {
+    it('在真实 5M 全量序列上输出 5 个中枢，各中枢几何与包含的 47 笔毫秒级对齐，并保持正确的扩展标记', () => {
+      const res = calculator.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
 
-      expect(resV2.phaseA).toHaveLength(resV1.phaseA.length);
-      expect(resV2.phaseB).toHaveLength(resV1.phaseB.length);
-
-      // 验证 5 个中枢的构件笔数、区间 [ZD, ZG]、极值 [DD, GG] 以及每一笔完全一致
-      for (let i = 0; i < resV2.phaseB.length; i++) {
-        const c1 = resV1.phaseB[i];
-        const c2 = resV2.phaseB[i];
-        expect(c2.trend).toBe(c1.trend);
-        expect(c2.zg).toBe(c1.zg);
-        expect(c2.zd).toBe(c1.zd);
-        expect(c2.gg).toBe(c1.gg);
-        expect(c2.dd).toBe(c1.dd);
-        expect(c2.expanded).toBe(c1.expanded);
-      }
-    });
-
-    it('V2 严格满足 47 笔真实构件在 5 个中枢中的每一笔时间、价格与极值契约', () => {
-      const res = v2.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      expect(res.phaseA).toHaveLength(5);
       expect(res.phaseB).toHaveLength(5);
 
       const [c0, c1, c2, c3, c4] = res.phaseB;
@@ -135,9 +115,9 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
     });
   });
 
-  describe('二、方案 1 专项：中枢进入笔与离开笔严格同向（奇偶性公理）', () => {
+  describe('二、中枢进入笔与离开笔严格同向（奇偶同向公理）', () => {
     it('所有封存的 Complete 中枢，离开笔必须与进入笔方向严格一致，且构件数必须为奇数', () => {
-      const res = v2.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      const res = calculator.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
       for (const channel of res.phaseB) {
         if (channel.type === ChannelType.Complete) {
           const entryBi = channel.bis[0];
@@ -161,7 +141,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         makeBi(4, TrendDirection.Up, 115, 160), // 离开笔 Up
         makeBi(5, TrendDirection.Down, 145, 160), // 3B
       ];
-      const resUp = v2.createChannels(upBis);
+      const resUp = calculator.createChannels(upBis);
       expect(resUp.phaseB).toHaveLength(1);
       expect(resUp.phaseB[0].bis[0].trend).toBe(TrendDirection.Up);
       expect(resUp.phaseB[0].bis[resUp.phaseB[0].bis.length - 1].trend).toBe(
@@ -176,7 +156,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         makeBi(4, TrendDirection.Down, 140, 185), // 离开笔 Down
         makeBi(5, TrendDirection.Up, 140, 155), // 3S
       ];
-      const resDown = v2.createChannels(downBis);
+      const resDown = calculator.createChannels(downBis);
       expect(resDown.phaseB).toHaveLength(1);
       expect(resDown.phaseB[0].bis[0].trend).toBe(TrendDirection.Down);
       expect(
@@ -185,7 +165,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
     });
   });
 
-  describe('三、方案 2 专项：离开笔 candidate list 记录与决策选取', () => {
+  describe('三、离开笔 candidate list 记录与决策选取', () => {
     it('顺势突破极值时完整记录候选离开笔快照，回退时选取极值匹配的最佳离开笔', () => {
       // 构造多次顺势破高后反转回踩的走势
       const bis: ChanBi[] = [
@@ -199,7 +179,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         makeBi(7, TrendDirection.Down, 110, 155), // 暴跌击穿 ZD(120)，触发反转决断
       ];
 
-      const res = v2.createChannels(bis);
+      const res = calculator.createChannels(bis);
       expect(res.phaseB).toHaveLength(1);
       const c = res.phaseB[0];
       // 成功回退至候选离开笔 1 (b4)，离开笔 high 严格等于当时的 GG 160
@@ -209,7 +189,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
     });
   });
 
-  describe('四、方案 3 专项：有限状态机（FSM）状态转移完整覆盖', () => {
+  describe('四、有限状态机（FSM）状态转移完整覆盖', () => {
     it('未离开反向崩塌守卫：未曾离开便反向击穿，状态机转换至 Collapsed，不输出伪中枢', () => {
       const bis: ChanBi[] = [
         makeBi(0, TrendDirection.Up, 100, 150),
@@ -219,7 +199,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         makeBi(4, TrendDirection.Up, 115, 135), // 内部震荡，未离开
         makeBi(5, TrendDirection.Down, 90, 135), // 暴跌直接砸穿 ZD 与 DD
       ];
-      const res = v2.createChannels(bis);
+      const res = calculator.createChannels(bis);
       expect(res.phaseB.some((c) => c.trend === TrendDirection.Up)).toBe(false);
     });
 
@@ -230,15 +210,15 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         makeBi(2, TrendDirection.Up, 120, 140),
         makeBi(3, TrendDirection.Down, 115, 140),
       ];
-      const res = v2.createChannels(bis);
+      const res = calculator.createChannels(bis);
       expect(res.phaseB).toHaveLength(1);
       expect(res.phaseB[0].type).toBe(ChannelType.UnComplete);
     });
   });
 
-  describe('五、方案 4 专项：延伸与中枢扩展的区分，严格重叠门禁（Strict Overlap Guard）', () => {
+  describe('五、延伸与中枢扩展的区分，严格重叠门禁（Strict Overlap Guard）', () => {
     it('中枢满 9 笔触发 expanded=true，未满 9 笔延伸维持 expanded=false', () => {
-      const res = v2.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      const res = calculator.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
       // 中枢 #1 为 7 笔延伸中枢，未满 9 笔，expanded 保持 false
       expect(res.phaseB[1].bis).toHaveLength(7);
       expect(res.phaseB[1].expanded).toBe(false);
@@ -257,7 +237,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
     it('严格重叠门禁（Strict Overlap Guard）：悬空逃逸笔（与 [ZD, ZG] 无交集）严禁被吸纳进中枢延伸', () => {
       // 构造初始核心 [120, 140]
       // 后续笔如果完全悬空（例如 low=160, high=180，远在 ZG 140 之上），严禁当成延伸吸纳
-      const fsm = new CentralStateMachineV2<ChanBi>(
+      const fsm = new CentralStateMachine<ChanBi>(
         0,
         [
           makeBi(0, TrendDirection.Up, 100, 150),
@@ -279,7 +259,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
     });
   });
 
-  describe('六、候选中枢有效性断言 isCandidateChannelValid（纠正 V1 >= 3 的历史缺陷）', () => {
+  describe('六、候选中枢有效性断言 isCandidateChannelValid', () => {
     it('完成笔中枢必须 >= 5 笔（离开笔包含在内），只有 3 笔或 4 笔的 Complete 中枢判定为无效', () => {
       const dummyBi = makeBi(0, TrendDirection.Up, 100, 150);
 
@@ -290,7 +270,7 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         zd: 120,
         type: ChannelType.Complete,
       };
-      expect(v2.isCandidateChannelValid(central3Bis)).toBe(false);
+      expect(calculator.isCandidateChannelValid(central3Bis)).toBe(false);
 
       // 4 笔若标记为 Complete，缺少离开笔，判定为无效
       const central4BisComplete: any = {
@@ -299,7 +279,9 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         zd: 120,
         type: ChannelType.Complete,
       };
-      expect(v2.isCandidateChannelValid(central4BisComplete)).toBe(false);
+      expect(calculator.isCandidateChannelValid(central4BisComplete)).toBe(
+        false,
+      );
 
       // 4 笔若是末端未完成中枢 (UnComplete)，属于合法核心
       const central4BisUncomplete: any = {
@@ -308,7 +290,9 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         zd: 120,
         type: ChannelType.UnComplete,
       };
-      expect(v2.isCandidateChannelValid(central4BisUncomplete)).toBe(true);
+      expect(calculator.isCandidateChannelValid(central4BisUncomplete)).toBe(
+        true,
+      );
 
       // 5 笔且 Complete 且 zg > zd，为标准有效完成笔中枢
       const central5BisComplete: any = {
@@ -317,7 +301,9 @@ describe('ChannelCalculatorV2 全新有限状态机算法套件', () => {
         zd: 120,
         type: ChannelType.Complete,
       };
-      expect(v2.isCandidateChannelValid(central5BisComplete)).toBe(true);
+      expect(calculator.isCandidateChannelValid(central5BisComplete)).toBe(
+        true,
+      );
     });
   });
 });
