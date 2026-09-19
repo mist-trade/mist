@@ -583,12 +583,10 @@ export class ChannelLifecycleEngine {
 
         // 4. 【序列末端顺势离开笔封存守卫】：
         // 当走势到达序列末尾（!pullback）时：
-        // A. 封闭历史切片（allowUncomplete === false）：当前笔顺势冲破 ZG/ZD 即可封存；
-        // B. 增量/全量数据末端：当前笔顺势冲破全局极值（breaksExtreme），即为有效离开终笔，封存为 Complete。
+        // 【离开笔第一公理】：离开笔除非是出现了 3 买/3 卖，否则极值必须突破 GG/DD！
+        // 序列末端无 pullback 无法形成 3 买/3 卖，故无论是否为封闭切片，离开终笔必须严格突破全局极值 breaksExtreme。
         const shouldSealAtEnd =
-          !pullback &&
-          isTrendAlignedWithEntry &&
-          (strategy.allowUncomplete === false ? hasBrokenOut : breaksExtreme);
+          !pullback && isTrendAlignedWithEntry && breaksExtreme;
 
         if (shouldSealAtEnd) {
           if (!latestCandidate) {

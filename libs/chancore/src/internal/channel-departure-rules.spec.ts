@@ -423,6 +423,88 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
   });
 
   // -------------------------------------------------------------------------
+  // 5.1 离开笔第一公理：无 3 买则必破 GG / 无 3 卖则必破 DD
+  // -------------------------------------------------------------------------
+  describe('【离开笔第一公理】离开笔除非是出现了3买/3卖，否则离开笔极值必须突破GG/DD (Axiom: Break GG/DD Unless 3B/3S)', () => {
+    it('向上笔中枢：第 5 笔突破 ZG(140) 达到 145 < GG(150)，随后回抽跌回 130 < ZG(140) 无 3B → 绝不能封存为 Complete 离开笔', () => {
+      const bis: ChanBi[] = [
+        makeBi(0, TrendDirection.Up, 100, 150),
+        makeBi(1, TrendDirection.Down, 120, 150),
+        makeBi(2, TrendDirection.Up, 120, 140),
+        makeBi(3, TrendDirection.Down, 115, 140), // 核心 [120, 140], GG=150
+        makeBi(4, TrendDirection.Up, 115, 145), // 冲破 ZG(140) 但未破 GG(150)
+        makeBi(5, TrendDirection.Down, 130, 145), // 回踩 130 < ZG(140)，无 3B
+        makeBi(6, TrendDirection.Up, 130, 138),
+      ];
+
+      const result = biService.createChannels(bis);
+      // b4 绝不能作为 5 笔 Complete 离开笔封存输出
+      const sealedAtB4 = result.phaseB.find(
+        (c) => c.type === ChannelType.Complete && c.bis.length === 5,
+      );
+      expect(sealedAtB4).toBeUndefined();
+    });
+
+    it('向下笔中枢：第 5 笔跌破 ZD(160) 达到 155 > DD(150)，随后反抽 170 > ZD(160) 无 3S → 绝不能封存为 Complete 离开笔', () => {
+      const bis: ChanBi[] = [
+        makeBi(0, TrendDirection.Down, 150, 200),
+        makeBi(1, TrendDirection.Up, 150, 180),
+        makeBi(2, TrendDirection.Down, 160, 180),
+        makeBi(3, TrendDirection.Up, 160, 185), // 核心 [160, 180], DD=150
+        makeBi(4, TrendDirection.Down, 155, 185), // 跌破 ZD(160) 但未破 DD(150)
+        makeBi(5, TrendDirection.Up, 155, 170), // 反抽 170 > ZD(160)，无 3S
+        makeBi(6, TrendDirection.Down, 162, 170),
+      ];
+
+      const result = biService.createChannels(bis);
+      const sealedAtB4 = result.phaseB.find(
+        (c) => c.type === ChannelType.Complete && c.bis.length === 5,
+      );
+      expect(sealedAtB4).toBeUndefined();
+    });
+
+    it('向上笔中枢：第 5 笔未破 GG(150)，随后的反向笔暴跌击穿 ZD(120) 且后续确认跌破起点（日线下跌笔确立）→ 严禁吸纳为中枢延伸，绝不跨入日线下跌笔', () => {
+      const bis: ChanBi[] = [
+        makeBi(0, TrendDirection.Up, 100, 150),
+        makeBi(1, TrendDirection.Down, 120, 150),
+        makeBi(2, TrendDirection.Up, 120, 140),
+        makeBi(3, TrendDirection.Down, 115, 140), // 核心 [120, 140], GG=150
+        makeBi(4, TrendDirection.Up, 115, 145), // 冲高 145 < GG(150)
+        makeBi(5, TrendDirection.Down, 110, 145), // 暴跌至 110，击穿 ZD(120)
+        makeBi(6, TrendDirection.Up, 110, 125),
+        makeBi(7, TrendDirection.Down, 90, 125), // 跌穿起点 100
+      ];
+
+      const result = biService.createChannels(bis);
+      // 绝不能产出包含 b5 且将 b4/b5 错误吸纳的向上中枢
+      expect(
+        result.phaseB.some(
+          (c) =>
+            c.trend === TrendDirection.Up && c.bis.some((b) => b.low === 110),
+        ),
+      ).toBe(false);
+    });
+
+    it('封闭切片末端（allowUncomplete: false）：末笔虽破 ZG 但未破 GG，且无 3B → 严禁草率封存为 Complete 离开笔', () => {
+      const bis: ChanBi[] = [
+        makeBi(0, TrendDirection.Up, 100, 150),
+        makeBi(1, TrendDirection.Down, 120, 150),
+        makeBi(2, TrendDirection.Up, 120, 140),
+        makeBi(3, TrendDirection.Down, 115, 140),
+        makeBi(4, TrendDirection.Up, 115, 145), // 末笔 145 > ZG(140)，但 145 < GG(150)，且序列结束无 pullback
+      ];
+
+      const result = biService.createChannels(bis, { allowUncomplete: false });
+      // 封闭切片末端未突破 GG 且无 3B，绝不能封存为 Complete 离开笔
+      expect(
+        result.phaseB.some(
+          (c) => c.type === ChannelType.Complete && c.bis.length === 5,
+        ),
+      ).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // 6. 未完成中枢与实时买卖点测试：末端中枢 UnComplete 标识与 3B/3S 实时求值
   // -------------------------------------------------------------------------
   describe('【未完成中枢】末端未离开中枢赋予 UnComplete 标识并实时参与三类买卖点计算', () => {
