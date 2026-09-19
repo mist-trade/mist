@@ -322,7 +322,7 @@ export class BacktestRunExecutor {
     onSignal: () => void,
   ): Promise<{ hasBars: boolean }> {
     const imputer = new StrategySeriesImputer();
-    const seenSignalTimes = new Set<number>();
+    const seenSignalKeys = new Set<string>();
     let afterTimestamp: Date | undefined;
     let hasPublicBars = false;
     const replayStart = replayStartFor(run, plan);
@@ -387,9 +387,9 @@ export class BacktestRunExecutor {
             const fresh = cursor.advance(identity, events);
             let freshEmitted = false;
             for (const event of fresh) {
-              const timeKey = event.time.getTime();
-              if (seenSignalTimes.has(timeKey)) continue;
-              seenSignalTimes.add(timeKey);
+              const signalKey = `${event.time.getTime()}_${event.type}`;
+              if (seenSignalKeys.has(signalKey)) continue;
+              seenSignalKeys.add(signalKey);
               results.push(
                 this.resultRepository.create({
                   backtestRunId: run.id,
@@ -435,9 +435,9 @@ export class BacktestRunExecutor {
               factorContext,
             );
             if (outcome.status === 'SIGNAL_EMITTED') {
-              const timeKey = bar.timestamp.getTime();
-              if (!seenSignalTimes.has(timeKey)) {
-                seenSignalTimes.add(timeKey);
+              const signalKey = `${bar.timestamp.getTime()}_${outcome.signalTag ?? outcome.action}`;
+              if (!seenSignalKeys.has(signalKey)) {
+                seenSignalKeys.add(signalKey);
                 results.push(
                   this.resultRepository.create({
                     backtestRunId: run.id,
@@ -469,9 +469,9 @@ export class BacktestRunExecutor {
           } else {
             const evaluation = evaluateStrategyPlan(plan.plan, imputer.read());
             if (evaluation.status === 'evaluated' && evaluation.matched) {
-              const timeKey = bar.timestamp.getTime();
-              if (!seenSignalTimes.has(timeKey)) {
-                seenSignalTimes.add(timeKey);
+              const signalKey = `${bar.timestamp.getTime()}_${plan.plan.signalKind}`;
+              if (!seenSignalKeys.has(signalKey)) {
+                seenSignalKeys.add(signalKey);
                 results.push(
                   this.resultRepository.create({
                     backtestRunId: run.id,
