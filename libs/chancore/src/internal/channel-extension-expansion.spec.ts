@@ -413,7 +413,7 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(result[2].dd).toBe(3871.3);
     });
 
-    it('连续相邻扩展独立生成外层大框', () => {
+    it('已扩展中枢排他捆绑：A与B已扩展，C与A无公共极值重叠导致A+B+C无法连续扩展时，禁止B与C单独扩展', () => {
       const b0 = makeTestBi(0, TrendDirection.Down, 80, 100);
       const b1 = makeTestBi(1, TrendDirection.Up, 85, 95);
       const b2 = makeTestBi(2, TrendDirection.Down, 83, 93);
@@ -429,6 +429,172 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       const b10 = makeTestBi(10, TrendDirection.Down, 46, 56);
       const b11 = makeTestBi(11, TrendDirection.Up, 49, 59);
       const b12 = makeTestBi(12, TrendDirection.Down, 30, 55);
+
+      // c1: [ZD: 86, ZG: 93], [DD: 65, GG: 100]
+      const c1 = makeMockChannel({
+        bis: [b0, b1, b2, b3, b4],
+        zg: 93,
+        zd: 86,
+        gg: 100,
+        dd: 65,
+        trend: TrendDirection.Down,
+      });
+
+      // c2: [ZD: 69, ZG: 76], [DD: 45, GG: 79]
+      // c1 与 c2 存在极值交集 [65, 79] (86 > 76 无核心交集)，触发 A+B 扩展捆绑
+      const c2 = makeMockChannel({
+        bis: [b4, b5, b6, b7, b8],
+        zg: 76,
+        zd: 69,
+        gg: 79,
+        dd: 45,
+        trend: TrendDirection.Down,
+      });
+
+      // c3: [ZD: 49, ZG: 56], [DD: 30, GG: 59]
+      // c3 与 c2 虽有交集 [45, 59]，但与 c1 [65, 100] 全无交集（max(DD)=65 > min(GG)=59）
+      // 无法与 A+B 构成 A+B+C 连续扩展；且因 A+B 已经捆绑，禁止拆开 B 单独做 B+C 扩展
+      const c3 = makeMockChannel({
+        bis: [b8, b9, b10, b11, b12],
+        zg: 56,
+        zd: 49,
+        gg: 59,
+        dd: 30,
+        trend: TrendDirection.Down,
+      });
+
+      const result = calculator.applyBiChannelExtensionAndExpansion([
+        c1,
+        c2,
+        c3,
+      ]);
+
+      // 输出结构为: [c1, E(c1, c2), c2, c3]，长度严格为 4
+      expect(result.length).toBe(4);
+      expect(result[0]).toBe(c1);
+      expect(result[0].expanded).toBe(false);
+
+      // 外层扩展大框 E(c1, c2)
+      expect(result[1].expanded).toBe(true);
+      expect(result[1].zg).toBe(93);
+      expect(result[1].zd).toBe(69);
+      expect(result[1].gg).toBe(100);
+      expect(result[1].dd).toBe(45);
+      expect(result[1].bis.length).toBe(9);
+
+      // c2 为内层普通中枢
+      expect(result[2]).toBe(c2);
+      expect(result[2].expanded).toBe(false);
+
+      // c3 保持独立中枢，杜绝被拆分的 c2 错误拉入 B+C 扩展大框
+      expect(result[3]).toBe(c3);
+      expect(result[3].expanded).toBe(false);
+      expect(result[3].extended).toBe(false);
+    });
+
+    it('三中枢连续扩展：A+B+C 全量极值存在公共交集，统一升级包裹为三中枢连续扩展大框', () => {
+      const b0 = makeTestBi(0, TrendDirection.Down, 80, 100);
+      const b1 = makeTestBi(1, TrendDirection.Up, 85, 95);
+      const b2 = makeTestBi(2, TrendDirection.Down, 83, 93);
+      const b3 = makeTestBi(3, TrendDirection.Up, 86, 96);
+      const b4 = makeTestBi(4, TrendDirection.Down, 65, 90);
+
+      const b5 = makeTestBi(5, TrendDirection.Up, 70, 80);
+      const b6 = makeTestBi(6, TrendDirection.Down, 68, 78);
+      const b7 = makeTestBi(7, TrendDirection.Up, 72, 82);
+      const b8 = makeTestBi(8, TrendDirection.Down, 55, 85);
+
+      const b9 = makeTestBi(9, TrendDirection.Up, 73, 83);
+      const b10 = makeTestBi(10, TrendDirection.Down, 71, 81);
+      const b11 = makeTestBi(11, TrendDirection.Up, 74, 84);
+      const b12 = makeTestBi(12, TrendDirection.Down, 60, 90);
+
+      // c1: [ZD: 86, ZG: 93], [DD: 65, GG: 100]
+      const c1 = makeMockChannel({
+        bis: [b0, b1, b2, b3, b4],
+        zg: 93,
+        zd: 86,
+        gg: 100,
+        dd: 65,
+        trend: TrendDirection.Down,
+      });
+
+      // c2: [ZD: 69, ZG: 76], [DD: 55, GG: 85]
+      const c2 = makeMockChannel({
+        bis: [b4, b5, b6, b7, b8],
+        zg: 76,
+        zd: 69,
+        gg: 85,
+        dd: 55,
+        trend: TrendDirection.Down,
+      });
+
+      // c3: [ZD: 71, ZG: 80], [DD: 60, GG: 90]
+      // 全量极值公共交集：max(65, 55, 60)=65 < min(100, 85, 90)=85 -> [65, 85] 存在交集
+      // 成功触发 A+B+C 连续扩展！
+      const c3 = makeMockChannel({
+        bis: [b8, b9, b10, b11, b12],
+        zg: 80,
+        zd: 71,
+        gg: 90,
+        dd: 60,
+        trend: TrendDirection.Down,
+      });
+
+      const result = calculator.applyBiChannelExtensionAndExpansion([
+        c1,
+        c2,
+        c3,
+      ]);
+
+      // 输出结构为: [c1, E(c1, c2, c3), c2, c3]，长度严格为 4
+      expect(result.length).toBe(4);
+      expect(result[0]).toBe(c1);
+      expect(result[0].expanded).toBe(false);
+
+      // 单一统一外层大框包裹 A+B+C
+      const continuousBox = result[1];
+      expect(continuousBox.expanded).toBe(true);
+      expect(continuousBox.extended).toBe(false);
+      // ZG = max(93, 76, 80) = 93; ZD = min(86, 69, 71) = 69
+      expect(continuousBox.zg).toBe(93);
+      expect(continuousBox.zd).toBe(69);
+      // GG = max(100, 85, 90) = 100; DD = min(65, 55, 60) = 55
+      expect(continuousBox.gg).toBe(100);
+      expect(continuousBox.dd).toBe(55);
+      // 构件笔去重连接笔后共 5 + 4 + 4 = 13 笔
+      expect(continuousBox.bis.length).toBe(13);
+      expect(continuousBox.bis[0]).toBe(b0);
+      expect(continuousBox.bis[12]).toBe(b12);
+
+      // 内层各子中枢依次排列
+      expect(result[2]).toBe(c2);
+      expect(result[2].expanded).toBe(false);
+      expect(result[3]).toBe(c3);
+      expect(result[3].expanded).toBe(false);
+    });
+
+    it('多中枢独立分段扩展：A+B 扩展后与 C 无法连续扩展，后续 C 与 D 独立触发新扩展', () => {
+      const b0 = makeTestBi(0, TrendDirection.Down, 80, 100);
+      const b1 = makeTestBi(1, TrendDirection.Up, 85, 95);
+      const b2 = makeTestBi(2, TrendDirection.Down, 83, 93);
+      const b3 = makeTestBi(3, TrendDirection.Up, 86, 96);
+      const b4 = makeTestBi(4, TrendDirection.Down, 65, 90);
+
+      const b5 = makeTestBi(5, TrendDirection.Up, 68, 78);
+      const b6 = makeTestBi(6, TrendDirection.Down, 66, 76);
+      const b7 = makeTestBi(7, TrendDirection.Up, 69, 79);
+      const b8 = makeTestBi(8, TrendDirection.Down, 45, 75);
+
+      const b9 = makeTestBi(9, TrendDirection.Up, 48, 58);
+      const b10 = makeTestBi(10, TrendDirection.Down, 46, 56);
+      const b11 = makeTestBi(11, TrendDirection.Up, 49, 59);
+      const b12 = makeTestBi(12, TrendDirection.Down, 30, 55);
+
+      const b13 = makeTestBi(13, TrendDirection.Up, 32, 42);
+      const b14 = makeTestBi(14, TrendDirection.Down, 31, 41);
+      const b15 = makeTestBi(15, TrendDirection.Up, 33, 43);
+      const b16 = makeTestBi(16, TrendDirection.Down, 20, 40);
 
       const c1 = makeMockChannel({
         bis: [b0, b1, b2, b3, b4],
@@ -457,26 +623,42 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
         trend: TrendDirection.Down,
       });
 
+      const c4 = makeMockChannel({
+        bis: [b12, b13, b14, b15, b16],
+        zg: 41,
+        zd: 33,
+        gg: 43,
+        dd: 20,
+        trend: TrendDirection.Down,
+      });
+
       const result = calculator.applyBiChannelExtensionAndExpansion([
         c1,
         c2,
         c3,
+        c4,
       ]);
 
-      // c1 与 c2 扩展，c2 与 c3 也扩展
-      // 结果结构为: [c1, E(c1,c2), c2, E(c2,c3), c3]
-      expect(result.length).toBe(5);
+      // c1 与 c2 扩展，c3 与 c4 扩展
+      // 结构为: [c1, E(c1,c2), c2, c3, E(c3,c4), c4]，长度严格为 6
+      expect(result.length).toBe(6);
       expect(result[0]).toBe(c1);
       expect(result[1].expanded).toBe(true);
       expect(result[1].zg).toBe(93);
       expect(result[1].zd).toBe(69);
 
       expect(result[2]).toBe(c2);
-      expect(result[3].expanded).toBe(true);
-      expect(result[3].zg).toBe(76);
-      expect(result[3].zd).toBe(49);
+      expect(result[2].expanded).toBe(false);
 
-      expect(result[4]).toBe(c3);
+      expect(result[3]).toBe(c3);
+      expect(result[3].expanded).toBe(false);
+
+      expect(result[4].expanded).toBe(true);
+      expect(result[4].zg).toBe(56);
+      expect(result[4].zd).toBe(33);
+
+      expect(result[5]).toBe(c4);
+      expect(result[5].expanded).toBe(false);
     });
   });
 
