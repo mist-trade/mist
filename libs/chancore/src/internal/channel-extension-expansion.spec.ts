@@ -332,6 +332,87 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(result[2].extended).toBe(false);
     });
 
+    it('实盘真实用例：平安银行 (000001) 30分钟图 4月7日前后两中枢扩展区间端到端校验', () => {
+      // 模拟 2026年3月26日 ~ 4月15日 平安银行 30M 真实走势构件笔序列
+      // c1: 3月26日 ~ 4月3日 震荡形成的中枢
+      const b0 = makeTestBi(0, TrendDirection.Down, 3852.09, 3937.1); // 进入笔
+      const b1 = makeTestBi(1, TrendDirection.Up, 3852.09, 3924.11);
+      const b2 = makeTestBi(2, TrendDirection.Down, 3872.78, 3924.11);
+      const b3 = makeTestBi(3, TrendDirection.Up, 3872.78, 3948.81);
+      const b4 = makeTestBi(4, TrendDirection.Down, 3891.86, 3948.81);
+      const b5 = makeTestBi(5, TrendDirection.Up, 3891.86, 3955.94);
+      const b6 = makeTestBi(6, TrendDirection.Down, 3871.3, 3955.94);
+      // b7: 4月3日 13:30 ~ 4月8日 15:00 离开第一个中枢拉升突破，同时作为第二个中枢进入笔
+      const b7 = makeTestBi(7, TrendDirection.Up, 3871.3, 3995.0); // 核心连接笔
+
+      // c2: 4月8日 ~ 4月13日 震荡形成的高位中枢
+      const b8 = makeTestBi(8, TrendDirection.Down, 3955.25, 3995.0);
+      const b9 = makeTestBi(9, TrendDirection.Up, 3955.25, 4011.02);
+      const b10 = makeTestBi(10, TrendDirection.Down, 3966.2, 4011.02);
+      const b11 = makeTestBi(11, TrendDirection.Up, 3966.2, 4050.62); // 离开笔
+
+      // 1. 第一个中枢 c1: [ZD: 3891.86, ZG: 3924.11], DD: 3794.68, GG: 3995.00
+      const c1 = makeMockChannel({
+        bis: [b0, b1, b2, b3, b4, b5, b6, b7],
+        zg: 3924.11,
+        zd: 3891.86,
+        gg: 3995.0,
+        dd: 3794.68,
+        trend: TrendDirection.Down,
+      });
+
+      // 2. 第二个中枢 c2: [ZD: 3966.20, ZG: 3995.00], DD: 3871.30, GG: 4050.62
+      const c2 = makeMockChannel({
+        bis: [b7, b8, b9, b10, b11],
+        zg: 3995.0,
+        zd: 3966.2,
+        gg: 4050.62,
+        dd: 3871.3,
+        trend: TrendDirection.Down,
+      });
+
+      // 3. 执行中枢延伸与扩展算法
+      const result = calculator.applyBiChannelExtensionAndExpansion([c1, c2]);
+
+      // 4. 结构断言：满足两中枢扩展，输出 [c1, expandedBox, c2]，长度严格为 3
+      expect(result).toHaveLength(3);
+
+      // (1) 内层左侧小中枢 c1: 保持普通笔中枢，杜绝误标扩展
+      expect(result[0]).toBe(c1);
+      expect(result[0].expanded).toBe(false);
+      expect(result[0].extended).toBe(false);
+      expect(result[0].zg).toBe(3924.11);
+      expect(result[0].zd).toBe(3891.86);
+      expect(result[0].gg).toBe(3995.0);
+      expect(result[0].dd).toBe(3794.68);
+
+      // (2) 外层包裹大框 expandedBox: 专属标记 expanded=true，完整包裹两中枢
+      const expandedBox = result[1];
+      expect(expandedBox.expanded).toBe(true);
+      expect(expandedBox.extended).toBe(false);
+      // ZG = max(3924.11, 3995.00) = 3995.00
+      expect(expandedBox.zg).toBe(3995.0);
+      // ZD = min(3891.86, 3966.20) = 3891.86
+      expect(expandedBox.zd).toBe(3891.86);
+      // GG = max(3995.00, 4050.62) = 4050.62
+      expect(expandedBox.gg).toBe(4050.62);
+      // DD = min(3794.68, 3871.30) = 3794.68
+      expect(expandedBox.dd).toBe(3794.68);
+      // 构件笔包含起止两中枢的所有构件 (b0 ~ b11，共 12 笔)
+      expect(expandedBox.bis).toHaveLength(12);
+      expect(expandedBox.bis[0]).toBe(b0);
+      expect(expandedBox.bis[11]).toBe(b11);
+
+      // (3) 内层右侧小中枢 c2: 保持普通笔中枢
+      expect(result[2]).toBe(c2);
+      expect(result[2].expanded).toBe(false);
+      expect(result[2].extended).toBe(false);
+      expect(result[2].zg).toBe(3995.0);
+      expect(result[2].zd).toBe(3966.2);
+      expect(result[2].gg).toBe(4050.62);
+      expect(result[2].dd).toBe(3871.3);
+    });
+
     it('连续相邻扩展独立生成外层大框', () => {
       const b0 = makeTestBi(0, TrendDirection.Down, 80, 100);
       const b1 = makeTestBi(1, TrendDirection.Up, 85, 95);
