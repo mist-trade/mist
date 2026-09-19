@@ -923,7 +923,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       zd: 4075.7,
       gg: 4121.7,
       dd: 4056.87,
-      expanded: true,
+      expanded: false,
       type: ChannelType.Complete,
       bis: [
         {
@@ -1160,7 +1160,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       zd: 4100.65,
       gg: 4140.23,
       dd: 4080.29,
-      expanded: true,
+      expanded: false,
       type: ChannelType.Complete,
       bis: [
         {
@@ -1293,7 +1293,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       zd: 4120.63,
       gg: 4160.99,
       dd: 4100.36,
-      expanded: true,
+      expanded: false,
       type: ChannelType.Complete,
       bis: [
         {
@@ -1512,7 +1512,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
 
       // 4. 中枢状态与几何参数
       expect(c0.type).toBe(ChannelType.Complete);
-      expect(c0.expanded).toBe(true);
+      expect(c0.expanded).toBe(false);
       expect(c0.zg).toBe(4088.01);
       expect(c0.zd).toBe(4075.7);
       expect(c0.gg).toBe(4121.7);

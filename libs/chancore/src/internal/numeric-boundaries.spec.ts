@@ -101,6 +101,7 @@ describe('ChanCore numeric boundaries', () => {
       type: ChannelType.Complete,
       status: ChannelStatus.Unknown,
       trend: TrendDirection.Up,
+      extended: false,
       expanded: false,
       startId: 1,
       endId: 2,

@@ -33,6 +33,7 @@ export interface BandVisualCommand extends BaseVisualCommand {
   readonly dd?: number;
   readonly style?: 'solid' | 'dashed' | 'dotted';
   readonly status?: 'complete' | 'uncomplete';
+  readonly extended?: boolean;
   readonly expanded?: boolean;
 }
 

@@ -112,7 +112,8 @@ export interface ChanChannel {
   readonly type: ChannelType;
   readonly status: ChannelStatus;
   readonly trend: TrendDirection;
-  readonly expanded: boolean; // 中枢扩张合并产物=true；普通同级中枢=false
+  readonly extended: boolean; // 中枢延伸融合产物=true；普通中枢=false
+  readonly expanded: boolean; // 中枢扩展外层大框=true；普通同级中枢=false
   readonly startId: number;
   readonly endId: number;
   readonly displayStartId: number;

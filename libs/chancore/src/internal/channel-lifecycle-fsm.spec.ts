@@ -63,14 +63,14 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
 
       const [c0, c1, c2, c3, c4] = res.phaseB;
 
-      // 中枢 #0：9笔上涨中枢（满 9 笔扩展为 true）
+      // 中枢 #0：9笔上涨中枢（单中枢维持普通中枢 expanded: false）
       expect(c0.trend).toBe(TrendDirection.Up);
       expect(c0.bis).toHaveLength(9);
       expect(c0.zg).toBe(4088.01);
       expect(c0.zd).toBe(4075.7);
       expect(c0.gg).toBe(4121.7);
       expect(c0.dd).toBe(4056.87);
-      expect(c0.expanded).toBe(true);
+      expect(c0.expanded).toBe(false);
       expect(c0.type).toBe(ChannelType.Complete);
 
       // 中枢 #1：7笔上涨中枢
@@ -91,23 +91,23 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
       expect(c2.dd).toBe(4096.85);
       expect(c2.expanded).toBe(false);
 
-      // 中枢 #3：13笔下跌中枢（满 9 笔扩展为 true）
+      // 中枢 #3：13笔下跌中枢（单中枢维持普通中枢 expanded: false）
       expect(c3.trend).toBe(TrendDirection.Down);
       expect(c3.bis).toHaveLength(13);
       expect(c3.zg).toBe(4108.71);
       expect(c3.zd).toBe(4100.65);
       expect(c3.gg).toBe(4140.23);
       expect(c3.dd).toBe(4080.29);
-      expect(c3.expanded).toBe(true);
+      expect(c3.expanded).toBe(false);
 
-      // 中枢 #4：13笔上涨中枢（满 9 笔扩展为 true）
+      // 中枢 #4：13笔上涨中枢（单中枢维持普通中枢 expanded: false）
       expect(c4.trend).toBe(TrendDirection.Up);
       expect(c4.bis).toHaveLength(13);
       expect(c4.zg).toBe(4127.82);
       expect(c4.zd).toBe(4120.63);
       expect(c4.gg).toBe(4160.99);
       expect(c4.dd).toBe(4100.36);
-      expect(c4.expanded).toBe(true);
+      expect(c4.expanded).toBe(false);
 
       // 统计所有中枢构件总笔数：9 + 7 + 5 + 13 + 13 = 47 笔
       const totalBis = res.phaseB.reduce((sum, c) => sum + c.bis.length, 0);
@@ -217,21 +217,21 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
   });
 
   describe('五、延伸与中枢扩展的区分，严格重叠门禁（Strict Overlap Guard）', () => {
-    it('中枢满 9 笔触发 expanded=true，未满 9 笔延伸维持 expanded=false', () => {
+    it('单中枢维持普通中枢（expanded=false），仅两中枢满足扩展条件时才产出扩展大框', () => {
       const res = calculator.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
-      // 中枢 #1 为 7 笔延伸中枢，未满 9 笔，expanded 保持 false
+      // 单中枢内部无论震荡 7 笔、9 笔还是 13 笔，单体自身均不是扩展大框（expanded 为 false）
       expect(res.phaseB[1].bis).toHaveLength(7);
       expect(res.phaseB[1].expanded).toBe(false);
 
-      // 中枢 #0 为 9 笔中枢，达到 9 笔结合扩展门槛，expanded 为 true
+      // 中枢 #0 为 9 笔中枢，单体自身维持 expanded=false
       expect(res.phaseB[0].bis).toHaveLength(9);
-      expect(res.phaseB[0].expanded).toBe(true);
+      expect(res.phaseB[0].expanded).toBe(false);
 
-      // 中枢 #3、#4 为 13 笔中枢，expanded 均满足扩展为 true
+      // 中枢 #3、#4 为 13 笔中枢，单体自身维持 expanded=false
       expect(res.phaseB[3].bis).toHaveLength(13);
-      expect(res.phaseB[3].expanded).toBe(true);
+      expect(res.phaseB[3].expanded).toBe(false);
       expect(res.phaseB[4].bis).toHaveLength(13);
-      expect(res.phaseB[4].expanded).toBe(true);
+      expect(res.phaseB[4].expanded).toBe(false);
     });
 
     it('严格重叠门禁（Strict Overlap Guard）：悬空逃逸笔（与 [ZD, ZG] 无交集）严禁被吸纳进中枢延伸', () => {

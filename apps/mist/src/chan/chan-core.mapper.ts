@@ -91,6 +91,7 @@ export function toChannelVo(channel: ChanChannel): ChannelVo {
     type: channel.type,
     status: channel.status,
     trend: channel.trend,
+    extended: channel.extended,
     expanded: channel.expanded,
     startId: channel.startId,
     endId: channel.endId,

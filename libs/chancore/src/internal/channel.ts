@@ -170,7 +170,6 @@ export class ChannelCalculator {
 
     const isComplete =
       c1.type === ChannelType.Complete && c2.type === ChannelType.Complete;
-    const expanded = c1.expanded || c2.expanded || mergedBis.length >= 9;
 
     return {
       bis: mergedBis,
@@ -186,7 +185,8 @@ export class ChannelCalculator {
       displayStartId: c1.displayStartId,
       displayEndId: c2.displayEndId,
       trend: c1.trend,
-      expanded,
+      extended: true,
+      expanded: false,
     };
   }
 
@@ -195,7 +195,7 @@ export class ChannelCalculator {
    * 1. 涵盖起止两中枢全部笔；
    * 2. ZG = max(zg1, zg2), ZD = min(zd1, zd2)，视觉上将两小框的核心区间整体包裹；
    * 3. GG = max(gg1, gg2), DD = min(dd1, dd2)；
-   * 4. 标记 expanded = true。
+   * 4. 专属标记 expanded = true，extended = false。
    */
   private buildExpandedBoundingBox(
     c1: ChanChannel,
@@ -219,6 +219,7 @@ export class ChannelCalculator {
       displayStartId: c1.displayStartId,
       displayEndId: c2.displayEndId,
       trend: c1.trend,
+      extended: false,
       expanded: true,
     };
   }
@@ -254,6 +255,7 @@ export class ChannelCalculator {
           startIndex,
           coreGeometry,
           false,
+          false,
         );
       },
       buildSealedChannel: (
@@ -261,7 +263,7 @@ export class ChannelCalculator {
         original,
         startIndex,
         geometry,
-        expanded,
+        _expanded,
         isComplete = true,
       ) => {
         return this.buildChannelFromBis(
@@ -269,7 +271,8 @@ export class ChannelCalculator {
           original,
           startIndex,
           geometry,
-          expanded || elements.length >= 9,
+          false,
+          false,
           isComplete,
         );
       },
@@ -286,6 +289,7 @@ export class ChannelCalculator {
     originalBis: readonly ChanBi[],
     startIndex: number,
     geometry: { zg: number; zd: number; gg: number; dd: number },
+    extended = false,
     expanded = false,
     isComplete = true,
   ): ChanChannel {
@@ -305,6 +309,7 @@ export class ChannelCalculator {
       startId,
       endId,
       trend: bis[0].trend,
+      extended,
       expanded,
       displayStartId,
       displayEndId,

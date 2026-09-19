@@ -117,6 +117,7 @@ describe('ChanCore HTTP mapper', () => {
       type: ChannelType.Complete,
       status: ChannelStatus.Valid,
       trend: TrendDirection.Up,
+      extended: false,
       expanded: false,
       startId: 1,
       endId: 2,
