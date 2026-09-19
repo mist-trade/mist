@@ -91,6 +91,26 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
       '【未完成中枢】末端未离开中枢赋予 UnComplete 标识并实时参与三类买卖点计算',
     ],
   },
+  {
+    id: 'BUG-CHAN-007',
+    name: '笔中枢延伸(extended)与扩展(expanded)双字段正交解耦与防套娃',
+    rootCause:
+      '旧算法将单中枢累积 9 笔标记为 expanded: true，导致随后产生两中枢扩展大框时内外层双重 expanded 标签套娃。改造为 extended 专用于 [ZD, ZG] 延伸合并，expanded 专用于 [DD, GG] 外层扩展大框，内层中枢保持基础形态。',
+    specFile: 'internal/channel-extension-expansion.spec.ts',
+    testCasePatterns: [
+      '实盘真实用例：平安银行 (000001) 30分钟图 4月7日前后两中枢扩展区间端到端校验',
+    ],
+  },
+  {
+    id: 'BUG-CHAN-008',
+    name: '中枢波动极值 [DD, GG] 排除外部连接笔污染与扩展误判',
+    rootCause:
+      '封存与构建中枢时错误将外部进入笔起点与离开笔终点计入 [DD, GG]，污染中枢自身震荡范围，导致无重叠的独立中枢误判为扩展。修复为严格仅从中枢内部震荡构件笔提取波动极值。',
+    specFile: 'internal/channel-extension-expansion.spec.ts',
+    testCasePatterns: [
+      '5M 实盘经典案例：2026年2月6日前后两独立上涨中枢极值交集判定',
+    ],
+  },
 ];
 
 describe('缠论核心算法缺陷回归与测试集合门禁 (ChanCore Bug Fix Regression Guard)', () => {
