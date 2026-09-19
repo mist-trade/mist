@@ -8,11 +8,16 @@ export interface ChanBspEpisodeIdentity {
   readonly units: 'bi' | 'duan';
 }
 
+interface CursorRecord {
+  lastEmittedTime: number;
+  emittedTypesAtLastTime: Set<string>;
+}
+
 /**
  * Monotonic emission cursor for Chan BSP events.
  *
  * Emits only newly confirmed points: per identity it keeps the greatest
- * confirmed unit index and emits events whose unit index advances it. Points
+ * confirmed timestamp and emits events whose time advances it. Points
  * that disappear and reappear under structure evolution (e.g. a channel
  * extension invalidating a third-type point) are NOT re-emitted, and the
  * cursor never regresses. Multiple point types on the same confirming unit
@@ -22,18 +27,47 @@ export interface ChanBspEpisodeIdentity {
  * rollover, pruned with the registry scopes on reconciliation (bounded).
  */
 export class ChanBspEpisodeCursor {
-  private readonly cursors = new Map<string, number>();
+  private readonly cursors = new Map<string, CursorRecord>();
 
   advance(
     identity: ChanBspEpisodeIdentity,
     events: readonly ChanBspEvent[],
   ): readonly ChanBspEvent[] {
     const key = identityKey(identity);
-    const lastEmitted = this.cursors.get(key) ?? -1;
-    const fresh = events.filter((event) => event.unitIndex > lastEmitted);
+    let record = this.cursors.get(key);
+    if (!record) {
+      record = {
+        lastEmittedTime: -1,
+        emittedTypesAtLastTime: new Set<string>(),
+      };
+      this.cursors.set(key, record);
+    }
+
+    const fresh = events.filter((event) => {
+      const eventTime = event.time.getTime();
+      if (eventTime > record.lastEmittedTime) return true;
+      if (eventTime === record.lastEmittedTime) {
+        return !record.emittedTypesAtLastTime.has(event.type);
+      }
+      return false;
+    });
+
     if (fresh.length > 0) {
-      const greatest = Math.max(...fresh.map((event) => event.unitIndex));
-      this.cursors.set(key, Math.max(lastEmitted, greatest));
+      const maxTime = Math.max(...fresh.map((event) => event.time.getTime()));
+      if (maxTime > record.lastEmittedTime) {
+        record.lastEmittedTime = maxTime;
+        record.emittedTypesAtLastTime = new Set(
+          fresh
+            .filter((event) => event.time.getTime() === maxTime)
+            .map((event) => event.type),
+        );
+      } else {
+        for (const event of fresh) {
+          if (event.time.getTime() === record.lastEmittedTime) {
+            record.emittedTypesAtLastTime.add(event.type);
+          }
+        }
+      }
     }
     return Object.freeze(fresh);
   }

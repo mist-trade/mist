@@ -42,11 +42,15 @@ export class BuySellPointDetector {
       return [];
     }
     const points: ChanBuySellPoint[] = [];
-    // ⚠️ 顺序契约：detectFirst 必须先于 detectSecond —— 二类的前置一类点集合
-    // （firstBuyUnits/firstSellUnits）从已产出的一类点构建；重排顺序会静默破坏
-    // "二买/二卖要求前置一类点"的判定（spec 门禁 D5）。
-    this.detectFirst(input, points);
-    this.detectSecond(input, points);
+    const divInput: ChanDivergenceInput = {
+      units: input.units,
+      zhongshus: input.zhongshus,
+      forces: input.forces,
+    };
+    const divergences = new DivergenceDetector().detectDivergences(divInput);
+
+    this.detectFirst(input, divergences, points);
+    this.detectSecond(input, divergences, points);
     this.detectThird(input, points);
     points.sort((a, b) => this.comparePoints(a, b));
     this.fillFirstTypeIndex(points);
@@ -54,10 +58,12 @@ export class BuySellPointDetector {
   }
 
   /** 一类：消费趋势背驰（Trend），盘整背驰（Consolidation）不产一类点。 */
-  private detectFirst(input: ChanBspInput, out: ChanBuySellPoint[]): void {
-    const { units, zhongshus, forces } = input;
-    const divInput: ChanDivergenceInput = { units, zhongshus, forces };
-    const divergences = new DivergenceDetector().detectDivergences(divInput);
+  private detectFirst(
+    input: ChanBspInput,
+    divergences: readonly import('../contracts').ChanDivergence[],
+    out: ChanBuySellPoint[],
+  ): void {
+    const { units } = input;
     for (const div of divergences) {
       if (div.type !== ChanDivergenceType.Trend) {
         continue; // 盘整背驰/中枢内部不产一类点（用户定调，第24课"背驰是最重要的"）
@@ -78,13 +84,19 @@ export class BuySellPointDetector {
   }
 
   /**
-   * 二类：相邻三元组 + 前置一类点（a 段必须是一类点确认段），不查背驰/力度。
-   * 前置一类点集合依赖 detectFirst 已先行执行（见 detectBuySellPoints 顺序契约注释）。
+   * 二类：相邻三元组 + 前置一类点/中枢盘背点确认，不查背驰/力度。
+   * 缠论 20/21/29 课：一买之后或中枢盘整背驰之后的次级别回抽不破前低构成二买。
    */
-  private detectSecond(input: ChanBspInput, out: ChanBuySellPoint[]): void {
+  private detectSecond(
+    input: ChanBspInput,
+    divergences: readonly import('../contracts').ChanDivergence[],
+    out: ChanBuySellPoint[],
+  ): void {
     const { units } = input;
     const firstBuyUnits = new Set<number>();
     const firstSellUnits = new Set<number>();
+
+    // 1. 前置一买/一卖确认
     for (const p of out) {
       if (p.type === ChanBspType.FirstBuy) {
         firstBuyUnits.add(p.unitIndex);
@@ -92,6 +104,19 @@ export class BuySellPointDetector {
         firstSellUnits.add(p.unitIndex);
       }
     }
+
+    // 2. 中枢盘整背驰点确认（29课："中枢盘整的买卖点归二类"）
+    for (const div of divergences) {
+      if (div.type === ChanDivergenceType.Consolidation) {
+        const trend = units[div.leaveIndex].trend;
+        if (trend === TrendDirection.Down) {
+          firstBuyUnits.add(div.leaveIndex);
+        } else if (trend === TrendDirection.Up) {
+          firstSellUnits.add(div.leaveIndex);
+        }
+      }
+    }
+
     for (let i = 0; i + 2 < units.length; i++) {
       const a = units[i];
       const b = units[i + 1];

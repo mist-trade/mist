@@ -108,30 +108,26 @@ function toBspUnit(
 export function toZhongshu(
   channel: ChanChannel | ChanDuanChannel,
 ): ChanDivergenceZhongshu {
-  const units = 'bis' in channel ? channel.bis : channel.duans;
-  const first = units[0];
-  if (!first) {
+  const isBi = 'bis' in channel;
+  const units = isBi ? channel.bis : channel.duans;
+  if (!units || units.length === 0) {
     throw new RangeError('chan channel must contain at least one unit');
   }
 
+  // 笔级中枢：bis[0] 为进入笔（b0），中枢核心区间始于 bis[1]（至少4笔：1进入 + 3构件）。
+  // 段级中枢：duans[0] 即为首个对称重叠构件段。
+  const first = isBi && units.length >= 4 ? units[1] : units[0];
+
+  // 末单元切片：
+  // 笔级已封存中枢（奇数笔 >= 5）：最后一笔为离开笔，中枢核心终止于倒数第2笔。
+  // 段级已封存中枢（奇数段 >= 5）：最后一段为离开段，中枢核心终止于倒数第2段。
   let last = units[units.length - 1];
-  // 针对已封存且含离开段的中枢（ChanChannel 长度为奇数且 >= 5，且非 9 笔扩展）：
-  // 在缠论定义中，离开段是离开中枢的次级别走势，中枢本体在离开段起点（即倒数第 2 单元末端）结束。
-  // 若中枢为未完成状态 (type === ChannelType.UnComplete)，units 本身即为中枢核心构件，无离开段，last 取末单元。
-  if (channel.type === ChannelType.Complete && !channel.expanded) {
-    if (
-      'bis' in channel &&
-      channel.bis.length >= 5 &&
-      channel.bis.length % 2 === 1
-    ) {
-      last = channel.bis[channel.bis.length - 2];
-    } else if (
-      'duans' in channel &&
-      channel.duans.length >= 4 &&
-      channel.duans.length % 2 === 0
-    ) {
-      last = channel.duans[channel.duans.length - 2];
-    }
+  if (
+    channel.type === ChannelType.Complete &&
+    units.length >= 5 &&
+    units.length % 2 === 1
+  ) {
+    last = units[units.length - 2];
   }
 
   return Object.freeze({
