@@ -65,6 +65,7 @@ function makeMockChannel(params: {
   dd: number;
   trend: TrendDirection;
   type?: ChannelType;
+  extended?: boolean;
   expanded?: boolean;
 }): ChanChannel {
   const firstBi = params.bis[0];
@@ -83,6 +84,7 @@ function makeMockChannel(params: {
     displayStartId: firstBi.originIds[0],
     displayEndId: lastBi.originIds[lastBi.originIds.length - 1],
     trend: params.trend,
+    extended: params.extended ?? false,
     expanded: params.expanded ?? false,
   };
 }
@@ -152,8 +154,9 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(extended.zg).toBe(28);
       expect(extended.zd).toBe(24);
 
-      // 满 9 笔自动标记 expanded = true
-      expect(extended.expanded).toBe(true);
+      // 明确标记 extended = true，expanded = false
+      expect(extended.extended).toBe(true);
+      expect(extended.expanded).toBe(false);
       expect(extended.type).toBe(ChannelType.Complete);
     });
 
@@ -257,7 +260,8 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(merged.bis.length).toBe(13);
       expect(merged.gg).toBe(42);
       expect(merged.dd).toBe(10);
-      expect(merged.expanded).toBe(true);
+      expect(merged.extended).toBe(true);
+      expect(merged.expanded).toBe(false);
     });
   });
 
@@ -303,12 +307,15 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       // 双层叠加保留：输出 [c1, expandedBox, c2]
       expect(result.length).toBe(3);
 
-      // 第 1 个是保留的 c1
+      // 第 1 个是保留的 c1（小框，非扩展大框）
       expect(result[0]).toBe(c1);
+      expect(result[0].expanded).toBe(false);
+      expect(result[0].extended).toBe(false);
 
       // 第 2 个是外层扩展大框
       const expandedBox = result[1];
       expect(expandedBox.expanded).toBe(true);
+      expect(expandedBox.extended).toBe(false);
       // 包裹两中枢核心区间：ZG = max(93, 76) = 93; ZD = min(86, 69) = 69
       expect(expandedBox.zg).toBe(93);
       expect(expandedBox.zd).toBe(69);
@@ -319,8 +326,10 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(expandedBox.bis[0]).toBe(b0);
       expect(expandedBox.bis[8]).toBe(b8);
 
-      // 第 3 个是保留的 c2
+      // 第 3 个是保留的 c2（小框，非扩展大框）
       expect(result[2]).toBe(c2);
+      expect(result[2].expanded).toBe(false);
+      expect(result[2].extended).toBe(false);
     });
 
     it('连续相邻扩展独立生成外层大框', () => {

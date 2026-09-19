@@ -155,6 +155,7 @@ export class ChanVisualAdapter {
           fill: true,
           style: isUncomplete ? 'dashed' : 'solid',
           status: isUncomplete ? 'uncomplete' : 'complete',
+          extended: zs.extended,
           expanded: zs.expanded,
         };
         commands.push(bandCmd);
@@ -253,6 +254,7 @@ export class ChanVisualAdapter {
           fill: true,
           style: isUncomplete ? 'dashed' : 'solid',
           status: isUncomplete ? 'uncomplete' : 'complete',
+          extended: false,
           expanded: zs.expanded,
         };
         commands.push(bandCmd);

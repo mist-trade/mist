@@ -287,7 +287,7 @@ describe('ChannelCalculator', () => {
       expect(result.phaseB[0].zd).toBeGreaterThan(result.phaseB[1].zg);
     });
 
-    it('enlarges channel to expanded when accumulation reaches 9 bis', () => {
+    it('maintains ordinary channel (expanded=false) when accumulation reaches 9 bis without second channel expansion', () => {
       const nineBis: ChanBi[] = [
         makeBiDirect(0, TrendDirection.Up, 100, 120),
         makeBiDirect(1, TrendDirection.Down, 102, 120),
@@ -304,7 +304,8 @@ describe('ChannelCalculator', () => {
 
       expect(result.phaseB).toHaveLength(1);
       expect(result.phaseB[0].bis.length).toBeGreaterThanOrEqual(9);
-      expect(result.phaseB[0].expanded).toBe(true);
+      expect(result.phaseB[0].expanded).toBe(false);
+      expect(result.phaseB[0].extended).toBe(false);
     });
 
     it('中枢状态机吸纳内部震荡：反向笔未打穿 DD 且无 3B 时，严禁机械伪 2s 提前关门，维持延伸态吸纳构件', () => {
