@@ -122,12 +122,14 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       };
     }
 
-    // 处理去重游标
+    // 处理去重游标（基于事件时间戳去重，避免滑动窗口相对下标漂移）
     let candidateEvents = matchedEvents;
     if (params.deduplicate) {
       const cursorKey = `${context.securityId}:${context.period}:${params.units}`;
-      const lastEmitted = this.cursorMap.get(cursorKey) ?? -1;
-      candidateEvents = matchedEvents.filter((e) => e.unitIndex > lastEmitted);
+      const lastEmittedTime = this.cursorMap.get(cursorKey) ?? -1;
+      candidateEvents = matchedEvents.filter(
+        (e) => e.time.getTime() > lastEmittedTime,
+      );
       if (candidateEvents.length === 0) {
         return {
           action: 'NEUTRAL',
@@ -135,8 +137,8 @@ export class ChanBspFactorPlugin implements FactorPlugin {
           reason: '缠论买卖点已在先前半闭合单元发射，无需重复触发',
         };
       }
-      const maxUnit = Math.max(...candidateEvents.map((e) => e.unitIndex));
-      this.cursorMap.set(cursorKey, Math.max(lastEmitted, maxUnit));
+      const maxTime = Math.max(...candidateEvents.map((e) => e.time.getTime()));
+      this.cursorMap.set(cursorKey, Math.max(lastEmittedTime, maxTime));
     }
 
     // 取最新一个买卖点作为主要触发决策
@@ -321,27 +323,26 @@ function toBspUnit(
 function toZhongshu(
   channel: ChanChannel | ChanDuanChannel,
 ): ChanDivergenceZhongshu {
-  const units = 'bis' in channel ? channel.bis : channel.duans;
-  const first = units[0];
-  if (!first) {
+  const isBi = 'bis' in channel;
+  const units = isBi ? channel.bis : channel.duans;
+  if (!units || units.length === 0) {
     throw new RangeError('chan channel must contain at least one unit');
   }
 
+  // 笔级中枢：bis[0] 为进入笔（b0），中枢核心区间始于 bis[1]（至少4笔：1进入 + 3构件）。
+  // 段级中枢：duans[0] 即为首个对称重叠构件段。
+  const first = isBi && units.length >= 4 ? units[1] : units[0];
+
+  // 末单元切片：
+  // 笔级已封存中枢（奇数笔 >= 5）：最后一笔为离开笔，中枢核心终止于倒数第2笔。
+  // 段级已封存中枢（奇数段 >= 5）：最后一段为离开段，中枢核心终止于倒数第2段。
   let last = units[units.length - 1];
-  if (channel.type === ChannelType.Complete && !channel.expanded) {
-    if (
-      'bis' in channel &&
-      channel.bis.length >= 5 &&
-      channel.bis.length % 2 === 1
-    ) {
-      last = channel.bis[channel.bis.length - 2];
-    } else if (
-      'duans' in channel &&
-      channel.duans.length >= 4 &&
-      channel.duans.length % 2 === 0
-    ) {
-      last = channel.duans[channel.duans.length - 2];
-    }
+  if (
+    channel.type === ChannelType.Complete &&
+    units.length >= 5 &&
+    units.length % 2 === 1
+  ) {
+    last = units[units.length - 2];
   }
 
   return {

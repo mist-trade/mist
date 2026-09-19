@@ -235,36 +235,49 @@ export class DivergenceDetector {
     return false;
   }
 
-  /** 趋势背驰：链末中枢（B）比较其进入段（A）vs 离开段（C），双口径严格 <，两者同向且等于链方向。 */
+  /** 趋势背驰：比较链末中枢离开段（C）vs 进入段（A/B），双口径严格 <，两者同向且等于链方向。 */
   private detectTrend(
     chain: Chain,
     units: readonly ChanDivergenceUnit[],
     forces: readonly ChanUnitForce[],
   ): ChanDivergence | null {
     const lastSpan = chain.spans[chain.spans.length - 1];
-    const enter = lastSpan.firstIndex - 1;
+    const firstSpan = chain.spans[0];
     const leave = lastSpan.lastIndex + 1;
-    if (enter < 0 || leave >= units.length) {
-      return null; // 无进入/离开段
+    if (leave >= units.length || units[leave].trend !== chain.direction) {
+      return null; // 无离开段或离开段方向不对
     }
-    // 进入段与离开段必须同向且等于链方向（24课 A/C 同向；否则不构成该趋势的背驰）
+
+    const bEnter = lastSpan.firstIndex - 1;
+    const aEnter = firstSpan.firstIndex - 1;
+
+    // 缠论第 24 课原典：标准趋势背驰比较 c 与 a 的力度，或 c 与 b 的力度。
+    // 优先比较末中枢进入段 b（连接段）；若 b 不背驰，回退比较首中枢进入段 a。
+    let enter = bEnter;
     if (
+      enter < 0 ||
       units[enter].trend !== chain.direction ||
-      units[leave].trend !== chain.direction
+      !this.isWeaker(forces[leave], forces[enter])
     ) {
-      return null;
+      if (
+        aEnter >= 0 &&
+        units[aEnter].trend === chain.direction &&
+        this.isWeaker(forces[leave], forces[aEnter])
+      ) {
+        enter = aEnter;
+      } else {
+        return null;
+      }
     }
-    if (this.isWeaker(forces[leave], forces[enter])) {
-      return {
-        type: ChanDivergenceType.Trend,
-        zhongshuIndex: lastSpan.zhongshuIndex,
-        enterIndex: enter,
-        leaveIndex: leave,
-        enterForce: { ...forces[enter] },
-        leaveForce: { ...forces[leave] },
-      };
-    }
-    return null;
+
+    return {
+      type: ChanDivergenceType.Trend,
+      zhongshuIndex: lastSpan.zhongshuIndex,
+      enterIndex: enter,
+      leaveIndex: leave,
+      enterForce: { ...forces[enter] },
+      leaveForce: { ...forces[leave] },
+    };
   }
 
   /** 双口径弱判定：leave.area < enter.area 且 leave.peak < enter.peak（严格 <，无 epsilon）。 */
