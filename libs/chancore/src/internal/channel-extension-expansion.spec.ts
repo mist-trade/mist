@@ -143,9 +143,9 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(extended.bis[0]).toBe(b0);
       expect(extended.bis[8]).toBe(b8);
 
-      // 全量笔极值
-      expect(extended.gg).toBe(45);
-      expect(extended.dd).toBe(10);
+      // 内部构件极值：排除进入笔 b0(10) 和离开笔 b8(45)
+      expect(extended.gg).toBe(38);
+      expect(extended.dd).toBe(18);
 
       // 内部笔 slice(1, -1) 为 b1~b7
       // 内部笔 highs: [28, 32, 29, 38, 35, 37, 34]，min(high) = 28
@@ -258,8 +258,8 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       const merged = result[0];
       // 5 + 4 + 4 = 13 笔
       expect(merged.bis.length).toBe(13);
-      expect(merged.gg).toBe(42);
-      expect(merged.dd).toBe(10);
+      expect(merged.gg).toBe(38);
+      expect(merged.dd).toBe(20);
       expect(merged.extended).toBe(true);
       expect(merged.expanded).toBe(false);
     });
@@ -847,6 +847,77 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(result.length).toBe(2);
       expect(result[0]).toBe(c1);
       expect(result[1]).toBe(c2);
+    });
+
+    it('5M 实盘经典案例：2026年2月6日前后两独立上涨中枢极值交集判定（A的GG=4104.62 < B的DD=4108.16，严格不扩展）', () => {
+      // 现场走势还原：
+      // 中枢 A（2月4日~2月6日上涨中枢）：
+      // 内部震荡构件笔最高点 GG = 4104.62，最低点 DD = 4048.94。
+      // 最后一笔顺势离开笔 b_connect 从 4029.97 冲高至 4118.45。
+      //
+      // 中枢 B（2月6日~2月11日高台阶上涨中枢）：
+      // 以 b_connect 作为向上进入笔进入中枢；
+      // 内部震荡构件笔最低点 DD = 4108.16，最高点 GG = 4120.07。
+      //
+      // 极值交集判定：
+      // max(DD_A, DD_B) = max(4048.94, 4108.16) = 4108.16
+      // min(GG_A, GG_B) = min(4104.62, 4120.07) = 4104.62
+      // 由于 4108.16 > 4104.62，两中枢围绕内部震荡构件的波动极值根本不存在交集（相差 3.54 点断层）；
+      // 判定结论：核心不重叠且波动极值不重叠，严格保持为两个独立的相续上涨中枢，杜绝误触中枢扩展捆绑！
+
+      const b_inA = makeTestBi(0, TrendDirection.Up, 4048.94, 4099.64);
+      const b1 = makeTestBi(1, TrendDirection.Down, 4056.97, 4099.64);
+      const b2 = makeTestBi(2, TrendDirection.Up, 4056.97, 4087.97);
+      const b3 = makeTestBi(3, TrendDirection.Down, 4070.73, 4087.97);
+      const b4 = makeTestBi(4, TrendDirection.Up, 4070.73, 4099.3);
+      const b5 = makeTestBi(5, TrendDirection.Down, 4064.91, 4099.3);
+      const b6 = makeTestBi(6, TrendDirection.Up, 4064.91, 4104.62); // 中枢 A 内部最高点 GG = 4104.62
+      const b_connect = makeTestBi(7, TrendDirection.Up, 4029.97, 4118.45); // A离开笔 / B进入笔
+
+      const b8 = makeTestBi(8, TrendDirection.Down, 4112.5, 4118.45);
+      const b9 = makeTestBi(9, TrendDirection.Up, 4112.5, 4120.07); // 中枢 B 内部最高点 GG = 4120.07
+      const b10 = makeTestBi(10, TrendDirection.Down, 4108.16, 4120.07); // 中枢 B 内部最低点 DD = 4108.16
+      const b11 = makeTestBi(11, TrendDirection.Up, 4108.16, 4118.45);
+      const b_outB = makeTestBi(12, TrendDirection.Up, 4110.0, 4134.34); // B离开笔
+
+      const cA = makeMockChannel({
+        bis: [b_inA, b1, b2, b3, b4, b5, b6, b_connect],
+        zg: 4099.3,
+        zd: 4070.73,
+        gg: 4104.62,
+        dd: 4048.94,
+        trend: TrendDirection.Up,
+      });
+
+      const cB = makeMockChannel({
+        bis: [b_connect, b8, b9, b10, b11, b_outB],
+        zg: 4118.45,
+        zd: 4110.0,
+        gg: 4120.07,
+        dd: 4108.16,
+        trend: TrendDirection.Up,
+      });
+
+      // 验证两者确实共享同一根连接笔
+      expect(cA.bis[cA.bis.length - 1]).toBe(cB.bis[0]);
+      // 验证波动极值关系：A.gg < B.dd，无重叠
+      expect(cA.gg).toBe(4104.62);
+      expect(cB.dd).toBe(4108.16);
+      expect(Math.max(cA.dd, cB.dd)).toBe(4108.16);
+      expect(Math.min(cA.gg, cB.gg)).toBe(4104.62);
+      expect(Math.max(cA.dd, cB.dd) < Math.min(cA.gg, cB.gg)).toBe(false);
+
+      const result = calculator.applyBiChannelExtensionAndExpansion([cA, cB]);
+
+      // 结构与输出断言：严格保持为两个独立中枢，杜绝产出扩展大框
+      expect(result).toHaveLength(2);
+      expect(result[0]).toBe(cA);
+      expect(result[0].expanded).toBe(false);
+      expect(result[0].gg).toBe(4104.62);
+
+      expect(result[1]).toBe(cB);
+      expect(result[1].expanded).toBe(false);
+      expect(result[1].dd).toBe(4108.16);
     });
   });
 });

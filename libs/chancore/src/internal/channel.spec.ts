@@ -248,7 +248,7 @@ describe('ChannelCalculator', () => {
       expect(channel.zg).toBe(117);
       expect(channel.zd).toBe(106);
       expect(channel.gg).toBe(120);
-      expect(channel.dd).toBe(100);
+      expect(channel.dd).toBe(102);
       expect(channel.zg).toBeGreaterThan(channel.zd);
     });
 
@@ -339,7 +339,7 @@ describe('ChannelCalculator', () => {
       const c0 = resUncomplete.phaseB[0];
       expect(c0.bis).toHaveLength(8);
       expect(c0.type).toBe(ChannelType.UnComplete);
-      expect(c0.dd).toBe(4100.36);
+      expect(c0.dd).toBe(4109.92);
     });
 
     it('5M 实盘经典用例一：01-07~01-13 第 1 号中枢避免 b[10] 假突破过早封存，消除 0.86 微型中枢并封存于 9 笔健康中枢', () => {
@@ -368,8 +368,8 @@ describe('ChannelCalculator', () => {
       expect(c.bis).toHaveLength(9);
       expect(c.zg).toBe(4088.01);
       expect(c.zd).toBe(4075.7);
-      expect(c.gg).toBe(4121.7);
-      expect(c.dd).toBe(4056.87);
+      expect(c.gg).toBe(4098.78);
+      expect(c.dd).toBe(4067.12);
     });
 
     it('5M 实盘经典用例二：01-21~01-26 1月22日中枢与后续高台阶中枢拆分，延伸至 01-26 14:35 (11 笔) 顺利封存，后续独立形成高台阶扩展中枢', () => {
@@ -403,7 +403,7 @@ describe('ChannelCalculator', () => {
       const c1 = result.phaseB[0];
       // 1月22日中枢在 b8(4160.99) 处顺利封存（9 笔），满足条件 2（离开笔破 GG + 随后出现 2s 封存）
       expect(c1.bis).toHaveLength(9);
-      expect(c1.gg).toBe(4160.99);
+      expect(c1.gg).toBe(4143.75);
       expect(c1.zg).toBe(4127.82);
 
       const c2 = result.phaseB[1];

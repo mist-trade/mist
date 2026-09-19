@@ -68,8 +68,8 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
       expect(c0.bis).toHaveLength(9);
       expect(c0.zg).toBe(4088.01);
       expect(c0.zd).toBe(4075.7);
-      expect(c0.gg).toBe(4121.7);
-      expect(c0.dd).toBe(4056.87);
+      expect(c0.gg).toBe(4098.78);
+      expect(c0.dd).toBe(4067.12);
       expect(c0.expanded).toBe(false);
       expect(c0.type).toBe(ChannelType.Complete);
 
@@ -78,8 +78,8 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
       expect(c1.bis).toHaveLength(7);
       expect(c1.zg).toBe(4167.16);
       expect(c1.zd).toBe(4151.9);
-      expect(c1.gg).toBe(4190.87);
-      expect(c1.dd).toBe(4093.01);
+      expect(c1.gg).toBe(4179.7);
+      expect(c1.dd).toBe(4126.23);
       expect(c1.expanded).toBe(false);
 
       // 中枢 #2：5笔下跌中枢
@@ -87,8 +87,8 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
       expect(c2.bis).toHaveLength(5);
       expect(c2.zg).toBe(4133.07);
       expect(c2.zd).toBe(4104.42);
-      expect(c2.gg).toBe(4190.87);
-      expect(c2.dd).toBe(4096.85);
+      expect(c2.gg).toBe(4138.55);
+      expect(c2.dd).toBe(4103.62);
       expect(c2.expanded).toBe(false);
 
       // 中枢 #3：13笔下跌中枢（单中枢维持普通中枢 expanded: false）
@@ -96,8 +96,8 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
       expect(c3.bis).toHaveLength(13);
       expect(c3.zg).toBe(4108.71);
       expect(c3.zd).toBe(4100.65);
-      expect(c3.gg).toBe(4140.23);
-      expect(c3.dd).toBe(4080.29);
+      expect(c3.gg).toBe(4128.93);
+      expect(c3.dd).toBe(4090.06);
       expect(c3.expanded).toBe(false);
 
       // 中枢 #4：13笔上涨中枢（单中枢维持普通中枢 expanded: false）
@@ -105,8 +105,8 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
       expect(c4.bis).toHaveLength(13);
       expect(c4.zg).toBe(4127.82);
       expect(c4.zd).toBe(4120.63);
-      expect(c4.gg).toBe(4160.99);
-      expect(c4.dd).toBe(4100.36);
+      expect(c4.gg).toBe(4143.75);
+      expect(c4.dd).toBe(4109.92);
       expect(c4.expanded).toBe(false);
 
       // 统计所有中枢构件总笔数：9 + 7 + 5 + 13 + 13 = 47 笔
@@ -184,7 +184,7 @@ describe('ChannelCalculator 有限状态机算法套件', () => {
       const c = res.phaseB[0];
       // 成功回退至候选离开笔 1 (b4)，离开笔 high 严格等于当时的 GG 160
       expect(c.bis).toHaveLength(5);
-      expect(c.gg).toBe(160);
+      expect(c.gg).toBe(150);
       expect(c.bis[4].high).toBe(160);
     });
   });

@@ -310,8 +310,12 @@ export class CentralStateMachine<T extends ChannelElement> {
     if (this.elements.length < candidate.elementCount) {
       this.elements.push(candidate.element);
     }
-    this.gg = candidate.geometry.gg;
-    this.dd = candidate.geometry.dd;
+    // 严格维护中枢波动极值纯净性：离开笔属于脱离中枢走势，中枢 [DD, GG] 严格保持为内部震荡构件极值
+    const internalElements = this.elements.slice(1, -1);
+    if (internalElements.length > 0) {
+      this.gg = Math.max(...internalElements.map((e) => e.high));
+      this.dd = Math.min(...internalElements.map((e) => e.low));
+    }
     this.isComplete = true;
     this.state = CentralLifecycleState.Sealed;
     if (this.elements.length >= 9) {
