@@ -77,54 +77,109 @@ export class ChannelCalculator {
     }
 
     const result: ChanChannel[] = [];
-    let current = channels[0];
+    let i = 0;
 
-    for (let i = 1; i < channels.length; i++) {
-      const next = channels[i];
+    while (i < channels.length) {
+      let current = channels[i];
 
-      // 前置条件1：前后两中枢共用离开笔和进入笔
-      const lastBiOfCurrent = current.bis[current.bis.length - 1];
-      const firstBiOfNext = next.bis[0];
-      const sharesConnectingBi = this.isSameBi(lastBiOfCurrent, firstBiOfNext);
+      // 阶段 1：向后贪婪吸收满足延伸条件（[ZD, ZG] 存在真实价格交集）的中枢
+      while (i + 1 < channels.length) {
+        const next = channels[i + 1];
 
-      // 前置条件2：同方向
-      const isSameTrend = current.trend === next.trend;
+        // 前置条件：前后两中枢共用离开笔和进入笔，且方向相同
+        const lastBi = current.bis[current.bis.length - 1];
+        const firstBi = next.bis[0];
+        if (!this.isSameBi(lastBi, firstBi) || current.trend !== next.trend) {
+          break;
+        }
 
-      if (!sharesConnectingBi || !isSameTrend) {
-        result.push(current);
-        current = next;
-        continue;
-      }
+        // 延伸判定（[ZD, ZG] 存在真实价格交集）
+        const hasCoreOverlap =
+          Math.max(current.zd, next.zd) < Math.min(current.zg, next.zg);
 
-      // 条件3：中枢延伸判定（[ZD, ZG] 存在真实价格交集）
-      const hasCoreOverlap =
-        Math.max(current.zd, next.zd) < Math.min(current.zg, next.zg);
+        if (!hasCoreOverlap) {
+          break;
+        }
 
-      if (hasCoreOverlap) {
-        // 执行中枢延伸融合（替换当前中枢，并继续向后贪婪吸收）
+        // 执行中枢延伸融合并推进
         current = this.mergeExtendedChannel(current, next);
-        continue;
+        i++;
       }
 
-      // 条件4：中枢扩展判定（[ZD, ZG] 无交集，但 [DD, GG] 存在真实价格交集）
-      const hasExtremeOverlap =
-        Math.max(current.dd, next.dd) < Math.min(current.gg, next.gg);
+      // 阶段 2：检查是否与后续中枢满足扩展条件（[DD, GG] 存在极值价格交集）
+      // 扩展状态机准则：
+      // 1. 若当前中枢与后续中枢满足极值交集，捆绑为扩展组 [A, B]；
+      // 2. 除非后续中枢与已捆绑全量中枢满足全量公共极值重叠（A+B+C 连续扩展），
+      //    否则已捆绑的中枢具有排他性，禁止剥离 B 单独与 C 做 B+C 扩展；
+      // 3. 连续扩展可无限向后贪婪吸收满足全量极值公共交集的新中枢。
+      if (i + 1 < channels.length) {
+        const next = channels[i + 1];
+        const lastBi = current.bis[current.bis.length - 1];
+        const firstBi = next.bis[0];
+        const sharesConnectingBi = this.isSameBi(lastBi, firstBi);
+        const isSameTrend = current.trend === next.trend;
 
-      if (hasExtremeOverlap) {
-        // 双层叠加保留：保留 current，并生成包含 current 与 next 的外层大框
-        result.push(current);
-        const expandedBox = this.buildExpandedBoundingBox(current, next);
-        result.push(expandedBox);
-        current = next;
-        continue;
+        const hasExtremeOverlap =
+          sharesConnectingBi &&
+          isSameTrend &&
+          Math.max(current.dd, next.dd) < Math.min(current.gg, next.gg);
+
+        if (hasExtremeOverlap) {
+          // 开启扩展组绑定（A + B）
+          const expansionGroup: ChanChannel[] = [current, next];
+          let commonDD = Math.max(current.dd, next.dd);
+          let commonGG = Math.min(current.gg, next.gg);
+          i++; // 已消费 channels[i+1] (即 next)
+
+          // 尝试向后连续扩展（A + B + C + ...）
+          while (i + 1 < channels.length) {
+            const cand = channels[i + 1];
+            const prevInGroup = expansionGroup[expansionGroup.length - 1];
+            const prevLastBi = prevInGroup.bis[prevInGroup.bis.length - 1];
+            const candFirstBi = cand.bis[0];
+
+            if (
+              !this.isSameBi(prevLastBi, candFirstBi) ||
+              cand.trend !== expansionGroup[0].trend
+            ) {
+              break;
+            }
+
+            // 全量公共极值交集判定：必须与组内所有已捆绑中枢保持公共极值重叠
+            const candCommonDD = Math.max(commonDD, cand.dd);
+            const candCommonGG = Math.min(commonGG, cand.gg);
+            const canContinuouslyExpand = candCommonDD < candCommonGG;
+
+            if (!canContinuouslyExpand) {
+              // 无法与已捆绑扩展组构成 A+B+C 连续扩展，终止扩展组吸收
+              break;
+            }
+
+            // 成功加入连续扩展组
+            expansionGroup.push(cand);
+            commonDD = candCommonDD;
+            commonGG = candCommonGG;
+            i++;
+          }
+
+          // 产出扩展组：输出首个基础中枢、外层扩展大框、以及组内后续子中枢
+          result.push(expansionGroup[0]);
+          const expandedBox = this.buildExpandedBoundingBox(expansionGroup);
+          result.push(expandedBox);
+          for (let k = 1; k < expansionGroup.length; k++) {
+            result.push(expansionGroup[k]);
+          }
+
+          i++;
+          continue;
+        }
       }
 
-      // 既无延伸也无扩展
+      // 普通独立中枢（既无扩展也无未尽延伸）
       result.push(current);
-      current = next;
+      i++;
     }
 
-    result.push(current);
     return result;
   }
 
@@ -192,33 +247,42 @@ export class ChannelCalculator {
 
   /**
    * 中枢扩展外层大框构建：
-   * 1. 涵盖起止两中枢全部笔；
-   * 2. ZG = max(zg1, zg2), ZD = min(zd1, zd2)，视觉上将两小框的核心区间整体包裹；
-   * 3. GG = max(gg1, gg2), DD = min(dd1, dd2)；
+   * 1. 涵盖起止各子中枢全部构件笔（去重相邻连接笔）；
+   * 2. ZG = max(...zg), ZD = min(...zd)，视觉上将各小框的核心区间整体包裹；
+   * 3. GG = max(...gg), DD = min(...dd)；
    * 4. 专属标记 expanded = true，extended = false。
    */
   private buildExpandedBoundingBox(
-    c1: ChanChannel,
-    c2: ChanChannel,
+    channels: readonly ChanChannel[],
   ): ChanChannel {
-    const mergedBis = [...c1.bis, ...c2.bis.slice(1)];
-    const isComplete =
-      c1.type === ChannelType.Complete && c2.type === ChannelType.Complete;
+    const first = channels[0];
+    const last = channels[channels.length - 1];
+
+    const mergedBis: ChanBi[] = [...first.bis];
+    for (let i = 1; i < channels.length; i++) {
+      mergedBis.push(...channels[i].bis.slice(1));
+    }
+
+    const isComplete = channels.every((c) => c.type === ChannelType.Complete);
+    const zg = Math.max(...channels.map((c) => c.zg));
+    const zd = Math.min(...channels.map((c) => c.zd));
+    const gg = Math.max(...channels.map((c) => c.gg));
+    const dd = Math.min(...channels.map((c) => c.dd));
 
     return {
       bis: mergedBis,
-      zg: Math.max(c1.zg, c2.zg),
-      zd: Math.min(c1.zd, c2.zd),
-      gg: Math.max(c1.gg, c2.gg),
-      dd: Math.min(c1.dd, c2.dd),
+      zg,
+      zd,
+      gg,
+      dd,
       level: ChannelLevel.Bi,
       type: isComplete ? ChannelType.Complete : ChannelType.UnComplete,
       status: ChannelStatus.Valid,
-      startId: c1.startId,
-      endId: c2.endId,
-      displayStartId: c1.displayStartId,
-      displayEndId: c2.displayEndId,
-      trend: c1.trend,
+      startId: first.startId,
+      endId: last.endId,
+      displayStartId: first.displayStartId,
+      displayEndId: last.displayEndId,
+      trend: first.trend,
       extended: false,
       expanded: true,
     };
