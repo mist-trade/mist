@@ -32,52 +32,12 @@ import {
   ChannelLifecycleEngine,
   resolveChannelAnchorIds,
 } from './channel-lifecycle';
-import { partitionSubBisForMacroBis } from './channel-partition';
 import { minMaxBy } from './min-max-by';
 
 export class ChannelCalculator {
   /**
-   * 跨级别邻近笔约束中枢求值（Adjacent Timeframe Pair Bounded Channels）
-   *
-   * @param subBis 次级别笔序列（构成中枢的构件）
-   * @param macroBis 父级别笔序列（提供时空边界）
-   */
-  getAdjacentBoundedChannels(
-    subBis: readonly ChanBi[],
-    macroBis: readonly ChanBi[],
-  ): ChanChannelTwoPhaseResult {
-    const validMacroBis = macroBis.filter((b) => b.status === BiStatus.Valid);
-    if (validMacroBis.length === 0 || subBis.length < 5) {
-      return { phaseA: [], phaseB: [] };
-    }
-
-    const allPhaseA: ChanChannel[] = [];
-    const allPhaseB: ChanChannel[] = [];
-
-    const slices = partitionSubBisForMacroBis(validMacroBis, subBis);
-
-    for (let sliceIdx = 0; sliceIdx < slices.length; sliceIdx++) {
-      const slice = slices[sliceIdx];
-      if (slice.length < 5) {
-        continue;
-      }
-
-      const isLastSlice = sliceIdx === slices.length - 1;
-      const sliceResult = this.createChannels(slice, {
-        allowUncomplete: isLastSlice,
-      });
-      allPhaseA.push(...sliceResult.phaseA);
-      allPhaseB.push(...sliceResult.phaseB);
-    }
-
-    return {
-      phaseA: allPhaseA,
-      phaseB: allPhaseB,
-    };
-  }
-
-  /**
-   * 主函数：识别笔级中枢（纯基于笔序列几何与状态机推进）
+   * 笔级走势中枢：入参 = `ChanBi[]`（通常来自 `createBi(k).phaseB`）。
+   * 必须严格经过【Phase A（原始候选）+ Phase B（不动点合并）】双阶段输出。
    *
    * @param data Phase B 笔序列
    * @param options.allowUncomplete 是否允许输出末端未完成中枢（默认为 true）

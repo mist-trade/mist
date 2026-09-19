@@ -4,7 +4,7 @@ import { ApiEnvelopeResponse } from '@app/transport/http';
 import { TimezoneService } from '@app/timezone';
 import { VisualCommandService } from '@app/visual-command';
 import { prepareMarketData } from '@app/market-data';
-import { type ChanBi, ChanCore, type ChanK } from '@app/chancore';
+import { type ChanK } from '@app/chancore';
 import { IndicatorService } from '../indicator/indicator.service';
 import { QueryVisualCommandsDto } from './dto/query-visual-commands.dto';
 import { VisualCommandPayloadVo } from './vo/visual-command.vo';
@@ -107,38 +107,12 @@ export class VisualController {
       ? query.layers.split(',').map((s) => s.trim())
       : ['chan'];
 
-    let macroBis: readonly ChanBi[] | undefined = undefined;
-
-    if (query.macroPeriod) {
-      const macroEntities = await this.indicatorService.findKData({
-        code: query.code,
-        period: query.macroPeriod,
-        startDate,
-        endDate,
-        source: query.source,
-      });
-
-      const macroChanKlines = this.toChanKlines(
-        macroEntities,
-        query.macroPeriod,
-        startDate,
-        endDate,
-        query.code,
-        query.source,
-      );
-
-      if (macroChanKlines.length >= 3) {
-        macroBis = ChanCore.createBi(macroChanKlines).phaseB;
-      }
-    }
-
     return this.visualCommandService.generateCommands({
       code: query.code,
       period: query.period,
       source: query.source ?? 'default',
       klines: chanKlines,
       layers: requestedLayers,
-      chanOptions: macroBis && macroBis.length > 0 ? { macroBis } : undefined,
     });
   }
 }

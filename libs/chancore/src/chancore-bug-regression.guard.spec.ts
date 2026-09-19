@@ -49,16 +49,6 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
   },
   {
     id: 'BUG-CHAN-003',
-    name: '次级别笔序列跨宏观大笔切片时拐点极值未对齐导致跨笔渗透',
-    rootCause:
-      '大笔切片采用固定大时间窗口导致次级别中枢跨越大笔拐点渗透。修复为基于宏观分型极值精准锚定次级别首尾小笔无缝切片。',
-    specFile: 'internal/channel-bounded.spec.ts',
-    testCasePatterns: [
-      'partitions sub-bis across multiple sequential macro bis without cross-boundary leakage',
-    ],
-  },
-  {
-    id: 'BUG-CHAN-004',
     name: '5M 级别第 1 号中枢假突破过早封存导致 0.86 微型中枢',
     rootCause:
       '顺势笔突破中枢上沿 ZG 但未突破前期历史极值 GG 时被误判为离开封存。确立规则 1：必须顺势突破极值 GG 并确认 3 类买卖点或反穿后才能封存。',
@@ -68,7 +58,7 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
     ],
   },
   {
-    id: 'BUG-CHAN-005',
+    id: 'BUG-CHAN-004',
     name: '5M 级别 1月22日长中枢 11 笔贪婪吞噬与 departure < GG 倒挂',
     rootCause:
       '顺势突破极值后，未检测后续走势自身已独立构成新中枢，旧中枢无限吸附后续上涨。确立规则 4：新中枢核心成立时触发旧中枢在离开端点强制封存。',
@@ -78,7 +68,7 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
     ],
   },
   {
-    id: 'BUG-CHAN-006',
+    id: 'BUG-CHAN-005',
     name: '中枢顺势离开突破与规则 1～4 状态机双向镜像对称完备封存',
     rootCause:
       '离开突破仅考虑向上中枢而遗漏向下中枢 3 卖（3S）镜像对称；未离开且未扩展的中枢在震荡中反向击穿反向沿时未及时失效导致伪中枢误报。',
@@ -92,23 +82,13 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
     ],
   },
   {
-    id: 'BUG-CHAN-007',
+    id: 'BUG-CHAN-006',
     name: '未封闭中枢实时产出标识 (UnComplete) 与买卖点及图表渲染闭合',
     rootCause:
       '旧中枢在未满足规则 1～4 封存条件前被抛弃或丢失 UnComplete 标识，导致实时第 3 类买卖点漏判与图表空白。支持未完成中枢 (ChannelType.UnComplete) 正常产出、买卖点实时定位以及前端虚线差异化渲染。',
     specFile: 'internal/channel-departure-rules.spec.ts',
     testCasePatterns: [
       '【未完成中枢】末端未离开中枢赋予 UnComplete 标识并实时参与三类买卖点计算',
-    ],
-  },
-  {
-    id: 'BUG-CHAN-008',
-    name: '大笔切片拐点顺势终笔对齐与历史切片末端未完成中枢误标修复',
-    rootCause:
-      '向下大笔在极值底点因时间邻近误吸入后续反弹向上笔截断切片，导致中枢吞入反向笔变形且下一切片首笔丢失；同时历史切片因到达切片末端误触发 isAtDataEnd 标记为 UnComplete 虚线中枢并贯穿全局。',
-    specFile: 'internal/channel-bounded.spec.ts',
-    testCasePatterns: [
-      '【BUG-CHAN-008】向下大笔切片顺势极值终笔对齐与历史中枢完整闭合',
     ],
   },
 ];
