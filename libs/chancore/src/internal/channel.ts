@@ -56,10 +56,171 @@ export class ChannelCalculator {
       options,
     );
 
-    // Phase B：直接采用状态机全生命周期自洽确认的中枢序列（彻底消除外层缝合补丁）
-    const phaseB = sequential;
+    // Phase B：采用状态机全生命周期自洽确认的中枢序列，并应用笔中枢延伸与扩展算法
+    const phaseB = this.applyBiChannelExtensionAndExpansion(sequential);
 
     return { phaseA, phaseB };
+  }
+
+  /**
+   * 对顺序生成的笔中枢应用延伸（Extension）与扩展（Expansion）逻辑：
+   * 1. 共同前置条件：前后两中枢必须共用连接笔（前离开笔 === 后进入笔），且方向相同；
+   * 2. 中枢延伸：两中枢 [ZD, ZG] 有交集，合并替换为单一大中枢，所有构件笔重新计算几何区间；支持链式贪婪吸收；
+   * 3. 中枢扩展：两中枢 [ZD, ZG] 无交集但 [DD, GG] 有交集，双层叠加保留，保留两中枢并额外追加外层大框中枢（expanded: true）；
+   * 4. 从前往后单向迭代，不走回头路。
+   */
+  applyBiChannelExtensionAndExpansion(
+    channels: readonly ChanChannel[],
+  ): ChanChannel[] {
+    if (channels.length <= 1) {
+      return [...channels];
+    }
+
+    const result: ChanChannel[] = [];
+    let current = channels[0];
+
+    for (let i = 1; i < channels.length; i++) {
+      const next = channels[i];
+
+      // 前置条件1：前后两中枢共用离开笔和进入笔
+      const lastBiOfCurrent = current.bis[current.bis.length - 1];
+      const firstBiOfNext = next.bis[0];
+      const sharesConnectingBi = this.isSameBi(lastBiOfCurrent, firstBiOfNext);
+
+      // 前置条件2：同方向
+      const isSameTrend = current.trend === next.trend;
+
+      if (!sharesConnectingBi || !isSameTrend) {
+        result.push(current);
+        current = next;
+        continue;
+      }
+
+      // 条件3：中枢延伸判定（[ZD, ZG] 存在真实价格交集）
+      const hasCoreOverlap =
+        Math.max(current.zd, next.zd) < Math.min(current.zg, next.zg);
+
+      if (hasCoreOverlap) {
+        // 执行中枢延伸融合（替换当前中枢，并继续向后贪婪吸收）
+        current = this.mergeExtendedChannel(current, next);
+        continue;
+      }
+
+      // 条件4：中枢扩展判定（[ZD, ZG] 无交集，但 [DD, GG] 存在真实价格交集）
+      const hasExtremeOverlap =
+        Math.max(current.dd, next.dd) < Math.min(current.gg, next.gg);
+
+      if (hasExtremeOverlap) {
+        // 双层叠加保留：保留 current，并生成包含 current 与 next 的外层大框
+        result.push(current);
+        const expandedBox = this.buildExpandedBoundingBox(current, next);
+        result.push(expandedBox);
+        current = next;
+        continue;
+      }
+
+      // 既无延伸也无扩展
+      result.push(current);
+      current = next;
+    }
+
+    result.push(current);
+    return result;
+  }
+
+  /**
+   * 判断两笔是否为同一笔（支持引用相等或起止时间与高低点一致）
+   */
+  private isSameBi(a: ChanBi, b: ChanBi): boolean {
+    if (a === b) return true;
+    return (
+      a.startTime.getTime() === b.startTime.getTime() &&
+      a.endTime.getTime() === b.endTime.getTime() &&
+      a.high === b.high &&
+      a.low === b.low
+    );
+  }
+
+  /**
+   * 中枢延伸融合：
+   * 1. 合并构件笔序列（排除重复的连接笔）；
+   * 2. 全量笔重算 GG / DD；
+   * 3. 排除进入笔与离开笔，以所有内部构件笔重算公共交集 [ZD, ZG]，极端波动倒挂时保底回退为两中枢原区间交集；
+   * 4. 继承未完成/已完成状态与扩展标记。
+   */
+  private mergeExtendedChannel(c1: ChanChannel, c2: ChanChannel): ChanChannel {
+    const mergedBis = [...c1.bis, ...c2.bis.slice(1)];
+    const gg = Math.max(...mergedBis.map((b) => b.high));
+    const dd = Math.min(...mergedBis.map((b) => b.low));
+
+    let zg: number;
+    let zd: number;
+
+    const internalBis = mergedBis.slice(1, -1);
+    const intHigh = minMaxBy(internalBis, (b) => b.high);
+    const intLow = minMaxBy(internalBis, (b) => b.low);
+
+    if (intHigh && intLow && intHigh.min > intLow.max) {
+      zg = intHigh.min;
+      zd = intLow.max;
+    } else {
+      zg = Math.min(c1.zg, c2.zg);
+      zd = Math.max(c1.zd, c2.zd);
+    }
+
+    const isComplete =
+      c1.type === ChannelType.Complete && c2.type === ChannelType.Complete;
+    const expanded = c1.expanded || c2.expanded || mergedBis.length >= 9;
+
+    return {
+      bis: mergedBis,
+      zg,
+      zd,
+      gg,
+      dd,
+      level: ChannelLevel.Bi,
+      type: isComplete ? ChannelType.Complete : ChannelType.UnComplete,
+      status: ChannelStatus.Valid,
+      startId: c1.startId,
+      endId: c2.endId,
+      displayStartId: c1.displayStartId,
+      displayEndId: c2.displayEndId,
+      trend: c1.trend,
+      expanded,
+    };
+  }
+
+  /**
+   * 中枢扩展外层大框构建：
+   * 1. 涵盖起止两中枢全部笔；
+   * 2. ZG = max(zg1, zg2), ZD = min(zd1, zd2)，视觉上将两小框的核心区间整体包裹；
+   * 3. GG = max(gg1, gg2), DD = min(dd1, dd2)；
+   * 4. 标记 expanded = true。
+   */
+  private buildExpandedBoundingBox(
+    c1: ChanChannel,
+    c2: ChanChannel,
+  ): ChanChannel {
+    const mergedBis = [...c1.bis, ...c2.bis.slice(1)];
+    const isComplete =
+      c1.type === ChannelType.Complete && c2.type === ChannelType.Complete;
+
+    return {
+      bis: mergedBis,
+      zg: Math.max(c1.zg, c2.zg),
+      zd: Math.min(c1.zd, c2.zd),
+      gg: Math.max(c1.gg, c2.gg),
+      dd: Math.min(c1.dd, c2.dd),
+      level: ChannelLevel.Bi,
+      type: isComplete ? ChannelType.Complete : ChannelType.UnComplete,
+      status: ChannelStatus.Valid,
+      startId: c1.startId,
+      endId: c2.endId,
+      displayStartId: c1.displayStartId,
+      displayEndId: c2.displayEndId,
+      trend: c1.trend,
+      expanded: true,
+    };
   }
 
   /**
