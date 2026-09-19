@@ -39,15 +39,17 @@ describe('BuySellPointDetector', () => {
     });
   });
 
-  it('仅盘整背驰（无趋势链）→ 不产一类点', () => {
-    // 单个中枢 + 进入段 vs 离开段双弱（Consolidation），但链长 1 无 Trend
+  it('单中枢盘整背驰（离开段背驰）→ 产出一类点', () => {
+    // 单个中枢 + 进入段 vs 离开段双弱（Consolidation），产出离开段对应的一类买卖点
     const units = makeBspAlternatingUnits(5);
     const zhongshus = [
       makeBspZhongshu(units[1].startTime, units[3].endTime, 20, 5),
     ];
     const forces = units.map((_, i) => makeBspForce(10 - i, 100 - i * 10));
     const points = calc.detectBuySellPoints({ units, zhongshus, forces });
-    expect(points).toHaveLength(0);
+    expect(points).toHaveLength(1);
+    expect(points[0].type).toBe(ChanBspType.FirstSell);
+    expect(points[0].unitIndex).toBe(4);
   });
 
   it('同中枢 Trend 与 Consolidation 并存 → 只产一个一类点（Trend）', () => {

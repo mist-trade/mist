@@ -217,23 +217,25 @@ describe('§7 BuySellPoint Audit — 一/二/三类', () => {
       expect(firstBuys).toHaveLength(1);
     });
 
-    it('仅盘整背驰 → 0 个一类点', () => {
+    it('盘整背驰（单中枢离开段背驰）→ 产出一类点', () => {
       const input = makeConsolidationOnlyBspCase();
       const points = bsp.detectBuySellPoints(input);
       const firstPoints = points.filter(
         (p) =>
           p.type === ChanBspType.FirstBuy || p.type === ChanBspType.FirstSell,
       );
-      expect(firstPoints).toHaveLength(0);
+      expect(firstPoints).toHaveLength(1);
+      expect(firstPoints[0].type).toBe(ChanBspType.FirstSell);
     });
   });
 
-  // §7.2 验证一类点：仅趋势背驰产出，盘整背驰不产一类点
-  describe('7.2 一类点仅由趋势背驰产出', () => {
-    it('盘整背驰 → 无一类点（即使离开段双弱于进入段）', () => {
+  // §7.2 验证一类点：趋势背驰与盘整背驰均可产出一类点
+  describe('7.2 一类点由趋势/盘整背驰产出', () => {
+    it('盘整背驰 → 产出一类点（单中枢离开段顶背驰产出一卖）', () => {
       const input = makeConsolidationOnlyBspCase();
       const points = bsp.detectBuySellPoints(input);
-      expect(points).toHaveLength(0);
+      expect(points).toHaveLength(1);
+      expect(points[0].type).toBe(ChanBspType.FirstSell);
     });
 
     it('趋势背驰 → 产一类点', () => {

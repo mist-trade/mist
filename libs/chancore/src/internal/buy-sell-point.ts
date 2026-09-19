@@ -57,22 +57,44 @@ export class BuySellPointDetector {
     return points;
   }
 
-  /** 一类：消费趋势背驰（Trend），盘整背驰（Consolidation）不产一类点。 */
+  /**
+   * 一类买卖点：消费背驰（趋势背驰 Trend 或 中枢离开段盘整背驰 Consolidation）。
+   * 缠论第 24 课原典：背驰是最重要的转折点；第 29 课原典：中枢离开段发生背驰（盘整背驰），
+   * 同样构成该级别的转折买卖点。单中枢离开段底背驰即为一买，顶背驰即为一卖。
+   */
   private detectFirst(
     input: ChanBspInput,
     divergences: readonly import('../contracts').ChanDivergence[],
     out: ChanBuySellPoint[],
   ): void {
     const { units } = input;
-    for (const div of divergences) {
-      if (div.type !== ChanDivergenceType.Trend) {
-        continue; // 盘整背驰/中枢内部不产一类点（用户定调，第24课"背驰是最重要的"）
+    const seenLeaves = new Set<number>();
+
+    // 优先消费趋势背驰（Trend），再补充盘整背驰（Consolidation）
+    const sortedDivs = [...divergences].sort((a, b) => {
+      if (
+        a.type === ChanDivergenceType.Trend &&
+        b.type !== ChanDivergenceType.Trend
+      )
+        return -1;
+      if (
+        a.type !== ChanDivergenceType.Trend &&
+        b.type === ChanDivergenceType.Trend
+      )
+        return 1;
+      return a.zhongshuIndex - b.zhongshuIndex;
+    });
+
+    for (const div of sortedDivs) {
+      if (seenLeaves.has(div.leaveIndex)) {
+        continue;
       }
       const leaveTrend = units[div.leaveIndex].trend;
       if (leaveTrend === TrendDirection.None) {
         continue;
       }
       const isBuy = leaveTrend === TrendDirection.Down;
+      seenLeaves.add(div.leaveIndex);
       out.push({
         type: isBuy ? ChanBspType.FirstBuy : ChanBspType.FirstSell,
         zhongshuIndex: div.zhongshuIndex,
