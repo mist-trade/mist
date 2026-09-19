@@ -119,14 +119,9 @@ export function toZhongshu(
   const first = isBi && units.length >= 4 ? units[1] : units[0];
 
   // 末单元切片：
-  // 笔级已封存中枢（奇数笔 >= 5）：最后一笔为离开笔，中枢核心终止于倒数第2笔。
-  // 段级已封存中枢（奇数段 >= 5）：最后一段为离开段，中枢核心终止于倒数第2段。
+  // 笔级/段级已封存中枢（>= 5 构件）：最后一单元为离开段，中枢核心区间终止于倒数第 2 单元。
   let last = units[units.length - 1];
-  if (
-    channel.type === ChannelType.Complete &&
-    units.length >= 5 &&
-    units.length % 2 === 1
-  ) {
+  if (channel.type === ChannelType.Complete && units.length >= 5) {
     last = units[units.length - 2];
   }
 
