@@ -1748,4 +1748,115 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(hasPostApril7Bis).toBe(false);
     });
   });
+
+  describe('用例 7：30分钟级别上涨中枢见顶转日线下跌笔防跨越门禁测试', () => {
+    it('30分钟上涨中枢见顶后，次级别反抽未破GG且无3买，随后反向跌穿ZD展开日线下跌笔：严禁吸纳延伸或误封离开笔，杜绝中枢跨越日线下跌笔', () => {
+      const bis30m: ChanBi[] = [
+        makeMockBi(
+          TrendDirection.Up,
+          3000,
+          3300,
+          '2026-05-04T01:30:00.000Z',
+          '2026-05-04T03:30:00.000Z',
+          1,
+          4,
+        ), // Bi 0: 进入笔
+        makeMockBi(
+          TrendDirection.Down,
+          3200,
+          3300,
+          '2026-05-04T05:00:00.000Z',
+          '2026-05-04T06:00:00.000Z',
+          5,
+          8,
+        ), // Bi 1: 构件 1
+        makeMockBi(
+          TrendDirection.Up,
+          3200,
+          3500,
+          '2026-05-04T06:00:00.000Z',
+          '2026-05-04T07:00:00.000Z',
+          9,
+          12,
+        ), // Bi 2: 构件 2 (日线最高点 GG=3500)
+        makeMockBi(
+          TrendDirection.Down,
+          3250,
+          3500,
+          '2026-05-05T01:30:00.000Z',
+          '2026-05-05T02:30:00.000Z',
+          13,
+          16,
+        ), // Bi 3: 构件 3 (核心确立: ZG=3300, ZD=3250, GG=3500, DD=3000)
+        makeMockBi(
+          TrendDirection.Up,
+          3250,
+          3340,
+          '2026-05-05T02:30:00.000Z',
+          '2026-05-05T03:30:00.000Z',
+          17,
+          20,
+        ), // Bi 4: 次级别冲高 3340 > ZG(3300)，但未破 GG(3500)
+        makeMockBi(
+          TrendDirection.Down,
+          3100,
+          3340,
+          '2026-05-05T05:00:00.000Z',
+          '2026-05-05T07:00:00.000Z',
+          21,
+          24,
+        ), // Bi 5: 日线下跌笔主跌暴跌至 3100 < ZD(3250)，无 3B
+        makeMockBi(
+          TrendDirection.Up,
+          3100,
+          3200,
+          '2026-05-06T01:30:00.000Z',
+          '2026-05-06T02:30:00.000Z',
+          25,
+          28,
+        ), // Bi 6: 日线下跌中反抽
+        makeMockBi(
+          TrendDirection.Down,
+          2900,
+          3200,
+          '2026-05-06T02:30:00.000Z',
+          '2026-05-06T06:00:00.000Z',
+          29,
+          32,
+        ), // Bi 7: 继续下杀跌破 3000
+      ];
+
+      const res = biCalc.createChannels(bis30m);
+
+      // 1. Bi 4 绝不能作为 5 笔 Complete 离开笔封存
+      const sealedAtBi4 = res.phaseB.find(
+        (c) =>
+          c.type === ChannelType.Complete &&
+          c.bis.length === 5 &&
+          c.bis[4].high === 3340,
+      );
+      expect(sealedAtBi4).toBeUndefined();
+
+      // 2. 绝对不能存在包含 Bi 5、Bi 6 或 Bi 7 的向上中枢（严禁将日线下跌笔吸纳为中枢延伸）
+      const leakedUpChannel = res.phaseB.find(
+        (c) =>
+          c.trend === TrendDirection.Up &&
+          c.bis.some(
+            (b) =>
+              b.startTime.getTime() >=
+              new Date('2026-05-05T05:00:00.000Z').getTime(),
+          ),
+      );
+      expect(leakedUpChannel).toBeUndefined();
+
+      // 3. 任何向上中枢的构件总数绝不能跨入日线下跌段
+      for (const c of res.phaseB) {
+        if (c.trend === TrendDirection.Up) {
+          expect(c.bis[c.bis.length - 1].startTime.getTime()).toBeLessThan(
+            new Date('2026-05-05T05:00:00.000Z').getTime(),
+          );
+        }
+      }
+    });
+  });
 });
