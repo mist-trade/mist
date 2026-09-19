@@ -4,7 +4,7 @@ import { ApiEnvelopeResponse } from '@app/transport/http';
 import { TimezoneService } from '@app/timezone';
 import { VisualCommandService } from '@app/visual-command';
 import { prepareMarketData } from '@app/market-data';
-import { type ChanK } from '@app/chancore';
+import { type ChanBi, ChanCore, type ChanK } from '@app/chancore';
 import { IndicatorService } from '../indicator/indicator.service';
 import { QueryVisualCommandsDto } from './dto/query-visual-commands.dto';
 import { VisualCommandPayloadVo } from './vo/visual-command.vo';
@@ -19,6 +19,50 @@ export class VisualController {
     private readonly indicatorService: IndicatorService,
     private readonly timezoneService: TimezoneService,
   ) {}
+
+  private toChanKlines(
+    kEntities: any[],
+    period: number,
+    startDate: Date,
+    endDate: Date,
+    code: string,
+    source?: string,
+  ): ChanK[] {
+    const sortedEntities = [...kEntities]
+      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
+      .filter(
+        (item, idx, arr) =>
+          idx === 0 ||
+          item.timestamp.getTime() !== arr[idx - 1].timestamp.getTime(),
+      );
+    const pipeline = prepareMarketData({
+      rawBars: sortedEntities,
+      period,
+      requiredBars: sortedEntities.length || 1,
+      windowStartAt: startDate,
+      windowEndAt: endDate,
+    });
+
+    if (pipeline.droppedKlines > 0) {
+      this.logger.warn(
+        `visual pipeline dropped ${pipeline.droppedKlines}/${pipeline.requestedKlines} bars code=${code} period=${period} source=${source ?? 'default'} resolutions=${JSON.stringify(pipeline.diagnostics.resolutionCounts)}`,
+      );
+    }
+
+    return pipeline.projected
+      .filter((bar) => bar.ohlc.effective !== null)
+      .map((bar, idx) => ({
+        id: idx + 1,
+        symbol: code,
+        time: bar.rawBar.timestamp,
+        open: bar.ohlc.effective!.open,
+        high: bar.ohlc.effective!.high,
+        low: bar.ohlc.effective!.low,
+        close: bar.ohlc.effective!.close,
+        volume: bar.volume.effective,
+        amount: bar.amount.effective,
+      }));
+  }
 
   @Get('commands')
   @ApiOperation({
@@ -50,59 +94,42 @@ export class VisualController {
       source: query.source,
     });
 
-    // 统一走全局 market-data pipeline：精度门控(KPriceProjector) → 补齐(Imputer) → 视图
-    // - 精度：KPriceProjector 对 string DECIMAL(20,2) 做校验，异常整根 dropped；number 已在 DB 侧 toFixed(2) 无损
-    // - 补齐：Imputer 对 OHLC/量额缺失做 backfilled/forwardFilled/unavailable，跨日不补
-    // - 非法数据修复+数据补全一口气在 pipeline 内完成，历史/实时/展示/指标同一份代码
-    // Imputer 要求严格递增时间戳，DB 侧已保证有序，但测试/容错侧先排序去重
-    const sortedEntities = [...kEntities]
-      .sort((a, b) => a.timestamp.getTime() - b.timestamp.getTime())
-      .filter(
-        (item, idx, arr) =>
-          idx === 0 ||
-          item.timestamp.getTime() !== arr[idx - 1].timestamp.getTime(),
-      );
-    const pipeline = prepareMarketData({
-      rawBars: sortedEntities,
-      period: query.period,
-      requiredBars: sortedEntities.length || 1,
-      windowStartAt: startDate,
-      windowEndAt: endDate,
-    });
-
-    if (pipeline.droppedKlines > 0) {
-      this.logger.warn(
-        `visual pipeline dropped ${pipeline.droppedKlines}/${pipeline.requestedKlines} bars code=${query.code} period=${query.period} source=${query.source ?? 'default'} resolutions=${JSON.stringify(pipeline.diagnostics.resolutionCounts)}`,
-      );
-    }
-
-    // pipeline.projected 是 Imputer 后的 effective 视图，转 ChanK 供 visual-command 消费
-    const chanKlines: ChanK[] = pipeline.projected
-      .filter((bar) => bar.ohlc.effective !== null)
-      .map((bar, idx) => ({
-        id: idx + 1,
-        symbol: query.code,
-        time: bar.rawBar.timestamp,
-        open: bar.ohlc.effective!.open,
-        high: bar.ohlc.effective!.high,
-        low: bar.ohlc.effective!.low,
-        close: bar.ohlc.effective!.close,
-        volume: bar.volume.effective,
-        amount: bar.amount.effective,
-      }));
+    const chanKlines = this.toChanKlines(
+      kEntities,
+      query.period,
+      startDate,
+      endDate,
+      query.code,
+      query.source,
+    );
 
     const requestedLayers = query.layers
       ? query.layers.split(',').map((s) => s.trim())
       : ['chan'];
 
+    let macroBis: readonly ChanBi[] | undefined = undefined;
+
     if (query.macroPeriod) {
-      await this.indicatorService.findKData({
+      const macroEntities = await this.indicatorService.findKData({
         code: query.code,
         period: query.macroPeriod,
         startDate,
         endDate,
         source: query.source,
       });
+
+      const macroChanKlines = this.toChanKlines(
+        macroEntities,
+        query.macroPeriod,
+        startDate,
+        endDate,
+        query.code,
+        query.source,
+      );
+
+      if (macroChanKlines.length >= 3) {
+        macroBis = ChanCore.createBi(macroChanKlines).phaseB;
+      }
     }
 
     return this.visualCommandService.generateCommands({
@@ -111,6 +138,7 @@ export class VisualController {
       source: query.source ?? 'default',
       klines: chanKlines,
       layers: requestedLayers,
+      chanOptions: macroBis && macroBis.length > 0 ? { macroBis } : undefined,
     });
   }
 }
