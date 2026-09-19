@@ -205,13 +205,25 @@ export class ChannelCalculator {
    */
   private mergeExtendedChannel(c1: ChanChannel, c2: ChanChannel): ChanChannel {
     const mergedBis = [...c1.bis, ...c2.bis.slice(1)];
-    const gg = Math.max(...mergedBis.map((b) => b.high));
-    const dd = Math.min(...mergedBis.map((b) => b.low));
+    const isComplete =
+      c1.type === ChannelType.Complete && c2.type === ChannelType.Complete;
+    const internalBis =
+      isComplete && mergedBis.length >= 5
+        ? mergedBis.slice(1, -1)
+        : mergedBis.slice(1);
+
+    const gg =
+      internalBis.length > 0
+        ? Math.max(...internalBis.map((b) => b.high))
+        : Math.max(...mergedBis.map((b) => b.high));
+    const dd =
+      internalBis.length > 0
+        ? Math.min(...internalBis.map((b) => b.low))
+        : Math.min(...mergedBis.map((b) => b.low));
 
     let zg: number;
     let zd: number;
 
-    const internalBis = mergedBis.slice(1, -1);
     const intHigh = minMaxBy(internalBis, (b) => b.high);
     const intLow = minMaxBy(internalBis, (b) => b.low);
 
@@ -222,9 +234,6 @@ export class ChannelCalculator {
       zg = Math.min(c1.zg, c2.zg);
       zd = Math.max(c1.zd, c2.zd);
     }
-
-    const isComplete =
-      c1.type === ChannelType.Complete && c2.type === ChannelType.Complete;
 
     return {
       bis: mergedBis,
@@ -304,10 +313,8 @@ export class ChannelCalculator {
         const geo = this.validateCoreGeometry(window);
         if (!geo) return null;
         const firstBi = window[0];
-        const gg = Math.max(firstBi.high, geo.gg);
-        const dd = Math.min(firstBi.low, geo.dd);
         return {
-          geometry: { ...geo, gg, dd },
+          geometry: geo,
           isUp: firstBi.trend === TrendDirection.Up,
         };
       },
@@ -361,12 +368,23 @@ export class ChannelCalculator {
     const { startId, endId, displayStartId, displayEndId } =
       resolveChannelAnchorIds(originalBis, startIndex, endIndex);
 
+    const internalBis =
+      isComplete && bis.length >= 5 ? bis.slice(1, -1) : bis.slice(1);
+    const gg =
+      internalBis.length > 0
+        ? Math.max(...internalBis.map((b) => b.high))
+        : geometry.gg;
+    const dd =
+      internalBis.length > 0
+        ? Math.min(...internalBis.map((b) => b.low))
+        : geometry.dd;
+
     return {
       bis: [...bis],
       zg: geometry.zg,
       zd: geometry.zd,
-      gg: geometry.gg,
-      dd: geometry.dd,
+      gg,
+      dd,
       level: ChannelLevel.Bi,
       type: isComplete ? ChannelType.Complete : ChannelType.UnComplete,
       status: ChannelStatus.Valid,

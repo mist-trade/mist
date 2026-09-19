@@ -921,8 +921,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       count: 9,
       zg: 4088.01,
       zd: 4075.7,
-      gg: 4121.7,
-      dd: 4056.87,
+      gg: 4098.78,
+      dd: 4067.12,
       expanded: false,
       type: ChannelType.Complete,
       bis: [
@@ -1018,8 +1018,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       count: 7,
       zg: 4167.16,
       zd: 4151.9,
-      gg: 4190.87,
-      dd: 4093.01,
+      gg: 4179.7,
+      dd: 4126.23,
       expanded: false,
       type: ChannelType.Complete,
       bis: [
@@ -1097,8 +1097,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       count: 5,
       zg: 4133.07,
       zd: 4104.42,
-      gg: 4190.87,
-      dd: 4096.85,
+      gg: 4138.55,
+      dd: 4103.62,
       expanded: false,
       type: ChannelType.Complete,
       bis: [
@@ -1158,8 +1158,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       count: 13,
       zg: 4108.71,
       zd: 4100.65,
-      gg: 4140.23,
-      dd: 4080.29,
+      gg: 4128.93,
+      dd: 4090.06,
       expanded: false,
       type: ChannelType.Complete,
       bis: [
@@ -1291,8 +1291,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       count: 13,
       zg: 4127.82,
       zd: 4120.63,
-      gg: 4160.99,
-      dd: 4100.36,
+      gg: 4143.75,
+      dd: 4109.92,
       expanded: false,
       type: ChannelType.Complete,
       bis: [
@@ -1515,8 +1515,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(c0.expanded).toBe(false);
       expect(c0.zg).toBe(4088.01);
       expect(c0.zd).toBe(4075.7);
-      expect(c0.gg).toBe(4121.7);
-      expect(c0.dd).toBe(4056.87);
+      expect(c0.gg).toBe(4098.78);
+      expect(c0.dd).toBe(4067.12);
 
       // 5. 后续走势：第 10 笔（Bi 13）为 3 买（回踩不破 ZG 4088.01）
       const bi13 = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[13];
@@ -1555,8 +1555,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(c1.type).toBe(ChannelType.Complete);
       expect(c1.zg).toBe(4167.16);
       expect(c1.zd).toBe(4151.9);
-      expect(c1.gg).toBe(4190.87);
-      expect(c1.dd).toBe(4093.01);
+      expect(c1.gg).toBe(4179.7);
+      expect(c1.dd).toBe(4126.23);
     });
 
     it('检验增量切片下该中枢的稳定状态（截取至 1月14日11:25 Bi 20 冲高顶端）', () => {
@@ -1659,9 +1659,9 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(lastBi.endTime).toEqual(new Date('2026-01-26T02:40:00.000Z'));
       expect(lastBi.high).toBe(4160.99);
 
-      // 3. 离开笔高点必须等于中枢的 GG，绝不能因为错误吸纳后续 3买/2卖 导致离开笔异常
-      expect(bigChannel?.gg).toBe(4160.99);
-      expect(lastBi.high).toBe(bigChannel?.gg);
+      // 3. 离开笔高点冲破中枢内部极值 GG(4143.75)，绝不能因为错误吸纳后续 3买/2卖 导致离开笔异常
+      expect(bigChannel?.gg).toBe(4143.75);
+      expect(lastBi.high).toBeGreaterThan(bigChannel!.gg);
 
       // 4. 严禁吸纳 01-26 10:40 之后的任何笔（3买回踩 4124.70、2卖反弹 4145.97、下杀 4101.83）
       const hasPostDepartureBis = bigChannel!.bis.some(
@@ -1676,9 +1676,9 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       const bi3Buy = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[57];
       expect(bi3Buy.low).toBeGreaterThan(bigChannel!.zd);
 
-      // Bi 58: 2卖反弹次高点 (01-26 11:05 ~ 14:35, high 4145.97 < GG 4160.99)
+      // Bi 58: 2卖反弹次高点 (01-26 11:05 ~ 14:35, high 4145.97 < 离开笔顶端 4160.99)
       const bi2Sell = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[58];
-      expect(bi2Sell.high).toBeLessThan(bigChannel!.gg);
+      expect(bi2Sell.high).toBeLessThan(lastBi.high);
 
       // Bi 59: 确认下杀 (01-26 14:35 ~ 01-27 10:05, low 4101.83)
       const biBreak = REAL_5M_JAN2026_FIRST_CENTRAL_BIS[59];
@@ -1715,13 +1715,11 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       );
 
       // 3. 中枢核心几何区间 [ZD, ZG] 与全局极值 [DD, GG]
-      // ZG = min(high(bi2), high(bi4)) = min(3929.53, 3902.61) = 3902.61
-      // ZD = max(low(bi2), low(bi4)) = max(3900.12, 3871.30) = 3900.12
-      // GG = max(high) = 3955.94 (Bi #1 进入笔高点)
-      // DD = min(low) = 3871.30 (Bi #3 于 4月3日 13:25 探底创下的全局极低点)
+      // GG = 3929.53 (内部构件最高点，排除进入笔 3955.94)
+      // DD = 3871.30 (Bi #3 于 4月3日 13:25 探底创下的内部极低点)
       expect(central.zg).toBe(3902.61);
       expect(central.zd).toBe(3900.12);
-      expect(central.gg).toBe(3955.94);
+      expect(central.gg).toBe(3929.53);
       expect(central.dd).toBe(3871.3);
 
       // 4. 4月3日核心构件验证 (Bi #3)

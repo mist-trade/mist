@@ -148,7 +148,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
       expect(c.bis).toHaveLength(5); // 离开笔包含在 b4
-      expect(c.gg).toBe(160);
+      expect(c.gg).toBe(150);
       expect(c.zg).toBe(140);
       expect(c.zd).toBe(120);
     });
@@ -168,7 +168,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
       expect(c.bis).toHaveLength(5);
-      expect(c.dd).toBe(140);
+      expect(c.dd).toBe(150);
       expect(c.zg).toBe(180);
       expect(c.zd).toBe(160);
     });
@@ -209,7 +209,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       const result = biService.createChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       expect(result.phaseB[0].bis).toHaveLength(5);
-      expect(result.phaseB[0].gg).toBe(160);
+      expect(result.phaseB[0].gg).toBe(150);
     });
 
     it('向下笔中枢：离开跌破 DD → 形成 3S → 下探未果 → 反向第 2 笔冲破 ZG 封存', () => {
@@ -227,7 +227,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       const result = biService.createChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       expect(result.phaseB[0].bis).toHaveLength(5);
-      expect(result.phaseB[0].dd).toBe(140);
+      expect(result.phaseB[0].dd).toBe(150);
     });
   });
 
@@ -249,7 +249,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
       expect(c.bis).toHaveLength(5);
-      expect(c.gg).toBe(160);
+      expect(c.gg).toBe(150);
       expect(c.zg).toBe(140);
       expect(c.zd).toBe(120);
     });
@@ -268,7 +268,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
       expect(c.bis).toHaveLength(5);
-      expect(c.dd).toBe(140);
+      expect(c.dd).toBe(150);
       expect(c.zg).toBe(180);
       expect(c.zd).toBe(160);
     });
@@ -294,9 +294,9 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       const result = biService.createChannels(bis);
       expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
       const c1 = result.phaseB[0];
-      // 旧中枢在 b4 顺利封存为 5 笔，离开高度 160 严格等于 GG 160
+      // 旧中枢在 b4 顺利封存为 5 笔，离开冲高至 160，中枢内部 GG 为 150
       expect(c1.bis).toHaveLength(5);
-      expect(c1.gg).toBe(160);
+      expect(c1.gg).toBe(150);
       expect(c1.zg).toBe(140);
       expect(c1.zd).toBe(120);
     });
@@ -318,7 +318,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
       const c1 = result.phaseB[0];
       expect(c1.bis).toHaveLength(5);
-      expect(c1.dd).toBe(140);
+      expect(c1.dd).toBe(150);
       expect(c1.zg).toBe(180);
       expect(c1.zd).toBe(160);
     });
@@ -526,7 +526,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       expect(c.zg).toBe(140);
       expect(c.zd).toBe(120);
       expect(c.gg).toBe(150);
-      expect(c.dd).toBe(100);
+      expect(c.dd).toBe(115);
     });
 
     it('向上走势突破离开后回踩 3B 形成当下：中枢封存为 Complete，实时产出 ThirdBuy', () => {

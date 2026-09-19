@@ -139,7 +139,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
       expect(res.sequential.length).toBeGreaterThanOrEqual(1);
       const c = res.sequential[0];
       expect(c.count).toBe(5); // [d0..d4]
-      expect(c.geometry.dd).toBe(60);
+      expect(c.geometry.dd).toBe(75);
     });
 
     it('Down Central: Rule 2 seals when 3S forms and stroke2 pierces ZG (90)', () => {
@@ -165,7 +165,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
       expect(res.sequential.length).toBeGreaterThanOrEqual(1);
       const c = res.sequential[0];
       expect(c.count).toBe(5);
-      expect(c.geometry.dd).toBe(60);
+      expect(c.geometry.dd).toBe(75);
     });
 
     it('Down Central: Rule 3 seals when No 3S and pullback pierces ZG (90)', () => {
@@ -187,7 +187,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
       expect(res.sequential.length).toBeGreaterThanOrEqual(1);
       const c = res.sequential[0];
       expect(c.count).toBe(5);
-      expect(c.geometry.dd).toBe(60);
+      expect(c.geometry.dd).toBe(75);
     });
 
     it('Down Central: Rule 4 seals when new core forms after breakout', () => {
@@ -212,7 +212,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
       expect(res.sequential.length).toBeGreaterThanOrEqual(1);
       const c = res.sequential[0];
       expect(c.count).toBe(5);
-      expect(c.geometry.dd).toBe(60);
+      expect(c.geometry.dd).toBe(75);
     });
   });
 });
