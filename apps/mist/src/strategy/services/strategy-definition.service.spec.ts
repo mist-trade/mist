@@ -142,7 +142,7 @@ describe('StrategyDefinitionService', () => {
       units: 'duan',
       points: { first: true, second: true, third: false },
       direction: 'buy',
-      requiredBarCount: 200,
+      requiredBarCount: 600,
     });
     expect(strategy.kind).toBe(StrategyKind.CHAN_BSP);
   });

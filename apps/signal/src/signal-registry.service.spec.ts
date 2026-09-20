@@ -107,7 +107,7 @@ describe('SignalRegistryService', () => {
         units: 'duan',
         points: { first: true, second: true, third: false },
         direction: 'buy',
-        requiredBarCount: 200,
+        requiredBarCount: 600,
       },
     });
   });
