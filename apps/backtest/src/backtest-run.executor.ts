@@ -352,6 +352,22 @@ export class BacktestRunExecutor {
     }
     imputer.hydrate(initial.bars);
 
+    if (initial.bars.length > 0 && plan.kind === 'chan_bsp') {
+      const preEvents = this.chanBspDetector
+        .evaluate(imputer.read(), plan.plan)
+        .filter((e) => e.time.getTime() < run.startDate.getTime());
+      if (preEvents.length > 0) {
+        const identity: ChanBspEpisodeIdentity = {
+          definitionId: run.strategyDefinitionId,
+          securityId,
+          source: run.source as StrategyRealtimeSource,
+          level: run.period,
+          units: plan.plan.units,
+        };
+        cursor.advance(identity, preEvents);
+      }
+    }
+
     // ② 计算阶段：逐根 append（只 forward-fill 新 bar）+ 滑动窗口 + 评估。
     while (true) {
       const page = await this.marketData.readReplayPage({
@@ -386,6 +402,9 @@ export class BacktestRunExecutor {
             const fresh = cursor.advance(identity, events);
             let freshEmitted = false;
             for (const event of fresh) {
+              if (event.time.getTime() < run.startDate.getTime()) {
+                continue;
+              }
               results.push(
                 this.resultRepository.create({
                   backtestRunId: run.id,

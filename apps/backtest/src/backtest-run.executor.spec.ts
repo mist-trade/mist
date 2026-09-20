@@ -530,6 +530,35 @@ describe('BacktestRunExecutor chan_bsp replay', () => {
     );
   });
 
+  it('filters out preheat points that occurred before run.startDate', async () => {
+    const PREHEAT_BUY: ChanBspEvent = {
+      type: 'first_buy',
+      units: 'duan',
+      time: new Date('2021-12-15T16:00:00.000Z'), // before startDate 2022-01-01
+      price: 1500.0,
+      zhongshuIndex: 0,
+      zg: 1550.0,
+      zd: 1480.0,
+      unitIndex: 5,
+    };
+    const fixture = chanBspFixture([PREHEAT_BUY, FIRST_BUY]);
+    const bars = chanBspBars();
+    fixture.dependencies.marketData.loadReplayWindow.mockResolvedValue({
+      bars: [bars[0]],
+    });
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars: bars.slice(1),
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    const fixtureCalls = fixture.dependencies.resultRepository.create.mock
+      .calls as [Record<string, unknown>][];
+    expect(fixtureCalls.length).toBe(1);
+    expect(fixtureCalls[0][0].signalTime).toEqual(FIRST_BUY.time);
+  });
+
   it('replays chan_bsp with zero and null quantities', async () => {
     const fixture = chanBspFixture([]);
     const bars = chanBspBars().map((bar, index) =>
