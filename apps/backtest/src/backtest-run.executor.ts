@@ -322,7 +322,7 @@ export class BacktestRunExecutor {
     onSignal: () => void,
   ): Promise<{ hasBars: boolean }> {
     const imputer = new StrategySeriesImputer();
-    const seenSignalTimes = new Set<number>();
+    const seenSignalKeys = new Set<string>();
     let afterTimestamp: Date | undefined;
     let hasPublicBars = false;
     const replayStart = replayStartFor(run, plan);
@@ -386,20 +386,16 @@ export class BacktestRunExecutor {
             };
             const fresh = cursor.advance(identity, events);
             let freshEmitted = false;
-            // 按优先级（一类 > 三类 > 二类）排序，保证同一时刻若出现多重买卖点（如二三买共振），
-            // 优先保留最高权重信号入库，严格符合 uq_backtest_signal_results_run_security_time 唯一键约束。
-            const prioritizedFresh = [...fresh].sort(
-              (a, b) => bspPriority(b.type) - bspPriority(a.type),
-            );
-            for (const event of prioritizedFresh) {
-              const timeKey = event.time.getTime();
-              if (seenSignalTimes.has(timeKey)) continue;
-              seenSignalTimes.add(timeKey);
+            for (const event of fresh) {
+              const signalKey = `${event.time.getTime()}_${event.type}`;
+              if (seenSignalKeys.has(signalKey)) continue;
+              seenSignalKeys.add(signalKey);
               results.push(
                 this.resultRepository.create({
                   backtestRunId: run.id,
                   securityCode,
                   signalTime: event.time,
+                  signalType: event.type,
                   confidence: event.type.startsWith('first_')
                     ? 92.0
                     : event.type.startsWith('third_')
@@ -440,14 +436,19 @@ export class BacktestRunExecutor {
               factorContext,
             );
             if (outcome.status === 'SIGNAL_EMITTED') {
-              const timeKey = bar.timestamp.getTime();
-              if (!seenSignalTimes.has(timeKey)) {
-                seenSignalTimes.add(timeKey);
+              const sigType =
+                (outcome.signalTag as string) ??
+                outcome.action ??
+                'decision_flow';
+              const signalKey = `${bar.timestamp.getTime()}_${sigType}`;
+              if (!seenSignalKeys.has(signalKey)) {
+                seenSignalKeys.add(signalKey);
                 results.push(
                   this.resultRepository.create({
                     backtestRunId: run.id,
                     securityCode,
                     signalTime: bar.timestamp,
+                    signalType: sigType,
                     confidence: outcome.confidence,
                     confidenceLevel: outcome.confidenceLevel,
                     decisionTrace: {
@@ -474,14 +475,16 @@ export class BacktestRunExecutor {
           } else {
             const evaluation = evaluateStrategyPlan(plan.plan, imputer.read());
             if (evaluation.status === 'evaluated' && evaluation.matched) {
-              const timeKey = bar.timestamp.getTime();
-              if (!seenSignalTimes.has(timeKey)) {
-                seenSignalTimes.add(timeKey);
+              const sigType = plan.plan.signalKind ?? 'rule_dsl';
+              const signalKey = `${bar.timestamp.getTime()}_${sigType}`;
+              if (!seenSignalKeys.has(signalKey)) {
+                seenSignalKeys.add(signalKey);
                 results.push(
                   this.resultRepository.create({
                     backtestRunId: run.id,
                     securityCode,
                     signalTime: bar.timestamp,
+                    signalType: sigType,
                     confidence: 80.0,
                     confidenceLevel: 'HIGH',
                     decisionTrace: {
@@ -534,6 +537,7 @@ export class BacktestRunExecutor {
           backtestRunId: result.backtestRunId,
           securityCode: result.securityCode,
           signalTime: result.signalTime,
+          signalType: result.signalType,
           confidence: result.confidence,
           confidenceLevel: result.confidenceLevel,
           decisionTrace: result.decisionTrace,
@@ -636,11 +640,4 @@ function classifyFailure(error: unknown): BacktestRunFailure {
 
 function errorTrace(error: unknown): string | undefined {
   return error instanceof Error ? error.stack : undefined;
-}
-
-function bspPriority(type: string): number {
-  if (type.startsWith('first_')) return 3;
-  if (type.startsWith('third_')) return 2;
-  if (type.startsWith('second_')) return 1;
-  return 0;
 }

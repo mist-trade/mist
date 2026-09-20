@@ -95,7 +95,7 @@ describe('strategy integrity entity metadata', () => {
       ),
     ).toEqual(
       expect.objectContaining({
-        columns: ['backtestRunId', 'securityCode', 'signalTime'],
+        columns: ['backtestRunId', 'securityCode', 'signalTime', 'signalType'],
         unique: true,
       }),
     );

@@ -12,7 +12,7 @@ import { BacktestRun } from './backtest-run.entity';
 @Entity({ name: 'backtest_signal_results' })
 @Index(
   'uq_backtest_signal_results_run_security_time',
-  ['backtestRunId', 'securityCode', 'signalTime'],
+  ['backtestRunId', 'securityCode', 'signalTime', 'signalType'],
   { unique: true },
 )
 @Index('idx_backtest_signal_results_run_time_id', [
@@ -38,6 +38,14 @@ export class BacktestSignalResult {
 
   @Column({ name: 'signal_time', type: 'datetime' })
   signalTime: Date = new Date();
+
+  @Column({
+    name: 'signal_type',
+    type: 'varchar',
+    length: 32,
+    default: 'signal',
+  })
+  signalType: string = 'signal';
 
   @Column({
     name: 'confidence',
