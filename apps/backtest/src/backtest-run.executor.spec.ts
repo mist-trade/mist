@@ -691,4 +691,48 @@ describe('BacktestRunExecutor chan_bsp replay', () => {
       ]),
     );
   });
+
+  it('persists concurrent second and third buy on the same timestamp as separate records', async () => {
+    const concurrentThirdBuy: ChanBspEvent = {
+      type: 'third_buy',
+      units: 'duan',
+      time: SECOND_BUY.time,
+      price: SECOND_BUY.price,
+      zhongshuIndex: 1,
+      zg: 1550,
+      zd: 1500,
+      unitIndex: 22,
+    };
+    const fixture = chanBspFixture([SECOND_BUY, concurrentThirdBuy]);
+    const bars = chanBspBars();
+    fixture.dependencies.marketData.loadReplayWindow.mockResolvedValue({
+      bars: [],
+    });
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars,
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    const fixtureCalls = fixture.dependencies.resultRepository.create.mock
+      .calls as [Record<string, unknown>][];
+    expect(fixtureCalls.length).toBe(2);
+    expect(fixtureCalls[0][0].signalTime).toEqual(SECOND_BUY.time);
+    expect(fixtureCalls[0][0].signalType).toBe('second_buy');
+    expect(fixtureCalls[1][0].signalTime).toEqual(SECOND_BUY.time);
+    expect(fixtureCalls[1][0].signalType).toBe('third_buy');
+    expect(fixture.dependencies.resultRepository.insert).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({
+          signalTime: SECOND_BUY.time,
+          signalType: 'second_buy',
+        }),
+        expect.objectContaining({
+          signalTime: SECOND_BUY.time,
+          signalType: 'third_buy',
+        }),
+      ]),
+    );
+  });
 });

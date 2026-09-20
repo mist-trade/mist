@@ -322,7 +322,6 @@ export class BacktestRunExecutor {
     onSignal: () => void,
   ): Promise<{ hasBars: boolean }> {
     const imputer = new StrategySeriesImputer();
-    const seenSignalKeys = new Set<string>();
     let afterTimestamp: Date | undefined;
     let hasPublicBars = false;
     const replayStart = replayStartFor(run, plan);
@@ -387,9 +386,6 @@ export class BacktestRunExecutor {
             const fresh = cursor.advance(identity, events);
             let freshEmitted = false;
             for (const event of fresh) {
-              const signalKey = `${event.time.getTime()}_${event.type}`;
-              if (seenSignalKeys.has(signalKey)) continue;
-              seenSignalKeys.add(signalKey);
               results.push(
                 this.resultRepository.create({
                   backtestRunId: run.id,
@@ -440,69 +436,61 @@ export class BacktestRunExecutor {
                 (outcome.signalTag as string) ??
                 outcome.action ??
                 'decision_flow';
-              const signalKey = `${bar.timestamp.getTime()}_${sigType}`;
-              if (!seenSignalKeys.has(signalKey)) {
-                seenSignalKeys.add(signalKey);
-                results.push(
-                  this.resultRepository.create({
-                    backtestRunId: run.id,
-                    securityCode,
-                    signalTime: bar.timestamp,
-                    signalType: sigType,
+              results.push(
+                this.resultRepository.create({
+                  backtestRunId: run.id,
+                  securityCode,
+                  signalTime: bar.timestamp,
+                  signalType: sigType,
+                  confidence: outcome.confidence,
+                  confidenceLevel: outcome.confidenceLevel,
+                  decisionTrace: {
+                    status: outcome.status,
+                    signalTag: outcome.signalTag,
+                    reason: outcome.reason,
+                    trace: outcome.trace,
+                  },
+                  contextSnapshot: {
+                    action: outcome.action,
                     confidence: outcome.confidence,
-                    confidenceLevel: outcome.confidenceLevel,
-                    decisionTrace: {
-                      status: outcome.status,
-                      signalTag: outcome.signalTag,
-                      reason: outcome.reason,
-                      trace: outcome.trace,
-                    },
-                    contextSnapshot: {
-                      action: outcome.action,
-                      confidence: outcome.confidence,
-                      signalTag: outcome.signalTag,
-                      reason: outcome.reason,
-                    },
-                    ruleSnapshot,
-                  }),
-                );
-                matchedCodes.add(securityCode);
-                onSignal();
-                if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
-                  await this.flushResults(results);
-              }
+                    signalTag: outcome.signalTag,
+                    reason: outcome.reason,
+                  },
+                  ruleSnapshot,
+                }),
+              );
+              matchedCodes.add(securityCode);
+              onSignal();
+              if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
+                await this.flushResults(results);
             }
           } else {
             const evaluation = evaluateStrategyPlan(plan.plan, imputer.read());
             if (evaluation.status === 'evaluated' && evaluation.matched) {
               const sigType = plan.plan.signalKind ?? 'rule_dsl';
-              const signalKey = `${bar.timestamp.getTime()}_${sigType}`;
-              if (!seenSignalKeys.has(signalKey)) {
-                seenSignalKeys.add(signalKey);
-                results.push(
-                  this.resultRepository.create({
-                    backtestRunId: run.id,
-                    securityCode,
-                    signalTime: bar.timestamp,
-                    signalType: sigType,
-                    confidence: 80.0,
-                    confidenceLevel: 'HIGH',
-                    decisionTrace: {
-                      signalKind: plan.plan.signalKind,
-                      matched: true,
-                    },
-                    contextSnapshot: serializeStrategyContextSnapshot(
-                      plan.plan,
-                      evaluation.context,
-                    ) as Record<string, unknown>,
-                    ruleSnapshot,
-                  }),
-                );
-                matchedCodes.add(securityCode);
-                onSignal();
-                if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
-                  await this.flushResults(results);
-              }
+              results.push(
+                this.resultRepository.create({
+                  backtestRunId: run.id,
+                  securityCode,
+                  signalTime: bar.timestamp,
+                  signalType: sigType,
+                  confidence: 80.0,
+                  confidenceLevel: 'HIGH',
+                  decisionTrace: {
+                    signalKind: plan.plan.signalKind,
+                    matched: true,
+                  },
+                  contextSnapshot: serializeStrategyContextSnapshot(
+                    plan.plan,
+                    evaluation.context,
+                  ) as Record<string, unknown>,
+                  ruleSnapshot,
+                }),
+              );
+              matchedCodes.add(securityCode);
+              onSignal();
+              if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
+                await this.flushResults(results);
             }
           }
         }

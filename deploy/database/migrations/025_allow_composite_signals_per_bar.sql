@@ -5,14 +5,9 @@
 ALTER TABLE `backtest_signal_results`
   ADD COLUMN `signal_type` VARCHAR(32) NOT NULL DEFAULT 'signal' AFTER `signal_time`;
 
--- 2. Drop legacy 3-column unique constraint
+-- 2. Drop legacy business unique constraint (use primary key id as unique identity)
 ALTER TABLE `backtest_signal_results`
   DROP INDEX `uq_backtest_signal_results_run_security_time`;
-
--- 3. Add expanded 4-column unique constraint including signal_type
-ALTER TABLE `backtest_signal_results`
-  ADD UNIQUE KEY `uq_backtest_signal_results_run_security_time`
-    (`backtest_run_id`, `security_code`, `signal_time`, `signal_type`);
 
 -- 4. Backfill existing historical records from JSON attributes if available
 UPDATE `backtest_signal_results`

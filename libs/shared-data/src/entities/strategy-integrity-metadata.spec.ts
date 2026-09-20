@@ -93,12 +93,7 @@ describe('strategy integrity entity metadata', () => {
           index.target === BacktestSignalResult &&
           index.name === 'uq_backtest_signal_results_run_security_time',
       ),
-    ).toEqual(
-      expect.objectContaining({
-        columns: ['backtestRunId', 'securityCode', 'signalTime', 'signalType'],
-        unique: true,
-      }),
-    );
+    ).toBeUndefined();
     expect(
       storage.indices.find(
         (index) =>
