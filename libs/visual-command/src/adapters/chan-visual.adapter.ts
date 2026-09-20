@@ -1,5 +1,6 @@
 import {
   BiStatus,
+  BiType,
   ChanCore,
   ChannelType,
   DuanStatus,
@@ -263,8 +264,11 @@ export class ChanVisualAdapter {
 
     // 5. Compute Buy/Sell Points (BSP)
     if (includeBsp && bis.length >= 3) {
+      const validBis = bis.filter(
+        (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
+      );
       const biChannels = ChanCore.createChannels(klines);
-      const bspUnits: readonly ChanBspUnit[] = bis.map((b) => ({
+      const bspUnits: readonly ChanBspUnit[] = validBis.map((b) => ({
         startTime: b.startTime,
         endTime: b.endTime,
         high: b.high,

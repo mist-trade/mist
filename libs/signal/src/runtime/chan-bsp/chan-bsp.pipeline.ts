@@ -1,7 +1,11 @@
 import {
+  BiStatus,
+  BiType,
   ChanCore,
   ChanBspType,
   ChannelType,
+  DuanStatus,
+  DuanType,
   type ChanBi,
   type ChanBspUnit,
   type ChanChannel,
@@ -39,12 +43,18 @@ export function runChanBspPipeline(
   let zhongshus: readonly ChanDivergenceZhongshu[];
   if (input.units === 'duan') {
     const duans = ChanCore.createDuan(phaseB);
+    const validDuans = duans.filter(
+      (d) => d.type === DuanType.Complete && d.status === DuanStatus.Valid,
+    );
     const duanChannels = ChanCore.createDuanChannels(duans);
-    units = duans.map(toBspUnit);
+    units = validDuans.map(toBspUnit);
     zhongshus = duanChannels.phaseB.map(toZhongshu);
   } else {
+    const validBis = phaseB.filter(
+      (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
+    );
     const channels = ChanCore.createChannels(input.klines);
-    units = phaseB.map(toBspUnit);
+    units = validBis.map(toBspUnit);
     zhongshus = channels.phaseB.map(toZhongshu);
   }
 

@@ -1,7 +1,11 @@
 import {
+  BiStatus,
+  BiType,
   ChanCore,
   ChanBspType,
   ChannelType,
+  DuanStatus,
+  DuanType,
   type ChanBi,
   type ChanBspUnit,
   type ChanChannel,
@@ -219,12 +223,18 @@ export class ChanBspFactorPlugin implements FactorPlugin {
 
     if (units === 'duan') {
       const duans = ChanCore.createDuan(phaseB);
+      const validDuans = duans.filter(
+        (d) => d.type === DuanType.Complete && d.status === DuanStatus.Valid,
+      );
       const duanChannels = ChanCore.createDuanChannels(duans);
-      bspUnits = duans.map(toBspUnit);
+      bspUnits = validDuans.map(toBspUnit);
       zhongshus = duanChannels.phaseB.map(toZhongshu);
     } else {
+      const validBis = phaseB.filter(
+        (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
+      );
       const channels = ChanCore.createChannels(klines);
-      bspUnits = phaseB.map(toBspUnit);
+      bspUnits = validBis.map(toBspUnit);
       zhongshus = channels.phaseB.map(toZhongshu);
     }
 

@@ -22,11 +22,11 @@ export const REALTIME_CHAN_BSP_LEVELS: readonly number[] = [1, 5, 15, 30, 60];
 export const CHAN_BSP_WINDOW_BUDGET: Readonly<
   Record<(typeof REALTIME_CHAN_BSP_LEVELS)[number], number>
 > = {
-  1: 800,
-  5: 500,
-  15: 300,
-  30: 200,
-  60: 120,
+  1: 1200,
+  5: 1000,
+  15: 600,
+  30: 600,
+  60: 400,
 };
 
 export type ChanBspEventType =

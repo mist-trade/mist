@@ -15,7 +15,7 @@ describe('compileChanBspConfig', () => {
       units: 'duan',
       points: { first: true, second: false, third: false },
       direction: 'buy',
-      requiredBarCount: 200, // 30m budget
+      requiredBarCount: 600, // 30m budget
     });
     expect(Object.isFrozen(plan)).toBe(true);
   });
@@ -71,18 +71,18 @@ describe('compileChanBspConfig', () => {
   it('assigns the level window budget for every realtime level', () => {
     expect(
       compileChanBspConfig(validRule, [Period.ONE_MIN]).requiredBarCount,
-    ).toBe(800);
+    ).toBe(1200);
     expect(
       compileChanBspConfig(validRule, [Period.FIVE_MIN]).requiredBarCount,
-    ).toBe(500);
+    ).toBe(1000);
     expect(
       compileChanBspConfig(validRule, [Period.FIFTEEN_MIN]).requiredBarCount,
-    ).toBe(300);
+    ).toBe(600);
     expect(
       compileChanBspConfig(validRule, [Period.THIRTY_MIN]).requiredBarCount,
-    ).toBe(200);
+    ).toBe(600);
     expect(
       compileChanBspConfig(validRule, [Period.SIXTY_MIN]).requiredBarCount,
-    ).toBe(120);
+    ).toBe(400);
   });
 });
