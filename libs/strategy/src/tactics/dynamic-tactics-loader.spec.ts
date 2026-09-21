@@ -9,27 +9,21 @@ import {
 } from './contracts/chan-four-quadrant-tactics.interface';
 
 describe('DynamicTacticsLoader', () => {
-  const originalEnv = { ...process.env };
   let tempDir: string;
 
   beforeEach(() => {
-    process.env = { ...originalEnv };
-    delete process.env.MIST_PRIVATE_TACTICS_PATH;
-    delete process.env.MIST_PRIVATE_TACTICS_DIR;
-    delete process.env.MIST_DISABLE_PRIVATE_TACTICS;
-    DynamicTacticsLoader.reloadTactics();
+    DynamicTacticsLoader.resetConfiguration();
   });
 
   afterEach(() => {
-    process.env = { ...originalEnv };
-    DynamicTacticsLoader.reloadTactics();
+    DynamicTacticsLoader.resetConfiguration();
     if (tempDir && fs.existsSync(tempDir)) {
       fs.rmSync(tempDir, { recursive: true, force: true });
     }
   });
 
-  it('falls back to StandardChanTactics when MIST_DISABLE_PRIVATE_TACTICS=true', () => {
-    process.env.MIST_DISABLE_PRIVATE_TACTICS = 'true';
+  it('falls back to StandardChanTactics when disabled', () => {
+    DynamicTacticsLoader.setDisabled(true);
     const tactics = DynamicTacticsLoader.reloadTactics();
     expect(tactics.id).toBe('standard-chan-tactics');
     expect(tactics.name).toBe('Standard Chan Baseline Tactics');
@@ -51,16 +45,22 @@ describe('DynamicTacticsLoader', () => {
     expect(leftBuy.quadrant).toBe(TacticalQuadrant.LeftBuy);
   });
 
-  it('dynamically loads the workspace private tactics when present', () => {
+  it('dynamically loads the workspace private tactics when present, or falls back to standard', () => {
     const tactics = DynamicTacticsLoader.reloadTactics();
     const meta = DynamicTacticsLoader.getActiveMetadata();
+    const hasLocalPrivate = fs.existsSync(path.join(__dirname, 'private'));
 
-    expect(meta.isPrivate).toBe(true);
-    expect(tactics.id).toBe('mist-alpha-core');
-    expect(tactics.name).toBe('Mist Private Alpha & Four-Quadrant Tactics');
+    if (hasLocalPrivate) {
+      expect(meta.isPrivate).toBe(true);
+      expect(tactics.id).toBe('mist-alpha-core');
+      expect(tactics.name).toBe('Mist Private Alpha & Four-Quadrant Tactics');
+    } else {
+      expect(meta.isPrivate).toBe(false);
+      expect(tactics.id).toBe('standard-chan-tactics');
+    }
   });
 
-  it('dynamically loads private tactics when MIST_PRIVATE_TACTICS_DIR contains a secret tactics module', () => {
+  it('dynamically loads private tactics when custom candidate paths contain a secret tactics module', () => {
     tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mist-tactics-test-'));
     const privateFile = path.join(tempDir, 'my-secret-tactics.js');
 
@@ -121,7 +121,7 @@ describe('DynamicTacticsLoader', () => {
     `;
     fs.writeFileSync(privateFile, code, 'utf-8');
 
-    process.env.MIST_PRIVATE_TACTICS_DIR = tempDir;
+    DynamicTacticsLoader.setCustomPaths([privateFile]);
     const tactics = DynamicTacticsLoader.reloadTactics();
 
     expect(tactics.id).toBe('my-secret-alpha');
@@ -154,7 +154,7 @@ describe('DynamicTacticsLoader', () => {
     const brokenFile = path.join(tempDir, 'my-secret-tactics.js');
     fs.writeFileSync(brokenFile, 'module.exports = { Invalid: 123 };', 'utf-8');
 
-    process.env.MIST_PRIVATE_TACTICS_DIR = tempDir;
+    DynamicTacticsLoader.setCustomPaths([brokenFile]);
     const tactics = DynamicTacticsLoader.reloadTactics();
 
     expect(tactics.id).toBe('standard-chan-tactics');

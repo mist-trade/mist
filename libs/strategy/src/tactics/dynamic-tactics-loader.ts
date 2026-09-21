@@ -98,28 +98,47 @@ export class DynamicTacticsLoader {
     return fallback;
   }
 
+  private static customPaths: string[] = [];
+  private static disabled = false;
+
+  /**
+   * 设置是否禁用私有战术加载（强制回退到标准基线）
+   */
+  public static setDisabled(disabled: boolean): void {
+    this.disabled = disabled;
+    this.reloadTactics();
+  }
+
+  /**
+   * 显式配置私有战术候选路径（按优先级排序）
+   */
+  public static setCustomPaths(paths: string[]): void {
+    this.customPaths = [...paths];
+    this.reloadTactics();
+  }
+
+  /**
+   * 重置配置为默认约定探测
+   */
+  public static resetConfiguration(): void {
+    this.customPaths = [];
+    this.disabled = false;
+    this.reloadTactics();
+  }
+
   /**
    * 获取可能包含私有战术的候选路径列表（按优先级排序）
    */
   private static getCandidatePaths(): string[] {
-    if (process.env.MIST_DISABLE_PRIVATE_TACTICS === 'true') {
+    if (this.disabled) {
       return [];
     }
 
-    // 1. 显式环境变量指定完整路径
-    if (process.env.MIST_PRIVATE_TACTICS_PATH) {
-      return [process.env.MIST_PRIVATE_TACTICS_PATH];
+    if (this.customPaths.length > 0) {
+      return this.customPaths;
     }
 
-    // 2. 环境变量指定目录（优先锁定此目录）
-    if (process.env.MIST_PRIVATE_TACTICS_DIR) {
-      return [
-        path.join(process.env.MIST_PRIVATE_TACTICS_DIR, 'my-secret-tactics'),
-        path.join(process.env.MIST_PRIVATE_TACTICS_DIR, 'index'),
-      ];
-    }
-
-    // 3. 约定相对路径（本地开发工作区内 private/ 目录）
+    // 约定相对路径（本地开发工作区内 private/ 目录）
     return [
       path.join(__dirname, 'private', 'my-secret-tactics'),
       path.join(__dirname, 'private', 'index'),
