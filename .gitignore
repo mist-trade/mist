@@ -81,3 +81,8 @@ aktools_*.log
 .codebuddy/
 .agent/
 handoff-prompts-*.md
+
+# Private proprietary trading tactics (never commit to remote)
+libs/strategy/src/tactics/private/
+*.private.ts
+*.secret.ts

@@ -82,3 +82,4 @@ export type {
 } from './evaluation/strategy-evaluation.types';
 export * from './factor';
 export * from './decision-flow';
+export * from './tactics';
