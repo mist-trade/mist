@@ -185,6 +185,8 @@ export interface ChanDivergenceUnit {
   readonly startTime: Date;
   readonly endTime: Date;
   readonly trend: TrendDirection;
+  readonly high?: number;
+  readonly low?: number;
 }
 
 /**

@@ -141,6 +141,27 @@ export class DivergenceDetector {
     ) {
       return null;
     }
+    // 形态学价格极值公理：背驰必须切实创出新极值（若 units 提供 high/low）
+    const leaveLow = units[leave].low;
+    const enterLow = units[enter].low;
+    const leaveHigh = units[leave].high;
+    const enterHigh = units[enter].high;
+    if (
+      leaveLow !== undefined &&
+      enterLow !== undefined &&
+      leaveHigh !== undefined &&
+      enterHigh !== undefined
+    ) {
+      if (units[leave].trend === TrendDirection.Down) {
+        if (leaveLow >= enterLow || leaveLow >= span.zd) {
+          return null; // 未创新低，不构成底背驰
+        }
+      } else if (units[leave].trend === TrendDirection.Up) {
+        if (leaveHigh <= enterHigh || leaveHigh <= span.zg) {
+          return null; // 未创新高，不构成顶背驰
+        }
+      }
+    }
     if (this.isWeaker(forces[leave], forces[enter])) {
       return {
         type: ChanDivergenceType.Consolidation,
@@ -246,6 +267,21 @@ export class DivergenceDetector {
     const leave = lastSpan.lastIndex + 1;
     if (leave >= units.length || units[leave].trend !== chain.direction) {
       return null; // 无离开段或离开段方向不对
+    }
+
+    // 形态学价格极值公理：趋势背驰离开段必须切实脱离末中枢创出新极值
+    const leaveLow = units[leave].low;
+    const leaveHigh = units[leave].high;
+    if (leaveLow !== undefined && leaveHigh !== undefined) {
+      if (chain.direction === TrendDirection.Down) {
+        if (leaveLow >= lastSpan.zd) {
+          return null; // 趋势向下未跌破末中枢
+        }
+      } else if (chain.direction === TrendDirection.Up) {
+        if (leaveHigh <= lastSpan.zg) {
+          return null; // 趋势向上未突破末中枢
+        }
+      }
     }
 
     const bEnter = lastSpan.firstIndex - 1;

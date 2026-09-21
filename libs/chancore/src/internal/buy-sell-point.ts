@@ -94,12 +94,36 @@ export class BuySellPointDetector {
         continue;
       }
       const isBuy = leaveTrend === TrendDirection.Down;
+
+      const leaveUnit = units[div.leaveIndex];
+      const enterUnit = units[div.enterIndex];
+      const zhongshu = input.zhongshus[div.zhongshuIndex];
+
+      // 核心形态学门禁：背驰必须切实创出新极值（价格创新极值与动能衰竭相背离）
+      if (isBuy) {
+        // 底背驰（一买）：离开段最低价必须跌破进入段最低价，且跌破中枢下轨
+        if (leaveUnit.low >= enterUnit.low) {
+          continue;
+        }
+        if (zhongshu && leaveUnit.low >= zhongshu.zd) {
+          continue;
+        }
+      } else {
+        // 顶背驰（一卖）：离开段最高价必须突破进入段最高价，且突破中枢上轨
+        if (leaveUnit.high <= enterUnit.high) {
+          continue;
+        }
+        if (zhongshu && leaveUnit.high <= zhongshu.zg) {
+          continue;
+        }
+      }
+
       seenLeaves.add(div.leaveIndex);
       out.push({
         type: isBuy ? ChanBspType.FirstBuy : ChanBspType.FirstSell,
         zhongshuIndex: div.zhongshuIndex,
         unitIndex: div.leaveIndex,
-        price: isBuy ? units[div.leaveIndex].low : units[div.leaveIndex].high,
+        price: isBuy ? leaveUnit.low : leaveUnit.high,
         firstTypeIndex: null,
       });
     }

@@ -41,9 +41,15 @@ describe('BuySellPointDetector', () => {
 
   it('单中枢盘整背驰（离开段背驰）→ 产出一类点', () => {
     // 单个中枢 + 进入段 vs 离开段双弱（Consolidation），产出离开段对应的一类买卖点
-    const units = makeBspAlternatingUnits(5);
+    const units = [
+      makeBspUnit('up', 0, 20, 10),
+      makeBspUnit('down', 1, 18, 12),
+      makeBspUnit('up', 2, 17, 13),
+      makeBspUnit('down', 3, 16, 11),
+      makeBspUnit('up', 4, 25, 15),
+    ];
     const zhongshus = [
-      makeBspZhongshu(units[1].startTime, units[3].endTime, 20, 5),
+      makeBspZhongshu(units[1].startTime, units[3].endTime, 18, 11, 18, 12),
     ];
     const forces = units.map((_, i) => makeBspForce(10 - i, 100 - i * 10));
     const points = calc.detectBuySellPoints({ units, zhongshus, forces });
@@ -380,19 +386,19 @@ function makeFirstBuyThenPullbackInput(): ChanBspInput {
 /** 上涨趋势链（9 段）：一卖于 u8（末段），无回抽段。 */
 function makeTrendUpInput(): ChanBspInput {
   const units = [
-    makeBspUnit('up', 0, 34, 24),
-    makeBspUnit('down', 1, 32, 22),
-    makeBspUnit('up', 2, 30, 20),
-    makeBspUnit('down', 3, 28, 18),
-    makeBspUnit('up', 4, 26, 16),
-    makeBspUnit('down', 5, 24, 14),
-    makeBspUnit('up', 6, 22, 12),
-    makeBspUnit('down', 7, 20, 10),
-    makeBspUnit('up', 8, 18, 8), // C < A → 一卖
+    makeBspUnit('up', 0, 18, 8),
+    makeBspUnit('down', 1, 20, 10),
+    makeBspUnit('up', 2, 22, 12),
+    makeBspUnit('down', 3, 24, 14),
+    makeBspUnit('up', 4, 26, 16), // 中枢2 进入段 A
+    makeBspUnit('down', 5, 28, 18),
+    makeBspUnit('up', 6, 30, 20),
+    makeBspUnit('down', 7, 32, 22),
+    makeBspUnit('up', 8, 34, 24), // C < A 力度背驰，但价格突破新高 34 > 26 → 一卖
   ];
   const zhongshus = [
-    makeBspZhongshu(units[1].startTime, units[3].endTime, 24, 10), // c1 较低
-    makeBspZhongshu(units[5].startTime, units[7].endTime, 32, 18), // c2 更高（up 递进）
+    makeBspZhongshu(units[1].startTime, units[3].endTime, 24, 10),
+    makeBspZhongshu(units[5].startTime, units[7].endTime, 32, 18),
   ];
   const forces = [
     makeBspForce(5, 50),
@@ -403,7 +409,7 @@ function makeTrendUpInput(): ChanBspInput {
     makeBspForce(5, 50),
     makeBspForce(5, 50),
     makeBspForce(5, 50),
-    makeBspForce(4, 40), // u8 C < A → Trend 背驰（up 链 → 一卖）
+    makeBspForce(4, 40), // C < A → Trend 背驰（up 链 → 一卖）
   ];
   return { units, zhongshus, forces };
 }
@@ -434,7 +440,7 @@ function makeTrendDownInput(): ChanBspInput {
     makeBspForce(5, 50),
     makeBspForce(5, 50),
     makeBspForce(5, 50),
-    makeBspForce(4, 40), // u8 C < A → Trend 背驰
+    makeBspForce(4, 40), // C < A → Trend 背驰
   ];
   return { units, zhongshus, forces };
 }
@@ -442,21 +448,21 @@ function makeTrendDownInput(): ChanBspInput {
 /** 上涨趋势链（11 段）：一卖于 u8，其后 u9 down / u10 up 反抽确认二卖。 */
 function makeFirstSellThenPullbackInput(): ChanBspInput {
   const units = [
-    makeBspUnit('up', 0, 34, 24),
-    makeBspUnit('down', 1, 32, 22),
-    makeBspUnit('up', 2, 30, 20),
-    makeBspUnit('down', 3, 28, 18),
+    makeBspUnit('up', 0, 18, 8),
+    makeBspUnit('down', 1, 20, 10),
+    makeBspUnit('up', 2, 22, 12),
+    makeBspUnit('down', 3, 24, 14),
     makeBspUnit('up', 4, 26, 16), // 中枢2 进入段 A
-    makeBspUnit('down', 5, 24, 14),
-    makeBspUnit('up', 6, 22, 12),
-    makeBspUnit('down', 7, 20, 10),
-    makeBspUnit('up', 8, 18, 8), // 中枢2 离开段 C（一卖，高点 18）
-    makeBspUnit('down', 9, 20, 10),
-    makeBspUnit('up', 10, 16, 9), // 反抽：高点 16 < 18 → 二卖
+    makeBspUnit('down', 5, 28, 18),
+    makeBspUnit('up', 6, 30, 20),
+    makeBspUnit('down', 7, 32, 22),
+    makeBspUnit('up', 8, 34, 24), // 中枢2 离开段 C（一卖，高点 34）
+    makeBspUnit('down', 9, 34, 20), // 一卖后回调
+    makeBspUnit('up', 10, 30, 20), // 反抽：高点 30 < 34 → 二卖
   ];
   const zhongshus = [
-    makeBspZhongshu(units[1].startTime, units[3].endTime, 24, 10), // c1 较低
-    makeBspZhongshu(units[5].startTime, units[7].endTime, 32, 18), // c2 更高（up 递进）
+    makeBspZhongshu(units[1].startTime, units[3].endTime, 24, 10),
+    makeBspZhongshu(units[5].startTime, units[7].endTime, 32, 18),
   ];
   const forces = [
     makeBspForce(5, 50),
@@ -467,7 +473,7 @@ function makeFirstSellThenPullbackInput(): ChanBspInput {
     makeBspForce(5, 50),
     makeBspForce(5, 50),
     makeBspForce(5, 50),
-    makeBspForce(4, 40), // u8 C < A → Trend 背驰（up 链 → 一卖）
+    makeBspForce(4, 40), // u8 C < A → 一卖
     makeBspForce(5, 50),
     makeBspForce(5, 50),
   ];

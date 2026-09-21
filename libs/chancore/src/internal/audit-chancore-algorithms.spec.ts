@@ -450,15 +450,15 @@ function makeBspForce(area: number, peak: number): ChanUnitForce {
  */
 function makeTrendUpBspCase(): ChanBspInput {
   const units = [
-    makeBspUnit('up', 0, 34, 24),
-    makeBspUnit('down', 1, 32, 22),
-    makeBspUnit('up', 2, 30, 20),
-    makeBspUnit('down', 3, 28, 18),
+    makeBspUnit('up', 0, 18, 8),
+    makeBspUnit('down', 1, 20, 10),
+    makeBspUnit('up', 2, 22, 12),
+    makeBspUnit('down', 3, 24, 14),
     makeBspUnit('up', 4, 26, 16),
-    makeBspUnit('down', 5, 24, 14),
-    makeBspUnit('up', 6, 22, 12),
-    makeBspUnit('down', 7, 20, 10),
-    makeBspUnit('up', 8, 18, 8), // C < A → 一卖
+    makeBspUnit('down', 5, 28, 18),
+    makeBspUnit('up', 6, 30, 20),
+    makeBspUnit('down', 7, 32, 22),
+    makeBspUnit('up', 8, 34, 24), // C < A → 一卖（突破新高 34 > 26）
   ];
   const zhongshus = [
     makeBspZhongshu(units[1].startTime, units[3].endTime, 24, 10),
@@ -512,17 +512,17 @@ function makeTrendDownBspCase(): ChanBspInput {
   return { units, zhongshus, forces };
 }
 
-/** 仅盘整背驰：5 段 + 1 中枢，无趋势链 → 不产一类点 */
+/** 仅盘整背驰：5 段 + 1 中枢，离开段突破新高但动力衰竭 → 产出一卖 */
 function makeConsolidationOnlyBspCase(): ChanBspInput {
   const units = [
-    makeBspUnit('up', 0, 34, 24),
-    makeBspUnit('down', 1, 32, 22),
-    makeBspUnit('up', 2, 30, 20),
-    makeBspUnit('down', 3, 28, 18),
-    makeBspUnit('up', 4, 26, 16),
+    makeBspUnit('up', 0, 20, 10),
+    makeBspUnit('down', 1, 18, 12),
+    makeBspUnit('up', 2, 17, 13),
+    makeBspUnit('down', 3, 16, 11),
+    makeBspUnit('up', 4, 25, 15), // leave: 突破新高 25 > 20，且 > zg 18
   ];
   const zhongshus = [
-    makeBspZhongshu(units[1].startTime, units[3].endTime, 32, 18),
+    makeBspZhongshu(units[1].startTime, units[3].endTime, 18, 11, 18, 12),
   ];
   const forces = [
     makeBspForce(9, 90), // enter 强
