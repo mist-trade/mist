@@ -102,28 +102,28 @@ export class DynamicTacticsLoader {
    * 获取可能包含私有战术的候选路径列表（按优先级排序）
    */
   private static getCandidatePaths(): string[] {
-    const candidates: string[] = [];
+    if (process.env.MIST_DISABLE_PRIVATE_TACTICS === 'true') {
+      return [];
+    }
 
     // 1. 显式环境变量指定完整路径
     if (process.env.MIST_PRIVATE_TACTICS_PATH) {
-      candidates.push(process.env.MIST_PRIVATE_TACTICS_PATH);
+      return [process.env.MIST_PRIVATE_TACTICS_PATH];
     }
 
-    // 2. 环境变量指定目录
+    // 2. 环境变量指定目录（优先锁定此目录）
     if (process.env.MIST_PRIVATE_TACTICS_DIR) {
-      candidates.push(
+      return [
         path.join(process.env.MIST_PRIVATE_TACTICS_DIR, 'my-secret-tactics'),
         path.join(process.env.MIST_PRIVATE_TACTICS_DIR, 'index'),
-      );
+      ];
     }
 
     // 3. 约定相对路径（本地开发工作区内 private/ 目录）
-    candidates.push(
+    return [
       path.join(__dirname, 'private', 'my-secret-tactics'),
       path.join(__dirname, 'private', 'index'),
-    );
-
-    return candidates;
+    ];
   }
 
   /**
