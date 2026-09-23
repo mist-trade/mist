@@ -45,8 +45,10 @@ export interface ChanTacticsContext {
   readonly symbol: string;
   readonly period: string | number; // 当前主交易级别（如 '30m' 或 30）
   readonly subPeriod?: string | number; // 次级别（如 '5m' 或 5）
+  readonly parentPeriod?: string | number; // 上一级别（大级别，如 '120m' 或 '1d'）
   readonly klines: readonly ChanK[]; // 本级别 K 线序列
   readonly subKlines?: readonly ChanK[]; // 次级别 K 线序列（用于跨周期穿透）
+  readonly parentKlines?: readonly ChanK[]; // 上一级别 K 线序列（用于大级别动能与多空金叉死叉审查）
   readonly bis: readonly ChanBi[]; // 本级别已确立笔序列
   readonly duans?: readonly ChanDuan[]; // 本级别已确立线段序列
   readonly zhongshus: readonly ChanDivergenceZhongshu[]; // 本级别已成形中枢区间序列
