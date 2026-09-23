@@ -22,6 +22,24 @@ export enum TacticalAction {
   None = 'none', // 观望
 }
 
+/** 宏观走势背景（顺势/逆势/震荡环境） */
+export type MacroTrendDirection = 'UP' | 'DOWN' | 'RANGE';
+
+/** 候选买卖点结构血统详情 */
+export interface CandidateBspMetadata {
+  readonly type:
+    | 'first_buy'
+    | 'first_sell'
+    | 'second_buy'
+    | 'second_sell'
+    | 'third_buy'
+    | 'third_sell';
+  readonly divergenceType?: 'trend' | 'consolidation';
+  readonly zhongshuCount: number; // 经历了几个中枢 (1, 2, 3...)
+  readonly price: number;
+  readonly time: Date;
+}
+
 /** 战术求值上下文数据包 */
 export interface ChanTacticsContext {
   readonly symbol: string;
@@ -34,6 +52,12 @@ export interface ChanTacticsContext {
   readonly zhongshus: readonly ChanDivergenceZhongshu[]; // 本级别已成形中枢区间序列
   readonly lastPrice?: number; // 最新即时价格
   readonly timestamp: Date; // 当前求值时间戳
+
+  /** 宏观走势背景（由大级别均线或线段级别推导：UP 上升 / DOWN 下跌 / RANGE 震荡） */
+  readonly macroTrend?: MacroTrendDirection;
+
+  /** 候选买卖点及其结构血统（方便私有逻辑审查中枢数量与背驰类型） */
+  readonly candidateBsp?: CandidateBspMetadata;
 }
 
 /** 单象限决策输出详情 */
