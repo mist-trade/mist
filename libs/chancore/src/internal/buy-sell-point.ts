@@ -50,7 +50,7 @@ export class BuySellPointDetector {
     const divergences = new DivergenceDetector().detectDivergences(divInput);
 
     this.detectFirst(input, divergences, points);
-    this.detectSecond(input, divergences, points);
+    this.detectSecond(input, points);
     this.detectThird(input, points);
     points.sort((a, b) => this.comparePoints(a, b));
     this.fillFirstTypeIndex(points);
@@ -130,36 +130,21 @@ export class BuySellPointDetector {
   }
 
   /**
-   * 二类：相邻三元组 + 前置一类点/中枢盘背点确认，不查背驰/力度。
-   * 缠论 20/21/29 课：一买之后或中枢盘整背驰之后的次级别回抽不破前低构成二买。
+   * 二类：相邻三元组 + 前置一类点确认，纯几何结构，不查背驰/力度。
+   * 缠论第 20/21 课原典：一买/一卖之后的次级别回抽不破前低/前高构成二买/二卖。
+   * 前置锚点严格依赖已通过形态与极值门禁验证的 FirstBuy / FirstSell。
    */
-  private detectSecond(
-    input: ChanBspInput,
-    divergences: readonly import('../contracts').ChanDivergence[],
-    out: ChanBuySellPoint[],
-  ): void {
+  private detectSecond(input: ChanBspInput, out: ChanBuySellPoint[]): void {
     const { units } = input;
     const firstBuyUnits = new Set<number>();
     const firstSellUnits = new Set<number>();
 
-    // 1. 前置一买/一卖确认
+    // 前置一买/一卖确认
     for (const p of out) {
       if (p.type === ChanBspType.FirstBuy) {
         firstBuyUnits.add(p.unitIndex);
       } else if (p.type === ChanBspType.FirstSell) {
         firstSellUnits.add(p.unitIndex);
-      }
-    }
-
-    // 2. 中枢盘整背驰点确认（29课："中枢盘整的买卖点归二类"）
-    for (const div of divergences) {
-      if (div.type === ChanDivergenceType.Consolidation) {
-        const trend = units[div.leaveIndex].trend;
-        if (trend === TrendDirection.Down) {
-          firstBuyUnits.add(div.leaveIndex);
-        } else if (trend === TrendDirection.Up) {
-          firstSellUnits.add(div.leaveIndex);
-        }
       }
     }
 

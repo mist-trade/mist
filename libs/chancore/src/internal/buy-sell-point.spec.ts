@@ -163,6 +163,41 @@ describe('BuySellPointDetector', () => {
     expect(points).toHaveLength(0);
   });
 
+  it('中枢内部未跌破中枢下轨的假盘背，即使后续回抽不破低点 → 绝不产出 SecondBuy', () => {
+    // 构造中枢区间 [12, 18]，u4 是中枢内部向下段 (low 14 > zd 12 且 low 14 > u0.low 10)
+    const units = [
+      makeBspUnit('down', 0, 20, 10), // 进入段 enter
+      makeBspUnit('up', 1, 18, 11),
+      makeBspUnit('down', 2, 16, 12),
+      makeBspUnit('up', 3, 17, 13),
+      makeBspUnit('down', 4, 16, 14), // leave (假离开段，未跌破 zd 12)
+      makeBspUnit('up', 5, 17, 14), // 反弹段
+      makeBspUnit('down', 6, 16, 15), // 回抽段 (low 15 > low 14)
+    ];
+    const zhongshus = [
+      makeBspZhongshu(units[1].startTime, units[3].endTime, 18, 11, 18, 12),
+    ];
+    const forces = [
+      makeBspForce(9, 90), // enter 强
+      makeBspForce(5, 50),
+      makeBspForce(5, 50),
+      makeBspForce(5, 50),
+      makeBspForce(2, 20), // 动能衰竭，可能触发 Consolidation
+      makeBspForce(5, 50),
+      makeBspForce(5, 50),
+    ];
+    const points = calc.detectBuySellPoints({
+      units,
+      zhongshus,
+      forces,
+    });
+    // u4 不是有效一买，u6 绝不能被认定为二买
+    expect(points.find((p) => p.type === ChanBspType.FirstBuy)).toBeUndefined();
+    expect(
+      points.find((p) => p.type === ChanBspType.SecondBuy),
+    ).toBeUndefined();
+  });
+
   // -------------------------------------------------------------------------
   // 三类（三买/三卖）：离开中枢后回抽不回中枢区间（几何，严格）
   // -------------------------------------------------------------------------
