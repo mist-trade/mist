@@ -67,23 +67,21 @@ describe('§6 Divergence Audit — 趋势/盘整双口径', () => {
       // 进入段 u0 up，离开段 u4 up → 同向
       expect(input.units[c.enterIndex].trend).toBe(TrendDirection.Up);
       expect(input.units[c.leaveIndex].trend).toBe(TrendDirection.Up);
-      // 双口径严格 <
       expect(c.leaveForce.area).toBeLessThan(c.enterForce.area);
-      expect(c.leaveForce.peak).toBeLessThan(c.enterForce.peak);
     });
 
-    it('仅 area 弱、peak 不弱 → 不报告（双口径必须同时满足）', () => {
+    it('以 MACD 面积为核心：area 弱但 peak 极强（毛刺） → 依然判定背驰', () => {
       const input = makeConsolidationCase();
       // 把离开段 peak 调高到 > 进入段
       const forces = [...input.forces];
-      forces[4] = makeForce(3, 999); // area 弱但 peak 极强
+      forces[4] = makeForce(3, 999); // area 弱 (3 < 9) 但 peak 极强 (999 > 90)
       const result = divergence.detectDivergences({
         ...input,
         forces,
       });
       expect(
         result.some((d) => d.type === ChanDivergenceType.Consolidation),
-      ).toBe(false);
+      ).toBe(true);
     });
 
     it('进入段 vs 离开段反向 → 不报告（24课 A/C 必须同向）', () => {

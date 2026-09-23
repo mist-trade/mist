@@ -33,7 +33,7 @@ interface Chain {
  *      本模块**不做非扩张判定**；expanded 中枢当普通中枢看待。
  * 5. 趋势背驰：每条链的链末中枢（B）比较其进入段（A）vs 离开段（C），双口径严格 <。
  *
- * 力度比较口径：**严格 <**（等于不算），无 epsilon；area 与 peak 均须满足（双口径互相印证）。
+ * 力度比较口径：以 MACD 柱体累积面积 area 为核心（严格 <，等于不算，无 epsilon）。
  * 保持不变式：确定性、不变异输入。
  */
 export class DivergenceDetector {
@@ -284,23 +284,23 @@ export class DivergenceDetector {
       }
     }
 
-    const bEnter = lastSpan.firstIndex - 1;
     const aEnter = firstSpan.firstIndex - 1;
+    const bEnter = lastSpan.firstIndex - 1;
 
     // 缠论第 24 课原典：标准趋势背驰比较 c 与 a 的力度，或 c 与 b 的力度。
-    // 优先比较末中枢进入段 b（连接段）；若 b 不背驰，回退比较首中枢进入段 a。
-    let enter = bEnter;
+    // 优先比较首中枢进入段 a（标准趋势背驰）；若 a 不背驰，回退尝试比较两中枢间的连接段 b。
+    let enter = aEnter;
     if (
       enter < 0 ||
       units[enter].trend !== chain.direction ||
       !this.isWeaker(forces[leave], forces[enter])
     ) {
       if (
-        aEnter >= 0 &&
-        units[aEnter].trend === chain.direction &&
-        this.isWeaker(forces[leave], forces[aEnter])
+        bEnter >= 0 &&
+        units[bEnter].trend === chain.direction &&
+        this.isWeaker(forces[leave], forces[bEnter])
       ) {
-        enter = aEnter;
+        enter = bEnter;
       } else {
         return null;
       }
@@ -316,8 +316,8 @@ export class DivergenceDetector {
     };
   }
 
-  /** 双口径弱判定：leave.area < enter.area 且 leave.peak < enter.peak（严格 <，无 epsilon）。 */
+  /** 动能弱判定：以 MACD 柱体累积面积为准（leave.area < enter.area，严格 <，无 epsilon）。 */
   private isWeaker(leave: ChanUnitForce, enter: ChanUnitForce): boolean {
-    return leave.area < enter.area && leave.peak < enter.peak;
+    return leave.area < enter.area;
   }
 }

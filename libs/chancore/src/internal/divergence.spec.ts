@@ -72,18 +72,20 @@ describe('DivergenceDetector (背驰，24课 A/B/C 三段结构，双口径)', (
     expect(result[0].leaveForce).toEqual(makeForce(3, 30));
   });
 
-  it('does NOT report when only one component is weaker (area shrinks but peak does not)', () => {
-    // 中枢 = [u1,u2,u3]；进入段 u0(peak=30) 离开段 u4(peak=40>30) → 不背驰
+  it('以 MACD 面积为准：area 衰竭但 peak 未衰竭（毛刺） → 依然判定背驰', () => {
+    // 中枢 = [u1,u2,u3]；进入段 u0(area=9, peak=30) 离开段 u4(area=3<9, peak=40>30) → 面积衰竭即判定背驰
     const input = makeConsolidationInput(5, {
       forces: [
-        makeForce(9, 30), // u0 enter peak=30
+        makeForce(9, 30), // u0 enter
         makeForce(5, 50), // u1
         makeForce(5, 50), // u2
         makeForce(5, 50), // u3
-        makeForce(3, 40), // u4 leave peak=40 > 30 → 不背驰
+        makeForce(3, 40), // u4 leave area 3 < 9
       ],
     });
-    expect(calc.detectDivergences(input)).toEqual([]);
+    const result = calc.detectDivergences(input);
+    expect(result).toHaveLength(1);
+    expect(result[0].type).toBe(ChanDivergenceType.Consolidation);
   });
 
   it('does NOT report on equality (strict less-than, no epsilon)', () => {
