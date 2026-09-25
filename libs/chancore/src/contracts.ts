@@ -97,6 +97,15 @@ export interface ChanBi {
   readonly endFenxing: ChanFenxing | null;
 }
 
+export interface ChanBiOptions {
+  /**
+   * 是否过滤顶底分型区间包含（工程防噪补丁）。
+   * - false（默认，符合缠论原典）：不进行顶底分型区间包含过滤，严格遵循原典第 81 课条件；
+   * - true：启用分型区间包含过滤，若候选笔两端分型区间相互包含则判为 Invalid。
+   */
+  readonly filterFenxingContainment?: boolean;
+}
+
 export interface ChanBiTwoPhaseResult {
   readonly phaseA: readonly ChanBi[];
   readonly phaseB: readonly ChanBi[];

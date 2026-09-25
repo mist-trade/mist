@@ -21,7 +21,8 @@ export class ChanService {
 
   // 画笔
   createBi(createBiDto: CreateBiDto) {
-    const result = ChanCore.createBi(createBiDto.k.map(toChanK));
+    const biOptions = this.toBiOptions(createBiDto);
+    const result = ChanCore.createBi(createBiDto.k.map(toChanK), biOptions);
     return {
       phaseA: result.phaseA.map(toBiVo),
       phaseB: result.phaseB.map(toBiVo),
@@ -43,7 +44,11 @@ export class ChanService {
       );
     }
 
-    const result = ChanCore.createChannels(createBiDto.k.map(toChanK));
+    const biOptions = this.toBiOptions(createBiDto);
+    const result = ChanCore.createChannels(
+      createBiDto.k.map(toChanK),
+      biOptions,
+    );
     return {
       phaseA: result.phaseA.map(toChannelVo),
       phaseB: result.phaseB.map(toChannelVo),
@@ -52,18 +57,26 @@ export class ChanService {
 
   // 画段（线段，特征序列法；入参 = createBi 返回值的 phaseB ChanBi[]，返回确认后的段数组）
   createDuan(createBiDto: CreateBiDto) {
-    const bis = ChanCore.createBi(createBiDto.k.map(toChanK));
+    const biOptions = this.toBiOptions(createBiDto);
+    const bis = ChanCore.createBi(createBiDto.k.map(toChanK), biOptions);
     return ChanCore.createDuan(bis.phaseB).map(toDuanVo);
   }
 
   // 段级中枢（对称重叠无方向；入参 = createDuan 返回值 ChanDuan[]，返回两阶段）
   createDuanChannels(createBiDto: CreateBiDto) {
-    const bis = ChanCore.createBi(createBiDto.k.map(toChanK));
+    const biOptions = this.toBiOptions(createBiDto);
+    const bis = ChanCore.createBi(createBiDto.k.map(toChanK), biOptions);
     const duans = ChanCore.createDuan(bis.phaseB);
     const result = ChanCore.createDuanChannels(duans);
     return {
       phaseA: result.phaseA.map(toDuanChannelVo),
       phaseB: result.phaseB.map(toDuanChannelVo),
     };
+  }
+
+  private toBiOptions(createBiDto: CreateBiDto) {
+    return createBiDto.filterFenxingContainment !== undefined
+      ? { filterFenxingContainment: createBiDto.filterFenxingContainment }
+      : undefined;
   }
 }

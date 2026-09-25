@@ -1,6 +1,7 @@
 import { BiStatus, BiType, FenxingType, TrendDirection } from '../contracts';
 import type {
   ChanBi,
+  ChanBiOptions,
   ChanBiTwoPhaseResult,
   ChanFenxing,
   ChanK,
@@ -17,6 +18,8 @@ type CompleteBiWithFenxings = ChanBi & {
 type ThreeBiPattern = 'up-down-up' | 'down-up-down';
 
 export class BiCalculator {
+  constructor(private readonly options?: ChanBiOptions) {}
+
   /**
    * 主函数：识别笔（新算法：Phase A 单时间栈 + Phase B invalid 区间归约）
    *
@@ -837,10 +840,12 @@ export class BiCalculator {
   private isCandidateBiValid(bi: ChanBi): boolean {
     const differentTypes = bi.startFenxing?.type !== bi.endFenxing?.type;
     const wideEnough = this.isBiWideEnough(bi);
-    const noContainment = !this.isFenxingContainment(
-      bi.startFenxing,
-      bi.endFenxing,
-    ).hasContainment;
+    const shouldFilterContainment =
+      this.options?.filterFenxingContainment ?? false;
+    const noContainment = shouldFilterContainment
+      ? !this.isFenxingContainment(bi.startFenxing, bi.endFenxing)
+          .hasContainment
+      : true;
 
     return differentTypes && wideEnough && noContainment;
   }

@@ -89,7 +89,10 @@ export class ChanController {
   })
   async postIndexBi(@Body() queryDto: IndicatorQueryDto) {
     const k = await this.getChanKData(queryDto);
-    return this.chanService.createBi({ k });
+    return this.chanService.createBi({
+      k,
+      filterFenxingContainment: queryDto.filterFenxingContainment,
+    });
   }
 
   @Post('fenxing')
@@ -125,7 +128,10 @@ export class ChanController {
   })
   async postChannel(@Body() queryDto: IndicatorQueryDto) {
     const k = await this.getChanKData(queryDto);
-    return this.chanService.createChannels({ k });
+    return this.chanService.createChannels({
+      k,
+      filterFenxingContainment: queryDto.filterFenxingContainment,
+    });
   }
 
   @Post('duan')
@@ -144,7 +150,10 @@ export class ChanController {
   })
   async postDuan(@Body() queryDto: IndicatorQueryDto) {
     const k = await this.getChanKData(queryDto);
-    return this.chanService.createDuan({ k });
+    return this.chanService.createDuan({
+      k,
+      filterFenxingContainment: queryDto.filterFenxingContainment,
+    });
   }
 
   @Post('duan-channel')
@@ -162,6 +171,9 @@ export class ChanController {
   })
   async postDuanChannel(@Body() queryDto: IndicatorQueryDto) {
     const k = await this.getChanKData(queryDto);
-    return this.chanService.createDuanChannels({ k });
+    return this.chanService.createDuanChannels({
+      k,
+      filterFenxingContainment: queryDto.filterFenxingContainment,
+    });
   }
 }

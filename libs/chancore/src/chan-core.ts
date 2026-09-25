@@ -1,5 +1,6 @@
 import type {
   ChanBi,
+  ChanBiOptions,
   ChanBiTwoPhaseResult,
   ChanBspInput,
   ChanBuySellPoint,
@@ -49,17 +50,27 @@ export class ChanCore {
     return new BiCalculator().getFenxings(mergedK);
   }
 
-  static createBi(orderedK: readonly ChanK[]): ChanBiTwoPhaseResult {
+  static createBi(
+    orderedK: readonly ChanK[],
+    options?: ChanBiOptions,
+  ): ChanBiTwoPhaseResult {
     assertChanKSeries(orderedK);
     const mergedK = new KMergeCalculator().merge(orderedK);
-    return new BiCalculator().getBi(mergedK);
+    return new BiCalculator(options).getBi(mergedK);
   }
 
-  static createChannels(orderedK: readonly ChanK[]): ChanChannelTwoPhaseResult {
+  static createChannels(
+    orderedK: readonly ChanK[],
+    options?: {
+      readonly allowUncomplete?: boolean;
+    } & ChanBiOptions,
+  ): ChanChannelTwoPhaseResult {
     assertChanKSeries(orderedK);
     const mergedK = new KMergeCalculator().merge(orderedK);
-    const bis = new BiCalculator().getBi(mergedK);
-    return new ChannelCalculator().createChannels(bis.phaseB);
+    const bis = new BiCalculator(options).getBi(mergedK);
+    return new ChannelCalculator().createChannels(bis.phaseB, {
+      allowUncomplete: options?.allowUncomplete,
+    });
   }
 
   /**

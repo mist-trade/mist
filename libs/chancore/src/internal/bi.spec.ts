@@ -333,6 +333,59 @@ describe('BiCalculator', () => {
     });
   });
 
+  describe('filterFenxingContainment option', () => {
+    it('defaults to false (aligned with original text) and allows candidate Bis with fractal containment', () => {
+      const defaultCalculator = new BiCalculator();
+      const filteredCalculator = new BiCalculator({
+        filterFenxingContainment: true,
+      });
+
+      const ids = [1, 2, 3, 4, 5];
+      const originData = ids.map((id, pos) => createK(id, 20, 10, pos + 1));
+      const topFenxing: ChanFenxing = {
+        type: FenxingType.Top,
+        high: 30,
+        low: 10,
+        leftIds: [-1],
+        middleIds: [1],
+        rightIds: [-2],
+        middleIndex: 0,
+        middleOriginId: 1,
+      };
+      const bottomFenxing: ChanFenxing = {
+        type: FenxingType.Bottom,
+        high: 25,
+        low: 15,
+        leftIds: [-3],
+        middleIds: [5],
+        rightIds: [-4],
+        middleIndex: 4,
+        middleOriginId: 5,
+      };
+
+      const candidateBi: ChanBi = {
+        startTime: originData[0].time,
+        endTime: originData[4].time,
+        high: 30,
+        low: 15,
+        trend: TrendDirection.Down,
+        type: BiType.Complete,
+        status: BiStatus.Unknown,
+        independentCount: 5,
+        originIds: [...ids],
+        originData,
+        startFenxing: topFenxing,
+        endFenxing: bottomFenxing,
+      };
+
+      // 默认（对齐原典）：宽笔不被分型区间包含过滤淘汰
+      expect(defaultCalculator['isCandidateBiValid'](candidateBi)).toBe(true);
+
+      // 开启过滤配置：检测到区间包含判定为 invalid
+      expect(filteredCalculator['isCandidateBiValid'](candidateBi)).toBe(false);
+    });
+  });
+
   it('owns both Phase A and Phase B reductions inside BiCalculator', () => {
     const source = readFileSync(join(__dirname, 'bi.ts'), 'utf8');
 

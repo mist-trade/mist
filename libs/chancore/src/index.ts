@@ -13,6 +13,7 @@ export {
 } from './contracts';
 export type {
   ChanBi,
+  ChanBiOptions,
   ChanBiTwoPhaseResult,
   ChanBspInput,
   ChanBspUnit,

@@ -15,8 +15,11 @@ import {
 } from './chan-full-output.characterization.fixture';
 import { createChanDuanAnchorFixture } from './chan-duan-anchor.characterization.fixture';
 import { DuanStatus, DuanType, TrendDirection } from './contracts';
+import type { ChanBiOptions } from './contracts';
 
 const EXPECTED_FULL_OUTPUT_SHA256 =
+  '53796f7a15bf4b59bacded76d59ca7248a6a08055bf6e16564f008922bbe8b79';
+const EXPECTED_FILTERED_CONTAINMENT_SHA256 =
   '352c7c5b5c3fddfb7eb60913e17ebea8f5cee0a652ea061efda54665ce69b811';
 
 function toContractK(source: ChanK): ChanCharacterizationK {
@@ -96,11 +99,11 @@ function toContractChannel(channel: ChanChannel) {
   };
 }
 
-function runCoreFullPipeline() {
+function runCoreFullPipeline(options?: ChanBiOptions) {
   const input = createChanFullOutputFixture();
   const merged = ChanCore.mergeK(input);
   const fenxings = ChanCore.findFenxings(input);
-  const bis = ChanCore.createBi(input);
+  const bis = ChanCore.createBi(input, options);
   const channels = ChanCore.createChannels(input);
 
   return {
@@ -131,55 +134,99 @@ function runCoreFullPipeline() {
 }
 
 describe('ChanCore full-output differential characterization', () => {
-  it('locks one raw K through merged K, Fenxing, Bi and Channel fingerprint', () => {
-    const result = runCoreFullPipeline();
-    const inputIds = result.input.map((k) => k.id);
+  describe('模式一：原典基准模式（默认：关闭分型包含过滤）', () => {
+    it('locks one raw K through merged K, Fenxing, Bi and Channel fingerprint', () => {
+      const result = runCoreFullPipeline();
+      const inputIds = result.input.map((k) => k.id);
 
-    expect(result.input).toHaveLength(45);
-    expect(new Set(inputIds).size).toBe(inputIds.length);
-    expect(
-      inputIds.some((id, index) => index > 0 && id < inputIds[index - 1]),
-    ).toBe(true);
-    expect(result.merged).toHaveLength(38);
-    expect(result.fenxings).toHaveLength(15);
-    expect(result.bis.phaseA).toHaveLength(9);
-    expect(result.bis.phaseB).toHaveLength(9);
-    // 600519 日线 fixture 的 9 笔中 7 根宽笔不达标（status=invalid）——
-    // 6 版起笔中枢只消费确认且有效笔，原先由无效笔构成的 1 个中枢消失（18 课语义修正）
-    expect(result.channels.phaseA).toHaveLength(0);
-    expect(result.channels.phaseB).toHaveLength(0);
+      expect(result.input).toHaveLength(45);
+      expect(new Set(inputIds).size).toBe(inputIds.length);
+      expect(
+        inputIds.some((id, index) => index > 0 && id < inputIds[index - 1]),
+      ).toBe(true);
+      expect(result.merged).toHaveLength(38);
+      expect(result.fenxings).toHaveLength(15);
+      expect(result.bis.phaseA).toHaveLength(9);
+      expect(result.bis.phaseB).toHaveLength(9);
 
-    const fingerprint = createHash('sha256')
-      .update(JSON.stringify(result.fingerprintPayload))
-      .digest('hex');
-    expect(fingerprint).toBe(EXPECTED_FULL_OUTPUT_SHA256);
+      // 原典规则下，Bi #5 满足 81 课条件为有效笔（3 根有效，5 根无效，1 根末端未完成）
+      const validBis = result.bis.phaseB.filter(
+        (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
+      );
+      const invalidBis = result.bis.phaseB.filter(
+        (b) => b.status === BiStatus.Invalid,
+      );
+      expect(validBis).toHaveLength(3);
+      expect(invalidBis).toHaveLength(5);
+
+      // 笔中枢只消费确认且有效笔，有效笔数量不足以构成中枢
+      expect(result.channels.phaseA).toHaveLength(0);
+      expect(result.channels.phaseB).toHaveLength(0);
+
+      const fingerprint = createHash('sha256')
+        .update(JSON.stringify(result.fingerprintPayload))
+        .digest('hex');
+      expect(fingerprint).toBe(EXPECTED_FULL_OUTPUT_SHA256);
+    });
+
+    it('locks unique wide-Bi endpoints and position distance with sparse IDs', () => {
+      const { bis } = runCoreFullPipeline();
+      const validCompleteBis = bis.phaseB.filter(
+        (bi) => bi.type === BiType.Complete && bi.status === BiStatus.Valid,
+      );
+
+      expect(validCompleteBis.length).toBeGreaterThan(0);
+      for (const bi of validCompleteBis) {
+        const ids = bi.originData.map((k) => k.id);
+        const startPositions = ids.flatMap((id, index) =>
+          id === bi.startFenxing?.middleOriginId ? [index] : [],
+        );
+        const endPositions = ids.flatMap((id, index) =>
+          id === bi.endFenxing?.middleOriginId ? [index] : [],
+        );
+
+        expect(startPositions).toHaveLength(1);
+        expect(endPositions).toHaveLength(1);
+        expect(endPositions[0] - startPositions[0]).toBeGreaterThanOrEqual(4);
+        expect(
+          Math.abs(
+            bi.endFenxing!.middleOriginId - bi.startFenxing!.middleOriginId,
+          ),
+        ).not.toBe(endPositions[0] - startPositions[0]);
+      }
+    });
   });
 
-  it('locks unique wide-Bi endpoints and position distance with sparse IDs', () => {
-    const { bis } = runCoreFullPipeline();
-    const validCompleteBis = bis.phaseB.filter(
-      (bi) => bi.type === BiType.Complete && bi.status === BiStatus.Valid,
-    );
+  describe('模式二：工程防噪模式（开启配置：filterFenxingContainment = true）', () => {
+    it('locks full pipeline output and legacy SHA256 fingerprint when containment filter is active', () => {
+      const result = runCoreFullPipeline({ filterFenxingContainment: true });
+      const inputIds = result.input.map((k) => k.id);
 
-    expect(validCompleteBis.length).toBeGreaterThan(0);
-    for (const bi of validCompleteBis) {
-      const ids = bi.originData.map((k) => k.id);
-      const startPositions = ids.flatMap((id, index) =>
-        id === bi.startFenxing?.middleOriginId ? [index] : [],
-      );
-      const endPositions = ids.flatMap((id, index) =>
-        id === bi.endFenxing?.middleOriginId ? [index] : [],
-      );
+      expect(result.input).toHaveLength(45);
+      expect(new Set(inputIds).size).toBe(inputIds.length);
+      expect(result.merged).toHaveLength(38);
+      expect(result.fenxings).toHaveLength(15);
+      expect(result.bis.phaseA).toHaveLength(9);
+      expect(result.bis.phaseB).toHaveLength(9);
 
-      expect(startPositions).toHaveLength(1);
-      expect(endPositions).toHaveLength(1);
-      expect(endPositions[0] - startPositions[0]).toBeGreaterThanOrEqual(4);
-      expect(
-        Math.abs(
-          bi.endFenxing!.middleOriginId - bi.startFenxing!.middleOriginId,
-        ),
-      ).not.toBe(endPositions[0] - startPositions[0]);
-    }
+      // 开启分型包含过滤时，Bi #5 被判定为 invalid（2 根有效，6 根无效，1 根末端未完成）
+      const validBis = result.bis.phaseB.filter(
+        (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
+      );
+      const invalidBis = result.bis.phaseB.filter(
+        (b) => b.status === BiStatus.Invalid,
+      );
+      expect(validBis).toHaveLength(2);
+      expect(invalidBis).toHaveLength(6);
+
+      expect(result.channels.phaseA).toHaveLength(0);
+      expect(result.channels.phaseB).toHaveLength(0);
+
+      const fingerprint = createHash('sha256')
+        .update(JSON.stringify(result.fingerprintPayload))
+        .digest('hex');
+      expect(fingerprint).toBe(EXPECTED_FILTERED_CONTAINMENT_SHA256);
+    });
   });
 
   it('locks Duan-level sequential resolution (adjacent wave overlap retains separate sequential units in phaseB)', () => {
