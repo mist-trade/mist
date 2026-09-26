@@ -358,7 +358,24 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const fullKlines = loadCanonicalKlines({ code, period });
-      const sliced = fullKlines.slice(-limit);
+      let filteredKlines = fullKlines;
+      if (rawParams.startDate) {
+        const startMs = new Date(rawParams.startDate).getTime();
+        if (!isNaN(startMs)) {
+          filteredKlines = filteredKlines.filter(
+            (k) => new Date(k.time).getTime() >= startMs,
+          );
+        }
+      }
+      if (rawParams.endDate) {
+        const endMs = new Date(rawParams.endDate).getTime();
+        if (!isNaN(endMs)) {
+          filteredKlines = filteredKlines.filter(
+            (k) => new Date(k.time).getTime() <= endMs,
+          );
+        }
+      }
+      const sliced = filteredKlines.slice(-limit);
       const klinesData = sliced.map((k) => ({
         id: k.id || 0,
         symbol: k.symbol || code,
@@ -426,7 +443,24 @@ const server = http.createServer(async (req, res) => {
 
     try {
       const fullKlines = loadCanonicalKlines({ code, period });
-      const commands = ChanVisualAdapter.convert(fullKlines, {
+      let targetKlines = fullKlines;
+      if (parsedUrl.query.startDate) {
+        const startMs = new Date(parsedUrl.query.startDate as string).getTime();
+        if (!isNaN(startMs)) {
+          targetKlines = targetKlines.filter(
+            (k) => new Date(k.time).getTime() >= startMs,
+          );
+        }
+      }
+      if (parsedUrl.query.endDate) {
+        const endMs = new Date(parsedUrl.query.endDate as string).getTime();
+        if (!isNaN(endMs)) {
+          targetKlines = targetKlines.filter(
+            (k) => new Date(k.time).getTime() <= endMs,
+          );
+        }
+      }
+      const commands = ChanVisualAdapter.convert(targetKlines, {
         includeBi: true,
         includeDuan: true,
         includeZhongshu: true,
@@ -438,7 +472,7 @@ const server = http.createServer(async (req, res) => {
         code,
         period,
         source,
-        totalKlines: fullKlines.length,
+        totalKlines: targetKlines.length,
         commands,
       });
     } catch (err: any) {
@@ -562,10 +596,14 @@ const server = http.createServer(async (req, res) => {
       },
     });
 
-    // 若当前游标已经存在帧，立即补发当前帧作为初态
+    // 若当前游标已经存在帧，立即补发当前帧作为初态；若新会话未就绪则推进至第0帧补发
     const currentFrame = session.engine.getCurrentFrame();
     if (currentFrame) {
       handleFrame(currentFrame);
+    } else if (session.engine.totalBars > 0) {
+      void session.engine.seek(0).then((frame) => {
+        if (frame) handleFrame(frame);
+      });
     }
 
     req.on('close', () => {
