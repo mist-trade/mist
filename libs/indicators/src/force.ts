@@ -19,6 +19,9 @@ export function computeChanUnitForces(
   klines: readonly { close: number; time: Date }[],
   units: readonly UnitForceTrendInput[],
 ): readonly UnitForceItem[] {
+  if (units.length === 0 || klines.length === 0) {
+    return Object.freeze([]);
+  }
   const closes = klines.map((k) => k.close);
   const kTimes = klines.map((k) => k.time);
   const macd = computeMacdSeries(closes);

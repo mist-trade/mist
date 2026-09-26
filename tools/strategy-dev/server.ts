@@ -19,6 +19,7 @@ import {
   StrategySimulationSession,
   createTacticsDecisionFlow,
   type SimulationFrame,
+  type SimulationSignal,
 } from '../../libs/strategy/src/simulation';
 import { loadCanonicalKlines, PERIOD_NAME_MAP } from './provider';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
@@ -212,9 +213,9 @@ const mockRuns: DevBacktestRun[] = [
     source: 'qmt',
     targetUniverse: ['000001'],
     period: 30,
-    startDate: '2025-07-03T05:30:00.000Z',
+    startDate: '2026-08-21T02:00:00.000Z',
     endDate: '2026-09-24T07:00:00.000Z',
-    signalCount: 80,
+    signalCount: 2,
     matchedSecurityCount: 1,
     startedAt: '2026-09-25T05:00:00.000Z',
     completedAt: '2026-09-25T05:00:02.000Z',
@@ -231,7 +232,7 @@ const mockRuns: DevBacktestRun[] = [
     period: 1440,
     startDate: '2024-01-01T16:00:00.000Z',
     endDate: '2026-09-23T16:00:00.000Z',
-    signalCount: 4,
+    signalCount: 2,
     matchedSecurityCount: 1,
     startedAt: '2026-09-25T04:50:00.000Z',
     completedAt: '2026-09-25T04:50:01.000Z',
@@ -259,6 +260,28 @@ const mockRuns: DevBacktestRun[] = [
 // 活跃仿真推流会话池
 const activeSessions = new Map<string, StrategySimulationSession>();
 
+// 回测信号内存缓存池 (cacheKey -> signals, runId -> signals)
+const backtestSignalsCache = new Map<string, readonly SimulationSignal[]>();
+const backtestRunSignalsMap = new Map<number, readonly SimulationSignal[]>();
+
+function getBacktestCacheKey(options: {
+  code: string;
+  period: number;
+  startDate?: string | Date;
+  endDate?: string | Date;
+  filterFenxingContainment?: boolean;
+}): string {
+  const start =
+    options.startDate instanceof Date
+      ? options.startDate.toISOString()
+      : options.startDate || '';
+  const end =
+    options.endDate instanceof Date
+      ? options.endDate.toISOString()
+      : options.endDate || '';
+  return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${start}:${end}`;
+}
+
 // 全量执行仿真并获取回测结果的统一纯净胶水
 async function runUnifiedSimulationBacktest(options: {
   code: string;
@@ -267,6 +290,15 @@ async function runUnifiedSimulationBacktest(options: {
   endDate?: string | Date;
   filterFenxingContainment?: boolean;
 }) {
+  const cacheKey = getBacktestCacheKey(options);
+  const cachedSignals = backtestSignalsCache.get(cacheKey);
+  if (cachedSignals) {
+    return {
+      signals: cachedSignals,
+      engine: null,
+    };
+  }
+
   const fullKlines = loadCanonicalKlines({
     code: options.code,
     period: options.period,
@@ -288,8 +320,11 @@ async function runUnifiedSimulationBacktest(options: {
     await engine.seek(bars.length - 1);
   }
 
+  const signals = engine.getAllSignals();
+  backtestSignalsCache.set(cacheKey, signals);
+
   return {
-    signals: engine.getAllSignals(),
+    signals,
     engine,
   };
 }
@@ -748,6 +783,7 @@ const server = http.createServer(async (req, res) => {
       };
 
       mockRuns.unshift(newRun);
+      backtestRunSignalsMap.set(newRun.id, signals);
 
       sendJson(
         res,
@@ -791,16 +827,23 @@ const server = http.createServer(async (req, res) => {
         parsedUrl.query.filterFenxingContainment === 'true' ||
         parsedUrl.query.filterFenxingContainment === '1';
 
-      // 统一走策略树仿真引擎计算
-      const { signals } = await runUnifiedSimulationBacktest({
-        code: symbol,
-        period,
-        filterFenxingContainment,
-        startDate: matchedRun?.startDate,
-        endDate: matchedRun?.endDate,
-      });
+      let signals: readonly SimulationSignal[] | undefined =
+        backtestRunSignalsMap.get(runId);
 
-      const signalResults = signals.map((sig, idx) => ({
+      if (!signals) {
+        // 统一走策略树仿真引擎计算
+        const result = await runUnifiedSimulationBacktest({
+          code: symbol,
+          period,
+          filterFenxingContainment,
+          startDate: matchedRun?.startDate,
+          endDate: matchedRun?.endDate,
+        });
+        signals = result.signals;
+        backtestRunSignalsMap.set(runId, signals);
+      }
+
+      const signalResults = (signals || []).map((sig, idx) => ({
         id: idx + 1,
         backtestRunId: runId,
         securityCode: symbol,
@@ -879,20 +922,21 @@ server.listen(PORT, '0.0.0.0', () => {
 
   setTimeout(async () => {
     try {
-      console.log(`🔄 [预热] 正在后台基于策略树预热 000001 30m 决策流数据...`);
-      const fullKlines = loadCanonicalKlines({ code: '000001', period: 30 });
-      const recentStart =
-        fullKlines.length > 200
-          ? fullKlines[fullKlines.length - 200].time
-          : undefined;
-      const { signals } = await runUnifiedSimulationBacktest({
-        code: '000001',
-        period: 30,
-        startDate: recentStart,
-      });
-      console.log(
-        `✅ [预热] 000001 30m 决策流推演就绪！(就绪信号数: ${signals.length})`,
-      );
+      console.log(`🔄 [预热] 正在后台基于策略树预热决策流回测数据...`);
+      for (const run of mockRuns) {
+        const symbol = run.targetUniverse[0] || '000001';
+        const { signals } = await runUnifiedSimulationBacktest({
+          code: symbol,
+          period: run.period,
+          startDate: run.startDate,
+          endDate: run.endDate,
+        });
+        backtestRunSignalsMap.set(run.id, signals);
+        run.signalCount = signals.length;
+        console.log(
+          `✅ [预热] ${symbol} ${run.period === 1440 ? '日线' : run.period + 'm'} 决策流推演就绪！(runId: ${run.id}, 信号数: ${signals.length})`,
+        );
+      }
     } catch (e: any) {
       console.error(`⚠️ [预热] 后台预热遇到问题:`, e.message);
     }
