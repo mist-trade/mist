@@ -47,18 +47,12 @@ export interface ChanBspPluginParams {
 export interface ChanBspDetectedEvent {
   readonly type: ChanBspType;
   readonly units: ChanBspUnitLevel;
-  readonly startTime: Date;
   readonly time: Date;
   readonly price: number;
   readonly zhongshuIndex: number | null;
   readonly zg: number | null;
   readonly zd: number | null;
   readonly unitIndex: number;
-}
-
-interface ChanBspCursorRecord {
-  lastStartTime: number;
-  emittedTypes: Set<string>;
 }
 
 /**
@@ -93,8 +87,8 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     requireConfirmedFenxing: { type: 'boolean', default: false },
   };
 
-  /** 增量发射游标：key -> ChanBspCursorRecord，基于笔/段起始时间戳与类型实现单调去重 */
-  private readonly cursorMap = new Map<string, ChanBspCursorRecord>();
+  /** 增量发射游标：key -> lastEmittedUnitIndex */
+  private readonly cursorMap = new Map<string, number>();
 
   public resetCursors(): void {
     this.cursorMap.clear();
@@ -139,23 +133,14 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       };
     }
 
-    // 处理去重游标（基于笔/段单元的唯一起始时间戳与事件类型去重，避免滑动窗口未闭合笔延伸重复触发）
+    // 处理去重游标（基于事件时间戳去重，避免滑动窗口相对下标漂移）
     let candidateEvents = matchedEvents;
     if (params.deduplicate) {
       const cursorKey = `${context.securityId}:${context.period}:${params.units}`;
-      let record = this.cursorMap.get(cursorKey);
-      if (!record) {
-        record = { lastStartTime: -1, emittedTypes: new Set<string>() };
-        this.cursorMap.set(cursorKey, record);
-      }
-      candidateEvents = matchedEvents.filter((e) => {
-        const startMs = e.startTime.getTime();
-        if (startMs > record!.lastStartTime) return true;
-        if (startMs === record!.lastStartTime) {
-          return !record!.emittedTypes.has(e.type);
-        }
-        return false;
-      });
+      const lastEmittedTime = this.cursorMap.get(cursorKey) ?? -1;
+      candidateEvents = matchedEvents.filter(
+        (e) => e.time.getTime() > lastEmittedTime,
+      );
       if (candidateEvents.length === 0) {
         return {
           action: 'NEUTRAL',
@@ -163,6 +148,8 @@ export class ChanBspFactorPlugin implements FactorPlugin {
           reason: '缠论买卖点已在先前半闭合单元发射，无需重复触发',
         };
       }
+      const maxTime = Math.max(...candidateEvents.map((e) => e.time.getTime()));
+      this.cursorMap.set(cursorKey, Math.max(lastEmittedTime, maxTime));
     }
 
     // 取最新一个买卖点作为主要触发决策
@@ -196,18 +183,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       }
     }
 
-    if (params.deduplicate) {
-      const cursorKey = `${context.securityId}:${context.period}:${params.units}`;
-      const record = this.cursorMap.get(cursorKey)!;
-      const startMs = latestEvent.startTime.getTime();
-      if (startMs > record.lastStartTime) {
-        record.lastStartTime = startMs;
-        record.emittedTypes = new Set([latestEvent.type]);
-      } else if (startMs === record.lastStartTime) {
-        record.emittedTypes.add(latestEvent.type);
-      }
-    }
-
     const action = isBuy ? 'BUY' : 'SELL';
     const confidence = this.computeConfidence(latestEvent.type);
     const unitLabel = params.units === 'duan' ? '线段' : '笔';
@@ -221,7 +196,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         eventType: latestEvent.type,
         units: latestEvent.units,
         price: latestEvent.price,
-        startTime: latestEvent.startTime.toISOString(),
         time: latestEvent.time.toISOString(),
         zg: latestEvent.zg,
         zd: latestEvent.zd,
@@ -322,7 +296,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       return {
         type: p.type,
         units,
-        startTime: unit.startTime,
         time: unit.endTime,
         price: p.price,
         zhongshuIndex: p.zhongshuIndex,
