@@ -145,6 +145,24 @@ describe('StrategySimulationEngine', () => {
     expect((engine as any).formatBadgeText('second_sell', false)).toBe('2卖');
     expect((engine as any).formatBadgeText('third_sell', false)).toBe('3卖');
   });
+
+  it('silently hydrates pre-warm bars without emitting historical signals on bar 0', async () => {
+    const bars = makeMockBars(100);
+    const startDate = bars[40].timestamp;
+    const engine = new StrategySimulationEngine(bars, {
+      securityCode: '000001',
+      period: 30,
+      startDate,
+      flow: createChanBspDecisionFlow(),
+      windowBudget: 50,
+    });
+
+    const frame0 = await engine.stepNext();
+    expect(frame0).not.toBeNull();
+    expect(frame0?.cursor).toBe(0);
+    // 第 0 步不应该泄漏预热区间已经形成的陈旧买卖点
+    expect(frame0?.signals.length).toBe(0);
+  });
 });
 
 describe('StrategySimulationSession', () => {

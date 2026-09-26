@@ -70,7 +70,7 @@ export class StrategySimulationEngine {
     this.preWarmBars = preWarmCandidates.slice(-this.windowBudget);
     this.replayBars = replayCandidates;
 
-    // 执行静默预热
+    // 执行静默预热滑窗装载
     this.preWarm();
   }
 
@@ -93,8 +93,7 @@ export class StrategySimulationEngine {
   }
 
   /**
-   * 静默预热历史滑窗
-   * 逐根灌入 preWarmBars，但不记录交易信号，使得首根推流 Bar 即可直接拥有完整的历史滑窗与指标
+   * 装载预热历史滑窗到 Imputer
    */
   private preWarm(): void {
     for (const bar of this.preWarmBars) {
@@ -105,10 +104,39 @@ export class StrategySimulationEngine {
     }
   }
 
+  private isPreWarmed = false;
+
+  /**
+   * 静默预热求值：驱动策略树（Decision Flow）执行预热切片，
+   * 使得因子插件（如 ChanBspFactorPlugin）的内部单调游标推进至预热结束时刻，
+   * 杜绝历史已形成的买卖点在首根推流 Bar 被误判为新信号发射。
+   */
+  private async ensurePreWarmed(): Promise<void> {
+    if (this.isPreWarmed) return;
+    this.isPreWarmed = true;
+
+    if (this.preWarmBars.length > 0) {
+      const projectedBars = this.imputer.read();
+      const lastPreWarmBar = this.preWarmBars[this.preWarmBars.length - 1];
+      const context: FactorContext = {
+        securityId: 1,
+        securityCode: this.securityCode,
+        timestamp: lastPreWarmBar.timestamp,
+        period: this.period,
+        bars: projectedBars,
+        attributes: new Map(),
+      };
+      // 静默执行策略树求值，不记录任何信号
+      await this.evaluator.evaluate(this.flow, context);
+    }
+  }
+
   /**
    * 单步向前推进一步（Step Next）
    */
   public async stepNext(): Promise<SimulationFrame | null> {
+    await this.ensurePreWarmed();
+
     if (this.cursor >= this.replayBars.length - 1) {
       return this.frames[this.cursor] ?? null;
     }
@@ -145,11 +173,17 @@ export class StrategySimulationEngine {
       const signalType = bspEvidence?.type || (isBuy ? 'buy' : 'sell');
       const badgeText = this.formatBadgeText(signalType, isBuy);
 
+      const triggerPrice =
+        typeof bspEvidence?.price === 'number' &&
+        Number.isFinite(bspEvidence.price)
+          ? bspEvidence.price
+          : currentBar.close;
+
       const sig: SimulationSignal = {
-        signalTime: currentBar.timestamp.toISOString(),
+        signalTime: bspEvidence?.time || currentBar.timestamp.toISOString(),
         signalType,
         badgeText,
-        triggerPrice: currentBar.close,
+        triggerPrice,
         isBuy,
         confidence: decision.confidence,
         decisionTrace: {
