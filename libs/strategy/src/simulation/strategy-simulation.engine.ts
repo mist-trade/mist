@@ -170,35 +170,51 @@ export class StrategySimulationEngine {
     if (decision.action === 'BUY' || decision.action === 'SELL') {
       const isBuy = decision.action === 'BUY';
       const bspEvidence = this.extractBspEvidence(decision.trace);
-      const signalType = bspEvidence?.type || (isBuy ? 'buy' : 'sell');
-      const badgeText = this.formatBadgeText(signalType, isBuy);
+      const candidates =
+        Array.isArray(bspEvidence?.candidateEvents) &&
+        bspEvidence.candidateEvents.length > 0
+          ? bspEvidence.candidateEvents
+          : [
+              {
+                eventType: bspEvidence?.type || (isBuy ? 'buy' : 'sell'),
+                price: bspEvidence?.price,
+                time: bspEvidence?.time,
+              },
+            ];
 
-      const triggerPrice =
-        typeof bspEvidence?.price === 'number' &&
-        Number.isFinite(bspEvidence.price)
-          ? bspEvidence.price
-          : currentBar.close;
+      for (const cand of candidates) {
+        const candType = String(
+          cand.eventType || cand.type || (isBuy ? 'buy' : 'sell'),
+        );
+        const candIsBuy = candType.endsWith('_buy') || isBuy;
+        const badgeText = this.formatBadgeText(candType, candIsBuy);
+        const triggerPrice =
+          typeof cand.price === 'number' && Number.isFinite(cand.price)
+            ? cand.price
+            : currentBar.close;
+        const signalTime = cand.time || currentBar.timestamp.toISOString();
 
-      const sig: SimulationSignal = {
-        signalTime: bspEvidence?.time || currentBar.timestamp.toISOString(),
-        signalType,
-        badgeText,
-        triggerPrice,
-        isBuy,
-        confidence: decision.confidence,
-        decisionTrace: {
-          action: decision.action,
-          signalTag: decision.signalTag,
+        const sig: SimulationSignal = {
+          signalTime,
+          signalType: candType,
+          badgeText,
+          triggerPrice,
+          isBuy: candIsBuy,
           confidence: decision.confidence,
-          reason: decision.reason,
-          trace: decision.trace,
-        },
-        securityCode: this.securityCode,
-        period: this.period,
-      };
+          decisionTrace: {
+            action: decision.action,
+            signalTag: decision.signalTag,
+            confidence: decision.confidence,
+            reason: decision.reason,
+            trace: decision.trace,
+          },
+          securityCode: this.securityCode,
+          period: this.period,
+        };
 
-      newSignals.push(sig);
-      this.accumulatedSignals.push(sig);
+        newSignals.push(sig);
+        this.accumulatedSignals.push(sig);
+      }
     }
 
     const frame: SimulationFrame = {

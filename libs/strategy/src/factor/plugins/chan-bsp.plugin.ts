@@ -87,11 +87,11 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     requireConfirmedFenxing: { type: 'boolean', default: false },
   };
 
-  /** 增量发射游标：key -> lastEmittedUnitIndex */
-  private readonly cursorMap = new Map<string, number>();
+  /** 已发射信号集合：scopeKey -> Set<`${timestamp}:${type}`> */
+  private readonly emittedSignals = new Map<string, Set<string>>();
 
   public resetCursors(): void {
-    this.cursorMap.clear();
+    this.emittedSignals.clear();
   }
 
   public async evaluate(
@@ -133,26 +133,36 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       };
     }
 
-    // 处理去重游标（基于事件时间戳去重，避免滑动窗口相对下标漂移）
+    // 处理去重游标（基于“时间点 + 1/2/3买卖点类型”精确去重，保留不同时间点或同时间不同类型的有效信号）
     let candidateEvents = matchedEvents;
     if (params.deduplicate) {
-      const cursorKey = `${context.securityId}:${context.period}:${params.units}`;
-      const lastEmittedTime = this.cursorMap.get(cursorKey) ?? -1;
-      candidateEvents = matchedEvents.filter(
-        (e) => e.time.getTime() > lastEmittedTime,
-      );
+      const scopeKey = `${context.securityId}:${context.period}:${units}`;
+      let emitted = this.emittedSignals.get(scopeKey);
+      if (!emitted) {
+        emitted = new Set<string>();
+        this.emittedSignals.set(scopeKey, emitted);
+      }
+
+      const seenInBatch = new Set<string>();
+      candidateEvents = matchedEvents.filter((e) => {
+        const key = `${e.time.getTime()}:${e.type}`;
+        if (emitted!.has(key) || seenInBatch.has(key)) {
+          return false;
+        }
+        seenInBatch.add(key);
+        return true;
+      });
+
       if (candidateEvents.length === 0) {
         return {
           action: 'NEUTRAL',
           confidence: 0.0,
-          reason: '缠论买卖点已在先前半闭合单元发射，无需重复触发',
+          reason: '缠论买卖点已在先前批次发射，无需重复触发',
         };
       }
-      const maxTime = Math.max(...candidateEvents.map((e) => e.time.getTime()));
-      this.cursorMap.set(cursorKey, Math.max(lastEmittedTime, maxTime));
     }
 
-    // 取最新一个买卖点作为主要触发决策
+    // 取最新一个买卖点作为主要触发决策（同帧全部候选买卖点同步附带在 evidence 中供决策树与仿真引擎消费）
     const latestEvent = candidateEvents[candidateEvents.length - 1];
     const isBuy = latestEvent.type.endsWith('_buy');
 
@@ -183,6 +193,17 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       }
     }
 
+    // 确认放行后，将本轮候选事件记入已发射集合
+    if (params.deduplicate) {
+      const scopeKey = `${context.securityId}:${context.period}:${units}`;
+      const emitted = this.emittedSignals.get(scopeKey);
+      if (emitted) {
+        for (const e of candidateEvents) {
+          emitted.add(`${e.time.getTime()}:${e.type}`);
+        }
+      }
+    }
+
     const action = isBuy ? 'BUY' : 'SELL';
     const confidence = this.computeConfidence(latestEvent.type);
     const unitLabel = params.units === 'duan' ? '线段' : '笔';
@@ -202,6 +223,16 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         zhongshuIndex: latestEvent.zhongshuIndex,
         unitIndex: latestEvent.unitIndex,
         allCandidatesCount: candidateEvents.length,
+        candidateEvents: candidateEvents.map((e) => ({
+          eventType: e.type,
+          units: e.units,
+          price: e.price,
+          time: e.time.toISOString(),
+          zg: e.zg,
+          zd: e.zd,
+          zhongshuIndex: e.zhongshuIndex,
+          unitIndex: e.unitIndex,
+        })),
         fenxing: confirmedFenxing
           ? {
               type: confirmedFenxing.type,
