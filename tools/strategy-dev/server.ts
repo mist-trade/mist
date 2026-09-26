@@ -409,7 +409,15 @@ const server = http.createServer(async (req, res) => {
       req.method === 'POST' ? await parseJsonBody(req) : parsedUrl.query;
     const code = resolveSecurityCode(rawParams, '000001');
     const period = resolvePeriod(rawParams.period, 30);
-    const limit = Number(rawParams.limit) || 2000;
+    const hasExplicitLimit =
+      rawParams.limit !== undefined &&
+      rawParams.limit !== null &&
+      String(rawParams.limit).trim().length > 0;
+    const limit = hasExplicitLimit
+      ? Number(rawParams.limit)
+      : rawParams.startDate
+        ? Infinity
+        : 2000;
 
     try {
       const fullKlines = loadCanonicalKlines({ code, period });
@@ -430,7 +438,9 @@ const server = http.createServer(async (req, res) => {
           );
         }
       }
-      const sliced = filteredKlines.slice(-limit);
+      const sliced = Number.isFinite(limit)
+        ? filteredKlines.slice(-limit)
+        : filteredKlines;
       const klinesData = sliced.map((k) => ({
         id: k.id || 0,
         symbol: k.symbol || code,
