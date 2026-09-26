@@ -110,6 +110,38 @@ describe('StrategySimulationEngine', () => {
     const frames = engine.getGeneratedFrames();
     expect(frames.length).toBe(41);
   });
+
+  it('correctly maps specific Chan BSP types into 1买/2买/3买 badges', () => {
+    const engine = new StrategySimulationEngine(mockBars, {
+      securityCode: '000001',
+      period: 30,
+      flow: createChanBspDecisionFlow(),
+    });
+
+    const traceWithThirdBuy = [
+      {
+        nodeId: 'guard_chan_bsp',
+        type: 'GUARD',
+        name: '缠论形态买卖点标准门禁',
+        action: 'BUY',
+        confidence: 0.9,
+        reason: '缠论笔级三买确认',
+        evidence: {
+          eventType: 'third_buy',
+          units: 'bi',
+          price: 3900,
+        },
+      },
+    ];
+
+    const extracted = (engine as any).extractBspEvidence(traceWithThirdBuy);
+    expect(extracted).not.toBeNull();
+    expect(extracted.type).toBe('third_buy');
+    expect((engine as any).formatBadgeText('third_buy', true)).toBe('3买');
+    expect((engine as any).formatBadgeText('first_buy', true)).toBe('1买');
+    expect((engine as any).formatBadgeText('second_buy', true)).toBe('2买');
+    expect((engine as any).formatBadgeText('first_sell', false)).toBe('1卖');
+  });
 });
 
 describe('StrategySimulationSession', () => {

@@ -2,6 +2,8 @@ import type { StrategyBar } from '@app/market-data';
 import { StrategySeriesImputer } from '@app/market-data';
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
 import { DecisionFlowEvaluator } from '../decision-flow/decision-flow-evaluator';
+import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
+import { ensureStandardPluginsRegistered } from '../factor/standard-plugins';
 import type { FactorContext } from '../factor/factor.types';
 import type {
   SimulationFrame,
@@ -39,7 +41,9 @@ export class StrategySimulationEngine {
     this.windowBudget = config.windowBudget ?? 600;
     this.flow = config.flow;
 
-    this.evaluator = new DecisionFlowEvaluator();
+    const registry = new InMemoryFactorPluginRegistry();
+    ensureStandardPluginsRegistered(registry);
+    this.evaluator = new DecisionFlowEvaluator({ registry });
     this.imputer = new StrategySeriesImputer();
 
     // 1. 根据 startDate / endDate 切分预热段与回放段（严格对齐线上 BacktestRunExecutor）
@@ -244,12 +248,35 @@ export class StrategySimulationEngine {
     trace: readonly any[] = [],
   ): { type?: string; [key: string]: any } | null {
     for (const item of trace) {
-      if (item.evidence && typeof item.evidence === 'object') {
-        if (item.evidence.bspType) {
-          return { type: item.evidence.bspType, ...item.evidence };
+      if (item?.evidence && typeof item.evidence === 'object') {
+        const rawType =
+          item.evidence.eventType ||
+          item.evidence.bspType ||
+          item.evidence.type ||
+          item.evidence.pointType ||
+          item.evidence.signalType;
+        if (rawType) {
+          return { type: String(rawType), ...item.evidence };
         }
-        if (item.evidence.type) {
-          return item.evidence;
+      }
+      if (typeof item?.reason === 'string') {
+        if (item.reason.includes('一买') || item.reason.includes('1买')) {
+          return { type: 'first_buy', ...item.evidence };
+        }
+        if (item.reason.includes('二买') || item.reason.includes('2买')) {
+          return { type: 'second_buy', ...item.evidence };
+        }
+        if (item.reason.includes('三买') || item.reason.includes('3买')) {
+          return { type: 'third_buy', ...item.evidence };
+        }
+        if (item.reason.includes('一卖') || item.reason.includes('1卖')) {
+          return { type: 'first_sell', ...item.evidence };
+        }
+        if (item.reason.includes('二卖') || item.reason.includes('2卖')) {
+          return { type: 'second_sell', ...item.evidence };
+        }
+        if (item.reason.includes('三卖') || item.reason.includes('3卖')) {
+          return { type: 'third_sell', ...item.evidence };
         }
       }
     }

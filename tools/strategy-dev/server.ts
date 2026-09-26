@@ -995,6 +995,7 @@ const server = http.createServer(async (req, res) => {
           triggerPrice: sig.triggerPrice,
           time: sig.signalTime,
           triggerTime: sig.signalTime,
+          badgeText: sig.badgeText,
           signalTag: sig.badgeText,
           chanBsp: {
             type: sig.signalType,
