@@ -268,7 +268,7 @@ const mockRuns: DevBacktestRun[] = [
     period: 30,
     startDate: '2025-07-03T05:30:00.000Z',
     endDate: '2026-09-24T07:00:00.000Z',
-    signalCount: 74,
+    signalCount: 51,
     matchedSecurityCount: 1,
     startedAt: '2026-09-25T05:00:00.000Z',
     completedAt: '2026-09-25T05:00:02.000Z',
