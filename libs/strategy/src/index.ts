@@ -85,3 +85,4 @@ export type {
 export * from './factor';
 export * from './decision-flow';
 export * from './tactics';
+export * from './simulation';

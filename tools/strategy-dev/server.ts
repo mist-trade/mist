@@ -4,39 +4,28 @@
  *
  * 端口: 8001 (默认与 mist-backend 生产端口一致)
  * 职责: 模拟生产 API 契约，支持 mist-fe 无感读取本地行情与动态渲染私有策略买卖点
+ * 准则: 严格薄网关，核心推演 100% 走策略树决策流与 StrategySimulationEngine，严禁私自手写伪回测
  */
 
 import * as http from 'http';
 import * as url from 'url';
-import { ChanCore } from '@app/chancore';
-import { runChanBspPipeline } from '../../libs/signal/src/runtime/chan-bsp/chan-bsp.pipeline';
-import {
-  ChanBspEpisodeCursor,
-  type ChanBspEpisodeIdentity,
-} from '../../libs/signal/src/runtime/chan-bsp/chan-bsp.episode';
+import * as fs from 'fs';
+import * as path from 'path';
+import { ChanCore, type ChanK } from '@app/chancore';
 import { ChanVisualAdapter } from '../../libs/visual-command/src/adapters/chan-visual.adapter';
-import type { VisualCommand } from '../../libs/visual-command/src/visual-command.types';
 import { DynamicTacticsLoader } from '../../libs/strategy/src/tactics/dynamic-tactics-loader';
 import {
-  TacticalQuadrant,
-  TacticalAction,
-  type ChanFourQuadrantTactics,
-  type ChanTacticsContext,
-  type TacticalQuadrantDecision,
-} from '../../libs/strategy/src/tactics/contracts/chan-four-quadrant-tactics.interface';
-import {
-  factorPluginRegistry,
-  ensureStandardPluginsRegistered,
-} from '../../libs/strategy/src/factor';
+  StrategySimulationEngine,
+  StrategySimulationSession,
+  createTacticsDecisionFlow,
+  type SimulationFrame,
+} from '../../libs/strategy/src/simulation';
 import { loadCanonicalKlines, PERIOD_NAME_MAP } from './provider';
-import { StrategySeriesImputer } from '../../libs/market-data/src/projection/strategy-series-imputer';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
 import type {
   StrategyBar,
   StrategyMarketSource,
 } from '../../libs/market-data/src/strategy-bar';
-import { CHAN_BSP_WINDOW_BUDGET } from '../../libs/signal/src/runtime/chan-bsp/chan-bsp.types';
-import { toChanKSeries } from '../../libs/signal/src/runtime/chan-bsp/chan-bsp.k-mapper';
 import { normalizeExternalDecimalText } from '../../libs/decimal/src/decimal8';
 
 const PORT = Number(process.env.PORT) || 8001;
@@ -101,59 +90,6 @@ function parseJsonBody(req: http.IncomingMessage): Promise<any> {
   });
 }
 
-function getBadgeText(quadrant: TacticalQuadrant): string {
-  switch (quadrant) {
-    case TacticalQuadrant.LeftBuy:
-      return '1买';
-    case TacticalQuadrant.RightBuy:
-      return '2买';
-    case TacticalQuadrant.LeftSell:
-      return '1卖';
-    case TacticalQuadrant.RightSell:
-      return '2卖';
-  }
-}
-
-function getBspBadgeText(bspType: string, quadrant: TacticalQuadrant): string {
-  switch (bspType) {
-    case 'first_buy':
-      return '1买';
-    case 'second_buy':
-      return '2买';
-    case 'third_buy':
-      return '3买';
-    case 'first_sell':
-      return '1卖';
-    case 'second_sell':
-      return '2卖';
-    case 'third_sell':
-      return '3卖';
-    default:
-      return getBadgeText(quadrant);
-  }
-}
-
-interface EvaluatedSignal {
-  decision: TacticalQuadrantDecision;
-  isBuy: boolean;
-  bspType: string;
-}
-
-interface EvaluationResult {
-  signals: EvaluatedSignal[];
-  commands: VisualCommand[];
-}
-
-const evalCache = new Map<string, EvaluationResult>();
-
-const pointInTimeVisualCache = new Map<string, VisualCommand[]>();
-
-interface EvaluateSignalsOptions {
-  filterFenxingContainment?: boolean;
-  startDate?: string;
-  endDate?: string;
-}
-
 function toStrategyBar(
   rawK: any,
   period: number,
@@ -181,207 +117,18 @@ function toStrategyBar(
   });
 }
 
-function evaluateSignals(
-  code: string,
-  period: number,
-  tactics: ChanFourQuadrantTactics,
-  options?: EvaluateSignalsOptions,
-): EvaluationResult {
-  const filterFenxingContainment = options?.filterFenxingContainment ?? false;
-  const runStartMs = options?.startDate
-    ? new Date(options.startDate).getTime()
-    : -Infinity;
-  const runEndMs = options?.endDate
-    ? new Date(options.endDate).getTime()
-    : Infinity;
-
-  const cacheKey = `${code}_${period}_${tactics.id}_${tactics.version}_${filterFenxingContainment}_${runStartMs}_${runEndMs}`;
-  const cached = evalCache.get(cacheKey);
-  if (cached) {
-    return cached;
-  }
-
-  const fullKlines = loadCanonicalKlines({ code, period });
-
-  // 1. 底图几何指令流（K线、笔、线段、中枢）
-  const commands: VisualCommand[] = [];
-  const chanCmds = ChanVisualAdapter.convert(fullKlines, {
-    includeBi: true,
-    includeDuan: true,
-    includeZhongshu: true,
-    includeBsp: false,
-    filterFenxingContainment,
-  });
-  commands.push(...chanCmds);
-
-  // 2. 线上标准数据流程：StrategySeriesImputer + 逐 Bar 循环喂入 + runChanBspPipeline + ChanBspEpisodeCursor
-  const windowBudget =
-    CHAN_BSP_WINDOW_BUDGET[period as 1 | 5 | 15 | 30 | 60] ?? 600;
-  const imputer = new StrategySeriesImputer();
-  const cursor = new ChanBspEpisodeCursor();
-  const identity: ChanBspEpisodeIdentity = {
-    definitionId: 1,
-    securityId: 1,
-    source: 'qmt',
-    level: period,
-    units: 'bi',
-  };
-
-  // 区分历史预热段 (< runStartMs) 与当前推演段 (>= runStartMs && <= runEndMs)
-  const preWarmKlines: any[] = [];
-  const replayKlines: any[] = [];
-
-  for (const k of fullKlines) {
-    const t = new Date(k.time).getTime();
-    if (t < runStartMs) {
-      preWarmKlines.push(k);
-    } else if (t <= runEndMs) {
-      replayKlines.push(k);
-    }
-  }
-
-  // ① 预热准备阶段：对齐线上 BacktestRunExecutor.replaySecurity 初始窗口段
-  // 逐根 append 历史 Bar 补齐，并在开盘前调用 pipeline 推进游标消费历史既有买卖点，杜绝旧信号漏入起始 Bar
-  const preWarmSlice = preWarmKlines.slice(-windowBudget);
-  for (const rawK of preWarmSlice) {
-    imputer.append(toStrategyBar(rawK, period));
-    while (imputer.read().length > windowBudget) {
-      imputer.trim();
-    }
-  }
-
-  if (imputer.read().length > 0) {
-    const projectedWindow = imputer.read();
-    const preEvents = runChanBspPipeline({
-      klines: toChanKSeries(projectedWindow),
-      units: 'bi',
-    }).filter((e) => e.time.getTime() < runStartMs);
-    if (preEvents.length > 0) {
-      cursor.advance(identity, preEvents);
-    }
-  }
-
-  // ② 计算阶段：严格使用循环把每一个 K 线单独喂进去，由线上真实流程自发返回结果
-  const signals: EvaluatedSignal[] = [];
-  const emittedKeys = new Set<string>();
-
-  for (const rawK of replayKlines) {
-    const bar = toStrategyBar(rawK, period);
-    imputer.append(bar);
-    while (imputer.read().length > windowBudget) {
-      imputer.trim();
-    }
-
-    const projectedWindow = imputer.read();
-    if (projectedWindow.length < 3) continue;
-
-    const chanKlines = toChanKSeries(projectedWindow);
-
-    // ① 调用后端标准生产流水线（包含合并 -> 笔 -> 中枢 -> 力度背驰 -> 买卖点检测）
-    const events = runChanBspPipeline({
-      klines: chanKlines,
-      units: 'bi',
-    });
-
-    // ② 调用后端单调时序游标：仅当最新这根 Bar 刚确认了新买卖点时才输出 fresh 事件
-    const fresh = cursor.advance(identity, events);
-    if (fresh.length === 0) continue;
-
-    // ③ 将刚确立的新买卖点输入到战术引擎裁决
-    for (const event of fresh) {
-      const eventTimeMs = event.time.getTime();
-      // 严格门禁：事件时间必须在回测时间窗口内，杜绝开盘前旧买卖点
-      if (eventTimeMs < runStartMs || eventTimeMs > runEndMs) continue;
-
-      // 严格防重：同一时刻同类型买卖点仅发出一次
-      const dedupeKey = `${eventTimeMs}_${event.type}`;
-      if (emittedKeys.has(dedupeKey)) continue;
-      emittedKeys.add(dedupeKey);
-
-      const ctx: ChanTacticsContext = {
-        symbol: code,
-        period: String(period),
-        klines: chanKlines as any,
-        bis: [],
-        zhongshus: [],
-        lastPrice: event.price,
-        timestamp: new Date(rawK.time),
-        candidateBsp: {
-          type: event.type as any,
-          price: event.price,
-          time: event.time,
-          zhongshuCount: event.zhongshuIndex !== null ? 1 : 0,
-        },
-      };
-
-      let decision: TacticalQuadrantDecision | undefined;
-      if (event.type === 'first_buy') {
-        decision = tactics.evaluateLeftBuy(ctx);
-      } else if (event.type === 'second_buy' || event.type === 'third_buy') {
-        decision = tactics.evaluateRightBuy(ctx);
-      } else if (event.type === 'first_sell') {
-        decision = tactics.evaluateLeftSell(ctx);
-      } else if (event.type === 'second_sell' || event.type === 'third_sell') {
-        decision = tactics.evaluateRightSell(ctx);
-      }
-
-      const isBuy = event.type.endsWith('_buy');
-      const defaultQuadrant = isBuy
-        ? event.type === 'first_buy'
-          ? TacticalQuadrant.LeftBuy
-          : TacticalQuadrant.RightBuy
-        : event.type === 'first_sell'
-          ? TacticalQuadrant.LeftSell
-          : TacticalQuadrant.RightSell;
-
-      const defaultReason =
-        event.type === 'first_buy'
-          ? '一买确认：趋势/中枢离开段背驰'
-          : event.type === 'second_buy'
-            ? '二买确认：一买后次回抽不破前低'
-            : event.type === 'third_buy'
-              ? '三买确认：突破中枢后次回抽不破ZG'
-              : event.type === 'first_sell'
-                ? '一卖确认：冲高离开段背驰冲顶'
-                : event.type === 'second_sell'
-                  ? '二卖确认：反抽不创新高破位'
-                  : '三卖确认：跌破中枢后次回抽反抽不破ZD';
-
-      const finalDecision: TacticalQuadrantDecision =
-        decision && decision.triggered
-          ? decision
-          : {
-              triggered: true,
-              quadrant: defaultQuadrant,
-              price: event.price,
-              time: event.time,
-              confidence:
-                decision?.confidence && decision.confidence > 0
-                  ? decision.confidence
-                  : 85,
-              action: isBuy
-                ? TacticalAction.OpenLong
-                : TacticalAction.CloseLong,
-              reason:
-                decision?.reason && decision.reason !== '未触发战术条件'
-                  ? decision.reason
-                  : defaultReason,
-            };
-
-      signals.push({
-        decision: finalDecision,
-        isBuy,
-        bspType: event.type,
-      });
-    }
-  }
-
-  const result: EvaluationResult = {
-    signals,
-    commands,
-  };
-  evalCache.set(cacheKey, result);
-  return result;
+function toChanKlines(projectedBars: readonly any[]): readonly ChanK[] {
+  return projectedBars.map((p, idx) => ({
+    id: idx + 1,
+    symbol: String(p.rawBar.securityId),
+    time: p.rawBar.timestamp,
+    open: p.ohlc.effective?.open ?? p.rawBar.open,
+    high: p.ohlc.effective?.high ?? p.rawBar.high,
+    low: p.ohlc.effective?.low ?? p.rawBar.low,
+    close: p.ohlc.effective?.close ?? p.rawBar.close,
+    volume: p.volume.effective,
+    amount: p.amount.effective,
+  }));
 }
 
 interface DevBacktestRun {
@@ -406,7 +153,7 @@ const mockRuns: DevBacktestRun[] = [
   {
     id: 1,
     strategyDefinitionId: 1,
-    strategyName: '上证指数 30m 缠论买卖点策略',
+    strategyName: '上证指数 30m 缠论策略树决策流回测',
     strategyVersionId: 1,
     status: 'completed',
     source: 'qmt',
@@ -423,7 +170,7 @@ const mockRuns: DevBacktestRun[] = [
   {
     id: 2,
     strategyDefinitionId: 1,
-    strategyName: '上证指数 日线 缠论买卖点策略',
+    strategyName: '上证指数 日线 缠论策略树决策流回测',
     strategyVersionId: 1,
     status: 'completed',
     source: 'qmt',
@@ -448,16 +195,57 @@ const mockRuns: DevBacktestRun[] = [
     period: 1440,
     startDate: '2024-01-01T00:00:00.000Z',
     endDate: '2026-08-21T00:00:00.000Z',
-    signalCount: 3,
+    signalCount: 18,
     matchedSecurityCount: 1,
-    startedAt: '2026-09-24T00:00:00.000Z',
-    completedAt: '2026-09-24T00:00:01.000Z',
-    createdAt: '2026-09-24T00:00:00.000Z',
+    startedAt: '2026-09-25T04:40:00.000Z',
+    completedAt: '2026-09-25T04:40:01.000Z',
+    createdAt: '2026-09-25T04:40:00.000Z',
   },
 ];
 
+// 活跃仿真推流会话池
+const activeSessions = new Map<string, StrategySimulationSession>();
+
+// 全量执行仿真并获取回测结果的统一纯净胶水
+async function runUnifiedSimulationBacktest(options: {
+  code: string;
+  period: number;
+  startDate?: string | Date;
+  endDate?: string | Date;
+  filterFenxingContainment?: boolean;
+}) {
+  const fullKlines = loadCanonicalKlines({
+    code: options.code,
+    period: options.period,
+  });
+  const bars = fullKlines.map((k) => toStrategyBar(k, options.period));
+  const tactics = DynamicTacticsLoader.reloadTactics();
+  const flow = createTacticsDecisionFlow(tactics);
+
+  const engine = new StrategySimulationEngine(bars, {
+    securityCode: options.code,
+    period: options.period,
+    startDate: options.startDate,
+    endDate: options.endDate,
+    filterFenxingContainment: options.filterFenxingContainment,
+    flow,
+  });
+
+  if (bars.length > 0) {
+    await engine.seek(bars.length - 1);
+  }
+
+  return {
+    signals: engine.getAllSignals(),
+    engine,
+  };
+}
+
 const server = http.createServer(async (req, res) => {
-  // 处理 CORS 预检请求
+  const parsedUrl = url.parse(req.url || '', true);
+  const pathname = parsedUrl.pathname || '';
+
+  // 跨域预检
   if (req.method === 'OPTIONS') {
     res.writeHead(204, {
       'Access-Control-Allow-Origin': '*',
@@ -468,173 +256,39 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  const parsedUrl = url.parse(req.url || '', true);
-  const pathname = parsedUrl.pathname || '';
-
-  // 0. 健康检查与就绪探针
+  // 1. 读取 K 线行情: GET/POST /v1/indicators/k
   if (
-    pathname === '/' ||
-    pathname === '/health' ||
-    pathname.endsWith('/v1/health')
+    (pathname.endsWith('/v1/indicators/k') ||
+      pathname.endsWith('/indicators/k')) &&
+    (req.method === 'GET' || req.method === 'POST')
   ) {
-    sendJson(res, {
-      status: 'ok',
-      service: 'strategy-dev',
-      time: new Date().toISOString(),
-    });
-    return;
-  }
-
-  // 0.1 标的证券列表: GET /v1/securities 或 /api/mist/v1/securities
-  if (pathname.endsWith('/v1/securities') && req.method === 'GET') {
-    sendJson(res, [
-      { id: 1, code: '600519', name: '贵州茅台', type: 'STOCK', status: 1 },
-      { id: 2, code: '000001', name: '上证指数', type: 'INDEX', status: 1 },
-      { id: 3, code: '000300', name: '沪深300', type: 'INDEX', status: 1 },
-      { id: 4, code: '399006', name: '创业板指', type: 'INDEX', status: 1 },
-      { id: 5, code: '002475', name: '立讯精密', type: 'STOCK', status: 1 },
-      { id: 6, code: '300059', name: '东方财富', type: 'STOCK', status: 1 },
-      { id: 7, code: '300502', name: '新易盛', type: 'STOCK', status: 1 },
-      { id: 8, code: '600030', name: '中信证券', type: 'STOCK', status: 1 },
-      { id: 9, code: '603127', name: '昭衍新药', type: 'STOCK', status: 1 },
-    ]);
-    return;
-  }
-
-  // 0.2 因子插件列表: GET /v1/factors/plugins 或 /api/mist/v1/factors/plugins
-  if (pathname.endsWith('/v1/factors/plugins') && req.method === 'GET') {
-    ensureStandardPluginsRegistered();
-    const category = parsedUrl.query.category as any;
-    const plugins = factorPluginRegistry.listByCategory(category);
-    sendJson(
-      res,
-      plugins.map((p) => ({
-        id: p.id,
-        name: p.name,
-        category: p.category,
-        version: p.version,
-        description: p.description,
-        paramSchema: p.paramSchema,
-      })),
-    );
-    return;
-  }
-
-  // 0.3 缠论核心分型: POST /v1/chan/fenxing
-  if (pathname.endsWith('/v1/chan/fenxing') && req.method === 'POST') {
-    const body = await parseJsonBody(req);
-    const code = resolveSecurityCode(body, '600519');
-    const period = resolvePeriod(body.period, 30);
-    try {
-      const klines = loadCanonicalKlines({ code, period });
-      const fenxings = ChanCore.findFenxings(klines);
-      sendJson(res, fenxings);
-    } catch {
-      sendJson(res, []);
-    }
-    return;
-  }
-
-  // 0.4 缠论笔: POST /v1/chan/bi
-  if (pathname.endsWith('/v1/chan/bi') && req.method === 'POST') {
-    const body = await parseJsonBody(req);
-    const code = resolveSecurityCode(body, '600519');
-    const period = resolvePeriod(body.period, 30);
-    try {
-      const klines = loadCanonicalKlines({ code, period });
-      const bis = ChanCore.createBi(klines);
-      sendJson(res, { phaseA: bis.phaseA, phaseB: bis.phaseB });
-    } catch {
-      sendJson(res, { phaseA: [], phaseB: [] });
-    }
-    return;
-  }
-
-  // 0.5 缠论笔中枢: POST /v1/chan/channels
-  if (pathname.endsWith('/v1/chan/channels') && req.method === 'POST') {
-    const body = await parseJsonBody(req);
-    const code = resolveSecurityCode(body, '600519');
-    const period = resolvePeriod(body.period, 30);
-    try {
-      const klines = loadCanonicalKlines({ code, period });
-      const channels = ChanCore.createChannels(klines);
-      sendJson(res, { phaseA: channels.phaseA, phaseB: channels.phaseB });
-    } catch {
-      sendJson(res, { phaseA: [], phaseB: [] });
-    }
-    return;
-  }
-
-  // 0.6 缠论段: POST /v1/chan/duan
-  if (pathname.endsWith('/v1/chan/duan') && req.method === 'POST') {
-    const body = await parseJsonBody(req);
-    const code = resolveSecurityCode(body, '600519');
-    const period = resolvePeriod(body.period, 30);
-    try {
-      const klines = loadCanonicalKlines({ code, period });
-      const bis = ChanCore.createBi(klines);
-      const duans = ChanCore.createDuan(bis.phaseB);
-      sendJson(res, duans);
-    } catch {
-      sendJson(res, []);
-    }
-    return;
-  }
-
-  // 0.7 缠论段中枢: POST /v1/chan/duan-channels
-  if (pathname.endsWith('/v1/chan/duan-channels') && req.method === 'POST') {
-    const body = await parseJsonBody(req);
-    const code = resolveSecurityCode(body, '600519');
-    const period = resolvePeriod(body.period, 30);
-    try {
-      const klines = loadCanonicalKlines({ code, period });
-      const bis = ChanCore.createBi(klines);
-      const duans = ChanCore.createDuan(bis.phaseB);
-      const duanChannels = ChanCore.createDuanChannels(duans);
-      sendJson(res, {
-        phaseA: duanChannels.phaseA,
-        phaseB: duanChannels.phaseB,
-      });
-    } catch {
-      sendJson(res, { phaseA: [], phaseB: [] });
-    }
-    return;
-  }
-
-  // 1. K 线数据接口: POST /v1/indicators/k 或 POST /api/mist/v1/indicators/k
-  if (pathname.endsWith('/v1/indicators/k') && req.method === 'POST') {
-    const body = await parseJsonBody(req);
-    const code = resolveSecurityCode(body, '600519');
-    const period = resolvePeriod(body.period, 30);
+    const rawParams =
+      req.method === 'POST' ? await parseJsonBody(req) : parsedUrl.query;
+    const code = resolveSecurityCode(rawParams, '000001');
+    const period = resolvePeriod(rawParams.period, 30);
+    const limit = Number(rawParams.limit) || 2000;
 
     try {
-      let klines = loadCanonicalKlines({ code, period });
-      if (body.startDate || body.endDate) {
-        const startMs = body.startDate
-          ? new Date(body.startDate).getTime()
-          : -Infinity;
-        const endMs = body.endDate
-          ? new Date(body.endDate).getTime()
-          : Infinity;
-        klines = klines.filter((k) => {
-          const t = new Date(k.time).getTime();
-          return t >= startMs && t <= endMs;
-        });
-      }
-      const kVoList = klines.map((k) => ({
-        id: k.id,
-        symbol: k.symbol,
-        time: k.time.toISOString(),
-        open: k.open,
-        high: k.high,
-        low: k.low,
-        close: k.close,
-        amount: k.amount ? Number(k.amount) : k.close * 1000,
+      const fullKlines = loadCanonicalKlines({ code, period });
+      const sliced = fullKlines.slice(-limit);
+      const klinesData = sliced.map((k) => ({
+        id: k.id || 0,
+        symbol: k.symbol || code,
+        time:
+          typeof k.time === 'string' ? k.time : new Date(k.time).toISOString(),
+        open: Number(k.open),
+        high: Number(k.high),
+        low: Number(k.low),
+        close: Number(k.close),
+        volume:
+          k.volume !== null && k.volume !== undefined ? Number(k.volume) : 0,
+        amount:
+          k.amount !== null && k.amount !== undefined ? Number(k.amount) : 0,
       }));
-      sendJson(res, kVoList);
+      sendJson(res, { klines: klinesData, total: fullKlines.length });
     } catch (err: any) {
       console.error(`[/v1/indicators/k] 错误:`, err.message);
-      sendJson(res, [], 200);
+      sendJson(res, { klines: [], total: 0 });
     }
     return;
   }
@@ -642,11 +296,8 @@ const server = http.createServer(async (req, res) => {
   // 2. 缠论包含合并 K 线: POST /v1/chan/merge-k
   if (pathname.endsWith('/v1/chan/merge-k') && req.method === 'POST') {
     const body = await parseJsonBody(req);
-    const code = body.code || body.securityId || '600519';
-    const period = Number(body.period) || 30;
-
+    const klines = body.klines || [];
     try {
-      const klines = loadCanonicalKlines({ code, period });
       const merged = ChanCore.mergeK(klines);
       const mergeKList = merged.map((m) => ({
         startTime: m.startTime.toISOString(),
@@ -675,7 +326,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 3. 统一绘图指令流: GET /v1/visual/commands
+  // 3. 统一绘图指令流: GET /v1/visual/commands (纯几何，严格遵守架构红线)
   if (pathname.endsWith('/v1/visual/commands') && req.method === 'GET') {
     const code = resolveSecurityCode(parsedUrl.query, '000001');
     const period = resolvePeriod(parsedUrl.query.period, 30);
@@ -684,67 +335,16 @@ const server = http.createServer(async (req, res) => {
       parsedUrl.query.filterFenxingContainment === '1';
 
     try {
-      const targetEndMs = parsedUrl.query.endDate
-        ? new Date(parsedUrl.query.endDate as string).getTime()
-        : Infinity;
-      const targetStartMs = parsedUrl.query.startDate
-        ? new Date(parsedUrl.query.startDate as string).getTime()
-        : -Infinity;
-
-      let commands: readonly VisualCommand[] = [];
-
-      // 若指定了 endDate，代表单步推演/切片复盘：必须基于截至 endDate 的真实历史可见 K 线动态现算，杜绝未来中枢剧透
-      if (Number.isFinite(targetEndMs)) {
-        const cacheKey = `${code}_${period}_${targetEndMs}_${filterFenxingContainment}`;
-        const cached = pointInTimeVisualCache.get(cacheKey);
-        if (cached) {
-          commands = cached;
-        } else {
-          const fullKlines = loadCanonicalKlines({ code, period });
-          const visibleKlines = fullKlines.filter(
-            (k) => new Date(k.time).getTime() <= targetEndMs,
-          );
-
-          if (visibleKlines.length >= 3) {
-            const pointInTimeCommands = ChanVisualAdapter.convert(
-              visibleKlines,
-              {
-                includeBi: true,
-                includeDuan: true,
-                includeZhongshu: true,
-                includeBsp: false,
-                filterFenxingContainment,
-              },
-            );
-            commands = pointInTimeCommands;
-            if (pointInTimeVisualCache.size > 2000) {
-              pointInTimeVisualCache.clear();
-            }
-            pointInTimeVisualCache.set(
-              cacheKey,
-              pointInTimeCommands as VisualCommand[],
-            );
-          } else {
-            commands = [];
-          }
-        }
-      } else {
-        const tactics = DynamicTacticsLoader.reloadTactics();
-        const evalResult = evaluateSignals(code, period, tactics, {
-          filterFenxingContainment,
-        });
-        commands = evalResult.commands;
-      }
-
-      const filtered = commands.filter((c: any) => {
-        const start = c.startTime || c.fromTime || c.time;
-        const end = c.endTime || c.toTime || c.time;
-        const startT = start ? new Date(start).getTime() : -Infinity;
-        const endT = end ? new Date(end).getTime() : startT;
-        return endT >= targetStartMs && startT <= targetEndMs;
+      const fullKlines = loadCanonicalKlines({ code, period });
+      const commands = ChanVisualAdapter.convert(fullKlines, {
+        includeBi: true,
+        includeDuan: true,
+        includeZhongshu: true,
+        includeBsp: false,
+        filterFenxingContainment,
       });
 
-      sendJson(res, { commands: filtered, count: filtered.length });
+      sendJson(res, { commands, count: commands.length });
     } catch (err: any) {
       console.error(`[/v1/visual/commands] 错误:`, err.message);
       sendJson(res, { commands: [], count: 0 });
@@ -752,50 +352,255 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 4. 策略版本激活/停用: POST /v1/strategies/:id/versions/:vid/activate 或 deactivate
-  if (
-    pathname.match(
-      /\/v1\/strategies\/\d+\/versions\/\d+\/(activate|deactivate)$/,
-    ) &&
-    req.method === 'POST'
-  ) {
-    sendJson(res, null);
+  // 4. 实时仿真推流核心端点
+  // 4.1 发起仿真会话: POST /v1/simulation/start
+  if (pathname.endsWith('/v1/simulation/start') && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const code = resolveSecurityCode(body, '000001');
+      const period = resolvePeriod(body.period, 30);
+      const filterFenxingContainment = Boolean(body.filterFenxingContainment);
+
+      const fullKlines = loadCanonicalKlines({ code, period });
+      const bars = fullKlines.map((k) => toStrategyBar(k, period));
+      const tactics = DynamicTacticsLoader.reloadTactics();
+      const flow = body.flow || createTacticsDecisionFlow(tactics);
+
+      const session = new StrategySimulationSession(bars, {
+        securityCode: code,
+        period,
+        startDate: body.startDate,
+        endDate: body.endDate,
+        filterFenxingContainment,
+        flow,
+      });
+
+      activeSessions.set(session.sessionId, session);
+
+      // 超时 30 分钟无活动自动清理
+      setTimeout(
+        () => {
+          if (activeSessions.has(session.sessionId)) {
+            activeSessions.get(session.sessionId)?.destroy();
+            activeSessions.delete(session.sessionId);
+          }
+        },
+        30 * 60 * 1000,
+      );
+
+      sendJson(res, session.getSummary(), 201);
+    } catch (err: any) {
+      console.error(`[POST /v1/simulation/start] 错误:`, err.message);
+      sendJson(res, { error: err.message }, 500);
+    }
     return;
   }
 
-  // 4.1 策略归档: POST /v1/strategies/:id/archive
-  if (
-    pathname.match(/\/v1\/strategies\/\d+\/archive$/) &&
-    req.method === 'POST'
-  ) {
-    sendJson(res, null);
-    return;
-  }
+  // 4.2 仿真推流长连接 (SSE): GET /v1/simulation/stream
+  if (pathname.endsWith('/v1/simulation/stream') && req.method === 'GET') {
+    const sessionId = String(parsedUrl.query.sessionId || '');
+    const session = activeSessions.get(sessionId);
 
-  // 4.2 创建策略版本: POST /v1/strategies/:id/versions
-  if (
-    pathname.match(/\/v1\/strategies\/\d+\/versions$/) &&
-    req.method === 'POST'
-  ) {
-    const body = await parseJsonBody(req);
-    sendJson(
-      res,
-      {
-        id: Date.now(),
-        strategyDefinitionId: 1,
-        versionNumber: 2,
-        signalKind: body.signalKind || 'entry',
-        status: 'draft',
-        description: body.description || '新建策略版本',
-        config: body.flowRule || {},
-        createdAt: new Date().toISOString(),
+    if (!session) {
+      res.writeHead(404, { 'Content-Type': 'text/plain' });
+      res.end(`Simulation session not found: ${sessionId}`);
+      return;
+    }
+
+    res.writeHead(200, {
+      'Content-Type': 'text/event-stream',
+      'Cache-Control': 'no-cache, no-transform',
+      Connection: 'keep-alive',
+      'Access-Control-Allow-Origin': '*',
+      'X-Accel-Buffering': 'no',
+    });
+    res.write(': stream-connected\n\n');
+
+    const handleFrame = (frame: SimulationFrame) => {
+      // 动态将 windowBars 转换为点位几何指令
+      const chanKlines = toChanKlines(frame.windowBars);
+      const commands = ChanVisualAdapter.convert(chanKlines, {
+        includeBi: true,
+        includeDuan: true,
+        includeZhongshu: true,
+        includeBsp: false,
+      });
+
+      const payload = {
+        sessionId: frame.sessionId,
+        cursor: frame.cursor,
+        total: frame.total,
+        bar: {
+          time: frame.bar.timestamp.toISOString(),
+          open: frame.bar.open,
+          high: frame.bar.high,
+          low: frame.bar.low,
+          close: frame.bar.close,
+          volume: frame.bar.volume ? Number(frame.bar.volume) : null,
+          amount: frame.bar.amount ? Number(frame.bar.amount) : null,
+        },
+        commands,
+        signals: frame.signals,
+        status: frame.status,
+      };
+
+      res.write(`event: frame\ndata: ${JSON.stringify(payload)}\n\n`);
+    };
+
+    session.setListeners({
+      onFrame: handleFrame,
+      onStatusChange: (status) => {
+        res.write(`event: status\ndata: ${JSON.stringify({ status })}\n\n`);
       },
-      201,
-    );
+    });
+
+    // 若当前游标已经存在帧，立即补发当前帧作为初态
+    const currentFrame = session.engine.getCurrentFrame();
+    if (currentFrame) {
+      handleFrame(currentFrame);
+    }
+
+    req.on('close', () => {
+      session.pause();
+    });
+
     return;
   }
 
-  // 4.3 策略版本列表: GET /v1/strategies/:id/versions
+  // 4.3 仿真控制指令: POST /v1/simulation/control
+  if (pathname.endsWith('/v1/simulation/control') && req.method === 'POST') {
+    try {
+      const body = await parseJsonBody(req);
+      const sessionId = String(body.sessionId || '');
+      const session = activeSessions.get(sessionId);
+
+      if (!session) {
+        sendJson(res, { error: `Session not found: ${sessionId}` }, 404);
+        return;
+      }
+
+      await session.control({
+        action: body.action,
+        param: body.param,
+      });
+
+      sendJson(res, session.getSummary());
+    } catch (err: any) {
+      console.error(`[POST /v1/simulation/control] 错误:`, err.message);
+      sendJson(res, { error: err.message }, 500);
+    }
+    return;
+  }
+
+  // 4.4 销毁仿真会话: POST /v1/simulation/stop
+  if (pathname.endsWith('/v1/simulation/stop') && req.method === 'POST') {
+    const body = await parseJsonBody(req);
+    const sessionId = String(body.sessionId || '');
+    const session = activeSessions.get(sessionId);
+    if (session) {
+      session.destroy();
+      activeSessions.delete(sessionId);
+    }
+    sendJson(res, { success: true });
+    return;
+  }
+
+  // 4.5 导出仿真队列与渲染数据快照: GET /v1/simulation/dump
+  if (pathname.endsWith('/v1/simulation/dump') && req.method === 'GET') {
+    let sessionId = String(parsedUrl.query.sessionId || '');
+    if (!sessionId && activeSessions.size > 0) {
+      // 默认读取最新的活跃 session
+      const allKeys = Array.from(activeSessions.keys());
+      sessionId = allKeys[allKeys.length - 1];
+    }
+
+    const session = activeSessions.get(sessionId);
+    if (!session) {
+      sendJson(res, { error: 'No active simulation session found' }, 404);
+      return;
+    }
+
+    try {
+      const dump = session.engine.dumpCurrentState();
+      const currentFrame = session.engine.getCurrentFrame();
+      const chanKlines = currentFrame
+        ? toChanKlines(currentFrame.windowBars)
+        : [];
+      const commands = ChanVisualAdapter.convert(chanKlines, {
+        includeBi: true,
+        includeDuan: true,
+        includeZhongshu: true,
+        includeBsp: false,
+      });
+
+      const fullDump = {
+        dumpTime: new Date().toISOString(),
+        sessionId: dump.sessionId,
+        securityCode: dump.securityCode,
+        period: dump.period,
+        cursor: dump.cursor,
+        totalBars: dump.totalBars,
+        preWarmBars: dump.preWarmBars,
+        currentBar: dump.currentBar,
+        queueSize: dump.windowQueue.length,
+        windowQueue: dump.windowQueue,
+        renderData: {
+          commandsCount: commands.length,
+          commands,
+        },
+        signalsCount: dump.signals.length,
+        signals: dump.signals,
+        latestFrameSignals: dump.latestFrameSignals,
+      };
+
+      try {
+        const dumpDir = path.resolve(__dirname, '../../.data/simulation-dumps');
+        if (!fs.existsSync(dumpDir)) {
+          fs.mkdirSync(dumpDir, { recursive: true });
+        }
+        fs.writeFileSync(
+          path.join(dumpDir, 'latest-dump.json'),
+          JSON.stringify(fullDump, null, 2),
+          'utf-8',
+        );
+        fs.writeFileSync(
+          path.join(dumpDir, `${dump.sessionId}.json`),
+          JSON.stringify(fullDump, null, 2),
+          'utf-8',
+        );
+      } catch {
+        // ignore disk write failure
+      }
+
+      sendJson(res, fullDump);
+    } catch (err: any) {
+      console.error(`[GET /v1/simulation/dump] 错误:`, err.message);
+      sendJson(res, { error: err.message }, 500);
+    }
+    return;
+  }
+
+  // 5. 策略列表: GET /v1/strategies
+  if (pathname.endsWith('/v1/strategies') && req.method === 'GET') {
+    const tactics = DynamicTacticsLoader.reloadTactics();
+    const meta = DynamicTacticsLoader.getActiveMetadata();
+    sendJson(res, [
+      {
+        id: 1,
+        name: `缠论策略树 [${tactics.name}]`,
+        description: `基于策略树决策流与四象限战术 (v${tactics.version})`,
+        kind: 'decision_flow',
+        status: 'active',
+        activeVersionNumber: 1,
+        metadata: meta,
+        periods: [1, 5, 15, 30, 60, 1440],
+        sources: ['qmt', 'tdx'],
+      },
+    ]);
+    return;
+  }
+
+  // 6. 策略版本与历史记录查询
   if (
     pathname.match(/\/v1\/strategies\/\d+\/versions$/) &&
     req.method === 'GET'
@@ -807,133 +612,44 @@ const server = http.createServer(async (req, res) => {
         strategyDefinitionId: 1,
         versionNumber: 1,
         signalKind: 'entry',
-        status: 'enabled',
-        description: `${tactics.name} (${tactics.id} v${tactics.version})`,
+        status: 'active',
+        description: `标准决策流版本 (集成四象限战术 v${tactics.version})`,
         config: {},
-        createdAt: new Date().toISOString(),
+        createdAt: new Date('2026-09-01').toISOString(),
       },
     ]);
     return;
   }
 
-  // 5. 创建策略定义: POST /v1/strategies
-  if (pathname.endsWith('/v1/strategies') && req.method === 'POST') {
-    const body = await parseJsonBody(req);
-    sendJson(
-      res,
-      {
-        id: Date.now(),
-        name: body.name || '新建策略',
-        description: body.description || '',
-        status: 'draft',
-        targetUniverse: body.targetUniverse || ['000001'],
-        periods: body.periods || [30],
-        sources: body.sources || ['qmt'],
-        createdAt: new Date().toISOString(),
-      },
-      201,
-    );
-    return;
-  }
-
-  // 5.1 策略列表: GET /v1/strategies
-  if (pathname.endsWith('/v1/strategies') && req.method === 'GET') {
-    const tactics = DynamicTacticsLoader.reloadTactics();
-    sendJson(res, [
-      {
-        id: 1,
-        name: tactics.name,
-        description: `本地开发动态战术 (${tactics.id} v${tactics.version})`,
-        status: 'enabled',
-        targetUniverse: ['000001', '600519'],
-        periods: [30, 1440, 1, 5],
-        sources: ['qmt', 'tdx'],
-      },
-    ]);
-    return;
-  }
-
-  // 5.2 策略实时信号: GET /v1/strategy-signals
-  if (pathname.endsWith('/v1/strategy-signals') && req.method === 'GET') {
-    try {
-      const tactics = DynamicTacticsLoader.reloadTactics();
-      const code = resolveSecurityCode(parsedUrl.query, '000001');
-      const period = resolvePeriod(parsedUrl.query.period, 30);
-      const { signals } = evaluateSignals(code, period, tactics);
-      const list = signals.slice(-50).map((sig, idx) => ({
-        id: idx + 1,
-        strategyDefinitionId: 1,
-        strategyVersionId: 1,
-        securityId: 1,
-        security: {
-          id: 1,
-          code,
-          name: code === '000001' ? '上证指数' : '贵州茅台',
-        },
-        period,
-        source: 'qmt',
-        signalTime: sig.decision.time.toISOString(),
-        signalSource: 'live',
-        signalKind: sig.isBuy ? 'entry' : 'exit',
-        signalType: sig.bspType,
-        confidence: sig.decision.confidence ?? 0.88,
-        confidenceLevel: 'HIGH',
-        decisionTrace: sig.decision,
-        contextSnapshot: {
-          type: sig.bspType,
-          action: sig.isBuy ? 'BUY' : 'SELL',
-          price: sig.decision.price,
-          triggerPrice: sig.decision.price,
-          time: sig.decision.time.toISOString(),
-          triggerTime: sig.decision.time.toISOString(),
-          signalTag: getBspBadgeText(sig.bspType, sig.decision.quadrant),
-          chanBsp: {
-            type: sig.bspType,
-            price: sig.decision.price,
-            level: period,
-            period,
-          },
-        },
-        ruleSnapshot: {
-          rule: sig.decision.reason,
-          quadrant: sig.decision.quadrant,
-        },
-        createdAt: sig.decision.time.toISOString(),
-      }));
-      sendJson(res, list);
-    } catch {
-      sendJson(res, []);
-    }
-    return;
-  }
-
-  // 5.3 策略告警事件: GET /v1/strategy-alert-events
-  if (pathname.endsWith('/v1/strategy-alert-events') && req.method === 'GET') {
-    sendJson(res, []);
-    return;
-  }
-
-  // 5.4 策略告警事件确认: POST /v1/strategy-alert-events/:id/ack
   if (
-    pathname.match(/\/v1\/strategy-alert-events\/\d+\/ack$/) &&
+    pathname.match(
+      /\/v1\/strategies\/\d+\/versions\/\d+\/(activate|deactivate)$/,
+    ) &&
     req.method === 'POST'
   ) {
-    sendJson(res, { id: 1, status: 'acked' });
+    sendJson(res, null);
     return;
   }
 
-  // 5.1 创建回测: POST /v1/strategy-backtests
+  // 7. 回测任务管理: GET/POST /v1/strategy-backtests
+  if (pathname.endsWith('/v1/strategy-backtests') && req.method === 'GET') {
+    sendJson(res, mockRuns);
+    return;
+  }
+
   if (pathname.endsWith('/v1/strategy-backtests') && req.method === 'POST') {
     try {
       const body = await parseJsonBody(req);
-      const tactics = DynamicTacticsLoader.reloadTactics();
       const symbol = resolveSecurityCode(body, '000001');
       const period = resolvePeriod(body.period, 30);
       const source = body.source || 'qmt';
       const startDate = body.startDate || '2024-01-01T00:00:00.000Z';
       const endDate = body.endDate || '2026-12-31T23:59:59.000Z';
 
-      const { signals } = evaluateSignals(symbol, period, tactics, {
+      // 统一走策略树仿真引擎计算
+      const { signals } = await runUnifiedSimulationBacktest({
+        code: symbol,
+        period,
         startDate,
         endDate,
       });
@@ -978,7 +694,7 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 6. 回测信号列表: GET /v1/strategy-backtests/:id/signals
+  // 8. 回测信号列表: GET /v1/strategy-backtests/:id/signals
   if (
     pathname.match(/\/v1\/strategy-backtests\/\d+\/signals$/) &&
     req.method === 'GET'
@@ -990,7 +706,6 @@ const server = http.createServer(async (req, res) => {
     const matchedRun = mockRuns.find((r) => r.id === runId) || mockRuns[0];
 
     try {
-      const tactics = DynamicTacticsLoader.reloadTactics();
       const symbol = resolveSecurityCode(
         parsedUrl.query,
         matchedRun?.targetUniverse[0] || '000001',
@@ -1002,58 +717,45 @@ const server = http.createServer(async (req, res) => {
       const filterFenxingContainment =
         parsedUrl.query.filterFenxingContainment === 'true' ||
         parsedUrl.query.filterFenxingContainment === '1';
-      const { signals } = evaluateSignals(symbol, period, tactics, {
+
+      // 统一走策略树仿真引擎计算
+      const { signals } = await runUnifiedSimulationBacktest({
+        code: symbol,
+        period,
         filterFenxingContainment,
         startDate: matchedRun?.startDate,
         endDate: matchedRun?.endDate,
       });
 
-      const signalResults = signals.map((sig, idx) => {
-        const d = sig.decision;
-        return {
-          id: idx + 1,
-          backtestRunId: runId,
-          securityCode: symbol,
-          signalTime: d.time.toISOString(),
-          signalType: sig.bspType,
-          confidence: d.confidence ?? 0.88,
-          confidenceLevel: 'HIGH',
-          decisionTrace: {
-            tacticsId: tactics.id,
-            tacticsName: tactics.name,
-            quadrant: d.quadrant,
-            action: sig.isBuy ? 'BUY' : 'SELL',
-            reason: d.reason,
-            price: d.price,
-            metadata: d.metadata,
+      const signalResults = signals.map((sig, idx) => ({
+        id: idx + 1,
+        backtestRunId: runId,
+        securityCode: symbol,
+        signalTime: sig.signalTime,
+        signalType: sig.signalType,
+        confidence: sig.confidence,
+        confidenceLevel: 'HIGH',
+        decisionTrace: sig.decisionTrace,
+        contextSnapshot: {
+          type: sig.signalType,
+          action: sig.isBuy ? 'BUY' : 'SELL',
+          price: sig.triggerPrice,
+          triggerPrice: sig.triggerPrice,
+          time: sig.signalTime,
+          triggerTime: sig.signalTime,
+          signalTag: sig.badgeText,
+          chanBsp: {
+            type: sig.signalType,
+            price: sig.triggerPrice,
+            level: period,
+            period,
           },
-          contextSnapshot: {
-            type: sig.bspType,
-            action: sig.isBuy ? 'BUY' : 'SELL',
-            price: d.price,
-            triggerPrice: d.price,
-            time: d.time.toISOString(),
-            triggerTime: d.time.toISOString(),
-            signalTag: getBspBadgeText(sig.bspType, d.quadrant),
-            chanBsp: {
-              type: sig.bspType,
-              price: d.price,
-              level: period,
-              period,
-            },
-            tactics: {
-              id: tactics.id,
-              name: tactics.name,
-              version: tactics.version,
-            },
-          },
-          ruleSnapshot: {
-            rule: d.reason,
-            quadrant: d.quadrant,
-          },
-          createdAt: d.time.toISOString(),
-        };
-      });
+        },
+        ruleSnapshot: {
+          rule: sig.badgeText,
+        },
+        createdAt: sig.signalTime,
+      }));
 
       sendJson(res, signalResults);
     } catch (err: any) {
@@ -1063,30 +765,20 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 7. 单次回测记录: GET /v1/strategy-backtests/:id
+  // 9. 单条回测详情: GET /v1/strategy-backtests/:id
   if (
     pathname.match(/\/v1\/strategy-backtests\/\d+$/) &&
     req.method === 'GET'
   ) {
     const runIdMatch = pathname.match(/\/v1\/strategy-backtests\/(\d+)$/);
     const runId = runIdMatch && runIdMatch[1] ? Number(runIdMatch[1]) : 1;
-    const matchedRun = mockRuns.find((r) => r.id === runId) || mockRuns[0];
-    sendJson(res, matchedRun);
+    const run = mockRuns.find((r) => r.id === runId) || mockRuns[0];
+    sendJson(res, run);
     return;
   }
 
-  // 8. 回测记录列表: GET /v1/strategy-backtests (或 GET /v1/strategy-backtests/runs)
-  if (
-    (pathname.endsWith('/v1/strategy-backtests') ||
-      pathname.endsWith('/v1/strategy-backtests/runs')) &&
-    req.method === 'GET'
-  ) {
-    sendJson(res, mockRuns);
-    return;
-  }
-
-  // 默认 404 兜底响应（符合 Mist 标准 Envelope 契约）
-  sendJson(res, null, 404, pathname || '/404');
+  // 默认 404
+  sendJson(res, { error: 'Not Found', path: pathname }, 404);
 });
 
 server.listen(PORT, '0.0.0.0', () => {
@@ -1096,32 +788,34 @@ server.listen(PORT, '0.0.0.0', () => {
   console.log(`已就绪契约:`);
   console.log(`  - POST /v1/indicators/k       (读取本地离线/快照行情)`);
   console.log(`  - POST /v1/chan/merge-k       (现算包含合并 K 线)`);
+  console.log(`  - GET  /v1/visual/commands    (现算纯几何指令流，笔/段/中枢)`);
+  console.log(`  - POST /v1/simulation/start   (创建流式推演仿真会话)`);
+  console.log(`  - GET  /v1/simulation/stream  (SSE 事件流长连接推流)`);
   console.log(
-    `  - GET  /v1/visual/commands    (现算缠论几何指令流，笔/段/中枢)`,
+    `  - POST /v1/simulation/control (播放/暂停/步进/调速/Seek 控制)`,
   );
+  console.log(`  - GET  /v1/simulation/dump    (导出仿真队列与渲染数据快照)`);
   console.log(`  - GET  /v1/strategies         (策略清单与版本)`);
-  console.log(`  - GET  /v1/strategy-backtests (回测记录与归因详情)\n`);
-  console.log(`现在可以在 mist-fe 目录运行: pnpm dev:local`);
+  console.log(`  - GET  /v1/strategy-backtests (策略树回测记录与归因详情)\n`);
 
-  // 异步在后台预热默认标的与周期，确保前端首次打开 0ms 瞬间响应
-  setTimeout(() => {
+  setTimeout(async () => {
     try {
-      const tactics = DynamicTacticsLoader.reloadTactics();
-      console.log('🔄 [预热] 正在后台预热 000001 30m 全量逐 Bar 回测数据...');
-      const res = evaluateSignals('000001', 30, tactics, {
-        startDate: mockRuns[0].startDate,
-        endDate: mockRuns[0].endDate,
+      console.log(`🔄 [预热] 正在后台基于策略树预热 000001 30m 决策流数据...`);
+      const fullKlines = loadCanonicalKlines({ code: '000001', period: 30 });
+      const recentStart =
+        fullKlines.length > 200
+          ? fullKlines[fullKlines.length - 200].time
+          : undefined;
+      const { signals } = await runUnifiedSimulationBacktest({
+        code: '000001',
+        period: 30,
+        startDate: recentStart,
       });
-      // 写入通用全局缓存键，确保无时间窗口查询同样 0ms 命中
-      evalCache.set(
-        `000001_30_${tactics.id}_${tactics.version}_false_-Infinity_Infinity`,
-        res,
-      );
       console.log(
-        `✅ [预热] 000001 30m 全量逐 Bar 回测数据已就绪！(信号数: ${res.signals.length}, 几何图元: ${res.commands.length})`,
+        `✅ [预热] 000001 30m 决策流推演就绪！(就绪信号数: ${signals.length})`,
       );
     } catch (e: any) {
-      console.warn('预热提示:', e.message);
+      console.error(`⚠️ [预热] 后台预热遇到问题:`, e.message);
     }
-  }, 50);
+  }, 100);
 });
