@@ -22,15 +22,22 @@ export class StrategySimulationSession {
   private listeners: SimulationSessionListeners = {};
   private isProcessing = false;
 
+  public readonly config: SimulationSessionConfig;
+
   constructor(
     allBars: readonly StrategyBar[],
     config: SimulationSessionConfig,
     listeners?: SimulationSessionListeners,
   ) {
+    this.config = config;
     this.engine = new StrategySimulationEngine(allBars, config);
     if (listeners) {
       this.listeners = listeners;
     }
+  }
+
+  public get startDate(): string | Date | undefined {
+    return this.config.startDate;
   }
 
   public get sessionId(): string {

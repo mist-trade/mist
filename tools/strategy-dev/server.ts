@@ -188,14 +188,34 @@ function toChanKlines(projectedBars: readonly any[]): readonly ChanK[] {
   }));
 }
 
-function formatFramePayload(frame: SimulationFrame): string {
+function isVisualCommandAfterOrAt(cmd: any, startMs: number): boolean {
+  const rawTime = cmd.startTime ?? cmd.fromTime ?? cmd.time;
+  if (!rawTime) return true;
+  const timeMs = new Date(rawTime).getTime();
+  return isNaN(timeMs) || timeMs >= startMs;
+}
+
+function formatFramePayload(
+  frame: SimulationFrame,
+  startDate?: string | Date,
+): string {
   const chanKlines = toChanKlines(frame.windowBars);
-  const commands = ChanVisualAdapter.convert(chanKlines, {
+  const allCommands = ChanVisualAdapter.convert(chanKlines, {
     includeBi: true,
     includeDuan: true,
     includeZhongshu: true,
     includeBsp: false,
   });
+
+  let commands = allCommands;
+  if (startDate) {
+    const startMs = new Date(startDate).getTime();
+    if (!isNaN(startMs)) {
+      commands = allCommands.filter((cmd) =>
+        isVisualCommandAfterOrAt(cmd, startMs),
+      );
+    }
+  }
 
   const payload = {
     sessionId: frame.sessionId,
@@ -560,7 +580,7 @@ const server = http.createServer(async (req, res) => {
         onFrame: (frame) => {
           const clients = sessionStreamClients.get(session.sessionId);
           if (!clients || clients.size === 0) return;
-          const payloadString = formatFramePayload(frame);
+          const payloadString = formatFramePayload(frame, session.startDate);
           for (const clientRes of clients) {
             try {
               clientRes.write(`event: frame\ndata: ${payloadString}\n\n`);
@@ -635,14 +655,16 @@ const server = http.createServer(async (req, res) => {
     if (currentFrame) {
       try {
         res.write(
-          `event: frame\ndata: ${formatFramePayload(currentFrame)}\n\n`,
+          `event: frame\ndata: ${formatFramePayload(currentFrame, session.startDate)}\n\n`,
         );
       } catch {}
     } else if (session.engine.totalBars > 0) {
       void session.engine.seek(0).then((frame) => {
         if (frame && clients?.has(res)) {
           try {
-            res.write(`event: frame\ndata: ${formatFramePayload(frame)}\n\n`);
+            res.write(
+              `event: frame\ndata: ${formatFramePayload(frame, session.startDate)}\n\n`,
+            );
           } catch {}
         }
       });
@@ -741,12 +763,19 @@ const server = http.createServer(async (req, res) => {
       const chanKlines = currentFrame
         ? toChanKlines(currentFrame.windowBars)
         : [];
-      const commands = ChanVisualAdapter.convert(chanKlines, {
+      const allCommands = ChanVisualAdapter.convert(chanKlines, {
         includeBi: true,
         includeDuan: true,
         includeZhongshu: true,
         includeBsp: false,
       });
+
+      const startMs = session.startDate
+        ? new Date(session.startDate).getTime()
+        : NaN;
+      const commands = !isNaN(startMs)
+        ? allCommands.filter((cmd) => isVisualCommandAfterOrAt(cmd, startMs))
+        : allCommands;
 
       const fullDump = {
         dumpTime: new Date().toISOString(),
