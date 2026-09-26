@@ -53,4 +53,13 @@ export class QueryVisualCommandsDto {
   @IsOptional()
   @IsString()
   endDate?: string;
+
+  @ApiPropertyOptional({
+    description:
+      '是否过滤顶底分型区间包含（工程防噪补丁）。默认 false（对齐缠论原典，不作分型包含过滤）',
+    example: false,
+  })
+  @IsOptional()
+  @Type(() => Boolean)
+  filterFenxingContainment?: boolean;
 }

@@ -96,6 +96,7 @@ describe('BacktestRunQueryService', () => {
           backtestRunId: 1,
           securityCode: '600000.SH',
           signalTime: new Date('2026-01-05T01:30:00Z'),
+          signalType: 'first_buy',
           confidence: 85,
           confidenceLevel: 'HIGH',
           decisionTrace: { status: 'SIGNAL_EMITTED', signalTag: 'TEST' },
@@ -122,6 +123,7 @@ describe('BacktestRunQueryService', () => {
         backtestRunId: 1,
         securityCode: '600000.SH',
         signalTime: '2026-01-05T01:30:00.000Z',
+        signalType: 'first_buy',
         confidence: 85,
         confidenceLevel: 'HIGH',
         decisionTrace: { status: 'SIGNAL_EMITTED', signalTag: 'TEST' },
@@ -131,6 +133,7 @@ describe('BacktestRunQueryService', () => {
       });
       expect(qb.select).toHaveBeenCalledWith(
         expect.arrayContaining([
+          'result.signalType',
           'result.confidence',
           'result.confidenceLevel',
           'result.decisionTrace',

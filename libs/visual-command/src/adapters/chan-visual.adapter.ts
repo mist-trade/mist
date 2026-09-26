@@ -24,6 +24,7 @@ export interface ChanVisualOptions {
   readonly includeDuan?: boolean;
   readonly includeZhongshu?: boolean;
   readonly includeBsp?: boolean;
+  readonly filterFenxingContainment?: boolean;
   readonly biColor?: string;
   readonly duanColor?: string;
   readonly zhongshuBiColor?: string;
@@ -74,7 +75,9 @@ export class ChanVisualAdapter {
     };
 
     // 1. Compute Bis (Strokes)
-    const biTwoPhase = ChanCore.createBi(klines);
+    const biTwoPhase = ChanCore.createBi(klines, {
+      filterFenxingContainment: options.filterFenxingContainment,
+    });
     const bis = biTwoPhase.phaseB;
 
     if (includeBi && bis.length > 0) {
@@ -111,7 +114,9 @@ export class ChanVisualAdapter {
 
     // 2. Compute Bi Channels (Zhongshu)
     if (includeZhongshu) {
-      const biChannels = ChanCore.createChannels(klines);
+      const biChannels = ChanCore.createChannels(klines, {
+        filterFenxingContainment: options.filterFenxingContainment,
+      });
       biChannels.phaseB.forEach((zs, i) => {
         // 防御：中枢构成单元须全部确认且有效（chancore 已保证；防旧版本/外部数据）
         // 中枢真实区间：从启动笔终点（第1根构件笔起点）到离开笔起点（最后一根构件笔终点）
@@ -146,8 +151,12 @@ export class ChanVisualAdapter {
           layer: 'chan_zs_bi',
           fromIndex: fromIdx,
           toIndex: toIdx,
+          startIndex: fromIdx,
+          endIndex: toIdx,
           fromTime: new Date(centralStartBi.startTime).toISOString(),
           toTime,
+          startTime: new Date(centralStartBi.startTime).toISOString(),
+          endTime: toTime,
           top: zs.zg,
           bottom: zs.zd,
           gg: zs.gg,
@@ -245,8 +254,12 @@ export class ChanVisualAdapter {
           layer: 'chan_zs_duan',
           fromIndex: fromIdx,
           toIndex: toIdx,
+          startIndex: fromIdx,
+          endIndex: toIdx,
           fromTime: new Date(first.startTime).toISOString(),
           toTime,
+          startTime: new Date(first.startTime).toISOString(),
+          endTime: toTime,
           top: zs.zg,
           bottom: zs.zd,
           gg: zs.gg,

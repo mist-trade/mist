@@ -119,6 +119,7 @@ export class BacktestRunQueryService {
         'result.backtestRunId',
         'result.securityCode',
         'result.signalTime',
+        'result.signalType',
         'result.confidence',
         'result.confidenceLevel',
         'result.decisionTrace',
@@ -191,6 +192,7 @@ function mapResult(result: BacktestSignalResult): BacktestSignalResultVo {
     backtestRunId: result.backtestRunId,
     securityCode: result.securityCode,
     signalTime: result.signalTime.toISOString(),
+    signalType: result.signalType,
     confidence:
       result.confidence !== null && result.confidence !== undefined
         ? Number(result.confidence)

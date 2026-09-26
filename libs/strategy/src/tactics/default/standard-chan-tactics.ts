@@ -1,5 +1,6 @@
-import { TrendDirection, type ChanK } from '@app/chancore';
+import { TrendDirection, FenxingType, type ChanK } from '@app/chancore';
 import { computeMacdSeries } from '@app/indicators';
+import { detectLatestConfirmedFenxing } from '../../analysis/chan-fenxing-trigger';
 import {
   ChanFourQuadrantTactics,
   ChanTacticsContext,
@@ -179,12 +180,8 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
         );
       }
     } else {
-      const k0 = klines[klines.length - 3];
-      const k1 = klines[klines.length - 2];
-      const k2 = klines[klines.length - 1];
-      const isBottomFenxing =
-        k0.low > k1.low && k2.low > k1.low && k2.close > k1.high;
-      if (!isBottomFenxing) {
+      const fenxing = detectLatestConfirmedFenxing(klines);
+      if (!fenxing || fenxing.type !== FenxingType.Bottom) {
         return this.emptyDecision(
           TacticalQuadrant.LeftBuy,
           ctx,
@@ -249,22 +246,31 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
       const b1 = bis[bis.length - 2];
       const b2 = bis[bis.length - 1];
 
-      // 下降笔 b0 -> 上升笔 b1 -> 下降笔 b2（不破 b0.low）
+      // 下降笔 b0 -> 上升笔 b1 -> 下降笔 b2（不破 b0.low）且当根 Bar 确认底分型
       if (
         b0.trend === TrendDirection.Down &&
         b1.trend === TrendDirection.Up &&
         b2.trend === TrendDirection.Down &&
         b2.low > b0.low
       ) {
+        const fenxing = detectLatestConfirmedFenxing(ctx.klines);
+        if (!fenxing || fenxing.type !== FenxingType.Bottom) {
+          return this.emptyDecision(
+            TacticalQuadrant.RightBuy,
+            ctx,
+            '二买形态观察中，等待底分型扳机确立',
+          );
+        }
+
         return {
           triggered: true,
           quadrant: TacticalQuadrant.RightBuy,
-          price: ctx.lastPrice ?? b2.low,
-          time: ctx.timestamp,
+          price: ctx.lastPrice ?? fenxing.extremumPrice,
+          time: fenxing.confirmedTime,
           confidence: macroTrend === 'UP' ? 92 : 82,
           action: TacticalAction.OpenLong,
-          reason: `标准二买形态：次次回抽低点(${b2.low})抬高不破前低(${b0.low}) (上一级别MACD: ${macroTrend})`,
-          stopLossPrice: b2.low,
+          reason: `标准二买形态：次次回抽低点(${b2.low})抬高不破前低(${b0.low})且底分型确立 (上一级别MACD: ${macroTrend})`,
+          stopLossPrice: fenxing.stopLossPrice,
         };
       }
     }
@@ -303,12 +309,8 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
         );
       }
     } else {
-      const k0 = klines[klines.length - 3];
-      const k1 = klines[klines.length - 2];
-      const k2 = klines[klines.length - 1];
-      const isTopFenxing =
-        k0.high < k1.high && k2.high < k1.high && k2.close < k1.low;
-      if (!isTopFenxing) {
+      const fenxing = detectLatestConfirmedFenxing(klines);
+      if (!fenxing || fenxing.type !== FenxingType.Top) {
         return this.emptyDecision(
           TacticalQuadrant.LeftSell,
           ctx,
@@ -370,21 +372,31 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
       const b1 = bis[bis.length - 2];
       const b2 = bis[bis.length - 1];
 
-      // 上升笔 b0 -> 下降笔 b1 -> 上升笔 b2（不过 b0.high）
+      // 上升笔 b0 -> 下降笔 b1 -> 上升笔 b2（不过 b0.high）且当根 Bar 确认顶分型
       if (
         b0.trend === TrendDirection.Up &&
         b1.trend === TrendDirection.Down &&
         b2.trend === TrendDirection.Up &&
         b2.high < b0.high
       ) {
+        const fenxing = detectLatestConfirmedFenxing(ctx.klines);
+        if (!fenxing || fenxing.type !== FenxingType.Top) {
+          return this.emptyDecision(
+            TacticalQuadrant.RightSell,
+            ctx,
+            '二卖形态观察中，等待顶分型扳机确立',
+          );
+        }
+
         return {
           triggered: true,
           quadrant: TacticalQuadrant.RightSell,
-          price: ctx.lastPrice ?? b2.high,
-          time: ctx.timestamp,
-          confidence: macroTrend === 'DOWN' ? 92 : 85,
+          price: ctx.lastPrice ?? fenxing.extremumPrice,
+          time: fenxing.confirmedTime,
+          confidence: macroTrend === 'DOWN' ? 90 : 82,
           action: TacticalAction.CloseLong,
-          reason: `二卖形态：反弹高点(${b2.high})不过前高(${b0.high})，动能衰竭 (上一级别MACD: ${macroTrend})`,
+          reason: `标准二卖形态：反弹高点(${b2.high})不过前高(${b0.high})且顶分型确立 (上一级别MACD: ${macroTrend})`,
+          stopLossPrice: fenxing.stopLossPrice,
         };
       }
     }

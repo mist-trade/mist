@@ -113,6 +113,9 @@ export class VisualController {
       source: query.source ?? 'default',
       klines: chanKlines,
       layers: requestedLayers,
+      chanOptions: {
+        filterFenxingContainment: query.filterFenxingContainment,
+      },
     });
   }
 }

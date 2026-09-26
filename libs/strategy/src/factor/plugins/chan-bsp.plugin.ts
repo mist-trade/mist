@@ -6,6 +6,7 @@ import {
   ChannelType,
   DuanStatus,
   DuanType,
+  FenxingType,
   type ChanBi,
   type ChanBspUnit,
   type ChanChannel,
@@ -16,6 +17,10 @@ import {
 } from '@app/chancore';
 import { computeChanUnitForces } from '@app/indicators';
 import type { ProjectedStrategyBar } from '@app/market-data';
+import {
+  detectLatestConfirmedFenxing,
+  type ConfirmedFenxingResult,
+} from '../../analysis/chan-fenxing-trigger';
 import type {
   FactorContext,
   FactorOpinion,
@@ -36,6 +41,7 @@ export interface ChanBspPluginParams {
   };
   readonly requiredBarCount?: number;
   readonly deduplicate?: boolean;
+  readonly requireConfirmedFenxing?: boolean;
 }
 
 export interface ChanBspDetectedEvent {
@@ -77,7 +83,8 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       },
     },
     requiredBarCount: { type: 'number', default: 50 },
-    deduplicate: { type: 'boolean', default: false },
+    deduplicate: { type: 'boolean', default: true },
+    requireConfirmedFenxing: { type: 'boolean', default: false },
   };
 
   /** 增量发射游标：key -> lastEmittedUnitIndex */
@@ -148,6 +155,34 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     // 取最新一个买卖点作为主要触发决策
     const latestEvent = candidateEvents[candidateEvents.length - 1];
     const isBuy = latestEvent.type.endsWith('_buy');
+
+    // 若开启当根分型确认门禁，必须满足最新 K 线刚刚确立底/顶分型
+    let confirmedFenxing: ConfirmedFenxingResult | null = null;
+    if (params.requireConfirmedFenxing) {
+      confirmedFenxing = detectLatestConfirmedFenxing(klines);
+      if (!confirmedFenxing) {
+        return {
+          action: 'NEUTRAL',
+          confidence: 0.0,
+          reason: '当前最新K线未确立有效分型扳机(笔内延伸或包含)',
+        };
+      }
+      if (isBuy && confirmedFenxing.type !== FenxingType.Bottom) {
+        return {
+          action: 'NEUTRAL',
+          confidence: 0.0,
+          reason: '检测到买点结构，但最新确立分型为顶分型而非底分型',
+        };
+      }
+      if (!isBuy && confirmedFenxing.type !== FenxingType.Top) {
+        return {
+          action: 'NEUTRAL',
+          confidence: 0.0,
+          reason: '检测到卖点结构，但最新确立分型为底分型而非顶分型',
+        };
+      }
+    }
+
     const action = isBuy ? 'BUY' : 'SELL';
     const confidence = this.computeConfidence(latestEvent.type);
     const unitLabel = params.units === 'duan' ? '线段' : '笔';
@@ -167,6 +202,14 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         zhongshuIndex: latestEvent.zhongshuIndex,
         unitIndex: latestEvent.unitIndex,
         allCandidatesCount: candidateEvents.length,
+        fenxing: confirmedFenxing
+          ? {
+              type: confirmedFenxing.type,
+              extremumPrice: confirmedFenxing.extremumPrice,
+              stopLossPrice: confirmedFenxing.stopLossPrice,
+              confirmedTime: confirmedFenxing.confirmedTime.toISOString(),
+            }
+          : undefined,
       },
     };
   }
@@ -184,7 +227,8 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         typeof params?.requiredBarCount === 'number'
           ? params.requiredBarCount
           : undefined,
-      deduplicate: params?.deduplicate === true,
+      deduplicate: params?.deduplicate !== false,
+      requireConfirmedFenxing: params?.requireConfirmedFenxing === true,
     };
   }
 

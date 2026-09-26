@@ -9,6 +9,10 @@ export class BacktestSignalResultVo {
   securityCode!: string;
   @ApiProperty()
   signalTime!: string;
+  @ApiPropertyOptional({
+    description: '买卖点/信号类型 (如 first_buy, second_sell 等)',
+  })
+  signalType?: string;
   @ApiPropertyOptional({ description: '决策流综合置信度得分 (0~100)' })
   confidence?: number | null;
   @ApiPropertyOptional({

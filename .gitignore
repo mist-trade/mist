@@ -86,3 +86,13 @@ handoff-prompts-*.md
 libs/strategy/src/tactics/private/
 *.private.ts
 *.secret.ts
+
+# Local offline market data cache (never commit raw market bars)
+.data/
+*.kline.json
+tools/strategy-dev/data/kline/*
+!tools/strategy-dev/data/kline/.gitkeep
+tools/strategy-dev/*.log
+*.log
+
+

@@ -10,6 +10,8 @@ export {
   calculateStrategyMacd,
 } from './analysis/strategy-macd';
 export type { StrategyMacdObservation } from './analysis/strategy-macd';
+export { detectLatestConfirmedFenxing } from './analysis/chan-fenxing-trigger';
+export type { ConfirmedFenxingResult } from './analysis/chan-fenxing-trigger';
 export type {
   StrategyBar,
   StrategyBarType,

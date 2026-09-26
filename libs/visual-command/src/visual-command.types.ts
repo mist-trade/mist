@@ -25,6 +25,10 @@ export interface BandVisualCommand extends BaseVisualCommand {
   readonly toIndex: number;
   readonly fromTime: string;
   readonly toTime: string;
+  readonly startIndex?: number;
+  readonly endIndex?: number;
+  readonly startTime?: string;
+  readonly endTime?: string;
   readonly top: number;
   readonly bottom: number;
   readonly color: string;
