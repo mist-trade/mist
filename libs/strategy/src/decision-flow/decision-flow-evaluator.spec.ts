@@ -169,6 +169,51 @@ describe('Phase 2: Decision Flow Engine', () => {
       expect(result.reason).toContain('前置门禁');
       expect(result.trace).toHaveLength(1);
     });
+
+    it('passes and inherits SELL action when requiredAction is BOTH and terminal action is INHERIT', async () => {
+      registry.register({
+        id: 'plugin.guard.sell_mock',
+        name: 'Mock Sell Guard',
+        category: 'CHAN',
+        version: '1.0.0',
+        description: '',
+        evaluate: async () => ({
+          action: 'SELL',
+          confidence: 0.9,
+          reason: '缠论笔级三卖确认',
+        }),
+      });
+
+      const flow: DecisionFlowNode = {
+        id: 'guard_both',
+        type: 'GUARD',
+        name: '多空双向门禁',
+        pluginId: 'plugin.guard.sell_mock',
+        requiredAction: 'BOTH',
+        minConfidence: 0.6,
+        onPass: {
+          id: 'term_inherit',
+          type: 'TERMINAL',
+          action: 'INHERIT',
+          signalTag: 'CHAN_BSP_SIGNAL',
+        },
+      };
+
+      const context: FactorContext = {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date(),
+        period: 5,
+        bars: [],
+        attributes: new Map(),
+      };
+
+      const result = await evaluator.evaluate(flow, context);
+      expect(result.status).toBe('SIGNAL_EMITTED');
+      expect(result.action).toBe('SELL');
+      expect(result.signalTag).toBe('CHAN_BSP_SIGNAL');
+      expect(result.confidence).toBe(90);
+    });
   });
 
   describe('BranchNode (Condition Routing)', () => {

@@ -140,7 +140,10 @@ describe('StrategySimulationEngine', () => {
     expect((engine as any).formatBadgeText('third_buy', true)).toBe('3买');
     expect((engine as any).formatBadgeText('first_buy', true)).toBe('1买');
     expect((engine as any).formatBadgeText('second_buy', true)).toBe('2买');
+    expect((engine as any).formatBadgeText('third_buy', true)).toBe('3买');
     expect((engine as any).formatBadgeText('first_sell', false)).toBe('1卖');
+    expect((engine as any).formatBadgeText('second_sell', false)).toBe('2卖');
+    expect((engine as any).formatBadgeText('third_sell', false)).toBe('3卖');
   });
 });
 

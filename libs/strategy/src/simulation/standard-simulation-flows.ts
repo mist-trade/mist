@@ -31,6 +31,11 @@ export function createChanBspDecisionFlow(
   const requiredBarCount = options?.requiredBarCount ?? 60;
   const deduplicate = options?.deduplicate ?? true;
 
+  const requiredAction =
+    direction === 'both' ? 'BOTH' : direction === 'sell' ? 'SELL' : 'BUY';
+  const terminalAction =
+    direction === 'both' ? 'INHERIT' : direction === 'sell' ? 'SELL' : 'BUY';
+
   return {
     id: 'guard_chan_bsp',
     type: 'GUARD',
@@ -43,12 +48,12 @@ export function createChanBspDecisionFlow(
       requiredBarCount,
       deduplicate,
     },
-    requiredAction: direction === 'sell' ? 'SELL' : 'BUY',
+    requiredAction,
     minConfidence: 0.6,
     onPass: {
       id: 'term_chan_bsp_passed',
       type: 'TERMINAL',
-      action: direction === 'sell' ? 'SELL' : 'BUY',
+      action: terminalAction,
       signalTag: 'CHAN_BSP',
       reason: '缠论结构确立，触发买卖点信号',
     },
@@ -80,20 +85,20 @@ export function createTacticsDecisionFlow(
       requiredBarCount: 60,
       deduplicate: true,
     },
-    requiredAction: 'BUY',
+    requiredAction: 'BOTH',
     minConfidence: 0.5,
     onPass: {
-      id: 'term_tactics_entry',
+      id: 'term_tactics_signal',
       type: 'TERMINAL',
-      action: 'BUY',
-      signalTag: 'TACTICS_ENTRY',
-      reason: `满足四象限战术 [${tactics.name}] 入场条件`,
+      action: 'INHERIT',
+      signalTag: 'TACTICS_SIGNAL',
+      reason: `满足四象限战术 [${tactics.name}] 触发条件`,
     },
     onFail: {
       id: 'term_tactics_abort',
       type: 'TERMINAL',
       action: 'ABORT',
-      reason: '未达四象限战术入场标准',
+      reason: '未达四象限战术触发标准',
     },
   };
 }

@@ -43,6 +43,7 @@ export class DecisionFlowEvaluator {
     context: FactorContext,
     trace: DecisionExecutionTraceItem[],
     currentScore?: number,
+    inheritedAction?: 'BUY' | 'SELL',
   ): Promise<DecisionResult> {
     switch (node.type) {
       case 'GUARD': {
@@ -60,17 +61,36 @@ export class DecisionFlowEvaluator {
         });
 
         const minConf = node.minConfidence ?? 0.0;
-        const passed =
-          opinion.action === node.requiredAction &&
-          opinion.confidence >= minConf;
+        const actionMatches =
+          node.requiredAction === 'BOTH' || node.requiredAction === 'ANY'
+            ? opinion.action === 'BUY' || opinion.action === 'SELL'
+            : opinion.action === node.requiredAction;
+        const passed = actionMatches && opinion.confidence >= minConf;
 
         const nextScore =
           currentScore ?? Number((opinion.confidence * 100).toFixed(1));
 
+        const nextInheritedAction =
+          opinion.action === 'BUY' || opinion.action === 'SELL'
+            ? opinion.action
+            : inheritedAction;
+
         if (passed) {
-          return this.evaluateNode(node.onPass, context, trace, nextScore);
+          return this.evaluateNode(
+            node.onPass,
+            context,
+            trace,
+            nextScore,
+            nextInheritedAction,
+          );
         } else if (node.onFail) {
-          return this.evaluateNode(node.onFail, context, trace, nextScore);
+          return this.evaluateNode(
+            node.onFail,
+            context,
+            trace,
+            nextScore,
+            inheritedAction,
+          );
         }
 
         return {
@@ -94,7 +114,13 @@ export class DecisionFlowEvaluator {
         const nextNode = conditionResult
           ? node.branches.true
           : node.branches.false;
-        return this.evaluateNode(nextNode, context, trace, currentScore);
+        return this.evaluateNode(
+          nextNode,
+          context,
+          trace,
+          currentScore,
+          inheritedAction,
+        );
       }
 
       case 'EXTRACTOR': {
@@ -115,7 +141,13 @@ export class DecisionFlowEvaluator {
           evidence: opinion.evidence,
         });
 
-        return this.evaluateNode(node.next, context, trace, currentScore);
+        return this.evaluateNode(
+          node.next,
+          context,
+          trace,
+          currentScore,
+          inheritedAction,
+        );
       }
 
       case 'CONSENSUS': {
@@ -180,6 +212,7 @@ export class DecisionFlowEvaluator {
             context,
             trace,
             calculatedScore,
+            inheritedAction,
           );
         } else if (node.onFailure) {
           return this.evaluateNode(
@@ -187,6 +220,7 @@ export class DecisionFlowEvaluator {
             context,
             trace,
             calculatedScore,
+            inheritedAction,
           );
         }
 
@@ -202,18 +236,21 @@ export class DecisionFlowEvaluator {
       }
 
       case 'TERMINAL': {
+        const finalAction =
+          node.action === 'INHERIT' ? inheritedAction || 'BUY' : node.action;
+
         trace.push({
           nodeId: node.id,
           type: 'TERMINAL',
-          action: node.action,
+          action: finalAction,
           signalTag: node.signalTag,
           reason: node.reason,
         });
 
-        const confidence = currentScore ?? (node.action === 'ABORT' ? 0 : 85);
+        const confidence = currentScore ?? (finalAction === 'ABORT' ? 0 : 85);
         const confidenceLevel = this.resolveConfidenceLevel(confidence);
 
-        if (node.action === 'ABORT') {
+        if (finalAction === 'ABORT') {
           return {
             status: 'ABORTED',
             confidence,
@@ -226,13 +263,13 @@ export class DecisionFlowEvaluator {
 
         return {
           status: 'SIGNAL_EMITTED',
-          action: node.action,
+          action: finalAction,
           confidence,
           confidenceLevel,
           signalTag: node.signalTag,
           reason:
             node.reason ??
-            `决策流信号发射 (${node.action === 'BUY' ? '买入/开仓' : '卖出/平仓'})`,
+            `决策流信号发射 (${finalAction === 'BUY' ? '买入/开仓' : '卖出/平仓'})`,
           trace,
         };
       }

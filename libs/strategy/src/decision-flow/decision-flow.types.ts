@@ -18,8 +18,8 @@ export interface GuardNode {
   readonly pluginId: string;
   /** 插件参数 */
   readonly params?: Record<string, unknown>;
-  /** 期望通过的动作，通常为 'BUY' */
-  readonly requiredAction: FactorAction;
+  /** 期望通过的动作，通常为 'BUY'，多空并存时可指定为 'BOTH' 或 'ANY' */
+  readonly requiredAction: FactorAction | 'BOTH' | 'ANY';
   /** 最低置信度要求（低于此置信度视作门禁未过，默认 0.0） */
   readonly minConfidence?: number;
   /** 门禁通过后流向的下一个节点 */
@@ -100,8 +100,8 @@ export interface ConsensusNode {
 export interface TerminalNode {
   readonly id: string;
   readonly type: 'TERMINAL';
-  /** 最终裁决：产生买入/卖出信号，或显式记录终止阻断 */
-  readonly action: 'BUY' | 'SELL' | 'ABORT';
+  /** 最终裁决：产生买入/卖出信号，或显式记录终止阻断，或继承前置门禁动作 (INHERIT) */
+  readonly action: 'BUY' | 'SELL' | 'ABORT' | 'INHERIT';
   /** 信号业务标签（如 'BREAKOUT_RESONANCE', 'OVERSOLD_REBOUND'） */
   readonly signalTag?: string;
   /** 终止说明 */
