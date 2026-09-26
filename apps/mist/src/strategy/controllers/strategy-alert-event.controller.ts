@@ -1,5 +1,6 @@
 import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
+import { ApiEnvelopeResponse } from '@app/transport/http';
 import { MarkStrategyAlertDeliveryDto } from '../dto/mark-strategy-alert-delivery.dto';
 import { QueryStrategyAlertEventDto } from '../dto/query-strategy-alert-event.dto';
 import { StrategyAlertEventService } from '../services/strategy-alert-event.service';
@@ -13,7 +14,11 @@ export class StrategyAlertEventController {
   ) {}
 
   @Get()
-  @ApiOkResponse({ type: StrategyAlertEventVo, isArray: true })
+  @ApiEnvelopeResponse({
+    status: 200,
+    type: StrategyAlertEventVo,
+    isArray: true,
+  })
   async findAll(
     @Query() query: QueryStrategyAlertEventDto,
   ): Promise<StrategyAlertEventVo[]> {
@@ -21,7 +26,7 @@ export class StrategyAlertEventController {
   }
 
   @Post(':id/delivered')
-  @ApiOkResponse({ type: StrategyAlertEventVo })
+  @ApiEnvelopeResponse({ status: 200, type: StrategyAlertEventVo })
   async markDelivered(
     @Param('id') id: string,
     @Body() dto: MarkStrategyAlertDeliveryDto,
@@ -30,7 +35,7 @@ export class StrategyAlertEventController {
   }
 
   @Post(':id/failed')
-  @ApiOkResponse({ type: StrategyAlertEventVo })
+  @ApiEnvelopeResponse({ status: 200, type: StrategyAlertEventVo })
   async markFailed(
     @Param('id') id: string,
     @Body() dto: MarkStrategyAlertDeliveryDto,
@@ -39,7 +44,7 @@ export class StrategyAlertEventController {
   }
 
   @Post(':id/ack')
-  @ApiOkResponse({ type: StrategyAlertEventVo })
+  @ApiEnvelopeResponse({ status: 200, type: StrategyAlertEventVo })
   async acknowledge(@Param('id') id: string): Promise<StrategyAlertEventVo> {
     return await this.strategyAlertEventService.acknowledge(Number(id));
   }

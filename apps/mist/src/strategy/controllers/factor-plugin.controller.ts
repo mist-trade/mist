@@ -1,5 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
-import { ApiOkResponse, ApiTags } from '@nestjs/swagger';
+import { ApiTags } from '@nestjs/swagger';
+import { ApiEnvelopeResponse } from '@app/transport/http';
 import {
   factorPluginRegistry,
   ensureStandardPluginsRegistered,
@@ -15,7 +16,7 @@ export class FactorPluginController {
   }
 
   @Get('plugins')
-  @ApiOkResponse({ type: [FactorPluginVo] })
+  @ApiEnvelopeResponse({ status: 200, type: FactorPluginVo, isArray: true })
   listPlugins(@Query('category') category?: FactorCategory): FactorPluginVo[] {
     ensureStandardPluginsRegistered();
     const plugins = factorPluginRegistry.listByCategory(category);

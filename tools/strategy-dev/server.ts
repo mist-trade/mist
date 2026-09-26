@@ -368,7 +368,8 @@ const server = http.createServer(async (req, res) => {
           high: k.high,
           low: k.low,
           close: k.close,
-          amount: k.amount ? Number(k.amount) : k.close * 1000,
+          amount:
+            k.amount !== null && k.amount !== undefined ? Number(k.amount) : 0,
         })),
       }));
       sendJson(res, mergeKList);
@@ -383,6 +384,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname.endsWith('/v1/visual/commands') && req.method === 'GET') {
     const code = resolveSecurityCode(parsedUrl.query, '000001');
     const period = resolvePeriod(parsedUrl.query.period, 30);
+    const source = (parsedUrl.query.source as string) || 'default';
     const filterFenxingContainment =
       parsedUrl.query.filterFenxingContainment === 'true' ||
       parsedUrl.query.filterFenxingContainment === '1';
@@ -397,10 +399,22 @@ const server = http.createServer(async (req, res) => {
         filterFenxingContainment,
       });
 
-      sendJson(res, { commands, count: commands.length });
+      sendJson(res, {
+        code,
+        period,
+        source,
+        totalKlines: fullKlines.length,
+        commands,
+      });
     } catch (err: any) {
       console.error(`[/v1/visual/commands] 错误:`, err.message);
-      sendJson(res, { commands: [], count: 0 });
+      sendJson(res, {
+        code,
+        period,
+        source,
+        totalKlines: 0,
+        commands: [],
+      });
     }
     return;
   }
@@ -816,10 +830,16 @@ const server = http.createServer(async (req, res) => {
         createdAt: sig.signalTime,
       }));
 
-      sendJson(res, signalResults);
+      sendJson(res, {
+        items: signalResults,
+        nextCursor: null,
+      });
     } catch (err: any) {
       console.error(`[/v1/strategy-backtests/:id/signals] 错误:`, err.message);
-      sendJson(res, []);
+      sendJson(res, {
+        items: [],
+        nextCursor: null,
+      });
     }
     return;
   }

@@ -1,4 +1,5 @@
-import { IsEnum, IsOptional, IsString } from 'class-validator';
+import { IsEnum, IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+import { Type } from 'class-transformer';
 import { DataSource, Period } from '@app/shared-data';
 
 export class QueryStrategySignalDto {
@@ -17,4 +18,11 @@ export class QueryStrategySignalDto {
   @IsOptional()
   @IsEnum(DataSource)
   source?: DataSource;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  limit?: number;
 }

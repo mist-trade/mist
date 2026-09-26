@@ -21,10 +21,13 @@ export class StrategySignalService {
     if (query.period !== undefined) where.period = query.period;
     if (query.source !== undefined) where.source = query.source;
 
+    const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
+
     return await this.signalRepository.find({
       where,
       relations: ['security'],
       order: { signalTime: 'DESC' },
+      take: limit,
     });
   }
 }
