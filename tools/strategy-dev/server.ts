@@ -338,10 +338,10 @@ const server = http.createServer(async (req, res) => {
         amount:
           k.amount !== null && k.amount !== undefined ? Number(k.amount) : 0,
       }));
-      sendJson(res, { klines: klinesData, total: fullKlines.length });
+      sendJson(res, klinesData);
     } catch (err: any) {
       console.error(`[/v1/indicators/k] 错误:`, err.message);
-      sendJson(res, { klines: [], total: 0 });
+      sendJson(res, []);
     }
     return;
   }
