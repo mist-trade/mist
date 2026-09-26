@@ -141,6 +141,9 @@ function parseJsonBody(req: http.IncomingMessage): Promise<any> {
         resolve({});
       }
     });
+    req.on('error', () => {
+      resolve({});
+    });
   });
 }
 
@@ -183,6 +186,36 @@ function toChanKlines(projectedBars: readonly any[]): readonly ChanK[] {
     volume: p.volume.effective,
     amount: p.amount.effective,
   }));
+}
+
+function formatFramePayload(frame: SimulationFrame): string {
+  const chanKlines = toChanKlines(frame.windowBars);
+  const commands = ChanVisualAdapter.convert(chanKlines, {
+    includeBi: true,
+    includeDuan: true,
+    includeZhongshu: true,
+    includeBsp: false,
+  });
+
+  const payload = {
+    sessionId: frame.sessionId,
+    cursor: frame.cursor,
+    total: frame.total,
+    bar: {
+      time: frame.bar.timestamp.toISOString(),
+      open: frame.bar.open,
+      high: frame.bar.high,
+      low: frame.bar.low,
+      close: frame.bar.close,
+      volume: frame.bar.volume ? Number(frame.bar.volume) : null,
+      amount: frame.bar.amount ? Number(frame.bar.amount) : null,
+    },
+    commands,
+    signals: frame.signals,
+    status: frame.status,
+  };
+
+  return JSON.stringify(payload);
 }
 
 interface DevBacktestRun {
@@ -259,6 +292,8 @@ const mockRuns: DevBacktestRun[] = [
 
 // 活跃仿真推流会话池
 const activeSessions = new Map<string, StrategySimulationSession>();
+// 活跃 SSE 客户端长连接广播池 (sessionId -> Set<http.ServerResponse>)
+const sessionStreamClients = new Map<string, Set<http.ServerResponse>>();
 
 // 回测信号内存缓存池 (cacheKey -> signals, runId -> signals)
 const backtestSignalsCache = new Map<string, readonly SimulationSignal[]>();
@@ -518,6 +553,35 @@ const server = http.createServer(async (req, res) => {
       });
 
       activeSessions.set(session.sessionId, session);
+      sessionStreamClients.set(session.sessionId, new Set());
+
+      // 绑定广播监听器：当会话产生新帧或状态变动时，向所有连接中的 SSE 客户端推送
+      session.setListeners({
+        onFrame: (frame) => {
+          const clients = sessionStreamClients.get(session.sessionId);
+          if (!clients || clients.size === 0) return;
+          const payloadString = formatFramePayload(frame);
+          for (const clientRes of clients) {
+            try {
+              clientRes.write(`event: frame\ndata: ${payloadString}\n\n`);
+            } catch {
+              // 忽略已断开的连接
+            }
+          }
+        },
+        onStatusChange: (status) => {
+          const clients = sessionStreamClients.get(session.sessionId);
+          if (!clients || clients.size === 0) return;
+          const statusString = JSON.stringify({ status });
+          for (const clientRes of clients) {
+            try {
+              clientRes.write(`event: status\ndata: ${statusString}\n\n`);
+            } catch {
+              // 忽略
+            }
+          }
+        },
+      });
 
       // 超时 30 分钟无活动自动清理
       setTimeout(
@@ -525,6 +589,7 @@ const server = http.createServer(async (req, res) => {
           if (activeSessions.has(session.sessionId)) {
             activeSessions.get(session.sessionId)?.destroy();
             activeSessions.delete(session.sessionId);
+            sessionStreamClients.delete(session.sessionId);
           }
         },
         30 * 60 * 1000,
@@ -558,56 +623,47 @@ const server = http.createServer(async (req, res) => {
     });
     res.write(': stream-connected\n\n');
 
-    const handleFrame = (frame: SimulationFrame) => {
-      // 动态将 windowBars 转换为点位几何指令
-      const chanKlines = toChanKlines(frame.windowBars);
-      const commands = ChanVisualAdapter.convert(chanKlines, {
-        includeBi: true,
-        includeDuan: true,
-        includeZhongshu: true,
-        includeBsp: false,
-      });
+    let clients = sessionStreamClients.get(sessionId);
+    if (!clients) {
+      clients = new Set();
+      sessionStreamClients.set(sessionId, clients);
+    }
+    clients.add(res);
 
-      const payload = {
-        sessionId: frame.sessionId,
-        cursor: frame.cursor,
-        total: frame.total,
-        bar: {
-          time: frame.bar.timestamp.toISOString(),
-          open: frame.bar.open,
-          high: frame.bar.high,
-          low: frame.bar.low,
-          close: frame.bar.close,
-          volume: frame.bar.volume ? Number(frame.bar.volume) : null,
-          amount: frame.bar.amount ? Number(frame.bar.amount) : null,
-        },
-        commands,
-        signals: frame.signals,
-        status: frame.status,
-      };
-
-      res.write(`event: frame\ndata: ${JSON.stringify(payload)}\n\n`);
-    };
-
-    session.setListeners({
-      onFrame: handleFrame,
-      onStatusChange: (status) => {
-        res.write(`event: status\ndata: ${JSON.stringify({ status })}\n\n`);
-      },
-    });
-
-    // 若当前游标已经存在帧，立即补发当前帧作为初态；若新会话未就绪则推进至第0帧补发
+    // 立即补发当前游标所在帧给该连接作为初始数据
     const currentFrame = session.engine.getCurrentFrame();
     if (currentFrame) {
-      handleFrame(currentFrame);
+      try {
+        res.write(
+          `event: frame\ndata: ${formatFramePayload(currentFrame)}\n\n`,
+        );
+      } catch {}
     } else if (session.engine.totalBars > 0) {
       void session.engine.seek(0).then((frame) => {
-        if (frame) handleFrame(frame);
+        if (frame && clients?.has(res)) {
+          try {
+            res.write(`event: frame\ndata: ${formatFramePayload(frame)}\n\n`);
+          } catch {}
+        }
       });
     }
 
+    // 心跳保活定时器（每 15 秒发送注释行），防止浏览器或代理在暂停空闲时挂起/断连
+    const pingTimer = setInterval(() => {
+      try {
+        res.write(': ping\n\n');
+      } catch {
+        clearInterval(pingTimer);
+      }
+    }, 15000);
+
     req.on('close', () => {
-      session.pause();
+      clearInterval(pingTimer);
+      clients?.delete(res);
+      // 只有当所有关联的长连接都已断开时，才将后台推演会话暂停
+      if (clients && clients.size === 0) {
+        session.pause();
+      }
     });
 
     return;
@@ -646,6 +702,19 @@ const server = http.createServer(async (req, res) => {
     if (session) {
       session.destroy();
       activeSessions.delete(sessionId);
+      const clients = sessionStreamClients.get(sessionId);
+      if (clients) {
+        for (const clientRes of clients) {
+          try {
+            clientRes.write(
+              `event: status\ndata: ${JSON.stringify({ status: 'completed' })}\n\n`,
+            );
+            clientRes.end();
+          } catch {}
+        }
+        clients.clear();
+      }
+      sessionStreamClients.delete(sessionId);
     }
     sendJson(res, { success: true });
     return;
