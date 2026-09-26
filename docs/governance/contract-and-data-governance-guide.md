@@ -106,6 +106,11 @@ connection 使用显式 `timezone: '+08:00'`，HTTP JSON 序列化为 ISO-8601 i
 - `meta.correlationId` 贯穿调用链，但不承担业务幂等。
 - one-way event 与 request-response RPC 分开设计。
 
+### 5.3 单一语义键名与包装结构透传
+
+- **单一语义键名对齐**：同一集合概念在全系统（生产、测试、本地网关）必须保持唯一 key。业务实体分页列表统一使用 `items`（`{ items: T[], nextCursor, total }`），严禁使用 `klines`、`records`、`list` 等别名；时序流（K线/指标/图元）在 Envelope `data` 中直接返回纯数组 `T[]`，严禁额外嵌套自定义键名。
+- **包装结构防反复拆包组装（透传纯度）**：标准包装结构（如分页对象、统一响应信封）从 producer 到 consumer 必须保持结构完整性与自然流转，严禁中间层无意义地“拆包 -> 重新包装为新对象 -> 下游再次拆包”。纯透传层应以泛型直接穿透，严禁剥离为裸数据而丢失元数据（如 `nextCursor`/`total`）；仅允许在末梢组件消费点按需解构。
+
 DTO/VO/Entity/domain contract 的命名和文件布局见
 [Mist Backend 代码风格指南](../mist-backend-code-style-guide.md)。
 
@@ -170,4 +175,6 @@ DTO/VO/Entity/domain contract 的命名和文件布局见
 - [ ] migration forward-only，entity/raw SQL/audit/test 同步。
 - [ ] 没有新增未经批准的 alias、dual write、fallback 或 partial success。
 - [ ] OpenAPI、fixture、`.sha256` 和 negative tests 已同步。
+- [ ] 集合与时序字段遵循单一语义键名（分页统一为 `items`，时序流统一为纯数组，无私有别名如 `klines`、`records`）。
+- [ ] 标准包装结构（分页对象/信封）上下游保持透传，无中间层反复拆包组装与元数据丢失。
 - [ ] 跨仓 breaking change 有匹配版本、发布顺序、HIL 与 rollback/repair-forward。

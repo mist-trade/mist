@@ -278,6 +278,22 @@ Chan 当前为请求时实时派生计算，不写 MySQL。未来若重新持久
   - 禁止引入不提供任何领域价值或校验逻辑的纯透传空壳层级。
 - 只要一个结构或方法在生产链路中可达性为零且无跨仓契约要求，应果断删除，降低认知与维护负担。
 
+### 6.10 单一语义键名对齐准则（防同义多 Key 歧义）
+
+- 核心原则：**同一数据概念与容器语义，在全链路（Service、Controller、Wire DTO/VO、BFF、Local Dev Mock、前端 Client/Store）必须遵循单一命名真源（Single Source of Truth），严禁出现同一含义使用多个不同 key。**
+- 分类收敛标准：
+  - **业务实体集合/分页列表**：统一且只能使用 `items` 作为列表承载键（例如 `{ items: T[], nextCursor?: string, total?: number }`），严禁随手起别名（如 `records`、`list`、`dataList`、`klines` 等）。
+  - **定长/窗口时序数据流（K线、指标、图元指令）**：在统一 Envelope 的 `data` 中直接返回**纯扁平数组 `T[]`**（如 `/v1/indicators/k`、`/v1/visual/commands`），严禁额外套壳自定义 key（如 `{ klines: [] }`）。
+  - **Mock 与本地网关对齐**：本地开发网关（如 `tools/strategy-dev/server.ts`）与单测 Mock 必须 100% 严格复用生产 DTO/VO 契约与序列化键名，严禁私自包装同义 key，杜绝环境不一致引发的运行时崩塌与前端多重兼容负担。
+
+### 6.11 包装结构防反复拆包组装准则（契约透传纯度）
+
+- 核心原则：**标准包装结构（如分页对象 `{ items: T[], nextCursor, total }`、统一响应 Envelope `{ success, data, ... }`、指标序列对齐包 `{ begIndex, ... }`）从最上游生产者到最下游消费者，必须保持包装结构的语义完整性与自然流转，严禁在中间流转层进行无价值的“拆包 -> 抽取字段重新组装新包装 -> 下游再次拆包”。**
+- 约束细则：
+  - **中间透传层无损传递**：中间业务层、网关转发层或 API Client 应直接透传标准包装对象（以泛型保持类型安全），严禁在中途强行剥离为裸数据（如将分页对象直接剥离为裸数组 `items` 抛弃其他元数据），导致下游永久丢失 `nextCursor`、`total`、`cursor`、`hasMore` 等关键字段。
+  - **末梢解构原则**：若下游具体组件或渲染函数仅需局部切片（如纯表格渲染仅需要 `items`），必须且只能在最末梢消费点（Component / Leaf Hook）按需解构使用，不得在中间流转链路破坏标准信封形态。
+  - **杜绝二次包装/别名再造**：禁止在 Service A 返回 `{ items, total }` 后，中间层拆开并包装为 `{ resultList: items, count: total }` 传递给下一层，造成前后端认知脱节、垃圾代码膨胀与多重类型维护成本。
+
 ## 7. 命名、文件和目录规则
 
 - Mist Backend 的 DTO/VO class 后缀、文件后缀、目录和边界以
@@ -342,6 +358,8 @@ Chan 当前为请求时实时派生计算，不写 MySQL。未来若重新持久
 - [ ] 缺失值没有被静默补零、补空字符串或补当前时间。
 - [ ] 已检索并复用共享工具库（`@app/timezone`、`@app/indicators`、`@app/decimal`、`@app/utils`、`@/app/lib/time` 等），无私有重复造轮子。
 - [ ] 遵循奥卡姆剃刀与 YAGNI 原则：无死代码、无未消费的空壳层级/DTO/包装器（删掉能否跑？能跑就删）。
+- [ ] 遵循单一语义键名对齐：同一数据概念在全链路（生产/测试/本地网关）使用唯一标准 key（如标准分页必为 `items`，时序流在 envelope.data 中直接返回纯数组，严禁自创同义 key 如 `klines`、`records`、`list`）。
+- [ ] 包装结构防反复拆包组装：标准信封/分页对象（`{ items, nextCursor, total }`）在上下游流转层保持透传，禁止中间层无意义拆包重装或剥离元数据，只在末梢消费点按需解构。
 - [ ] collection、queue、retry 和 pending map 有界且可清理。
 - [ ] 数据库变更使用新增 migration，并同步 ORM/raw SQL/审计。
 - [ ] 文件移动和重命名已更新完整影响面。
