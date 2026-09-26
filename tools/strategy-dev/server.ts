@@ -30,6 +30,59 @@ import { normalizeExternalDecimalText } from '../../libs/decimal/src/decimal8';
 
 const PORT = Number(process.env.PORT) || 8001;
 
+// 严格门禁：tools/strategy-dev/server.ts 属于本地开发网关，严禁在生产环境启动
+if (process.env.NODE_ENV === 'production') {
+  console.error(
+    '❌ [FATAL] tools/strategy-dev/server.ts 属于本地开发网关，严禁在生产环境 (NODE_ENV=production) 中启动！',
+  );
+  process.exit(1);
+}
+
+/**
+ * 严格门禁：校验当前请求是否处于允许的本地开发环境
+ * 1. 禁止在 NODE_ENV=production 环境调用仿真套件
+ * 2. 仅允许本地环回来源 (127.0.0.1, ::1, ::ffff:127.0.0.1, localhost) 调用
+ */
+function checkLocalDevAccess(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): boolean {
+  if (process.env.NODE_ENV === 'production') {
+    sendJson(
+      res,
+      {
+        error:
+          'Forbidden: Strategy simulation suite is strictly restricted to local development environment and disabled in production.',
+      },
+      403,
+    );
+    return false;
+  }
+
+  const remoteIp = req.socket?.remoteAddress || '';
+  const isLoopback =
+    remoteIp === '127.0.0.1' ||
+    remoteIp === '::1' ||
+    remoteIp === '::ffff:127.0.0.1' ||
+    remoteIp.startsWith('127.') ||
+    remoteIp === '';
+
+  const allowRemoteDev = process.env.ALLOW_REMOTE_DEV_SIMULATION === 'true';
+
+  if (!isLoopback && !allowRemoteDev && process.env.NODE_ENV !== 'test') {
+    sendJson(
+      res,
+      {
+        error: `Forbidden: Strategy simulation suite is strictly restricted to local development environment. Request from unauthorized host (${remoteIp}) was rejected.`,
+      },
+      403,
+    );
+    return false;
+  }
+
+  return true;
+}
+
 function resolveSecurityCode(rawQuery: any, fallback = '000001'): string {
   return String(
     rawQuery?.code || rawQuery?.symbol || rawQuery?.securityCode || fallback,
@@ -352,7 +405,13 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 4. 实时仿真推流核心端点
+  // 4. 实时仿真推流核心端点 (严格门禁：仅允许本地开发环境调用，禁止外部/生产调用)
+  if (pathname.includes('/v1/simulation/')) {
+    if (!checkLocalDevAccess(req, res)) {
+      return;
+    }
+  }
+
   // 4.1 发起仿真会话: POST /v1/simulation/start
   if (pathname.endsWith('/v1/simulation/start') && req.method === 'POST') {
     try {

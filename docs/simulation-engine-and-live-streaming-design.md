@@ -166,3 +166,20 @@
    - 彻底废弃与清理原本孤立硬编码的 `chan_bsp` 执行分支；
    - 缠论买卖点与战术求值全面归口统一的决策流策略树（Decision Flow Tree），以 `plugin.chan.bsp`（`ChanBspFactorPlugin`）作为标准节点统一求值；
    - 彻底清理 `server.ts` 和评估服务中对 `chan_bsp` 的特化硬编码，全仓一律走策略树流程。
+
+---
+
+## 六、运行环境隔离与使用场景限制（严格仅限本地 Dev）
+
+为保证生产环境的高可靠性与严格的架构边界，整个流式推演仿真体系（包含会话创建、控制指令、SSE 长连接推流与诊断快照导出）**严格仅允许在本地开发环境 (`local dev`) 中运行和调用，禁止在生产环境或公开网络中暴露**：
+
+1. **后端网关刚性门禁 (`tools/strategy-dev/server.ts`)**：
+   - **生产启动熔断**：`server.ts` 启动时强制校验 `process.env.NODE_ENV !== 'production'`，若在生产模式下启动直接退出进程；
+   - **请求来源白名单**：所有 `/v1/simulation/*` 路由强制经由 `checkLocalDevAccess` 拦截，仅允许本地回环地址（`127.0.0.1`、`::1`、`localhost` 等）访问，非本地 IP 或生产调用一律返回 `403 Forbidden`；
+   - **生产微服务零暴露**：生产环境中的主后端（`apps/mist`、`apps/backtest`、`apps/signal` 等）不挂载任何 `/v1/simulation/*` 路由与仿真调度器。
+
+2. **前端客户端与工作台安全分流 (`mist-fe`)**：
+   - **客户端防漏闸门 (`app/api/client.ts`)**：`startSimulation`、`controlSimulation`、`getSimulationStreamUrl`、`fetchSimulationDump` 均内置 `isLocalDevEnvironment()` 校验，在生产构建中直接拒绝请求；
+   - **工作台双轨自适应 (`BacktestWorkspace.tsx`)**：
+     - **本地开发环境 (`isDev = true`)**：激活全量 SSE 推演仿真长连接，支持播放/暂停/调速/步进/Seek 以及“📥 导出诊断快照”；
+     - **生产/非本地环境 (`isDev = false`)**：自动降级为只读的离线历史复盘模式（基于 MySQL 已有回测结果切片展示），完全禁用并隐藏诊断快照导出按钮，界面明确标示 `[📜 历史复盘]`。

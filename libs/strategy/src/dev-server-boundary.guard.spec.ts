@@ -111,5 +111,17 @@ describe('Dev Server Architecture & Boundary Guard (本地开发服务门禁)', 
       );
       expect(hasSimulationImport).toBe(true);
     });
+
+    it('仿真套件必须包含严格的环境隔离门禁 (禁止在生产环境启动，且限制仿真 API 仅本地开发可用)', () => {
+      // 必须包含 production 启动检查
+      expect(serverSource).toMatch(
+        /process\.env\.NODE_ENV === ['"]production['"]/,
+      );
+      expect(serverSource).toMatch(/checkLocalDevAccess/);
+      // 必须拦截 /v1/simulation/
+      expect(serverSource).toMatch(
+        /pathname\.includes\(['"]\/v1\/simulation\/['"]\)/,
+      );
+    });
   });
 });
