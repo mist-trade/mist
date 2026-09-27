@@ -117,34 +117,28 @@ describe('StrategyDefinitionService', () => {
     signalKind: StrategySignalKind.ENTRY,
   };
 
-  it('creates a chan_bsp definition with the chan_bsp rule semantics', async () => {
+  it('rejects creating a chan_bsp definition with CHAN_BSP_KIND_RETIRED', async () => {
     const { service, definitions, versions } = createHarness();
 
-    const strategy = await service.create({
-      ...createDto,
-      kind: StrategyKind.CHAN_BSP,
-      periods: [Period.THIRTY_MIN],
-      rule: {
-        units: 'duan',
-        points: { first: true, second: true, third: false },
-        direction: 'buy',
-      },
-    });
+    await expect(
+      service.create({
+        ...createDto,
+        kind: StrategyKind.CHAN_BSP,
+        periods: [Period.THIRTY_MIN],
+        rule: {
+          units: 'duan',
+          points: { first: true, second: true, third: false },
+          direction: 'buy',
+        },
+      }),
+    ).rejects.toThrow(
+      expect.objectContaining({
+        response: expect.objectContaining({ code: 'CHAN_BSP_KIND_RETIRED' }),
+      }),
+    );
 
-    expect(definitions[0].kind).toBe(StrategyKind.CHAN_BSP);
-    expect(versions[0].rule).toEqual({
-      units: 'duan',
-      points: { first: true, second: true, third: false },
-      direction: 'buy',
-    });
-    expect(versions[0].validationSummary).toEqual({
-      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
-      units: 'duan',
-      points: { first: true, second: true, third: false },
-      direction: 'buy',
-      requiredBarCount: 600,
-    });
-    expect(strategy.kind).toBe(StrategyKind.CHAN_BSP);
+    expect(definitions).toHaveLength(0);
+    expect(versions).toHaveLength(0);
   });
 
   it('rejects an invalid chan_bsp rule with an HTTP 400 error', async () => {
@@ -160,7 +154,7 @@ describe('StrategyDefinitionService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('rejects a chan_bsp definition with a non-realtime period', async () => {
+  it('rejects creating a chan_bsp definition regardless of period', async () => {
     const { service } = createHarness();
 
     await expect(
@@ -177,23 +171,24 @@ describe('StrategyDefinitionService', () => {
     ).rejects.toThrow(BadRequestException);
   });
 
-  it('enables a chan_bsp definition through the chan_bsp validation path', async () => {
+  it('rejects enabling a chan_bsp definition with CHAN_BSP_KIND_RETIRED', async () => {
     const { service } = createHarness();
-    await service.create({
-      ...createDto,
+    // 透传既有 chan_bsp 定义（绕过 create 的退役门禁，模拟存量数据）
+    const repository = (service as unknown as {
+      definitionRepository: { findOne: jest.Mock; save: jest.Mock };
+    }).definitionRepository;
+    repository.findOne.mockResolvedValue({
+      id: 1,
       kind: StrategyKind.CHAN_BSP,
-      periods: [Period.THIRTY_MIN],
-      rule: {
-        units: 'duan',
-        points: { first: true, second: true, third: false },
-        direction: 'buy',
-      },
+      status: StrategyStatus.DISABLED,
+      currentVersionId: 1,
     });
 
-    const enabled = await service.enable(1);
-
-    expect(enabled.status).toBe(StrategyStatus.ENABLED);
-    expect(enabled.kind).toBe(StrategyKind.CHAN_BSP);
+    await expect(service.enable(1)).rejects.toThrow(
+      expect.objectContaining({
+        response: expect.objectContaining({ code: 'CHAN_BSP_KIND_RETIRED' }),
+      }),
+    );
   });
 
   it('atomically creates a draft definition and its only immutable version', async () => {

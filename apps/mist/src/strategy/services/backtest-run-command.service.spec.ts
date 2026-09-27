@@ -22,7 +22,12 @@ function dto() {
 
 function fixture() {
   const run = { id: 41 };
-  const version = { id: 7, strategyDefinitionId: 3 };
+  const version = {
+    id: 7,
+    strategyDefinitionId: 3,
+    signalKind: 'entry',
+    rule: { field: 'k.close', operator: 'gt', value: 1 },
+  };
   const runRepository = {
     create: jest.fn().mockReturnValue(run),
     save: jest.fn().mockResolvedValue(run),
@@ -159,22 +164,6 @@ describe('BacktestRunCommandService chan_bsp dispatch', () => {
     expect(result).toEqual(
       expect.objectContaining({ runId: 41, initialStatus: 'PENDING' }),
     );
-  });
-
-  it('rejects a chan_bsp run with an unsupported period before persisting', async () => {
-    const f = chanBspFixture();
-
-    await expect(
-      f.service.createRun({ ...dto(), period: Period.DAY }),
-    ).rejects.toThrow(
-      expect.objectContaining({
-        response: expect.objectContaining({
-          code: 'CHAN_BSP_PERIOD_UNSUPPORTED',
-        }),
-      }),
-    );
-
-    expect(f.runRepository.save).not.toHaveBeenCalled();
   });
 
   it('maps an invalid chan_bsp rule to a 400 before persisting', async () => {

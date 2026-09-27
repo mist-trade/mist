@@ -7,7 +7,6 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import {
   StrategyDefinition,
-  Period,
   StrategyKind,
   StrategyRuleSchemaVersion,
   StrategySignalKind,
@@ -15,7 +14,10 @@ import {
   StrategyVersion,
 } from '@app/shared-data';
 import type { CompiledStrategyExecutionPlan } from '@app/strategy';
-import { compileChanBspConfig, ChanBspConfigError } from '@app/signal';
+import {
+  StoredDefinitionCompileError,
+  compileStoredDefinitionVersion,
+} from '@app/strategy';
 import { Repository } from 'typeorm';
 import { CreateStrategyDefinitionDto } from '../dto/create-strategy-definition.dto';
 import { StrategyExecutionPlanService } from '../rules/strategy-execution-plan.service';
@@ -34,11 +36,18 @@ export class StrategyDefinitionService {
 
   async create(dto: CreateStrategyDefinitionDto): Promise<StrategyDefinition> {
     const kind = dto.kind ?? StrategyKind.RULE_DSL;
+    if (kind === StrategyKind.CHAN_BSP) {
+      // chan_bsp 独立执行分支已退役：新建必须走决策流（存量经透明编译兼容）
+      throw new BadRequestException({
+        code: 'CHAN_BSP_KIND_RETIRED',
+        message:
+          'chan_bsp kind is retired; create a decision_flow definition instead',
+      });
+    }
     const validation = this.validateRuleForCreate(
       kind,
       dto.rule,
       dto.signalKind,
-      dto.periods,
     );
     return await this.definitionRepository.manager.transaction(
       async (manager) => {
@@ -108,6 +117,14 @@ export class StrategyDefinitionService {
           definitionRepository,
           id,
         );
+        if (definition.kind === StrategyKind.CHAN_BSP) {
+          // chan_bsp 独立执行分支已退役：启用被拒绝，恢复使用需转为决策流定义
+          throw new BadRequestException({
+            code: 'CHAN_BSP_KIND_RETIRED',
+            message:
+              'chan_bsp kind is retired; re-enabling requires converting to a decision_flow definition',
+          });
+        }
         const version = await this.requireOwnedCurrentVersion(
           definition,
           versionRepository,
@@ -192,25 +209,25 @@ export class StrategyDefinitionService {
   }
 
   /**
-   * Kind-dispatched rule validation for persisted versions. `rule_dsl` keeps
-   * the existing DSL compilation (realtime registration additionally applies
-   * the quantity HIL gate); `chan_bsp` validates through the shared config
-   * compiler.
+   * Kind-dispatched rule validation for persisted versions. All kinds compile
+   * through the shared stored-definition compiler (decision flow is the only
+   * runtime shape); `rule_dsl` realtime registration additionally applies the
+   * quantity HIL gate.
    */
   private validateStoredVersion(
     definition: StrategyDefinition,
     version: StrategyVersion,
     forRealtime: boolean,
   ): void {
-    if (definition.kind === StrategyKind.CHAN_BSP) {
-      compileChanBspConfigSafe(version.rule, definition.periods);
-      return;
-    }
     if (definition.kind === StrategyKind.DECISION_FLOW) {
       const rootNode = (version.rule as any)?.rootNode;
       if (!rootNode || !rootNode.type) {
         throw new BadRequestException('决策流版本规则缺少有效的 rootNode');
       }
+      return;
+    }
+    if (definition.kind === StrategyKind.CHAN_BSP) {
+      compileStoredDefinitionVersionSafe(definition.kind, version.rule);
       return;
     }
     if (forRealtime) {
@@ -226,24 +243,10 @@ export class StrategyDefinitionService {
     kind: StrategyKind,
     rule: Record<string, unknown>,
     signalKind: StrategySignalKind,
-    periods: readonly Period[],
   ): {
     normalizedRule: Record<string, unknown>;
     validationSummary: Record<string, unknown>;
   } {
-    if (kind === StrategyKind.CHAN_BSP) {
-      const plan = compileChanBspConfigSafe(rule, periods);
-      return {
-        normalizedRule: rule,
-        validationSummary: {
-          ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
-          units: plan.units,
-          points: plan.points,
-          direction: plan.direction,
-          requiredBarCount: plan.requiredBarCount,
-        },
-      };
-    }
     if (kind === StrategyKind.DECISION_FLOW) {
       const rootNode = (rule as any)?.rootNode;
       if (!rootNode || !rootNode.type) {
@@ -284,14 +287,14 @@ function toValidationSummary(
   };
 }
 
-function compileChanBspConfigSafe(
+function compileStoredDefinitionVersionSafe(
+  kind: StrategyKind,
   rule: Record<string, unknown>,
-  periods: readonly Period[],
-): ReturnType<typeof compileChanBspConfig> {
+): void {
   try {
-    return compileChanBspConfig(rule, periods);
+    compileStoredDefinitionVersion({ kind, rule });
   } catch (error) {
-    if (error instanceof ChanBspConfigError) {
+    if (error instanceof StoredDefinitionCompileError) {
       throw new BadRequestException(error.message);
     }
     throw error;

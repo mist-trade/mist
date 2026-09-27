@@ -4,20 +4,17 @@ import {
   DataSource,
   Security,
   StrategyDefinition,
-  StrategyKind,
   StrategyRuleSchemaVersion,
   StrategyStatus,
 } from '@app/shared-data';
 import { normalizeSecurityCode } from '@app/utils';
 import {
-  compileStoredStrategyRuleWithNormalized,
-  type DecisionFlowNode,
+  compileStoredDefinitionVersion,
+  StoredDefinitionCompileError,
   type StrategyRealtimeSource,
 } from '@app/strategy';
 import { In, Repository } from 'typeorm';
 import {
-  ChanBspConfigError,
-  compileChanBspConfig,
   type RealtimeStrategyExecutionPlan,
   type SignalRegistryRefreshV1,
 } from '@app/signal';
@@ -63,10 +60,10 @@ export class SignalRegistryService implements OnApplicationBootstrap {
   }
 
   /**
-   * Compile with chan_bsp judgment-point logging: rejected chan_bsp configs
-   * warn with a bounded reason (operator-facing), successful compiles log an
-   * info lifecycle line with definition/level/units. Other compile failures
-   * keep the existing registry failure semantics.
+   * Compile with source-kind judgment-point logging: rejected configs warn
+   * with a bounded reason (operator-facing), successful legacy-kind compiles
+   * log an info lifecycle line with definition/sourceKind. Other compile
+   * failures keep the existing registry failure semantics.
    */
   private safeCompile(
     definition: StrategyDefinition,
@@ -74,27 +71,28 @@ export class SignalRegistryService implements OnApplicationBootstrap {
   ): SignalRegistryDefinition {
     try {
       const compiled = compileRegistryDefinition(definition, securityIdsByCode);
-      if (compiled.executionPlan.kind === 'chan_bsp') {
+      if (compiled.executionPlan.sourceKind === 'chan_bsp') {
         this.logger.log(
           {
-            code: 'chan_bsp_plan_compiled',
+            code: 'strategy_plan_compiled',
             definitionId: compiled.definitionId,
+            sourceKind: 'chan_bsp',
             level: definition.periods[0],
-            units: compiled.executionPlan.plan.units,
           },
-          'chan_bsp plan compiled',
+          'legacy chan_bsp plan transparently compiled to decision flow',
         );
       }
       return compiled;
     } catch (error) {
-      if (error instanceof ChanBspConfigError) {
+      if (error instanceof StoredDefinitionCompileError) {
         this.logger.warn(
           {
-            code: 'chan_bsp_config_invalid',
+            code: 'strategy_config_invalid',
             definitionId: definition.id,
-            reason: error.reason,
+            sourceKind: definition.kind,
+            reason: error.code,
           },
-          'chan_bsp strategy config rejected',
+          'strategy config rejected at compile boundary',
         );
       }
       throw error;
@@ -301,46 +299,19 @@ function compileRegistryDefinition(
       `Strategy version ${version.id} has unsupported rule schema`,
     );
   }
-  const compiled: {
-    executionPlan: SignalRegistryExecutionPlan;
-    ruleSnapshot: Readonly<Record<string, unknown>>;
-  } =
-    definition.kind === StrategyKind.CHAN_BSP
-      ? {
-          executionPlan: {
-            kind: 'chan_bsp',
-            plan: compileChanBspConfig(version.rule, definition.periods),
-          },
-          ruleSnapshot: version.rule as Readonly<Record<string, unknown>>,
-        }
-      : definition.kind === StrategyKind.DECISION_FLOW
-        ? {
-            executionPlan: {
-              kind: 'decision_flow',
-              flow: version.rule as unknown as DecisionFlowNode,
-              signalKind: version.signalKind,
-              requiredBarCount:
-                typeof (version.rule as any)?.requiredBarCount === 'number'
-                  ? (version.rule as any).requiredBarCount
-                  : 50,
-            },
-            ruleSnapshot: version.rule as Readonly<Record<string, unknown>>,
-          }
-        : (() => {
-            const compilation = compileStoredStrategyRuleWithNormalized(
-              version.rule,
-              version.signalKind,
-            );
-            return {
-              executionPlan: {
-                kind: 'rule_dsl',
-                plan: compilation.plan,
-              },
-              ruleSnapshot: compilation.normalizedRule as Readonly<
-                Record<string, unknown>
-              >,
-            };
-          })();
+  // 编译边界统一收口：三种来源 kind 全部透明编译为 decision_flow 求值计划。
+  const compiled = compileStoredDefinitionVersion({
+    kind: definition.kind,
+    rule: version.rule as Record<string, unknown>,
+    signalKind: version.signalKind,
+  });
+  const executionPlan: SignalRegistryExecutionPlan = {
+    kind: 'decision_flow',
+    flow: compiled.flow,
+    signalKind: version.signalKind,
+    requiredBarCount: compiled.requiredBarCount,
+    sourceKind: compiled.sourceKind,
+  };
   return Object.freeze({
     definitionId: definition.id,
     versionId: version.id,
@@ -353,7 +324,7 @@ function compileRegistryDefinition(
     ),
     periods: Object.freeze([...definition.periods]),
     sources: Object.freeze([...definition.sources]),
-    executionPlan: compiled.executionPlan,
+    executionPlan,
     ruleSnapshot: compiled.ruleSnapshot,
   });
 }

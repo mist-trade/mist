@@ -1,19 +1,18 @@
 import type { DataSource, Period, StrategySignalKind } from '@app/shared-data';
-import type {
-  CompiledStrategyExecutionPlan,
-  DecisionFlowNode,
-} from '@app/strategy';
-import type { ChanBspPlan } from '@app/signal';
+import type { DecisionFlowNode } from '@app/strategy';
+import type { StoredDefinitionSourceKind } from '@app/strategy';
 
-export type SignalRegistryExecutionPlan =
-  | { readonly kind: 'rule_dsl'; readonly plan: CompiledStrategyExecutionPlan }
-  | { readonly kind: 'chan_bsp'; readonly plan: ChanBspPlan }
-  | {
-      readonly kind: 'decision_flow';
-      readonly flow: DecisionFlowNode;
-      readonly signalKind?: StrategySignalKind;
-      readonly requiredBarCount: number;
-    };
+/**
+ * 统一求值计划（编译边界产物）：运行时只有 decision_flow 单一形态。
+ * legacy kind（rule_dsl / chan_bsp）已在编译边界经共享 helper 透明编译为决策流树。
+ */
+export type SignalRegistryExecutionPlan = {
+  readonly kind: 'decision_flow';
+  readonly flow: DecisionFlowNode;
+  readonly signalKind?: StrategySignalKind;
+  readonly requiredBarCount: number;
+  readonly sourceKind: StoredDefinitionSourceKind;
+};
 
 export interface SignalRegistryDefinition {
   readonly definitionId: number;

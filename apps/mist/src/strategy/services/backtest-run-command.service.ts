@@ -12,7 +12,10 @@ import {
   StrategyKind,
   StrategyVersion,
 } from '@app/shared-data';
-import { ChanBspConfigError, compileChanBspConfig } from '@app/signal';
+import {
+  StoredDefinitionCompileError,
+  compileStoredDefinitionVersion,
+} from '@app/strategy';
 import {
   HttpBusinessRejection,
   HttpRequestContextService,
@@ -97,38 +100,25 @@ export class BacktestRunCommandService {
       );
     }
 
+    // 编译边界统一收口：kind 仅用于落库（DB 历史语义），回放一律走
+    // compileStoredDefinitionVersion 透明编译出的 decision_flow 统一计划。
     let kind: StrategyKind;
-    if (definition.kind === StrategyKind.CHAN_BSP) {
-      // 分派编译先行：chan_bsp 配置不是 DSL 树，compileStoredVersion 会误编译。
-      try {
-        compileChanBspConfig(
-          version.rule as Record<string, unknown>,
-          definition.periods,
-        );
-      } catch (error) {
-        if (error instanceof ChanBspConfigError) {
-          throw new BadRequestException(error.message);
-        }
-        throw error;
-      }
-      if (
-        dto.period !== 1 &&
-        dto.period !== 5 &&
-        dto.period !== 15 &&
-        dto.period !== 30 &&
-        dto.period !== 60
-      ) {
+    try {
+      compileStoredDefinitionVersion({
+        kind: definition.kind,
+        rule: version.rule as Record<string, unknown>,
+        signalKind: version.signalKind,
+      });
+    } catch (error) {
+      if (error instanceof StoredDefinitionCompileError) {
         throw new BadRequestException({
-          code: 'CHAN_BSP_PERIOD_UNSUPPORTED',
-          message: 'chan_bsp replay period must be one of 1/5/15/30/60',
+          code: 'STRATEGY_CONFIG_INVALID',
+          message: error.message,
         });
       }
-      kind = StrategyKind.CHAN_BSP;
-    } else if (definition.kind === StrategyKind.DECISION_FLOW) {
-      kind = StrategyKind.DECISION_FLOW;
-    } else {
-      kind = StrategyKind.RULE_DSL;
+      throw error;
     }
+    kind = definition.kind;
 
     const run = await this.runRepository.save(
       this.runRepository.create({

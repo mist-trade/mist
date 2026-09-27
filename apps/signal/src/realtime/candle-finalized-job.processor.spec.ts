@@ -1,4 +1,6 @@
 import { compileStoredStrategyRule, type StrategyBar } from '@app/strategy';
+import { StrategySignalKind } from '@app/shared-data';
+import type { SignalRegistryDefinition } from '../signal-registry.types';
 import { CANDLE_FINALIZED_JOB_NAME } from '@app/signal';
 import {
   CandleFinalizedJobProcessor,
@@ -447,30 +449,52 @@ describe('CandleFinalizedJobProcessor', () => {
       evaluation as never,
     );
 
-    processor.reconcileRegistry({
-      generation: 2,
-      definitions: new Map([
-        [
-          1,
-          {
+    const definitions = new Map<number, SignalRegistryDefinition>([
+      [
+        1,
+        {
             definitionId: 1,
             versionId: 3,
-            signalKind: 'entry' as never,
+            signalKind: StrategySignalKind.ENTRY,
             targetUniverse: ['000001.SZ'],
             securityIds: new Set([9]),
             periods: [1, 5],
             sources: ['tdx' as never],
             executionPlan: {
-              kind: 'rule_dsl',
-              plan: compileStoredStrategyRule(
-                { field: 'k.close', operator: 'gt', value: 1 },
-                'entry',
-              ),
+              kind: 'decision_flow',
+              flow: {
+                id: 'guard_legacy_rule',
+                type: 'GUARD',
+                name: '存量规则门禁',
+                pluginId: 'plugin.legacy.rule-dsl',
+                params: {},
+                requiredAction: 'BUY',
+                minConfidence: 0.5,
+                onPass: {
+                  id: 'term_pass',
+                  type: 'TERMINAL',
+                  action: 'BUY',
+                  signalTag: 'LEGACY_DSL',
+                  reason: 'matched',
+                },
+                onFail: {
+                  id: 'term_fail',
+                  type: 'TERMINAL',
+                  action: 'ABORT',
+                  reason: 'unmatched',
+                },
+              },
+              signalKind: StrategySignalKind.ENTRY,
+              requiredBarCount: 50,
+              sourceKind: 'rule_dsl',
             },
             ruleSnapshot: { field: 'k.close', operator: 'gt', value: 1 },
           },
-        ],
-      ]),
+      ],
+    ]);
+    processor.reconcileRegistry({
+      generation: 2,
+      definitions,
     });
 
     expect(periodBuilder.retainGroups).toHaveBeenCalledWith([
@@ -500,7 +524,6 @@ describe('CandleFinalizedJobProcessor', () => {
           signalKind: 'entry',
         },
       ],
-      [], // no chan_bsp definitions in this registry — no cursor identities
     );
   });
 

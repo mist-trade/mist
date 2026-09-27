@@ -256,13 +256,6 @@ export class CandleFinalizedJobProcessor {
       period: number;
       signalKind: 'entry' | 'exit';
     }> = [];
-    const chanBspIdentities: Array<{
-      definitionId: number;
-      securityId: number;
-      source: 'tdx' | 'qmt';
-      level: number;
-      units: 'bi' | 'duan';
-    }> = [];
     for (const definition of snapshot.definitions.values()) {
       for (const source of definition.sources) {
         if (source !== 'tdx' && source !== 'qmt') continue;
@@ -278,21 +271,13 @@ export class CandleFinalizedJobProcessor {
               period,
               signalKind: definition.signalKind,
             });
-            if (definition.executionPlan.kind === 'chan_bsp') {
-              chanBspIdentities.push({
-                definitionId: definition.definitionId,
-                securityId,
-                source,
-                level: period,
-                units: definition.executionPlan.plan.units,
-              });
-            }
           }
         }
       }
     }
     this.periodBuilder.retainGroups(groups);
-    this.evaluation.retainRegistryScopes(groups, episodes, chanBspIdentities);
+    // 过渡形态：episode 游标保留身份将在实时内核化重构中随 episode store 一并移除
+    this.evaluation.retainRegistryScopes(groups, episodes, []);
     if (this.runtimeObservability) {
       const after = this.evaluation.diagnostics().groupCount;
       this.runtimeObservability.recordConsumerRemoval(before - after);
