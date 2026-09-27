@@ -2,6 +2,7 @@ import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
 import { parseRedisConnectionUrl } from '@app/realtime';
+import { ONE_MINUTE_MS } from '@app/timezone';
 import {
   OO_ALERT_BULLMQ_PREFIX,
   OO_ALERT_JOB,
@@ -65,5 +66,5 @@ export class OoAlertQueueService implements OnModuleDestroy {
 }
 
 function windowStartMs(ts: string): number {
-  return Math.floor(Date.parse(ts) / 60_000) * 60_000;
+  return Math.floor(Date.parse(ts) / ONE_MINUTE_MS) * ONE_MINUTE_MS;
 }

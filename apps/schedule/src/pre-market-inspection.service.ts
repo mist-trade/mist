@@ -11,6 +11,11 @@ import {
   SecurityStatus,
 } from '@app/shared-data';
 import { TimezoneService } from '@app/timezone';
+import {
+  BEIJING_DATE_SUFFIX,
+  INSPECTION_STATUS,
+  PRE_MARKET_INSPECTION_CONFIG,
+} from './pre-market-inspection.constants';
 
 export interface DimensionCheckResult {
   readonly passed: boolean;
@@ -21,7 +26,9 @@ export interface DimensionCheckResult {
 
 export interface PreMarketInspectionReport {
   readonly targetDate: string;
-  readonly overallStatus: 'PASSED' | 'FAILED';
+  readonly overallStatus:
+    | typeof INSPECTION_STATUS.PASSED
+    | typeof INSPECTION_STATUS.FAILED;
   readonly dimensions: {
     readonly datasource: DimensionCheckResult;
     readonly klines: DimensionCheckResult;
@@ -80,15 +87,15 @@ export class PreMarketInspectionService {
       this.checkPipelineSwitches(),
     ]);
 
-    const overallStatus: 'PASSED' | 'FAILED' =
+    const overallStatus =
       datasource.passed &&
       klines.passed &&
       subscription.passed &&
       realtime.passed &&
       infrastructure.passed &&
       pipelineSwitches.passed
-        ? 'PASSED'
-        : 'FAILED';
+        ? INSPECTION_STATUS.PASSED
+        : INSPECTION_STATUS.FAILED;
 
     const report: PreMarketInspectionReport = {
       targetDate: dateStr,
@@ -207,8 +214,12 @@ export class PreMarketInspectionService {
     }
 
     const prevDateStr = this.timezoneService.formatDate(previousTradingDay);
-    const startOfDay = new Date(`${prevDateStr}T00:00:00+08:00`);
-    const endOfDay = new Date(`${prevDateStr}T23:59:59+08:00`);
+    const startOfDay = new Date(
+      `${prevDateStr}${BEIJING_DATE_SUFFIX.START_OF_DAY}`,
+    );
+    const endOfDay = new Date(
+      `${prevDateStr}${BEIJING_DATE_SUFFIX.END_OF_DAY}`,
+    );
 
     // Query active assigned securities
     const activeAssignments = await this.assignmentRepo.find({
@@ -305,17 +316,19 @@ export class PreMarketInspectionService {
   async checkRealtimePipeline(): Promise<DimensionCheckResult> {
     const tdxBase =
       this.configService.get<string>('TDX_BASE_URL') ??
-      'http://tdx-datasource:9001';
+      PRE_MARKET_INSPECTION_CONFIG.DEFAULT_TDX_BASE_URL;
     const qmtBase =
       this.configService.get<string>('QMT_BASE_URL') ??
-      'http://qmt-datasource:9002';
+      PRE_MARKET_INSPECTION_CONFIG.DEFAULT_QMT_BASE_URL;
 
     const errors: string[] = [];
 
     // Probe bridge and websocket readiness from datasources
     try {
       const tdxRes = await fetch(`${tdxBase}/health`, {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(
+          PRE_MARKET_INSPECTION_CONFIG.DEFAULT_PROBE_TIMEOUT_MS,
+        ),
       });
       if (tdxRes.ok) {
         const body = (await tdxRes.json()) as Record<string, unknown>;
@@ -330,7 +343,9 @@ export class PreMarketInspectionService {
 
     try {
       const qmtRes = await fetch(`${qmtBase}/health`, {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(
+          PRE_MARKET_INSPECTION_CONFIG.DEFAULT_PROBE_TIMEOUT_MS,
+        ),
       });
       if (qmtRes.ok) {
         const body = (await qmtRes.json()) as Record<string, unknown>;
@@ -378,16 +393,18 @@ export class PreMarketInspectionService {
     // Signal service probe
     const signalHealthUrl =
       this.configService.get<string>('SIGNAL_HEALTH_URL') ??
-      'http://signal:8010/health';
+      PRE_MARKET_INSPECTION_CONFIG.DEFAULT_SIGNAL_HEALTH_URL;
     try {
       const res = await fetch(signalHealthUrl, {
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(
+          PRE_MARKET_INSPECTION_CONFIG.DEFAULT_PROBE_TIMEOUT_MS,
+        ),
       });
       if (!res.ok) {
         errors.push(`Signal 服务健康端点返回 HTTP ${res.status}`);
       } else {
         const body = (await res.json()) as Record<string, unknown>;
-        if (body['status'] !== 'ok') {
+        if (body['status'] !== INSPECTION_STATUS.OK) {
           errors.push(`Signal 服务状态异常: status=${body['status']}`);
         }
       }
@@ -420,16 +437,16 @@ export class PreMarketInspectionService {
   async checkPipelineSwitches(): Promise<DimensionCheckResult> {
     const backendHealthUrl =
       this.configService.get<string>('BACKEND_HEALTH_URL') ??
-      'http://mist-backend:8001/health';
+      PRE_MARKET_INSPECTION_CONFIG.DEFAULT_BACKEND_HEALTH_URL;
     const signalHealthUrl =
       this.configService.get<string>('SIGNAL_HEALTH_URL') ??
-      'http://signal:8010/health';
+      PRE_MARKET_INSPECTION_CONFIG.DEFAULT_SIGNAL_HEALTH_URL;
     const tdxBase =
       this.configService.get<string>('TDX_BASE_URL') ??
-      'http://tdx-datasource:9001';
+      PRE_MARKET_INSPECTION_CONFIG.DEFAULT_TDX_BASE_URL;
     const qmtBase =
       this.configService.get<string>('QMT_BASE_URL') ??
-      'http://qmt-datasource:9002';
+      PRE_MARKET_INSPECTION_CONFIG.DEFAULT_QMT_BASE_URL;
     const feishuWebhook =
       this.configService.get<string>('OO_ALERT_FEISHU_WEBHOOK') ||
       this.configService.get<string>('NOTIFICATION_FEISHU_WEBHOOK');
@@ -437,13 +454,13 @@ export class PreMarketInspectionService {
     const errors: string[] = [];
     const remediation: string[] = [];
     const statusBadges: Record<string, string> = {
-      backend: 'unknown',
-      signal: 'unknown',
-      tdx: 'unknown',
-      qmt: 'unknown',
-      redis: 'unknown',
-      lifecycle: 'unknown',
-      feishu: feishuWebhook ? 'ok' : 'missing',
+      backend: INSPECTION_STATUS.UNKNOWN,
+      signal: INSPECTION_STATUS.UNKNOWN,
+      tdx: INSPECTION_STATUS.UNKNOWN,
+      qmt: INSPECTION_STATUS.UNKNOWN,
+      redis: INSPECTION_STATUS.UNKNOWN,
+      lifecycle: INSPECTION_STATUS.UNKNOWN,
+      feishu: feishuWebhook ? INSPECTION_STATUS.OK : 'missing',
     };
 
     if (!feishuWebhook) {

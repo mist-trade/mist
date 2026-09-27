@@ -12,6 +12,7 @@ import type {
 } from '@app/strategy';
 import { LessThan } from 'typeorm';
 import type { Repository } from 'typeorm';
+import { MARKET_SOURCES } from '@app/constants';
 
 export const BACKTEST_REPLAY_PAGE_SIZE = 1_000;
 
@@ -93,7 +94,10 @@ function assertCriteria(criteria: StrategyReplayPageCriteria): void {
   if (!Number.isSafeInteger(criteria.period) || criteria.period <= 0) {
     throw new TypeError('replay period must be a positive safe integer');
   }
-  if (criteria.source !== 'tdx' && criteria.source !== 'qmt') {
+  if (
+    criteria.source !== MARKET_SOURCES.TDX &&
+    criteria.source !== MARKET_SOURCES.QMT
+  ) {
     throw new TypeError('backtest replay source must be tdx or qmt');
   }
   if (!validDate(criteria.startAt) || !validDate(criteria.endAt)) {
@@ -116,7 +120,10 @@ function assertWindowCriteria(criteria: StrategyReplayWindowCriteria): void {
   if (!Number.isSafeInteger(criteria.period) || criteria.period <= 0) {
     throw new TypeError('replay window period must be a positive safe integer');
   }
-  if (criteria.source !== 'tdx' && criteria.source !== 'qmt') {
+  if (
+    criteria.source !== MARKET_SOURCES.TDX &&
+    criteria.source !== MARKET_SOURCES.QMT
+  ) {
     throw new TypeError('backtest replay window source must be tdx or qmt');
   }
   if (!validDate(criteria.endAt)) {
@@ -133,7 +140,7 @@ function assertWindowCriteria(criteria: StrategyReplayWindowCriteria): void {
 }
 
 function toDataSource(source: StrategyRealtimeSource): DataSource {
-  return source === 'tdx' ? DataSource.TDX : DataSource.QMT;
+  return source === MARKET_SOURCES.TDX ? DataSource.TDX : DataSource.QMT;
 }
 
 function validDate(value: Date): boolean {

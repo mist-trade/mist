@@ -1,4 +1,5 @@
 import { Decimal8 } from '@app/decimal';
+import { CANDLE_FIELDS, CANDLE_STATUS, CANDLE_VALIDITY } from '@app/constants';
 import { Injectable } from '@nestjs/common';
 import type {
   CanonicalRealtimeSnapshot,
@@ -108,20 +109,20 @@ export class OpenCandleAggregator {
   ): ApplySnapshotOutcome {
     if (snapshot.eventTime === null || !snapshot.quality.aggregationEligible) {
       this.recordSkip(snapshot.source, snapshot.securityId, 'no_event_time');
-      return { kind: 'skipped', reason: 'no_event_time' };
+      return { kind: CANDLE_STATUS.SKIPPED, reason: 'no_event_time' };
     }
 
     const bucket = resolveCandleBucket(snapshot.eventTime);
     if (bucket === null) {
       this.recordSkip(snapshot.source, snapshot.securityId, 'out_of_session');
-      return { kind: 'skipped', reason: 'out_of_session' };
+      return { kind: CANDLE_STATUS.SKIPPED, reason: 'out_of_session' };
     }
     if (
       options.acceptedAtMs !== undefined &&
       options.graceMs !== undefined &&
       options.acceptedAtMs > bucket.bucketEndMs + options.graceMs
     ) {
-      return { kind: 'skipped', reason: 'late_after_grace' };
+      return { kind: CANDLE_STATUS.SKIPPED, reason: 'late_after_grace' };
     }
 
     // A security can move source between trading days. Remove every prior-day
@@ -159,7 +160,10 @@ export class OpenCandleAggregator {
           snapshot.securityId,
           'not_aggregation_eligible',
         );
-        return { kind: 'skipped', reason: 'not_aggregation_eligible' };
+        return {
+          kind: CANDLE_STATUS.SKIPPED,
+          reason: 'not_aggregation_eligible',
+        };
       }
       owner.current = this.openCandidate(
         bucket,
@@ -178,15 +182,21 @@ export class OpenCandleAggregator {
     }
 
     if (bucket.bucketStartMs < owner.current.state.bucketStartMs) {
-      return { kind: 'skipped', reason: 'duplicate_or_late' };
+      return { kind: CANDLE_STATUS.SKIPPED, reason: 'duplicate_or_late' };
     }
 
     if (owner.prior !== null) {
-      return { kind: 'skipped', reason: 'candidate_capacity_exceeded' };
+      return {
+        kind: CANDLE_STATUS.SKIPPED,
+        reason: 'candidate_capacity_exceeded',
+      };
     }
 
     if (!isValidPrice(snapshot.prices.last)) {
-      return { kind: 'skipped', reason: 'not_aggregation_eligible' };
+      return {
+        kind: CANDLE_STATUS.SKIPPED,
+        reason: 'not_aggregation_eligible',
+      };
     }
 
     const prior = owner.current;
@@ -194,12 +204,12 @@ export class OpenCandleAggregator {
     owner.current = this.openCandidate(
       bucket,
       snapshot,
-      prior.state.validity === 'valid'
+      prior.state.validity === CANDLE_VALIDITY.VALID
         ? baselineFromCandidate(prior.state)
         : owner.committedBaseline,
     );
     return {
-      kind: 'rolled-over',
+      kind: CANDLE_STATUS.ROLLED_OVER,
       prior: bucketOf(prior.state),
       opened: bucket,
     };
@@ -257,7 +267,8 @@ export class OpenCandleAggregator {
       for (const candidate of [owner.prior, owner.current]) {
         if (!candidate) continue;
         candidateCount++;
-        if (candidate.state.validity === 'invalid') invalidCandidateCount++;
+        if (candidate.state.validity === CANDLE_VALIDITY.INVALID)
+          invalidCandidateCount++;
         if (candidate.frozen) frozenCandidateCount++;
       }
     }
@@ -314,7 +325,7 @@ export class OpenCandleAggregator {
     const { owner, position, slot } = candidate;
     const frozen = slot.frozen;
     if (!frozen) return false;
-    if (frozen.validity === 'valid') {
+    if (frozen.validity === CANDLE_VALIDITY.VALID) {
       owner.committedBaseline = {
         tradingDay: frozen.tradingDay,
         cumulativeVolume: frozen.closingCumulativeVolume,
@@ -351,8 +362,9 @@ export class OpenCandleAggregator {
       bucketStartMs === undefined
         ? owner.current
         : findSlotByBucket(owner, bucketStartMs);
-    if (!slot || slot.frozen || slot.state.validity === 'invalid') return;
-    slot.state.validity = 'invalid';
+    if (!slot || slot.frozen || slot.state.validity === CANDLE_VALIDITY.INVALID)
+      return;
+    slot.state.validity = CANDLE_VALIDITY.INVALID;
     slot.state.invalidReason = reason;
     if (slot === owner.prior) this.rebaseCurrent(owner);
   }
@@ -406,7 +418,7 @@ export class OpenCandleAggregator {
       lastEventTime: snapshot.eventTime!,
       lastAppliedEventTimeMs: Date.parse(snapshot.eventTime!),
       closingSnapshot: toClosingSnapshot(snapshot),
-      validity: counterReset ? 'invalid' : 'valid',
+      validity: counterReset ? CANDLE_VALIDITY.INVALID : CANDLE_VALIDITY.VALID,
       invalidReason: counterReset ? 'counter_reset' : null,
     };
     return { state, frozen: null };
@@ -419,21 +431,21 @@ export class OpenCandleAggregator {
     isPrior: boolean,
   ): ApplySnapshotOutcome {
     if (candidate.frozen) {
-      return { kind: 'skipped', reason: 'late_after_grace' };
+      return { kind: CANDLE_STATUS.SKIPPED, reason: 'late_after_grace' };
     }
     const state = candidate.state;
     const eventMs = Date.parse(snapshot.eventTime!);
     if (eventMs <= state.lastAppliedEventTimeMs) {
-      return { kind: 'skipped', reason: 'duplicate_or_late' };
+      return { kind: CANDLE_STATUS.SKIPPED, reason: 'duplicate_or_late' };
     }
 
     const price = snapshot.prices.last;
     if (!isValidPrice(price)) {
-      state.validity = 'invalid';
+      state.validity = CANDLE_VALIDITY.INVALID;
       state.invalidReason = 'invalid_price';
       if (isPrior) this.rebaseCurrent(owner);
       return {
-        kind: 'invalidated',
+        kind: CANDLE_STATUS.INVALIDATED,
         reason: 'invalid_price',
         bucket: bucketOf(state),
       };
@@ -453,53 +465,53 @@ export class OpenCandleAggregator {
       snapshot.cumulativeAmount === null
     ) {
       this.quantityMissingFrameCount++;
-      return { kind: 'updated', bucket: bucketOf(state) };
+      return { kind: CANDLE_STATUS.UPDATED, bucket: bucketOf(state) };
     }
 
     const volume = applyQuantityUpdate(
-      readQuantity(state, 'volume'),
+      readQuantity(state, CANDLE_FIELDS.VOLUME),
       snapshot.cumulativeVolume,
     );
     const amount = applyQuantityUpdate(
-      readQuantity(state, 'amount'),
+      readQuantity(state, CANDLE_FIELDS.AMOUNT),
       snapshot.cumulativeAmount,
     );
-    writeQuantity(state, 'volume', volume);
-    writeQuantity(state, 'amount', amount);
+    writeQuantity(state, CANDLE_FIELDS.VOLUME, volume);
+    writeQuantity(state, CANDLE_FIELDS.AMOUNT, amount);
     if (volume.counterReset || amount.counterReset) {
-      state.validity = 'invalid';
+      state.validity = CANDLE_VALIDITY.INVALID;
       state.invalidReason = 'counter_reset';
       if (isPrior) this.rebaseCurrent(owner);
       return {
-        kind: 'invalidated',
+        kind: CANDLE_STATUS.INVALIDATED,
         reason: 'counter_reset',
         bucket: bucketOf(state),
       };
     }
 
     if (isPrior) this.rebaseCurrent(owner);
-    return { kind: 'updated', bucket: bucketOf(state) };
+    return { kind: CANDLE_STATUS.UPDATED, bucket: bucketOf(state) };
   }
 
   private rebaseCurrent(owner: MarketSeriesState): void {
     const current = owner.current?.state;
     if (!current) return;
     const preceding =
-      owner.prior?.state.validity === 'valid'
+      owner.prior?.state.validity === CANDLE_VALIDITY.VALID
         ? baselineFromCandidate(owner.prior.state)
         : owner.committedBaseline;
     const volume = rebaseQuantity(
-      readQuantity(current, 'volume'),
+      readQuantity(current, CANDLE_FIELDS.VOLUME),
       preceding?.cumulativeVolume ?? null,
     );
     const amount = rebaseQuantity(
-      readQuantity(current, 'amount'),
+      readQuantity(current, CANDLE_FIELDS.AMOUNT),
       preceding?.cumulativeAmount ?? null,
     );
-    writeQuantity(current, 'volume', volume);
-    writeQuantity(current, 'amount', amount);
+    writeQuantity(current, CANDLE_FIELDS.VOLUME, volume);
+    writeQuantity(current, CANDLE_FIELDS.AMOUNT, amount);
     if (volume.counterReset || amount.counterReset) {
-      current.validity = 'invalid';
+      current.validity = CANDLE_VALIDITY.INVALID;
       current.invalidReason = 'counter_reset';
     }
   }
@@ -540,13 +552,13 @@ function isValidPrice(value: number): boolean {
 }
 
 function outcomeForOpened(state: OpenCandleState): ApplySnapshotOutcome {
-  return state.validity === 'invalid'
+  return state.validity === CANDLE_VALIDITY.INVALID
     ? {
-        kind: 'invalidated',
+        kind: CANDLE_STATUS.INVALIDATED,
         reason: state.invalidReason ?? 'invalid_ohlc',
         bucket: bucketOf(state),
       }
-    : { kind: 'opened', bucket: bucketOf(state) };
+    : { kind: CANDLE_STATUS.OPENED, bucket: bucketOf(state) };
 }
 
 function findSlotByBucket(
@@ -777,7 +789,7 @@ function readQuantity(
   state: OpenCandleState,
   field: 'volume' | 'amount',
 ): QuantityState {
-  return field === 'volume'
+  return field === CANDLE_FIELDS.VOLUME
     ? {
         baseline: state.baselineCumulativeVolume,
         first: state.firstCumulativeVolume,
@@ -799,7 +811,7 @@ function writeQuantity(
   field: 'volume' | 'amount',
   quantity: QuantityState,
 ): void {
-  if (field === 'volume') {
+  if (field === CANDLE_FIELDS.VOLUME) {
     state.baselineCumulativeVolume = quantity.baseline;
     state.firstCumulativeVolume = quantity.first;
     state.lastCumulativeVolume = quantity.last;

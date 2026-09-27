@@ -27,6 +27,12 @@ import { convertQmtNativeSnapshot } from './native-snapshot.converter';
 import { QmtRealtimeAllowlistResolver } from './realtime-allowlist.resolver';
 import { QmtRealtimeStore } from './realtime.store';
 import { RealtimeSubscriptionRuntimeRegistry } from '../../../realtime-subscriptions/realtime-subscription-runtime.registry';
+import {
+  DEFAULT_QMT_BASE_URL,
+  DEFAULT_QMT_WS_CLIENT_ID,
+  DEFAULT_WS_RECONNECT_DELAY_MS,
+  DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS,
+} from '../../constants';
 
 type ControlRequest =
   | { type: 'sync_subscriptions'; symbols: string[] }
@@ -74,18 +80,17 @@ export class QmtRealtimeClient
     @Optional()
     private readonly subscriptionRuntime?: RealtimeSubscriptionRuntimeRegistry,
   ) {
-    const baseUrl =
-      config.get<string>('QMT_BASE_URL') ?? 'http://127.0.0.1:9002';
+    const baseUrl = config.get<string>('QMT_BASE_URL') ?? DEFAULT_QMT_BASE_URL;
     const clientId =
-      config.get<string>('QMT_WS_CLIENT_ID') ?? 'mist-backend-qmt-realtime';
+      config.get<string>('QMT_WS_CLIENT_ID') ?? DEFAULT_QMT_WS_CLIENT_ID;
     this.wsUrl = `${baseUrl.replace(/^http/, 'ws')}/ws/realtime/qmt/${clientId}`;
     this.reconnectDelayMs = config.get<number>(
       'QMT_WS_RECONNECT_DELAY_MS',
-      5000,
+      DEFAULT_WS_RECONNECT_DELAY_MS,
     );
     this.controlTimeoutMs = config.get<number>(
       'QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS',
-      10_000,
+      DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS,
     );
     void clock;
   }

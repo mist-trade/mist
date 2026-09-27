@@ -27,6 +27,12 @@ import { convertTdxNativeSnapshot } from './native-snapshot.converter';
 import { TdxRealtimeAllowlistResolver } from './realtime-allowlist.resolver';
 import { TdxRealtimeStore } from './realtime.store';
 import { RealtimeSubscriptionRuntimeRegistry } from '../../../realtime-subscriptions/realtime-subscription-runtime.registry';
+import {
+  DEFAULT_TDX_BASE_URL,
+  DEFAULT_TDX_WS_CLIENT_ID,
+  DEFAULT_WS_RECONNECT_DELAY_MS,
+  DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS,
+} from '../../constants';
 
 type ControlRequest =
   | { type: 'sync_subscriptions'; symbols: string[] }
@@ -82,18 +88,17 @@ export class TdxRealtimeClient
     @Optional()
     private readonly subscriptionRuntime?: RealtimeSubscriptionRuntimeRegistry,
   ) {
-    const baseUrl =
-      config.get<string>('TDX_BASE_URL') ?? 'http://127.0.0.1:9001';
+    const baseUrl = config.get<string>('TDX_BASE_URL') ?? DEFAULT_TDX_BASE_URL;
     const clientId =
-      config.get<string>('TDX_WS_CLIENT_ID') ?? 'mist-backend-tdx-realtime';
+      config.get<string>('TDX_WS_CLIENT_ID') ?? DEFAULT_TDX_WS_CLIENT_ID;
     this.wsUrl = `${baseUrl.replace(/^http/, 'ws')}/ws/realtime/tdx/${clientId}`;
     this.reconnectDelayMs = config.get<number>(
       'TDX_WS_RECONNECT_DELAY_MS',
-      5000,
+      DEFAULT_WS_RECONNECT_DELAY_MS,
     );
     this.controlTimeoutMs = config.get<number>(
       'TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS',
-      10_000,
+      DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS,
     );
     void desiredPoster;
   }

@@ -9,15 +9,28 @@ export const FIBONACCI_EXTENSION_RATIOS = [
   1.272, 1.382, 1.618, 2.0, 2.618,
 ] as const;
 
+export const DEFAULT_FIBONACCI_PERIOD = 50;
+export const DEFAULT_FIBONACCI_TOLERANCE_RATIO = 0.008;
+
+export const RETRACEMENT_ZONES = Object.freeze({
+  ABOVE_SWING: 'ABOVE_SWING',
+  SHALLOW: 'SHALLOW',
+  MODERATE: 'MODERATE',
+  GOLDEN_POCKET: 'GOLDEN_POCKET',
+  DEEP: 'DEEP',
+  INVALIDATED: 'INVALIDATED',
+} as const);
+
+export const FIBONACCI_RATIOS = Object.freeze({
+  HALF: 0.5,
+  GOLDEN_RATIO: 0.618,
+  SHALLOW_RATIO: 0.382,
+} as const);
+
 export type FibonacciDirection = 'up' | 'down';
 
 export type RetracementZone =
-  | 'ABOVE_SWING'
-  | 'SHALLOW'
-  | 'MODERATE'
-  | 'GOLDEN_POCKET'
-  | 'DEEP'
-  | 'INVALIDATED';
+  (typeof RETRACEMENT_ZONES)[keyof typeof RETRACEMENT_ZONES];
 
 /**
  * TradingView official Fibonacci Retracement theme colors and opacity values.

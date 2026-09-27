@@ -9,6 +9,20 @@ import {
   TacticalQuadrant,
   TacticalQuadrantDecision,
 } from '../contracts/chan-four-quadrant-tactics.interface';
+import {
+  MACRO_TREND_DIRECTIONS,
+  HIGHER_PERIOD_RATIOS,
+  MACD_MIN_CALCULATION_BARS,
+  CANDIDATE_BSP_TYPES,
+} from '../../strategy.constants';
+
+const DEFAULT_STOP_LOSS_FACTOR = 0.98;
+const CONFIDENCE_HIGH_ALIGN = 95;
+const CONFIDENCE_HIGH_DIVERGE = 88;
+const CONFIDENCE_MID_ALIGN = 92;
+const CONFIDENCE_MID_DIVERGE = 82;
+const CONFIDENCE_BASE_ALIGN = 90;
+const CONFIDENCE_BASE_DIVERGE = 80;
 
 /**
  * 周期换算比率：
@@ -21,15 +35,17 @@ import {
  * - 默认 ratio = 4
  */
 export function getHigherPeriodRatio(period?: string | number): number {
-  if (!period) return 4;
+  if (!period) return HIGHER_PERIOD_RATIOS.DEFAULT;
   const p = String(period).toLowerCase().trim();
-  if (p === '1m' || p === '1') return 5;
-  if (p === '5m' || p === '5') return 6;
-  if (p === '15m' || p === '15') return 4;
-  if (p === '30m' || p === '30') return 4;
-  if (p === '60m' || p === '60' || p === '1h') return 4;
-  if (p === '1d' || p === 'day' || p === 'daily') return 5;
-  return 4;
+  if (p === '1m' || p === '1') return HIGHER_PERIOD_RATIOS.ONE_MIN;
+  if (p === '5m' || p === '5') return HIGHER_PERIOD_RATIOS.FIVE_MIN;
+  if (p === '15m' || p === '15') return HIGHER_PERIOD_RATIOS.FIFTEEN_MIN;
+  if (p === '30m' || p === '30') return HIGHER_PERIOD_RATIOS.THIRTY_MIN;
+  if (p === '60m' || p === '60' || p === '1h')
+    return HIGHER_PERIOD_RATIOS.SIXTY_MIN;
+  if (p === '1d' || p === 'day' || p === 'daily')
+    return HIGHER_PERIOD_RATIOS.DAILY;
+  return HIGHER_PERIOD_RATIOS.DEFAULT;
 }
 
 /**
@@ -88,16 +104,19 @@ export function deriveMacroTrendFromHigherMacd(
     dif: number,
     dea: number,
   ): MacroTrendDirection => {
-    if (dif > dea) return 'UP'; // 金叉多头
-    if (dif < dea) return 'DOWN'; // 死叉空头
+    if (dif > dea) return MACRO_TREND_DIRECTIONS.UP; // 金叉多头
+    if (dif < dea) return MACRO_TREND_DIRECTIONS.DOWN; // 死叉空头
     // 零轴水上/水下辅助判断
-    if (dif > 0) return 'UP';
-    if (dif < 0) return 'DOWN';
-    return 'RANGE';
+    if (dif > 0) return MACRO_TREND_DIRECTIONS.UP;
+    if (dif < 0) return MACRO_TREND_DIRECTIONS.DOWN;
+    return MACRO_TREND_DIRECTIONS.RANGE;
   };
 
   // 1. 若外部显式提供了上一级别 K 线数据 parentKlines，直接计算其 MACD
-  if (ctx.parentKlines && ctx.parentKlines.length >= 34) {
+  if (
+    ctx.parentKlines &&
+    ctx.parentKlines.length >= MACD_MIN_CALCULATION_BARS
+  ) {
     const closes = ctx.parentKlines.map((k) => k.close);
     const macdRes = computeMacdSeries(closes);
     if (macdRes.macd.length > 0 && macdRes.signal.length > 0) {
@@ -108,9 +127,9 @@ export function deriveMacroTrendFromHigherMacd(
   }
 
   // 2. 若未提供 parentKlines，尝试从本级别 klines 重采样合成本级别之上的上一级别 K 线
-  if (ctx.klines && ctx.klines.length >= 34) {
+  if (ctx.klines && ctx.klines.length >= MACD_MIN_CALCULATION_BARS) {
     const resampled = resampleToHigherKlines(ctx.klines, ctx.period);
-    if (resampled.length >= 34) {
+    if (resampled.length >= MACD_MIN_CALCULATION_BARS) {
       const closes = resampled.map((k) => k.close);
       const macdRes = computeMacdSeries(closes);
       if (macdRes.macd.length > 0 && macdRes.signal.length > 0) {
@@ -120,7 +139,7 @@ export function deriveMacroTrendFromHigherMacd(
       }
     }
 
-    // 3. 兜底方案：如果合成大级别后根数不足 34，退化采用本级别 MACD 金叉死叉状态判断
+    // 3. 兜底方案：如果合成大级别后根数不足 MACD_MIN_CALCULATION_BARS，退化采用本级别 MACD 金叉死叉状态判断
     const baseCloses = ctx.klines.map((k) => k.close);
     const baseMacd = computeMacdSeries(baseCloses);
     if (baseMacd.macd.length > 0 && baseMacd.signal.length > 0) {
@@ -130,7 +149,7 @@ export function deriveMacroTrendFromHigherMacd(
     }
   }
 
-  return 'RANGE';
+  return MACRO_TREND_DIRECTIONS.RANGE;
 }
 
 /**
@@ -162,7 +181,7 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
       this.countConsecutiveDownZhongshus(ctx);
 
     // 2. 核心风控门禁：大级别 MACD 死叉（下跌趋势段）严禁单中枢抄底，必须等待 >= 2 个下跌中枢趋势背驰
-    if (macroTrend === 'DOWN' && downZhongshuCount < 2) {
+    if (macroTrend === MACRO_TREND_DIRECTIONS.DOWN && downZhongshuCount < 2) {
       return this.emptyDecision(
         TacticalQuadrant.LeftBuy,
         ctx,
@@ -172,7 +191,7 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
 
     // 3. 候选形态检查：若有 candidateBsp 则检验，无则检查本级别底分型
     if (ctx.candidateBsp) {
-      if (ctx.candidateBsp.type !== 'first_buy') {
+      if (ctx.candidateBsp.type !== CANDIDATE_BSP_TYPES.FIRST_BUY) {
         return this.emptyDecision(
           TacticalQuadrant.LeftBuy,
           ctx,
@@ -196,9 +215,9 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
       klines[klines.length - 1].close;
 
     const reason =
-      macroTrend === 'UP'
+      macroTrend === MACRO_TREND_DIRECTIONS.UP
         ? `上一级别MACD金叉(顺势良性回调)，${downZhongshuCount}中枢底背驰买入`
-        : macroTrend === 'DOWN'
+        : macroTrend === MACRO_TREND_DIRECTIONS.DOWN
           ? `上一级别MACD死叉(空头大趋势)，${downZhongshuCount}中枢终极衰竭趋势背驰抄底`
           : `震荡行情箱体边缘，${downZhongshuCount}中枢底背驰买入`;
 
@@ -207,10 +226,14 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
       quadrant: TacticalQuadrant.LeftBuy,
       price,
       time: ctx.candidateBsp?.time ?? ctx.timestamp,
-      confidence: macroTrend === 'UP' ? 90 : 80,
+      confidence:
+        macroTrend === MACRO_TREND_DIRECTIONS.UP
+          ? CONFIDENCE_BASE_ALIGN
+          : CONFIDENCE_BASE_DIVERGE,
       action: TacticalAction.OpenLong,
       reason,
-      stopLossPrice: klines[klines.length - 2]?.low ?? price * 0.98,
+      stopLossPrice:
+        klines[klines.length - 2]?.low ?? price * DEFAULT_STOP_LOSS_FACTOR,
     };
   }
 
@@ -223,14 +246,20 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
     // 优先消费结构性候选二买/三买
     if (ctx.candidateBsp) {
       const type = ctx.candidateBsp.type;
-      if (type === 'second_buy' || type === 'third_buy') {
-        const isSecond = type === 'second_buy';
+      if (
+        type === CANDIDATE_BSP_TYPES.SECOND_BUY ||
+        type === CANDIDATE_BSP_TYPES.THIRD_BUY
+      ) {
+        const isSecond = type === CANDIDATE_BSP_TYPES.SECOND_BUY;
         return {
           triggered: true,
           quadrant: TacticalQuadrant.RightBuy,
           price: ctx.candidateBsp.price,
           time: ctx.candidateBsp.time,
-          confidence: macroTrend === 'UP' ? 95 : 88,
+          confidence:
+            macroTrend === MACRO_TREND_DIRECTIONS.UP
+              ? CONFIDENCE_HIGH_ALIGN
+              : CONFIDENCE_HIGH_DIVERGE,
           action: TacticalAction.OpenLong,
           reason: isSecond
             ? `二买确认：一买后次次回抽不破前低 (上一级别MACD: ${macroTrend})`
@@ -267,7 +296,10 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
           quadrant: TacticalQuadrant.RightBuy,
           price: ctx.lastPrice ?? fenxing.extremumPrice,
           time: fenxing.confirmedTime,
-          confidence: macroTrend === 'UP' ? 92 : 82,
+          confidence:
+            macroTrend === MACRO_TREND_DIRECTIONS.UP
+              ? CONFIDENCE_MID_ALIGN
+              : CONFIDENCE_MID_DIVERGE,
           action: TacticalAction.OpenLong,
           reason: `标准二买形态：次次回抽低点(${b2.low})抬高不破前低(${b0.low})且底分型确立 (上一级别MACD: ${macroTrend})`,
           stopLossPrice: fenxing.stopLossPrice,
@@ -292,7 +324,7 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
       ctx.candidateBsp?.zhongshuCount ?? this.countConsecutiveUpZhongshus(ctx);
 
     // 上一级别 MACD 金叉（上升趋势段）中，单中枢冲高往往是中继，严禁过早轻易卖飞，需 >= 2 中枢背驰
-    if (macroTrend === 'UP' && upZhongshuCount < 2) {
+    if (macroTrend === MACRO_TREND_DIRECTIONS.UP && upZhongshuCount < 2) {
       return this.emptyDecision(
         TacticalQuadrant.LeftSell,
         ctx,
@@ -301,7 +333,7 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
     }
 
     if (ctx.candidateBsp) {
-      if (ctx.candidateBsp.type !== 'first_sell') {
+      if (ctx.candidateBsp.type !== CANDIDATE_BSP_TYPES.FIRST_SELL) {
         return this.emptyDecision(
           TacticalQuadrant.LeftSell,
           ctx,
@@ -325,9 +357,9 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
       klines[klines.length - 1].close;
 
     const reason =
-      macroTrend === 'DOWN'
+      macroTrend === MACRO_TREND_DIRECTIONS.DOWN
         ? `上一级别MACD死叉(顺势空头压制)，${upZhongshuCount}中枢反弹承压一卖`
-        : macroTrend === 'UP'
+        : macroTrend === MACRO_TREND_DIRECTIONS.UP
           ? `上一级别MACD金叉(强势多头)，${upZhongshuCount}中枢极度超买高位背驰止盈一卖`
           : `震荡行情箱体上轨，${upZhongshuCount}中枢顶背驰一卖`;
 
@@ -336,7 +368,10 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
       quadrant: TacticalQuadrant.LeftSell,
       price,
       time: ctx.candidateBsp?.time ?? ctx.timestamp,
-      confidence: macroTrend === 'DOWN' ? 92 : 85,
+      confidence:
+        macroTrend === MACRO_TREND_DIRECTIONS.DOWN
+          ? CONFIDENCE_MID_ALIGN
+          : CONFIDENCE_MID_DIVERGE,
       action: TacticalAction.CloseLong,
       reason,
     };
@@ -350,14 +385,20 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
 
     if (ctx.candidateBsp) {
       const type = ctx.candidateBsp.type;
-      if (type === 'second_sell' || type === 'third_sell') {
-        const isSecond = type === 'second_sell';
+      if (
+        type === CANDIDATE_BSP_TYPES.SECOND_SELL ||
+        type === CANDIDATE_BSP_TYPES.THIRD_SELL
+      ) {
+        const isSecond = type === CANDIDATE_BSP_TYPES.SECOND_SELL;
         return {
           triggered: true,
           quadrant: TacticalQuadrant.RightSell,
           price: ctx.candidateBsp.price,
           time: ctx.candidateBsp.time,
-          confidence: macroTrend === 'DOWN' ? 95 : 88,
+          confidence:
+            macroTrend === MACRO_TREND_DIRECTIONS.DOWN
+              ? CONFIDENCE_HIGH_ALIGN
+              : CONFIDENCE_HIGH_DIVERGE,
           action: TacticalAction.CloseLong,
           reason: isSecond
             ? `二卖确认：反弹不过前高 (上一级别MACD: ${macroTrend})`
@@ -393,7 +434,10 @@ export class StandardChanTactics implements ChanFourQuadrantTactics {
           quadrant: TacticalQuadrant.RightSell,
           price: ctx.lastPrice ?? fenxing.extremumPrice,
           time: fenxing.confirmedTime,
-          confidence: macroTrend === 'DOWN' ? 90 : 82,
+          confidence:
+            macroTrend === MACRO_TREND_DIRECTIONS.DOWN
+              ? CONFIDENCE_BASE_ALIGN
+              : CONFIDENCE_BASE_DIVERGE,
           action: TacticalAction.CloseLong,
           reason: `标准二卖形态：反弹高点(${b2.high})不过前高(${b0.high})且顶分型确立 (上一级别MACD: ${macroTrend})`,
           stopLossPrice: fenxing.stopLossPrice,

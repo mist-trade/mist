@@ -1,7 +1,12 @@
 import {
   computeFibonacciObservation,
   TRADINGVIEW_FIB_STYLES,
+  RETRACEMENT_ZONES,
 } from '@app/indicators';
+import {
+  DECISION_ACTIONS,
+  DEFAULT_TECHNICAL_FACTOR_CONFIDENCE,
+} from '../../strategy.constants';
 import type {
   FactorContext,
   FactorOpinion,
@@ -78,7 +83,7 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
 
     if (closes.length < period) {
       return {
-        action: 'NEUTRAL',
+        action: DECISION_ACTIONS.NEUTRAL,
         confidence: 0.0,
         reason: `K线数量不足(${closes.length}/${period})，无法计算斐波那契波段`,
       };
@@ -97,8 +102,8 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
     if (direction === 'pullback' || direction === 'both') {
       if (obs.isGoldenPocket) {
         return {
-          action: 'BUY',
-          confidence: 0.75,
+          action: DECISION_ACTIONS.BUY,
+          confidence: DEFAULT_TECHNICAL_FACTOR_CONFIDENCE,
           reason: `价格回调至斐波那契黄金口袋区间 [${goldenPocketBottom} ~ ${goldenPocketTop}] (当前回撤: ${ratioPercent}%)`,
           evidence: {
             high: obs.high,
@@ -126,8 +131,8 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
       if (isReboundGoldenPocket) {
         const reboundPercent = (reboundRatio * 100).toFixed(1);
         return {
-          action: 'SELL',
-          confidence: 0.75,
+          action: DECISION_ACTIONS.SELL,
+          confidence: DEFAULT_TECHNICAL_FACTOR_CONFIDENCE,
           reason: `价格反弹至斐波那契黄金口袋阻力区 (当前反弹: ${reboundPercent}%)`,
           evidence: {
             high: obs.high,
@@ -145,13 +150,17 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
 
     // 3. 其他非关键位 (浅回调/中度/深回调)
     let zoneDesc = '未到达关键位';
-    if (obs.zone === 'SHALLOW') zoneDesc = `浅度回调(${ratioPercent}%)`;
-    else if (obs.zone === 'MODERATE') zoneDesc = `中度回调(${ratioPercent}%)`;
-    else if (obs.zone === 'DEEP') zoneDesc = `深度回调(${ratioPercent}%)`;
-    else if (obs.zone === 'ABOVE_SWING') zoneDesc = '突破波段新高';
+    if (obs.zone === RETRACEMENT_ZONES.SHALLOW)
+      zoneDesc = `浅度回调(${ratioPercent}%)`;
+    else if (obs.zone === RETRACEMENT_ZONES.MODERATE)
+      zoneDesc = `中度回调(${ratioPercent}%)`;
+    else if (obs.zone === RETRACEMENT_ZONES.DEEP)
+      zoneDesc = `深度回调(${ratioPercent}%)`;
+    else if (obs.zone === RETRACEMENT_ZONES.ABOVE_SWING)
+      zoneDesc = '突破波段新高';
 
     return {
-      action: 'NEUTRAL',
+      action: DECISION_ACTIONS.NEUTRAL,
       confidence: 0.0,
       reason: `价格处于斐波那契${zoneDesc}，未触发黄金口袋共振`,
       evidence: {

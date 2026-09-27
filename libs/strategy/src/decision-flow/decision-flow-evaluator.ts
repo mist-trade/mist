@@ -11,6 +11,7 @@ import type {
   DecisionFlowNode,
   DecisionResult,
 } from './decision-flow.types';
+import { DECISION_ACTIONS } from '../strategy.constants';
 
 export interface DecisionFlowEvaluatorOptions {
   readonly registry?: FactorPluginRegistry;
@@ -63,7 +64,8 @@ export class DecisionFlowEvaluator {
         const minConf = node.minConfidence ?? 0.0;
         const actionMatches =
           node.requiredAction === 'BOTH' || node.requiredAction === 'ANY'
-            ? opinion.action === 'BUY' || opinion.action === 'SELL'
+            ? opinion.action === DECISION_ACTIONS.BUY ||
+              opinion.action === DECISION_ACTIONS.SELL
             : opinion.action === node.requiredAction;
         const passed = actionMatches && opinion.confidence >= minConf;
 
@@ -71,7 +73,8 @@ export class DecisionFlowEvaluator {
           currentScore ?? Number((opinion.confidence * 100).toFixed(1));
 
         const nextInheritedAction =
-          opinion.action === 'BUY' || opinion.action === 'SELL'
+          opinion.action === DECISION_ACTIONS.BUY ||
+          opinion.action === DECISION_ACTIONS.SELL
             ? opinion.action
             : inheritedAction;
 
@@ -168,14 +171,15 @@ export class DecisionFlowEvaluator {
         for (const { item, opinion } of results) {
           totalWeight += item.weight;
           const isVetoItem = item.isVeto === true;
-          const itemVetoTriggered = isVetoItem && opinion.action === 'SELL';
+          const itemVetoTriggered =
+            isVetoItem && opinion.action === DECISION_ACTIONS.SELL;
 
           if (itemVetoTriggered) {
             vetoTriggered = true;
             vetoReason = `插件[${pluginName(item.pluginId)}]行使一票否决权: ${opinion.reason}`;
           }
 
-          if (opinion.action === 'BUY') {
+          if (opinion.action === DECISION_ACTIONS.BUY) {
             earnedScore += item.weight * opinion.confidence;
           }
 
@@ -237,7 +241,9 @@ export class DecisionFlowEvaluator {
 
       case 'TERMINAL': {
         const finalAction =
-          node.action === 'INHERIT' ? inheritedAction || 'BUY' : node.action;
+          node.action === 'INHERIT'
+            ? inheritedAction || DECISION_ACTIONS.BUY
+            : node.action;
 
         trace.push({
           nodeId: node.id,

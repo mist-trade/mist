@@ -17,6 +17,12 @@ import {
   SecuritySourceConfig,
 } from '@app/shared-data';
 import { mistEnvSchema } from '@app/config';
+import { MARKET_SOURCES } from '@app/constants';
+import {
+  HIL_REASONS,
+  HIL_RESULTS,
+  HIL_TIMEOUTS,
+} from './realtime-subscription-hil.constants';
 import { DynamicModule, Module, Type } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
@@ -142,8 +148,8 @@ export async function runRealtimeSubscriptionHil({
   overlaySymbol: requestedOverlaySymbol,
   rawFixturePath,
   rawCaptureDirectory,
-  snapshotTimeoutMs = 30_000,
-  qmtCallbackObservationMs = 10_000,
+  snapshotTimeoutMs = HIL_TIMEOUTS.DEFAULT_SNAPSHOT_TIMEOUT_MS,
+  qmtCallbackObservationMs = HIL_TIMEOUTS.DEFAULT_QMT_CALLBACK_OBSERVATION_MS,
 }: HilRunOptions): Promise<HilEvidence> {
   const symbol = normalizeHilSymbol(requestedSymbol);
   const overlaySymbol = normalizeHilSymbol(requestedOverlaySymbol);
@@ -164,7 +170,7 @@ export async function runRealtimeSubscriptionHil({
   try {
     const resolved = resolveClient(source, context);
     const { client, ready } = resolved;
-    await waitUntilReady(ready, 30_000);
+    await waitUntilReady(ready, HIL_TIMEOUTS.DEFAULT_READY_TIMEOUT_MS);
     operations.push(
       ...(await runControlSequence(
         client,
@@ -186,7 +192,7 @@ export async function runRealtimeSubscriptionHil({
               );
             }
           : undefined,
-        source === 'qmt'
+        source === MARKET_SOURCES.QMT
           ? {
               observationWindowMs: qmtCallbackObservationMs,
               readCapturedAt: () => {
@@ -204,7 +210,7 @@ export async function runRealtimeSubscriptionHil({
   } catch {
     operations.push({
       operation: 'harness.initialize',
-      result: 'failure',
+      result: HIL_RESULTS.FAILURE,
       reason: 'HIL_INITIALIZATION_FAILED',
     });
   } finally {
@@ -443,8 +449,12 @@ export async function runControlSequence(
   await recordOperation(operations, 'unsubscribe.overlay', () =>
     client.unsubscribe(overlaySymbol),
   );
-  if (source === 'tdx') {
-    for (let cycle = 1; cycle <= 3; cycle += 1) {
+  if (source === MARKET_SOURCES.TDX) {
+    for (
+      let cycle = 1;
+      cycle <= HIL_TIMEOUTS.DEFAULT_TDX_VERIFY_CYCLES;
+      cycle += 1
+    ) {
       await recordOperation(
         operations,
         `getSubscriptions.afterUnsubscribe.cycle${cycle}`,
@@ -463,9 +473,11 @@ export async function runControlSequence(
         callbackCapturedAtBefore === callbackCapturedAtAfter;
       operations.push({
         operation: 'observeCallbackCessation.overlay',
-        result: callbackStoppedDuringWindow ? 'success' : 'failure',
+        result: callbackStoppedDuringWindow
+          ? HIL_RESULTS.SUCCESS
+          : HIL_RESULTS.FAILURE,
         reason: callbackStoppedDuringWindow
-          ? 'none'
+          ? HIL_REASONS.NONE
           : 'HIL_QMT_CALLBACK_CONTINUED_AFTER_UNSUBSCRIBE',
       });
 
@@ -624,7 +636,7 @@ function validateSubscriptionState(
     'getSubscriptions.afterSubscribe',
   );
   const afterUnsubscribe =
-    source === 'tdx'
+    source === MARKET_SOURCES.TDX
       ? [1, 2, 3].map((cycle) =>
           successfulValue(
             operations,
@@ -637,7 +649,7 @@ function validateSubscriptionState(
     'getSubscriptions.afterReplacementCleanup',
   );
   const valid =
-    source === 'qmt'
+    source === MARKET_SOURCES.QMT
       ? isQmtState(afterSync, symbol, []) &&
         isQmtState(afterSubscribe, symbol, [overlaySymbol]) &&
         isQmtState(afterUnsubscribe, symbol, []) &&
@@ -646,17 +658,17 @@ function validateSubscriptionState(
       : isTdxState(afterSync, [symbol]) &&
         isTdxState(afterSubscribe, [symbol, overlaySymbol]) &&
         Array.isArray(afterUnsubscribe) &&
-        afterUnsubscribe.length === 3 &&
+        afterUnsubscribe.length === HIL_TIMEOUTS.DEFAULT_TDX_VERIFY_CYCLES &&
         afterUnsubscribe.every((state) => isTdxState(state, [symbol]));
   return valid
     ? {
         operation: 'validateSubscriptions.exactState',
-        result: 'success',
-        reason: 'none',
+        result: HIL_RESULTS.SUCCESS,
+        reason: HIL_REASONS.NONE,
       }
     : {
         operation: 'validateSubscriptions.exactState',
-        result: 'failure',
+        result: HIL_RESULTS.FAILURE,
         reason: 'HIL_SUBSCRIPTION_STATE_INVALID',
       };
 }

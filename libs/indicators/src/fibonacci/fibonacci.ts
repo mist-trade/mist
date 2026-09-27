@@ -1,7 +1,10 @@
 import pl from 'nodejs-polars';
 import { IndicatorInputError, IndicatorValueError } from '../errors';
 import {
+  DEFAULT_FIBONACCI_PERIOD,
+  DEFAULT_FIBONACCI_TOLERANCE_RATIO,
   FIBONACCI_EXTENSION_RATIOS,
+  FIBONACCI_RATIOS,
   FIBONACCI_RETRACEMENT_RATIOS,
   FibonacciDirection,
   FibonacciLevelItem,
@@ -10,6 +13,7 @@ import {
   FibonacciObservation,
   FibonacciParams,
   FibonacciSeriesResult,
+  RETRACEMENT_ZONES,
   RetracementZone,
   StaticSwingFibonacciResult,
 } from './fibonacci.types';
@@ -37,7 +41,7 @@ export function computeFibonacciSeries(
   closes: readonly number[],
   params?: FibonacciParams,
 ): FibonacciSeriesResult {
-  const period = params?.period ?? 50;
+  const period = params?.period ?? DEFAULT_FIBONACCI_PERIOD;
   if (!Number.isInteger(period) || period <= 0) {
     throw new IndicatorInputError(
       `Fibonacci period must be a positive integer (got ${period})`,
@@ -73,7 +77,7 @@ export function computeFibonacciSeries(
 
   const ratioExpr = pl
     .when(diffExpr.eq(0))
-    .then(pl.lit(0.5))
+    .then(pl.lit(FIBONACCI_RATIOS.HALF))
     .otherwise(rHighExpr.sub(pl.col('close')).div(diffExpr));
 
   const retracements =
@@ -179,7 +183,7 @@ export function computeFibonacciObservation(
   const low = df.getColumn('low').min() as number;
 
   const diff = high - low;
-  const ratio = diff === 0 ? 0.5 : (high - close) / diff;
+  const ratio = diff === 0 ? FIBONACCI_RATIOS.HALF : (high - close) / diff;
 
   const retracements =
     params?.customRetracements ?? FIBONACCI_RETRACEMENT_RATIOS;
@@ -193,22 +197,24 @@ export function computeFibonacciObservation(
     levels[ext.toString()] = low + diff * ext;
   }
 
-  const tol = params?.toleranceRatio ?? 0.008;
-  const isGoldenPocket = ratio >= 0.5 - tol && ratio <= 0.618 + tol;
+  const tol = params?.toleranceRatio ?? DEFAULT_FIBONACCI_TOLERANCE_RATIO;
+  const isGoldenPocket =
+    ratio >= FIBONACCI_RATIOS.HALF - tol &&
+    ratio <= FIBONACCI_RATIOS.GOLDEN_RATIO + tol;
 
   let zone: RetracementZone;
   if (ratio < 0) {
-    zone = 'ABOVE_SWING';
-  } else if (ratio < 0.382) {
-    zone = 'SHALLOW';
-  } else if (ratio < 0.5 - tol) {
-    zone = 'MODERATE';
+    zone = RETRACEMENT_ZONES.ABOVE_SWING;
+  } else if (ratio < FIBONACCI_RATIOS.SHALLOW_RATIO) {
+    zone = RETRACEMENT_ZONES.SHALLOW;
+  } else if (ratio < FIBONACCI_RATIOS.HALF - tol) {
+    zone = RETRACEMENT_ZONES.MODERATE;
   } else if (isGoldenPocket) {
-    zone = 'GOLDEN_POCKET';
+    zone = RETRACEMENT_ZONES.GOLDEN_POCKET;
   } else if (ratio <= 1.0) {
-    zone = 'DEEP';
+    zone = RETRACEMENT_ZONES.DEEP;
   } else {
-    zone = 'INVALIDATED';
+    zone = RETRACEMENT_ZONES.INVALIDATED;
   }
 
   return Object.freeze({

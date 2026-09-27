@@ -11,9 +11,16 @@ import {
   REALTIME_CANDLE_GRACE_LIMITS,
   REALTIME_CANDLE_QUEUE_LIMITS,
   REALTIME_CANDLE_TERMINAL_GRACE_LIMITS,
+  REALTIME_PRODUCTIZATION_MODES,
+  REALTIME_CONFIG_KEYS,
 } from '@app/config';
 import { DataSource } from '@app/shared-data';
-import { formatTradingDayString } from '@app/timezone';
+import {
+  formatTradingDayString,
+  ONE_MINUTE_MS,
+  HOURS_PER_DAY,
+  MINUTES_PER_HOUR,
+} from '@app/timezone';
 import type Redis from 'ioredis';
 import { Clock } from '../clock.service';
 import { RealtimeRedisService } from '../realtime-redis.service';
@@ -133,33 +140,43 @@ export class RealtimeMarketDataProductService
     private readonly handoffObservability?: RealtimeStrategyHandoffObservabilityService,
   ) {
     const rawMode =
-      this.config.get<string>('REALTIME_PRODUCTIZATION_MODE') ?? 'off';
+      this.config.get<string>(REALTIME_CONFIG_KEYS.PRODUCTIZATION_MODE) ??
+      REALTIME_PRODUCTIZATION_MODES.OFF;
     // A7 (design 437): invalid mode fails fast (defense-in-depth beyond Joi).
-    if (rawMode !== 'off' && rawMode !== 'shadow' && rawMode !== 'on') {
+    if (
+      rawMode !== REALTIME_PRODUCTIZATION_MODES.OFF &&
+      rawMode !== REALTIME_PRODUCTIZATION_MODES.SHADOW &&
+      rawMode !== REALTIME_PRODUCTIZATION_MODES.ON
+    ) {
       throw new Error(
         `Invalid REALTIME_PRODUCTIZATION_MODE=${JSON.stringify(rawMode)}; expected off, shadow, or on`,
       );
     }
     this.mode = rawMode;
     this.graceMs =
-      this.config.get<number>('REALTIME_CANDLE_GRACE_MS') ??
+      this.config.get<number>(REALTIME_CONFIG_KEYS.GRACE_MS) ??
       REALTIME_CANDLE_GRACE_LIMITS.default;
     this.terminalGraceMs =
-      this.config.get<number>('REALTIME_CANDLE_TERMINAL_GRACE_MS') ??
+      this.config.get<number>(REALTIME_CONFIG_KEYS.TERMINAL_GRACE_MS) ??
       REALTIME_CANDLE_TERMINAL_GRACE_LIMITS.default;
     this.queue = new KeyedQueue({
       maxPendingPerSeries:
         this.config.get<number>(
-          'REALTIME_CANDLE_QUEUE_MAX_PENDING_PER_SERIES',
+          REALTIME_CONFIG_KEYS.QUEUE_MAX_PENDING_PER_SERIES,
         ) ?? REALTIME_CANDLE_QUEUE_LIMITS.perSeries.default,
       maxPendingGlobal:
-        this.config.get<number>('REALTIME_CANDLE_QUEUE_MAX_PENDING_GLOBAL') ??
-        REALTIME_CANDLE_QUEUE_LIMITS.global.default,
+        this.config.get<number>(
+          REALTIME_CONFIG_KEYS.QUEUE_MAX_PENDING_GLOBAL,
+        ) ?? REALTIME_CANDLE_QUEUE_LIMITS.global.default,
     });
   }
 
   onModuleInit(): void {
-    if (this.mode === 'off' || !this.redis.isAvailable()) return;
+    if (
+      this.mode === REALTIME_PRODUCTIZATION_MODES.OFF ||
+      !this.redis.isAvailable()
+    )
+      return;
     this.initializeStartupBoundary();
     void this.scanDue();
     this.scannerTimer = setInterval(
@@ -831,9 +848,13 @@ export class RealtimeMarketDataProductService
     let candidate = current
       ? current.bucketStartMs === now
         ? current.bucketStartMs
-        : current.bucketStartMs + 60_000
-      : Math.ceil(now / 60_000) * 60_000;
-    for (let index = 0; index <= 24 * 60; index++, candidate += 60_000) {
+        : current.bucketStartMs + ONE_MINUTE_MS
+      : Math.ceil(now / ONE_MINUTE_MS) * ONE_MINUTE_MS;
+    for (
+      let index = 0;
+      index <= HOURS_PER_DAY * MINUTES_PER_HOUR;
+      index++, candidate += ONE_MINUTE_MS
+    ) {
       const bucket = resolveCandleBucket(new Date(candidate).toISOString());
       if (bucket?.bucketStartMs === candidate) return candidate;
     }
@@ -865,7 +886,7 @@ export class RealtimeMarketDataProductService
 
       const hardHorizon =
         decoded.bucketStartMs +
-        60_000 +
+        ONE_MINUTE_MS +
         FINALIZATION_HARD_HORIZON_MS +
         (isSessionTerminalBucket(decoded.bucketStartMs)
           ? this.terminalGraceMs

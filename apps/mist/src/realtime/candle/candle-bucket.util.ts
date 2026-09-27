@@ -6,7 +6,10 @@ import {
   MORNING_START_MIN,
   ASIA_SHANGHAI_TIMEZONE,
   formatTradingDayString,
+  ONE_MINUTE_MS,
+  MINUTES_PER_HOUR,
 } from '@app/timezone';
+import { CANDLE_SESSIONS } from '@app/constants';
 import type { CandleBucket, CandleSession } from './candle.types';
 
 /**
@@ -52,24 +55,24 @@ export function resolveCandleBucket(eventTimeIso: string): CandleBucket | null {
   // Bucket start = the wall-clock minute truncated (seconds/ms zeroed),
   // expressed back as epoch ms. A 1-minute candle [bucketStart, bucketEnd).
   const bucketStartMs = truncateToMinuteMs(zoned);
-  const bucketEndMs = bucketStartMs + 60_000;
+  const bucketEndMs = bucketStartMs + ONE_MINUTE_MS;
 
   return { tradingDay, session, bucketStartMs, bucketEndMs };
 }
 
 function resolveSession(zoned: Date): CandleSession | null {
-  const minutesOfDay = zoned.getHours() * 60 + zoned.getMinutes();
+  const minutesOfDay = zoned.getHours() * MINUTES_PER_HOUR + zoned.getMinutes();
 
   // Morning 09:30–11:30, half-open at 11:31 (11:30 is the last bucket and
   // absorbs post-close tail frames).
   if (minutesOfDay >= MORNING_START_MIN && minutesOfDay < MORNING_END_MIN) {
-    return 'morning';
+    return CANDLE_SESSIONS.MORNING;
   }
 
   // Afternoon 13:00–15:00, half-open at 15:01 (15:00 is the last bucket and
   // absorbs the closing-auction print).
   if (minutesOfDay >= AFTERNOON_START_MIN && minutesOfDay < AFTERNOON_END_MIN) {
-    return 'afternoon';
+    return CANDLE_SESSIONS.AFTERNOON;
   }
 
   return null;
@@ -86,7 +89,7 @@ function resolveSession(zoned: Date): CandleSession | null {
  */
 export function isSessionTerminalBucket(bucketStartMs: number): boolean {
   const zoned = toZonedTime(new Date(bucketStartMs), TIME_ZONE);
-  const minutesOfDay = zoned.getHours() * 60 + zoned.getMinutes();
+  const minutesOfDay = zoned.getHours() * MINUTES_PER_HOUR + zoned.getMinutes();
   return (
     minutesOfDay === MORNING_END_MIN - 1 || // 11:30
     minutesOfDay === AFTERNOON_END_MIN - 1 // 15:00

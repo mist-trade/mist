@@ -26,6 +26,15 @@ import type {
   FactorOpinion,
   FactorPlugin,
 } from '../factor.types';
+import {
+  DECISION_ACTIONS,
+  CHAN_BSP_UNITS,
+  CHAN_BSP_DIRECTIONS,
+  DEFAULT_REQUIRED_BARS_DUAN,
+  DEFAULT_REQUIRED_BARS_BI,
+  BSP_CONFIDENCE,
+  CANDIDATE_BSP_TYPES,
+} from '../../strategy.constants';
 
 export type ChanBspUnitLevel = 'bi' | 'duan';
 
@@ -100,11 +109,14 @@ export class ChanBspFactorPlugin implements FactorPlugin {
   ): Promise<FactorOpinion> {
     const params = this.resolveParams(rawParams);
     const minBars =
-      params.requiredBarCount ?? (params.units === 'duan' ? 200 : 50);
+      params.requiredBarCount ??
+      (params.units === CHAN_BSP_UNITS.DUAN
+        ? DEFAULT_REQUIRED_BARS_DUAN
+        : DEFAULT_REQUIRED_BARS_BI);
 
     if (context.bars.length < minBars) {
       return {
-        action: 'NEUTRAL',
+        action: DECISION_ACTIONS.NEUTRAL,
         confidence: 0.0,
         reason: `K线不足${minBars}根(当前${context.bars.length}根)，无法确立缠论结构`,
       };
@@ -113,13 +125,13 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     const klines = this.toChanKSeries(context.bars);
     if (klines.length === 0) {
       return {
-        action: 'NEUTRAL',
+        action: DECISION_ACTIONS.NEUTRAL,
         confidence: 0.0,
         reason: '有效行情数据为空，未形成缠论K线',
       };
     }
 
-    const units = params.units ?? 'bi';
+    const units = params.units ?? CHAN_BSP_UNITS.BI;
     const allEvents = this.detectEvents(klines, units);
     const matchedEvents = allEvents.filter((event) =>
       this.matchesFilter(event, params),
@@ -127,7 +139,7 @@ export class ChanBspFactorPlugin implements FactorPlugin {
 
     if (matchedEvents.length === 0) {
       return {
-        action: 'NEUTRAL',
+        action: DECISION_ACTIONS.NEUTRAL,
         confidence: 0.0,
         reason: '未检测到满足条件的缠论买卖点',
       };
@@ -155,7 +167,7 @@ export class ChanBspFactorPlugin implements FactorPlugin {
 
       if (candidateEvents.length === 0) {
         return {
-          action: 'NEUTRAL',
+          action: DECISION_ACTIONS.NEUTRAL,
           confidence: 0.0,
           reason: '缠论买卖点已在先前批次发射，无需重复触发',
         };
@@ -172,21 +184,21 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       confirmedFenxing = detectLatestConfirmedFenxing(klines);
       if (!confirmedFenxing) {
         return {
-          action: 'NEUTRAL',
+          action: DECISION_ACTIONS.NEUTRAL,
           confidence: 0.0,
           reason: '当前最新K线未确立有效分型扳机(笔内延伸或包含)',
         };
       }
       if (isBuy && confirmedFenxing.type !== FenxingType.Bottom) {
         return {
-          action: 'NEUTRAL',
+          action: DECISION_ACTIONS.NEUTRAL,
           confidence: 0.0,
           reason: '检测到买点结构，但最新确立分型为顶分型而非底分型',
         };
       }
       if (!isBuy && confirmedFenxing.type !== FenxingType.Top) {
         return {
-          action: 'NEUTRAL',
+          action: DECISION_ACTIONS.NEUTRAL,
           confidence: 0.0,
           reason: '检测到卖点结构，但最新确立分型为底分型而非顶分型',
         };
@@ -204,9 +216,9 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       }
     }
 
-    const action = isBuy ? 'BUY' : 'SELL';
+    const action = isBuy ? DECISION_ACTIONS.BUY : DECISION_ACTIONS.SELL;
     const confidence = this.computeConfidence(latestEvent.type);
-    const unitLabel = params.units === 'duan' ? '线段' : '笔';
+    const unitLabel = params.units === CHAN_BSP_UNITS.DUAN ? '线段' : '笔';
     const pointLabel = this.formatPointName(latestEvent.type);
 
     return {
@@ -247,8 +259,9 @@ export class ChanBspFactorPlugin implements FactorPlugin {
 
   private resolveParams(params?: Record<string, unknown>): ChanBspPluginParams {
     return {
-      units: (params?.units as ChanBspUnitLevel) ?? 'bi',
-      direction: (params?.direction as ChanBspDirection) ?? 'buy',
+      units: (params?.units as ChanBspUnitLevel) ?? CHAN_BSP_UNITS.BI,
+      direction:
+        (params?.direction as ChanBspDirection) ?? CHAN_BSP_DIRECTIONS.BUY,
       points: {
         first: params?.points ? (params.points as any).first !== false : true,
         second: params?.points ? (params.points as any).second !== false : true,
@@ -296,7 +309,7 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     let bspUnits: readonly ChanBspUnit[];
     let zhongshus: readonly ChanDivergenceZhongshu[];
 
-    if (units === 'duan') {
+    if (units === CHAN_BSP_UNITS.DUAN) {
       const duans = ChanCore.createDuan(phaseB);
       const validDuans = duans.filter(
         (d) => d.type === DuanType.Complete && d.status === DuanStatus.Valid,
@@ -342,8 +355,8 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     params: ChanBspPluginParams,
   ): boolean {
     const isBuy = event.type.endsWith('_buy');
-    if (params.direction === 'buy' && !isBuy) return false;
-    if (params.direction === 'sell' && isBuy) return false;
+    if (params.direction === CHAN_BSP_DIRECTIONS.BUY && !isBuy) return false;
+    if (params.direction === CHAN_BSP_DIRECTIONS.SELL && isBuy) return false;
 
     const points = params.points ?? {};
     if (event.type.startsWith('first_') && points.first === false) return false;
@@ -356,33 +369,33 @@ export class ChanBspFactorPlugin implements FactorPlugin {
 
   private computeConfidence(type: ChanBspType): number {
     switch (type) {
-      case 'first_buy':
-      case 'first_sell':
-        return 0.92;
-      case 'third_buy':
-      case 'third_sell':
-        return 0.9;
-      case 'second_buy':
-      case 'second_sell':
-        return 0.86;
+      case CANDIDATE_BSP_TYPES.FIRST_BUY:
+      case CANDIDATE_BSP_TYPES.FIRST_SELL:
+        return BSP_CONFIDENCE.FIRST;
+      case CANDIDATE_BSP_TYPES.THIRD_BUY:
+      case CANDIDATE_BSP_TYPES.THIRD_SELL:
+        return BSP_CONFIDENCE.THIRD;
+      case CANDIDATE_BSP_TYPES.SECOND_BUY:
+      case CANDIDATE_BSP_TYPES.SECOND_SELL:
+        return BSP_CONFIDENCE.SECOND;
       default:
-        return 0.8;
+        return BSP_CONFIDENCE.DEFAULT;
     }
   }
 
   private formatPointName(type: ChanBspType): string {
     switch (type) {
-      case 'first_buy':
+      case CANDIDATE_BSP_TYPES.FIRST_BUY:
         return '一买';
-      case 'first_sell':
+      case CANDIDATE_BSP_TYPES.FIRST_SELL:
         return '一卖';
-      case 'second_buy':
+      case CANDIDATE_BSP_TYPES.SECOND_BUY:
         return '二买';
-      case 'second_sell':
+      case CANDIDATE_BSP_TYPES.SECOND_SELL:
         return '二卖';
-      case 'third_buy':
+      case CANDIDATE_BSP_TYPES.THIRD_BUY:
         return '三买';
-      case 'third_sell':
+      case CANDIDATE_BSP_TYPES.THIRD_SELL:
         return '三卖';
       default:
         return type;

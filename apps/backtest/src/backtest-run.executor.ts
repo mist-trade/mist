@@ -13,11 +13,15 @@ import {
   type BacktestTargetIssue,
 } from '@app/shared-data';
 import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
+import { PERIOD_MINUTES } from '@app/constants';
 import {
   compileStoredStrategyRule,
   evaluateStrategyPlan,
   serializeStrategyContextSnapshot,
   DecisionFlowEvaluator,
+  DEFAULT_REQUIRED_BARS_BI,
+  SIGNAL_KINDS,
+  STRATEGY_KINDS,
   type CompiledStrategyExecutionPlan,
   type DecisionFlowNode,
   type FactorContext,
@@ -48,9 +52,9 @@ const BACKTEST_RESULT_BATCH_SIZE = 100;
  */
 type ReplayPlan =
   | { kind: 'rule_dsl'; plan: CompiledStrategyExecutionPlan }
-  | { kind: 'chan_bsp'; plan: ChanBspPlan }
+  | { kind: typeof STRATEGY_KINDS.CHAN_BSP; plan: ChanBspPlan }
   | {
-      kind: 'decision_flow';
+      kind: typeof STRATEGY_KINDS.DECISION_FLOW;
       flow: DecisionFlowNode;
       requiredBarCount: number;
     };
@@ -183,7 +187,7 @@ export class BacktestRunExecutor {
     const plan: ReplayPlan =
       run.kind === StrategyKind.CHAN_BSP
         ? {
-            kind: 'chan_bsp',
+            kind: STRATEGY_KINDS.CHAN_BSP,
             plan: compileChanBspConfig(
               version.rule as Record<string, unknown>,
               definition.periods,
@@ -191,18 +195,20 @@ export class BacktestRunExecutor {
           }
         : run.kind === StrategyKind.DECISION_FLOW
           ? {
-              kind: 'decision_flow',
+              kind: STRATEGY_KINDS.DECISION_FLOW,
               flow: version.rule as unknown as DecisionFlowNode,
               requiredBarCount:
                 typeof (version.rule as any)?.requiredBarCount === 'number'
                   ? (version.rule as any).requiredBarCount
-                  : 50,
+                  : DEFAULT_REQUIRED_BARS_BI,
             }
           : {
               kind: 'rule_dsl',
               plan: compileStoredStrategyRule(
                 version.rule,
-                version.signalKind as 'entry' | 'exit',
+                version.signalKind as
+                  | typeof SIGNAL_KINDS.ENTRY
+                  | typeof SIGNAL_KINDS.EXIT,
               ),
             };
     if (
@@ -211,7 +217,7 @@ export class BacktestRunExecutor {
     ) {
       throw new BacktestRunFailure('BACKTEST_CHAN_BSP_PERIOD_UNSUPPORTED');
     }
-    if (plan.kind === 'chan_bsp') {
+    if (plan.kind === STRATEGY_KINDS.CHAN_BSP) {
       this.logger.log(
         `backtest chan_bsp plan compiled runId=${run.id} level=${run.period} units=${plan.plan.units}`,
       );
@@ -614,7 +620,7 @@ function uniqueIssues(
 
 function replayStartFor(run: BacktestRun, plan: ReplayPlan): Date {
   if (
-    run.period >= 1_440 ||
+    run.period >= PERIOD_MINUTES['1d'] ||
     (plan.kind === 'rule_dsl' &&
       !plan.plan.fields.some(
         (field) => field === 'k.volume' || field === 'k.amount',

@@ -5,7 +5,9 @@ import {
   StrategyDefinition,
   StrategySignal,
 } from '@app/shared-data';
-import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
+import { ASIA_SHANGHAI_TIMEZONE, MINUTES_PER_HOUR } from '@app/timezone';
+import { PERIOD_MINUTES } from '@app/constants';
+import { CHAN_BSP_UNITS, SIGNAL_KINDS } from '@app/strategy';
 
 export interface NotificationMessage {
   readonly securityCode: string;
@@ -127,18 +129,22 @@ function directionLabel(kind: unknown, ctx?: Record<string, unknown>): string {
   const chanBsp = ctx?.chanBsp as Record<string, unknown> | undefined;
   if (chanBsp && typeof chanBsp.type === 'string') {
     const typeName = CHAN_BSP_TYPE_NAMES[chanBsp.type] ?? chanBsp.type;
-    const unitLabel = chanBsp.units === 'duan' ? '段级' : '笔级';
+    const unitLabel = chanBsp.units === CHAN_BSP_UNITS.DUAN ? '段级' : '笔级';
     return `${typeName} (${unitLabel})`;
   }
-  if (kind === 'entry') return '买入';
-  if (kind === 'exit') return '卖出';
+  if (kind === SIGNAL_KINDS.ENTRY) return '买入';
+  if (kind === SIGNAL_KINDS.EXIT) return '卖出';
   return String(kind ?? 'signal');
 }
 
 function formatPeriod(period: unknown): string {
   if (typeof period !== 'number') return '';
-  if (period >= 1440) return period % 1440 === 0 ? '日线' : `${period}m`;
-  if (period >= 60) return period % 60 === 0 ? `${period / 60}h` : `${period}m`;
+  if (period >= PERIOD_MINUTES['1d'])
+    return period % PERIOD_MINUTES['1d'] === 0 ? '日线' : `${period}m`;
+  if (period >= MINUTES_PER_HOUR)
+    return period % MINUTES_PER_HOUR === 0
+      ? `${period / MINUTES_PER_HOUR}h`
+      : `${period}m`;
   return `${period}m`;
 }
 

@@ -28,8 +28,23 @@ import type {
   StrategyMarketSource,
 } from '../../libs/market-data/src/strategy-bar';
 import { normalizeExternalDecimalText } from '../../libs/decimal/src/decimal8';
+import {
+  DEFAULT_DEV_PORT,
+  DEFAULT_DEV_SECURITY_CODE,
+  DEFAULT_DEV_PERIOD,
+  DEFAULT_DEV_KLINE_LIMIT,
+  DEFAULT_DEV_SECURITY_ID,
+  DEFAULT_DEV_MARKET_SOURCE,
+  DEFAULT_DEV_API_PATH,
+  LOOPBACK_IPS,
+  LOOPBACK_IPV4_PREFIX,
+  DEV_HTTP_STATUS,
+  DEV_CORS_HEADERS,
+  SSE_HEARTBEAT_INTERVAL_MS,
+  SESSION_INACTIVE_TTL_MS,
+} from './strategy-dev.constants';
 
-const PORT = Number(process.env.PORT) || 8001;
+const PORT = Number(process.env.PORT) || DEFAULT_DEV_PORT;
 
 // 严格门禁：tools/strategy-dev/server.ts 属于本地开发网关，严禁在生产环境启动
 if (process.env.NODE_ENV === 'production') {
@@ -55,17 +70,15 @@ function checkLocalDevAccess(
         error:
           'Forbidden: Strategy simulation suite is strictly restricted to local development environment and disabled in production.',
       },
-      403,
+      DEV_HTTP_STATUS.FORBIDDEN,
     );
     return false;
   }
 
   const remoteIp = req.socket?.remoteAddress || '';
   const isLoopback =
-    remoteIp === '127.0.0.1' ||
-    remoteIp === '::1' ||
-    remoteIp === '::ffff:127.0.0.1' ||
-    remoteIp.startsWith('127.') ||
+    LOOPBACK_IPS.includes(remoteIp as any) ||
+    remoteIp.startsWith(LOOPBACK_IPV4_PREFIX) ||
     remoteIp === '';
 
   const allowRemoteDev = process.env.ALLOW_REMOTE_DEV_SIMULATION === 'true';
@@ -76,7 +89,7 @@ function checkLocalDevAccess(
       {
         error: `Forbidden: Strategy simulation suite is strictly restricted to local development environment. Request from unauthorized host (${remoteIp}) was rejected.`,
       },
-      403,
+      DEV_HTTP_STATUS.FORBIDDEN,
     );
     return false;
   }
@@ -84,13 +97,16 @@ function checkLocalDevAccess(
   return true;
 }
 
-function resolveSecurityCode(rawQuery: any, fallback = '000001'): string {
+function resolveSecurityCode(
+  rawQuery: any,
+  fallback = DEFAULT_DEV_SECURITY_CODE,
+): string {
   return String(
     rawQuery?.code || rawQuery?.symbol || rawQuery?.securityCode || fallback,
   );
 }
 
-function resolvePeriod(rawPeriod: any, fallback = 30): number {
+function resolvePeriod(rawPeriod: any, fallback = DEFAULT_DEV_PERIOD): number {
   if (typeof rawPeriod === 'number' && !isNaN(rawPeriod) && rawPeriod > 0) {
     return rawPeriod;
   }
@@ -103,14 +119,24 @@ function resolvePeriod(rawPeriod: any, fallback = 30): number {
   return fallback;
 }
 
-function wrapEnvelope(data: any, statusCode = 200, reqPath = '/api/v1') {
+function wrapEnvelope(
+  data: any,
+  statusCode: number = DEV_HTTP_STATUS.OK,
+  reqPath = DEFAULT_DEV_API_PATH,
+) {
   return JSON.stringify({
-    success: statusCode >= 200 && statusCode < 300,
+    success:
+      statusCode >= DEV_HTTP_STATUS.OK &&
+      statusCode < DEV_HTTP_STATUS.SUCCESS_MAX,
     statusCode,
-    message: statusCode >= 200 && statusCode < 300 ? 'SUCCESS' : 'ERROR',
+    message:
+      statusCode >= DEV_HTTP_STATUS.OK &&
+      statusCode < DEV_HTTP_STATUS.SUCCESS_MAX
+        ? 'SUCCESS'
+        : 'ERROR',
     requestId: `dev-${Date.now()}`,
     timestamp: new Date().toISOString(),
-    path: reqPath && reqPath.trim().length > 0 ? reqPath : '/api/v1',
+    path: reqPath && reqPath.trim().length > 0 ? reqPath : DEFAULT_DEV_API_PATH,
     data,
   });
 }
@@ -118,15 +144,10 @@ function wrapEnvelope(data: any, statusCode = 200, reqPath = '/api/v1') {
 function sendJson(
   res: http.ServerResponse,
   data: any,
-  statusCode = 200,
-  reqPath = '/api/v1',
+  statusCode: number = DEV_HTTP_STATUS.OK,
+  reqPath = DEFAULT_DEV_API_PATH,
 ) {
-  res.writeHead(statusCode, {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-  });
+  res.writeHead(statusCode, DEV_CORS_HEADERS);
   res.end(wrapEnvelope(data, statusCode, reqPath));
 }
 
@@ -150,8 +171,8 @@ function parseJsonBody(req: http.IncomingMessage): Promise<any> {
 function toStrategyBar(
   rawK: any,
   period: number,
-  securityId = 1,
-  source: StrategyMarketSource = 'qmt',
+  securityId = DEFAULT_DEV_SECURITY_ID,
+  source: StrategyMarketSource = DEFAULT_DEV_MARKET_SOURCE,
 ): StrategyBar {
   return Object.freeze({
     securityId,
@@ -390,11 +411,7 @@ const server = http.createServer(async (req, res) => {
 
   // 跨域预检
   if (req.method === 'OPTIONS') {
-    res.writeHead(204, {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-      'Access-Control-Allow-Headers': 'Content-Type, Authorization',
-    });
+    res.writeHead(DEV_HTTP_STATUS.NO_CONTENT, DEV_CORS_HEADERS);
     res.end();
     return;
   }
@@ -407,8 +424,8 @@ const server = http.createServer(async (req, res) => {
   ) {
     const rawParams =
       req.method === 'POST' ? await parseJsonBody(req) : parsedUrl.query;
-    const code = resolveSecurityCode(rawParams, '000001');
-    const period = resolvePeriod(rawParams.period, 30);
+    const code = resolveSecurityCode(rawParams, DEFAULT_DEV_SECURITY_CODE);
+    const period = resolvePeriod(rawParams.period, DEFAULT_DEV_PERIOD);
     const hasExplicitLimit =
       rawParams.limit !== undefined &&
       rawParams.limit !== null &&
@@ -417,7 +434,7 @@ const server = http.createServer(async (req, res) => {
       ? Number(rawParams.limit)
       : rawParams.startDate
         ? Infinity
-        : 2000;
+        : DEFAULT_DEV_KLINE_LIMIT;
 
     try {
       const fullKlines = loadCanonicalKlines({ code, period });
@@ -499,8 +516,11 @@ const server = http.createServer(async (req, res) => {
 
   // 3. 统一绘图指令流: GET /v1/visual/commands (纯几何，严格遵守架构红线)
   if (pathname.endsWith('/v1/visual/commands') && req.method === 'GET') {
-    const code = resolveSecurityCode(parsedUrl.query, '000001');
-    const period = resolvePeriod(parsedUrl.query.period, 30);
+    const code = resolveSecurityCode(
+      parsedUrl.query,
+      DEFAULT_DEV_SECURITY_CODE,
+    );
+    const period = resolvePeriod(parsedUrl.query.period, DEFAULT_DEV_PERIOD);
     const source = (parsedUrl.query.source as string) || 'default';
     const filterFenxingContainment =
       parsedUrl.query.filterFenxingContainment === 'true' ||
@@ -564,8 +584,8 @@ const server = http.createServer(async (req, res) => {
   if (pathname.endsWith('/v1/simulation/start') && req.method === 'POST') {
     try {
       const body = await parseJsonBody(req);
-      const code = resolveSecurityCode(body, '000001');
-      const period = resolvePeriod(body.period, 30);
+      const code = resolveSecurityCode(body, DEFAULT_DEV_SECURITY_CODE);
+      const period = resolvePeriod(body.period, DEFAULT_DEV_PERIOD);
       const filterFenxingContainment = Boolean(body.filterFenxingContainment);
 
       const fullKlines = loadCanonicalKlines({ code, period });
@@ -613,22 +633,23 @@ const server = http.createServer(async (req, res) => {
         },
       });
 
-      // 超时 30 分钟无活动自动清理
-      setTimeout(
-        () => {
-          if (activeSessions.has(session.sessionId)) {
-            activeSessions.get(session.sessionId)?.destroy();
-            activeSessions.delete(session.sessionId);
-            sessionStreamClients.delete(session.sessionId);
-          }
-        },
-        30 * 60 * 1000,
-      );
+      // 超时无活动自动清理
+      setTimeout(() => {
+        if (activeSessions.has(session.sessionId)) {
+          activeSessions.get(session.sessionId)?.destroy();
+          activeSessions.delete(session.sessionId);
+          sessionStreamClients.delete(session.sessionId);
+        }
+      }, SESSION_INACTIVE_TTL_MS);
 
-      sendJson(res, session.getSummary(), 201);
+      sendJson(res, session.getSummary(), DEV_HTTP_STATUS.CREATED);
     } catch (err: any) {
       console.error(`[POST /v1/simulation/start] 错误:`, err.message);
-      sendJson(res, { error: err.message }, 500);
+      sendJson(
+        res,
+        { error: err.message },
+        DEV_HTTP_STATUS.INTERNAL_SERVER_ERROR,
+      );
     }
     return;
   }
@@ -687,7 +708,7 @@ const server = http.createServer(async (req, res) => {
       } catch {
         clearInterval(pingTimer);
       }
-    }, 15000);
+    }, SSE_HEARTBEAT_INTERVAL_MS);
 
     req.on('close', () => {
       clearInterval(pingTimer);
@@ -709,7 +730,11 @@ const server = http.createServer(async (req, res) => {
       const session = activeSessions.get(sessionId);
 
       if (!session) {
-        sendJson(res, { error: `Session not found: ${sessionId}` }, 404);
+        sendJson(
+          res,
+          { error: `Session not found: ${sessionId}` },
+          DEV_HTTP_STATUS.NOT_FOUND,
+        );
         return;
       }
 
@@ -721,7 +746,11 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, session.getSummary());
     } catch (err: any) {
       console.error(`[POST /v1/simulation/control] 错误:`, err.message);
-      sendJson(res, { error: err.message }, 500);
+      sendJson(
+        res,
+        { error: err.message },
+        DEV_HTTP_STATUS.INTERNAL_SERVER_ERROR,
+      );
     }
     return;
   }
@@ -894,9 +923,9 @@ const server = http.createServer(async (req, res) => {
   if (pathname.endsWith('/v1/strategy-backtests') && req.method === 'POST') {
     try {
       const body = await parseJsonBody(req);
-      const symbol = resolveSecurityCode(body, '000001');
-      const period = resolvePeriod(body.period, 30);
-      const source = body.source || 'qmt';
+      const symbol = resolveSecurityCode(body, DEFAULT_DEV_SECURITY_CODE);
+      const period = resolvePeriod(body.period, DEFAULT_DEV_PERIOD);
+      const source = body.source || DEFAULT_DEV_MARKET_SOURCE;
       const startDate = body.startDate || '2024-01-01T00:00:00.000Z';
       const endDate = body.endDate || '2026-12-31T23:59:59.000Z';
 

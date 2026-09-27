@@ -1,5 +1,13 @@
 import { Decimal8 } from '@app/decimal';
-import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
+import {
+  ASIA_SHANGHAI_TIMEZONE,
+  MORNING_START_MIN,
+  MORNING_END_MIN,
+  AFTERNOON_START_MIN,
+  AFTERNOON_END_MIN,
+  MINUTES_PER_HOUR,
+  ONE_MINUTE_MS,
+} from '@app/timezone';
 import type { StrategyBar, StrategyTrigger } from '@app/strategy';
 
 export const REALTIME_STRATEGY_PERIODS = [1, 5, 15, 30, 60] as const;
@@ -147,18 +155,16 @@ function sessionPosition(timestamp: Date): SessionPosition {
   };
   const hour = value('hour');
   const minute = value('minute');
-  const wallMinute = hour * 60 + minute;
-  const morningStart = 9 * 60 + 30;
-  const afternoonStart = 13 * 60;
+  const wallMinute = hour * MINUTES_PER_HOUR + minute;
   // Half-open sessions with a 1-minute close extension, aligned with the
   // producer bucket universe (242 buckets): 11:30 and 15:00 are legal
   // session-terminal buckets that absorb post-close tail frames and the
   // closing-auction print. See openspec/changes/fix-close-auction-bucket-semantic.
   const sessionStartWall =
-    wallMinute >= morningStart && wallMinute < 11 * 60 + 31
-      ? morningStart
-      : wallMinute >= afternoonStart && wallMinute < 15 * 60 + 1
-        ? afternoonStart
+    wallMinute >= MORNING_START_MIN && wallMinute < MORNING_END_MIN
+      ? MORNING_START_MIN
+      : wallMinute >= AFTERNOON_START_MIN && wallMinute < AFTERNOON_END_MIN
+        ? AFTERNOON_START_MIN
         : null;
   if (sessionStartWall === null) {
     throw new RangeError(
@@ -167,7 +173,7 @@ function sessionPosition(timestamp: Date): SessionPosition {
   }
   const minuteOffset = wallMinute - sessionStartWall;
   return {
-    sessionStartMs: timestampMs - minuteOffset * 60_000,
+    sessionStartMs: timestampMs - minuteOffset * ONE_MINUTE_MS,
     minuteOffset,
   };
 }

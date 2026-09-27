@@ -18,7 +18,15 @@ import {
 } from '@app/realtime';
 import { Decimal8 } from '@app/decimal';
 import { fromZonedTime } from 'date-fns-tz';
-import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
+import {
+  ASIA_SHANGHAI_TIMEZONE,
+  MORNING_START_MIN,
+  MORNING_END_MIN,
+  AFTERNOON_START_MIN,
+  AFTERNOON_END_MIN,
+  MINUTES_PER_HOUR,
+  ONE_MINUTE_MS,
+} from '@app/timezone';
 import { LessThan, Repository } from 'typeorm';
 import { SignalRealtimeRedisService } from './signal-realtime-redis.service';
 
@@ -227,19 +235,17 @@ function sessionPosition(timestamp: Date): {
   minuteOffset: number;
 } {
   const parts = shanghaiParts(timestamp);
-  const wallMinute = parts.hour * 60 + parts.minute;
-  const morningStart = 9 * 60 + 30;
-  const afternoonStart = 13 * 60;
+  const wallMinute = parts.hour * MINUTES_PER_HOUR + parts.minute;
   const start =
-    wallMinute >= morningStart && wallMinute < 11 * 60 + 31
-      ? morningStart
-      : wallMinute >= afternoonStart && wallMinute < 15 * 60 + 1
-        ? afternoonStart
+    wallMinute >= MORNING_START_MIN && wallMinute < MORNING_END_MIN
+      ? MORNING_START_MIN
+      : wallMinute >= AFTERNOON_START_MIN && wallMinute < AFTERNOON_END_MIN
+        ? AFTERNOON_START_MIN
         : null;
   if (start === null) throw new RangeError('realtime K is outside session');
   const minuteOffset = wallMinute - start;
   return {
-    sessionStartMs: timestamp.getTime() - minuteOffset * 60_000,
+    sessionStartMs: timestamp.getTime() - minuteOffset * ONE_MINUTE_MS,
     minuteOffset,
   };
 }

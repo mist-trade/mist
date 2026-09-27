@@ -34,6 +34,8 @@
     "hil:realtime-subscriptions": "node dist/apps/realtime-subscription-hil/main.js",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "lint:check": "eslint \"{src,apps,libs,test}/**/*.ts\"",
+    "audit:magic": "node tools/audit/scan-magic-literals.mjs",
+    "check:magic": "node tools/audit/scan-magic-literals.mjs --check",
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:ci": "jest --runInBand --watchman=false --forceExit",
