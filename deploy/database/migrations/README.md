@@ -349,3 +349,20 @@ Every `*_ready` value must be 1; orphan/cross-Security and ineligible counts mus
 be zero. Retain the complete ledger, readback and `SHOW CREATE TABLE` output.
 Application rollback leaves migration 015 and assignment rows in place and
 sets lifecycle mode off. It must not drop the table or delete routing facts.
+
+## 026 — unify_pipeline_dual_timestamp
+
+Forward-only. Adds `pivot_time DATETIME NULL` to `backtest_signal_results` and
+`strategy_signals` (dual-timestamp contract: `signal_time` stays the confirming
+bar / trigger time, `pivot_time` carries the structural extremum used for chart
+markers) and backfills `pivot_time = signal_time` for all existing rows, which
+keeps frontend marker positions identical to pre-migration rendering under the
+existing fallback logic.
+
+Deactivates every `strategy_definitions` row with `kind='chan_bsp'`
+(`status='disabled'`); rows are kept for audit. Reactivation is blocked by the
+application guard (`CHAN_BSP_KIND_RETIRED`) — converting the definition to a
+`decision_flow` kind is the supported path. Manual rollback of the deactivation,
+if ever required: `UPDATE strategy_definitions SET status='enabled' WHERE
+kind='chan_bsp';` (do not roll back rows written with the corrected trigger-time
+`signal_time` semantics).

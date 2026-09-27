@@ -38,6 +38,8 @@ export interface ShadowStrategyCandidate {
   readonly pivotTime: string | null;
   /** 形态几何极值点价格（止损参考），无 pivot 语义为 null */
   readonly pivotPrice: number | null;
+  /** 信号类型标签（决策流 signalTag ?? action） */
+  readonly signalType: string;
   readonly barType: StrategyBar['type'];
   readonly confidence: number;
   readonly confidenceLevel: 'HIGH' | 'MEDIUM' | 'LOW' | null;
@@ -138,6 +140,7 @@ function toCandidate(
     triggerPrice: signal.triggerPrice,
     pivotTime: signal.pivotTime,
     pivotPrice: signal.pivotPrice,
+    signalType: signal.signalType,
     barType: bar.type,
     confidence: signal.confidence,
     confidenceLevel: signal.confidenceLevel,

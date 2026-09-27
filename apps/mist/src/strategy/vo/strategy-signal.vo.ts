@@ -42,6 +42,9 @@ export class StrategySignalVo {
   @ApiProperty({ type: String, format: 'date-time' })
   signalTime!: Date;
 
+  @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
+  pivotTime?: Date | null;
+
   @ApiProperty({ enum: StrategySignalSource })
   signalSource!: StrategySignalSource;
 

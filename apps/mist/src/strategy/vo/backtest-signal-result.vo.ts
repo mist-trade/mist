@@ -10,6 +10,11 @@ export class BacktestSignalResultVo {
   @ApiProperty()
   signalTime!: string;
   @ApiPropertyOptional({
+    description: '形态几何极值时刻 (图表 Marker 定位)，无 pivot 语义为 null',
+    nullable: true,
+  })
+  pivotTime?: string | null;
+  @ApiPropertyOptional({
     description: '买卖点/信号类型 (如 first_buy, second_sell 等)',
   })
   signalType?: string;

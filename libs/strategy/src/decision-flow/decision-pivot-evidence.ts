@@ -23,8 +23,9 @@ export function extractPivotEvidence(
     const evidence = item?.evidence;
     if (!evidence || typeof evidence !== 'object') continue;
     const raw = evidence as RawPivotEvidence;
+    // 仅接受显式买卖点类型字段；`type` 过于泛化（DSL 快照的 k.type 等）不入列
     const rawType =
-      raw.eventType ?? raw.bspType ?? raw.type ?? raw.pointType ?? raw.signalType;
+      raw.eventType ?? raw.bspType ?? raw.pointType ?? raw.signalType;
     if (rawType === undefined || rawType === null) continue;
     return normalizePivotEvidence(raw);
   }
