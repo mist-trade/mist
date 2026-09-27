@@ -64,6 +64,11 @@ export interface ChanBspDetectedEvent {
   readonly unitIndex: number;
 }
 
+interface ScopeCursorRecord {
+  lastEmittedPivotTime: number;
+  emittedTypesAtLastPivotTime: Set<string>;
+}
+
 /**
  * 缠论买卖点因子插件
  * 封装 ChanCore 算法与增量游标，领域中立地输出 FactorOpinion
@@ -96,11 +101,11 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     requireConfirmedFenxing: { type: 'boolean', default: false },
   };
 
-  /** 已发射信号集合：scopeKey -> Set<`${timestamp}:${type}`> */
-  private readonly emittedSignals = new Map<string, Set<string>>();
+  /** 已发射信号单调游标：scopeKey -> ScopeCursorRecord */
+  private readonly cursorMap = new Map<string, ScopeCursorRecord>();
 
   public resetCursors(): void {
-    this.emittedSignals.clear();
+    this.cursorMap.clear();
   }
 
   public async evaluate(
@@ -145,23 +150,39 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       };
     }
 
-    // 处理去重游标（基于“时间点 + 1/2/3买卖点类型”精确去重，保留不同时间点或同时间不同类型的有效信号）
+    // 处理去重游标（单调极值时间游标守护，严禁回溯发射早于已发射极值时间的事件）
     let candidateEvents = matchedEvents;
     if (params.deduplicate) {
       const scopeKey = `${context.securityId}:${context.period}:${units}`;
-      let emitted = this.emittedSignals.get(scopeKey);
-      if (!emitted) {
-        emitted = new Set<string>();
-        this.emittedSignals.set(scopeKey, emitted);
+      let record = this.cursorMap.get(scopeKey);
+      if (!record) {
+        record = {
+          lastEmittedPivotTime: -1,
+          emittedTypesAtLastPivotTime: new Set<string>(),
+        };
+        this.cursorMap.set(scopeKey, record);
       }
 
       const seenInBatch = new Set<string>();
       candidateEvents = matchedEvents.filter((e) => {
-        const key = `${e.time.getTime()}:${e.type}`;
-        if (emitted!.has(key) || seenInBatch.has(key)) {
+        const t = e.time.getTime();
+        // 严格单调门禁：禁止发射早于上次已发射极值时间的事件
+        if (t < record!.lastEmittedPivotTime) {
           return false;
         }
-        seenInBatch.add(key);
+        if (t === record!.lastEmittedPivotTime) {
+          if (
+            record!.emittedTypesAtLastPivotTime.has(e.type) ||
+            seenInBatch.has(`${t}:${e.type}`)
+          ) {
+            return false;
+          }
+        } else {
+          if (seenInBatch.has(`${t}:${e.type}`)) {
+            return false;
+          }
+        }
+        seenInBatch.add(`${t}:${e.type}`);
         return true;
       });
 
@@ -174,9 +195,14 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       }
     }
 
-    // 取最新一个买卖点作为主要触发决策（同帧全部候选买卖点同步附带在 evidence 中供决策树与仿真引擎消费）
+    // 取最新一个买卖点作为主要触发决策
     const latestEvent = candidateEvents[candidateEvents.length - 1];
     const isBuy = latestEvent.type.endsWith('_buy');
+
+    // 方向一致性保护：本轮放行的候选事件必须与主要触发决策同向，严禁在同一决策帧混杂反向形态
+    const finalCandidates = candidateEvents.filter((e) =>
+      isBuy ? e.type.endsWith('_buy') : !e.type.endsWith('_buy'),
+    );
 
     // 若开启当根分型确认门禁，必须满足最新 K 线刚刚确立底/顶分型
     let confirmedFenxing: ConfirmedFenxingResult | null = null;
@@ -205,13 +231,27 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       }
     }
 
-    // 确认放行后，将本轮候选事件记入已发射集合
+    // 确认放行后，将本轮候选事件更新至单调游标
     if (params.deduplicate) {
       const scopeKey = `${context.securityId}:${context.period}:${units}`;
-      const emitted = this.emittedSignals.get(scopeKey);
-      if (emitted) {
-        for (const e of candidateEvents) {
-          emitted.add(`${e.time.getTime()}:${e.type}`);
+      const record = this.cursorMap.get(scopeKey);
+      if (record) {
+        const maxTime = Math.max(
+          ...finalCandidates.map((e) => e.time.getTime()),
+        );
+        if (maxTime > record.lastEmittedPivotTime) {
+          record.lastEmittedPivotTime = maxTime;
+          record.emittedTypesAtLastPivotTime = new Set(
+            finalCandidates
+              .filter((e) => e.time.getTime() === maxTime)
+              .map((e) => e.type),
+          );
+        } else if (maxTime === record.lastEmittedPivotTime) {
+          for (const e of finalCandidates) {
+            if (e.time.getTime() === record.lastEmittedPivotTime) {
+              record.emittedTypesAtLastPivotTime.add(e.type);
+            }
+          }
         }
       }
     }
@@ -220,6 +260,13 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     const confidence = this.computeConfidence(latestEvent.type);
     const unitLabel = params.units === CHAN_BSP_UNITS.DUAN ? '线段' : '笔';
     const pointLabel = this.formatPointName(latestEvent.type);
+
+    const lastBar =
+      context.bars.length > 0 ? context.bars[context.bars.length - 1] : null;
+    const currentBarClose =
+      lastBar?.ohlc?.effective?.close ??
+      (lastBar?.rawBar as any)?.close ??
+      latestEvent.price;
 
     return {
       action,
@@ -230,16 +277,24 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         units: latestEvent.units,
         price: latestEvent.price,
         time: latestEvent.time.toISOString(),
+        pivotTime: latestEvent.time.toISOString(),
+        pivotPrice: latestEvent.price,
+        triggerTime: context.timestamp.toISOString(),
+        triggerPrice: currentBarClose,
         zg: latestEvent.zg,
         zd: latestEvent.zd,
         zhongshuIndex: latestEvent.zhongshuIndex,
         unitIndex: latestEvent.unitIndex,
-        allCandidatesCount: candidateEvents.length,
-        candidateEvents: candidateEvents.map((e) => ({
+        allCandidatesCount: finalCandidates.length,
+        candidateEvents: finalCandidates.map((e) => ({
           eventType: e.type,
           units: e.units,
           price: e.price,
           time: e.time.toISOString(),
+          pivotTime: e.time.toISOString(),
+          pivotPrice: e.price,
+          triggerTime: context.timestamp.toISOString(),
+          triggerPrice: currentBarClose,
           zg: e.zg,
           zd: e.zd,
           zhongshuIndex: e.zhongshuIndex,

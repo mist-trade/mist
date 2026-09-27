@@ -170,7 +170,7 @@ export class StrategySimulationEngine {
     if (decision.action === 'BUY' || decision.action === 'SELL') {
       const isBuy = decision.action === 'BUY';
       const bspEvidence = this.extractBspEvidence(decision.trace);
-      const candidates =
+      const rawCandidates =
         Array.isArray(bspEvidence?.candidateEvents) &&
         bspEvidence.candidateEvents.length > 0
           ? bspEvidence.candidateEvents
@@ -179,8 +179,19 @@ export class StrategySimulationEngine {
                 eventType: bspEvidence?.type || (isBuy ? 'buy' : 'sell'),
                 price: bspEvidence?.price,
                 time: bspEvidence?.time,
+                pivotTime: bspEvidence?.pivotTime || bspEvidence?.time,
+                pivotPrice: bspEvidence?.pivotPrice ?? bspEvidence?.price,
               },
             ];
+
+      // 方向门禁：决策为 BUY 时仅放行买点候选，决策为 SELL 时仅放行卖点候选，严禁同帧混入反向形态
+      const candidates = rawCandidates.filter((cand) => {
+        const candType = String(
+          cand.eventType || cand.type || (isBuy ? 'buy' : 'sell'),
+        );
+        const candIsBuy = candType.endsWith('_buy') || candType === 'buy';
+        return isBuy ? candIsBuy : !candIsBuy;
+      });
 
       for (const cand of candidates) {
         const candType = String(
@@ -188,17 +199,34 @@ export class StrategySimulationEngine {
         );
         const candIsBuy = candType.endsWith('_buy') || isBuy;
         const badgeText = this.formatBadgeText(candType, candIsBuy);
-        const triggerPrice =
-          typeof cand.price === 'number' && Number.isFinite(cand.price)
-            ? cand.price
-            : currentBar.close;
-        const signalTime = cand.time || currentBar.timestamp.toISOString();
+
+        // 双时间戳法定分离契约：
+        // 1. signalTime / triggerTime: 严格等于当前确认 Bar 的时间戳 (右侧闭合确立，用于交易撮合与单调推进)
+        const signalTime = currentBar.timestamp.toISOString();
+        const triggerTime = signalTime;
+        // 2. pivotTime: 形态几何极值时刻 (用于图表锚点与结构归因)
+        const pivotTime = String(
+          cand.pivotTime || cand.time || currentBar.timestamp.toISOString(),
+        );
+        // 3. triggerPrice: 当根决策 Bar 的收盘价 (真实撮合基准)
+        const triggerPrice = currentBar.close;
+        // 4. pivotPrice: 形态几何极值点价格 (止损参考)
+        const pivotPrice =
+          typeof cand.pivotPrice === 'number' &&
+          Number.isFinite(cand.pivotPrice)
+            ? cand.pivotPrice
+            : typeof cand.price === 'number' && Number.isFinite(cand.price)
+              ? cand.price
+              : currentBar.close;
 
         const sig: SimulationSignal = {
           signalTime,
+          triggerTime,
+          pivotTime,
+          triggerPrice,
+          pivotPrice,
           signalType: candType,
           badgeText,
-          triggerPrice,
           isBuy: candIsBuy,
           confidence: decision.confidence,
           decisionTrace: {
@@ -223,8 +251,9 @@ export class StrategySimulationEngine {
       total: this.replayBars.length,
       bar: currentBar,
       windowBars: projectedBars,
-      signals: newSignals,
-      status: this.isCompleted ? 'completed' : 'playing',
+      signals: [...this.accumulatedSignals],
+      latestSignals: newSignals,
+      status: this.isCompleted ? 'completed' : 'idle',
     };
 
     this.frames[this.cursor] = frame;
@@ -365,15 +394,18 @@ export class StrategySimulationEngine {
       totalBars: this.replayBars.length,
       preWarmBars: this.preWarmBars.length,
       currentBar: currentFrame?.bar ?? null,
-      windowQueue: this.imputer.read().map((p) => ({
+      windowQueue: (currentFrame
+        ? currentFrame.windowBars
+        : this.imputer.read()
+      ).map((p) => ({
         time: p.rawBar.timestamp.toISOString(),
         ohlc: p.ohlc.effective,
         volume: p.volume.effective,
         amount: p.amount.effective,
         resolution: p.ohlc.resolution,
       })),
-      signals: this.accumulatedSignals,
-      latestFrameSignals: currentFrame?.signals ?? [],
+      signals: currentFrame ? [...currentFrame.signals] : [],
+      latestFrameSignals: currentFrame?.latestSignals ?? [],
     };
   }
 }

@@ -219,6 +219,7 @@ function isVisualCommandAfterOrAt(cmd: any, startMs: number): boolean {
 function formatFramePayload(
   frame: SimulationFrame,
   startDate?: string | Date,
+  currentStatus?: string,
 ): string {
   const chanKlines = toChanKlines(frame.windowBars);
   const allCommands = ChanVisualAdapter.convert(chanKlines, {
@@ -253,7 +254,8 @@ function formatFramePayload(
     },
     commands,
     signals: frame.signals,
-    status: frame.status,
+    latestSignals: frame.latestSignals ?? [],
+    status: currentStatus ?? frame.status,
   };
 
   return JSON.stringify(payload);
@@ -602,15 +604,27 @@ const server = http.createServer(async (req, res) => {
         flow,
       });
 
+      // 初始化首帧 (cursor 0)，确保会话就绪且首帧在客户端连接前已同步可用
+      if (session.engine.totalBars > 0 && session.engine.currentCursor < 0) {
+        await session.stepNext();
+      }
+
       activeSessions.set(session.sessionId, session);
       sessionStreamClients.set(session.sessionId, new Set());
+      console.log(
+        `[SIMULATION] POST /v1/simulation/start sessionId=${session.sessionId} code=${code} period=${period}`,
+      );
 
       // 绑定广播监听器：当会话产生新帧或状态变动时，向所有连接中的 SSE 客户端推送
       session.setListeners({
         onFrame: (frame) => {
           const clients = sessionStreamClients.get(session.sessionId);
           if (!clients || clients.size === 0) return;
-          const payloadString = formatFramePayload(frame, session.startDate);
+          const payloadString = formatFramePayload(
+            frame,
+            session.startDate,
+            session.currentStatus,
+          );
           for (const clientRes of clients) {
             try {
               clientRes.write(`event: frame\ndata: ${payloadString}\n\n`);
@@ -680,26 +694,25 @@ const server = http.createServer(async (req, res) => {
       sessionStreamClients.set(sessionId, clients);
     }
     clients.add(res);
+    console.log(
+      `[SIMULATION] GET /v1/simulation/stream sessionId=${sessionId} (clients: ${clients.size})`,
+    );
 
     // 立即补发当前游标所在帧给该连接作为初始数据
     const currentFrame = session.engine.getCurrentFrame();
     if (currentFrame) {
       try {
         res.write(
-          `event: frame\ndata: ${formatFramePayload(currentFrame, session.startDate)}\n\n`,
+          `event: frame\ndata: ${formatFramePayload(currentFrame, session.startDate, session.currentStatus)}\n\n`,
         );
       } catch {}
-    } else if (session.engine.totalBars > 0) {
-      void session.engine.seek(0).then((frame) => {
-        if (frame && clients?.has(res)) {
-          try {
-            res.write(
-              `event: frame\ndata: ${formatFramePayload(frame, session.startDate)}\n\n`,
-            );
-          } catch {}
-        }
-      });
     }
+    // 立即发送当前会话状态事件，确保客户端准确同步播放/暂停态
+    try {
+      res.write(
+        `event: status\ndata: ${JSON.stringify({ status: session.currentStatus })}\n\n`,
+      );
+    } catch {}
 
     // 心跳保活定时器（每 15 秒发送注释行），防止浏览器或代理在暂停空闲时挂起/断连
     const pingTimer = setInterval(() => {
@@ -738,6 +751,9 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+      console.log(
+        `[SIMULATION] POST /v1/simulation/control sessionId=${sessionId} action=${body.action} param=${body.param}`,
+      );
       await session.control({
         action: body.action,
         param: body.param,
@@ -759,6 +775,7 @@ const server = http.createServer(async (req, res) => {
   if (pathname.endsWith('/v1/simulation/stop') && req.method === 'POST') {
     const body = await parseJsonBody(req);
     const sessionId = String(body.sessionId || '');
+    console.log(`[SIMULATION] POST /v1/simulation/stop sessionId=${sessionId}`);
     const session = activeSessions.get(sessionId);
     if (session) {
       session.destroy();
@@ -1023,6 +1040,8 @@ const server = http.createServer(async (req, res) => {
         backtestRunId: runId,
         securityCode: symbol,
         signalTime: sig.signalTime,
+        triggerTime: sig.triggerTime || sig.signalTime,
+        pivotTime: sig.pivotTime || sig.signalTime,
         signalType: sig.signalType,
         confidence: sig.confidence,
         confidenceLevel: 'HIGH',
@@ -1032,13 +1051,17 @@ const server = http.createServer(async (req, res) => {
           action: sig.isBuy ? 'BUY' : 'SELL',
           price: sig.triggerPrice,
           triggerPrice: sig.triggerPrice,
+          pivotPrice: sig.pivotPrice ?? sig.triggerPrice,
           time: sig.signalTime,
-          triggerTime: sig.signalTime,
+          triggerTime: sig.triggerTime || sig.signalTime,
+          pivotTime: sig.pivotTime || sig.signalTime,
           badgeText: sig.badgeText,
           signalTag: sig.badgeText,
           chanBsp: {
             type: sig.signalType,
-            price: sig.triggerPrice,
+            price: sig.pivotPrice ?? sig.triggerPrice,
+            triggerPrice: sig.triggerPrice,
+            pivotPrice: sig.pivotPrice ?? sig.triggerPrice,
             level: period,
             period,
           },

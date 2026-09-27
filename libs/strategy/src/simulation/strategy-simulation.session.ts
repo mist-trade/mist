@@ -17,7 +17,7 @@ export interface SimulationSessionListeners {
 export class StrategySimulationSession {
   public readonly engine: StrategySimulationEngine;
   private status: SimulationSessionStatus = 'idle';
-  private speedMs = 500;
+  private speedMs = 250;
   private timer: NodeJS.Timeout | null = null;
   private listeners: SimulationSessionListeners = {};
   private isProcessing = false;

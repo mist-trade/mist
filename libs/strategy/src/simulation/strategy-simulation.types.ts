@@ -12,10 +12,18 @@ export type SimulationSessionStatus =
   | 'completed';
 
 export interface SimulationSignal {
+  /** 决策触发时刻 (ISO 字符串) = currentBar.timestamp (右侧闭合确立，用于交易撮合与单调推进) */
   readonly signalTime: string;
+  /** 显式声明的决策触发时刻 (与 signalTime 严格等价) */
+  readonly triggerTime: string;
+  /** 形态几何极值时刻 (ISO 字符串) = cand.pivotTime || cand.time (用于图表锚点与结构归因) */
+  readonly pivotTime: string;
+  /** 决策触发时刻收盘市价 (虚拟撮合基准价) */
+  readonly triggerPrice: number;
+  /** 形态几何极值点价格 (止损参考基准价) */
+  readonly pivotPrice: number;
   readonly signalType: string;
   readonly badgeText: string;
-  readonly triggerPrice: number;
   readonly isBuy: boolean;
   readonly confidence: number;
   readonly decisionTrace: Record<string, unknown> | null;
@@ -29,7 +37,10 @@ export interface SimulationFrame {
   readonly total: number;
   readonly bar: StrategyBar;
   readonly windowBars: readonly ProjectedStrategyBar[];
+  /** 截至当前帧已累积的所有有效信号 (Accumulated signals up to this cursor) */
   readonly signals: readonly SimulationSignal[];
+  /** 仅当前单帧新触发的增量信号 (Delta signals of this frame) */
+  readonly latestSignals?: readonly SimulationSignal[];
   readonly status: SimulationSessionStatus;
 }
 
