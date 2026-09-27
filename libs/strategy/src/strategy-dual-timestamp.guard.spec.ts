@@ -1,4 +1,5 @@
-import { StrategySimulationEngine } from './simulation/strategy-simulation.engine';
+import { StrategyEvaluationKernel } from './kernel/strategy-evaluation-kernel';
+import type { KernelConfig } from './kernel/kernel.types';
 import { createChanBspDecisionFlow } from './simulation/standard-simulation-flows';
 import { ChanBspFactorPlugin } from './factor/plugins/chan-bsp.plugin';
 import type { StrategyBar } from '@app/market-data';
@@ -22,7 +23,7 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
   }
 
   describe('1. 双时间戳法定分离契约 (Dual-Timestamp Contract)', () => {
-    it('SimulationSignal 必须严格分离 signalTime (决策触发时刻) 与 pivotTime (形态极值时刻)', async () => {
+    it('内核信号必须严格分离 signalTime (决策触发时刻) 与 pivotTime (形态极值时刻)', async () => {
       const startTime = new Date('2025-07-01T09:30:00.000Z');
       const bars: StrategyBar[] = Array.from({ length: 65 }, (_, i) =>
         makeStrategyBar(
@@ -37,33 +38,42 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
         requiredBarCount: 50,
       });
 
-      const engine = new StrategySimulationEngine(bars, {
+      const config: KernelConfig = {
+        securityId: 1,
         securityCode: '000001',
         period: 30,
-        flow,
-      });
+        publicFrom: bars[0].timestamp,
+        plans: [
+          {
+            definitionId: 1,
+            versionId: 1,
+            flow,
+            ruleSnapshot: Object.freeze({}),
+            requiredBarCount: 50,
+          },
+        ],
+      };
+      const kernel = new StrategyEvaluationKernel(config);
 
-      // 推进多步
-      for (let i = 0; i < 60; i++) {
-        const frame = await engine.stepNext();
-        if (frame && frame.latestSignals && frame.latestSignals.length > 0) {
-          for (const sig of frame.latestSignals) {
-            // 契约断言 1: signalTime 必须严格等于当前确认 Bar 的时间戳 (右侧确立时刻)
-            expect(sig.signalTime).toBe(frame.bar.timestamp.toISOString());
-            expect(sig.triggerTime).toBe(frame.bar.timestamp.toISOString());
+      // 逐 Bar 推进
+      for (const bar of bars) {
+        const signals = await kernel.push(bar);
+        for (const signal of signals) {
+          // 契约断言 1: signalTime 必须严格等于当前确认 Bar 的时间戳 (右侧确立时刻)
+          expect(signal.signalTime).toBe(bar.timestamp);
+          expect(signal.triggerTime).toBe(bar.timestamp.toISOString());
 
-            // 契约断言 2: pivotTime 必须存在且时间戳必然早于或等于 signalTime (绝对无未来极值)
-            expect(sig.pivotTime).toBeDefined();
-            const pivotMs = new Date(sig.pivotTime).getTime();
-            const signalMs = new Date(sig.signalTime).getTime();
-            expect(pivotMs).toBeLessThanOrEqual(signalMs);
+          // 契约断言 2: pivotTime 必须存在且时间戳必然早于或等于 signalTime (绝对无未来极值)
+          expect(signal.pivotTime).not.toBeNull();
+          const pivotMs = new Date(signal.pivotTime as string).getTime();
+          const signalMs = signal.signalTime.getTime();
+          expect(pivotMs).toBeLessThanOrEqual(signalMs);
 
-            // 契约断言 3: triggerPrice 必须等于当前 Bar 的收盘价 (真实撮合基准)
-            expect(sig.triggerPrice).toBe(frame.bar.close);
+          // 契约断言 3: triggerPrice 必须等于当前 Bar 的收盘价 (真实撮合基准)
+          expect(signal.triggerPrice).toBe(bar.close);
 
-            // 契约断言 4: pivotPrice 必须为正数 (止损参考基准)
-            expect(sig.pivotPrice).toBeGreaterThan(0);
-          }
+          // 契约断言 4: pivotPrice 必须为正数 (止损参考基准)
+          expect(signal.pivotPrice).toBeGreaterThan(0);
         }
       }
     });

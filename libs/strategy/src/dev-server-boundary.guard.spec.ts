@@ -33,8 +33,8 @@ describe('Dev Server Architecture & Boundary Guard (本地开发服务门禁)', 
     });
 
     it('回测推进与买卖点检测必须复用生产级策略树与仿真引擎，严禁私自手写信号检测或伪切片循环', () => {
-      // 必须复用生产仿真引擎 StrategySimulationEngine 与策略树流程
-      expect(serverSource).toMatch(/StrategySimulationEngine/);
+      // 必须复用生产统一求值内核 StrategyEvaluationKernel 与策略树流程
+      expect(serverSource).toMatch(/StrategyEvaluationKernel/);
 
       // 严禁私自手写买卖点检测器或背驰遍历循环
       expect(serverSource).not.toMatch(/function\s+detectBuySellPoints/);
@@ -107,7 +107,7 @@ describe('Dev Server Architecture & Boundary Guard (本地开发服务门禁)', 
 
       // 检查是否引入了策略仿真引擎
       const hasSimulationImport = serverSource.includes(
-        'StrategySimulationEngine',
+        'StrategyEvaluationKernel',
       );
       expect(hasSimulationImport).toBe(true);
     });

@@ -4,7 +4,7 @@
  *
  * 端口: 8001 (默认与 mist-backend 生产端口一致)
  * 职责: 模拟生产 API 契约，支持 mist-fe 无感读取本地行情与动态渲染私有策略买卖点
- * 准则: 严格薄网关，核心推演 100% 走策略树决策流与 StrategySimulationEngine，严禁私自手写伪回测
+ * 准则: 严格薄网关，核心推演 100% 走策略树决策流与 StrategyEvaluationKernel 统一内核，严禁私自手写伪回测
  */
 
 import * as http from 'http';
@@ -15,12 +15,16 @@ import { ChanCore, type ChanK } from '@app/chancore';
 import { ChanVisualAdapter } from '../../libs/visual-command/src/adapters/chan-visual.adapter';
 import { DynamicTacticsLoader } from '../../libs/strategy/src/tactics/dynamic-tactics-loader';
 import {
-  StrategySimulationEngine,
   StrategySimulationSession,
   createTacticsDecisionFlow,
   type SimulationFrame,
   type SimulationSignal,
 } from '../../libs/strategy/src/simulation';
+import {
+  StrategyEvaluationKernel,
+  type KernelSignal,
+} from '../../libs/strategy/src/kernel';
+import { mapKernelSignalToSimulationSignal } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
 import { loadCanonicalKlines, PERIOD_NAME_MAP } from './provider';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
 import type {
@@ -360,7 +364,7 @@ function getBacktestCacheKey(options: {
   return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${start}:${end}`;
 }
 
-// 全量执行仿真并获取回测结果的统一纯净胶水
+// 全量执行仿真并获取回测结果的统一纯净胶水（统一内核 push 驱动）
 async function runUnifiedSimulationBacktest(options: {
   code: string;
   period: number;
@@ -373,7 +377,7 @@ async function runUnifiedSimulationBacktest(options: {
   if (cachedSignals) {
     return {
       signals: cachedSignals,
-      engine: null,
+      kernel: null,
     };
   }
 
@@ -381,29 +385,50 @@ async function runUnifiedSimulationBacktest(options: {
     code: options.code,
     period: options.period,
   });
-  const bars = fullKlines.map((k) => toStrategyBar(k, options.period));
+  let bars = fullKlines.map((k) => toStrategyBar(k, options.period));
+  if (options.endDate) {
+    const endMs = new Date(options.endDate).getTime();
+    bars = bars.filter((bar) => bar.timestamp.getTime() <= endMs);
+  }
   const tactics = DynamicTacticsLoader.reloadTactics();
   const flow = createTacticsDecisionFlow(tactics);
+  const publicFrom = options.startDate
+    ? new Date(options.startDate)
+    : new Date(-8640000000000000);
 
-  const engine = new StrategySimulationEngine(bars, {
+  const kernel = new StrategyEvaluationKernel({
+    securityId: DEFAULT_DEV_SECURITY_ID,
     securityCode: options.code,
     period: options.period,
-    startDate: options.startDate,
-    endDate: options.endDate,
-    filterFenxingContainment: options.filterFenxingContainment,
-    flow,
+    publicFrom,
+    plans: [
+      {
+        definitionId: 0,
+        versionId: 0,
+        flow,
+        ruleSnapshot: Object.freeze({}),
+        requiredBarCount: 60,
+      },
+    ],
   });
 
-  if (bars.length > 0) {
-    await engine.seek(bars.length - 1);
+  const collected: SimulationSignal[] = [];
+  for (const bar of bars) {
+    const signals: readonly KernelSignal[] = await kernel.push(bar);
+    for (const signal of signals) {
+      collected.push(
+        mapKernelSignalToSimulationSignal(signal, {
+          securityCode: options.code,
+          period: options.period,
+        }),
+      );
+    }
   }
-
-  const signals = engine.getAllSignals();
-  backtestSignalsCache.set(cacheKey, signals);
+  backtestSignalsCache.set(cacheKey, collected);
 
   return {
-    signals,
-    engine,
+    signals: collected,
+    kernel,
   };
 }
 
@@ -605,7 +630,7 @@ const server = http.createServer(async (req, res) => {
       });
 
       // 初始化首帧 (cursor 0)，确保会话就绪且首帧在客户端连接前已同步可用
-      if (session.engine.totalBars > 0 && session.engine.currentCursor < 0) {
+      if (session.totalBars > 0 && session.currentCursor < 0) {
         await session.stepNext();
       }
 
@@ -699,7 +724,7 @@ const server = http.createServer(async (req, res) => {
     );
 
     // 立即补发当前游标所在帧给该连接作为初始数据
-    const currentFrame = session.engine.getCurrentFrame();
+    const currentFrame = session.getCurrentFrame();
     if (currentFrame) {
       try {
         res.write(
@@ -814,8 +839,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     try {
-      const dump = session.engine.dumpCurrentState();
-      const currentFrame = session.engine.getCurrentFrame();
+      const dump = session.dumpCurrentState();
+      const currentFrame = session.getCurrentFrame();
       const chanKlines = currentFrame
         ? toChanKlines(currentFrame.windowBars)
         : [];
