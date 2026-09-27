@@ -8,35 +8,18 @@ import {
   DataSource,
   Security,
   StrategyDefinition,
-  StrategyKind,
   StrategyVersion,
   type BacktestTargetIssue,
 } from '@app/shared-data';
 import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
 import { PERIOD_MINUTES } from '@app/constants';
 import {
-  compileStoredStrategyRule,
-  evaluateStrategyPlan,
-  serializeStrategyContextSnapshot,
-  DecisionFlowEvaluator,
-  DEFAULT_REQUIRED_BARS_BI,
-  SIGNAL_KINDS,
-  STRATEGY_KINDS,
-  type CompiledStrategyExecutionPlan,
-  type DecisionFlowNode,
-  type FactorContext,
-  type StrategyMarketSource,
+  compileStoredDefinitionVersion,
+  HistoricalBarSource,
+  StrategyEvaluationKernel,
+  type CompiledStoredDefinition,
   type StrategyRealtimeSource,
 } from '@app/strategy';
-import { StrategySeriesImputer } from '@app/market-data';
-import {
-  ChanBspDetector,
-  ChanBspEpisodeCursor,
-  serializeChanBspContextSnapshot,
-  compileChanBspConfig,
-  type ChanBspEpisodeIdentity,
-  type ChanBspPlan,
-} from '@app/signal';
 import { DataSource as TypeOrmDataSource, In, Repository } from 'typeorm';
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
 import { BacktestRunFailure } from './backtest-run-error';
@@ -44,22 +27,6 @@ import { HealthStateService } from './health/health-state.service';
 
 const BACKTEST_CALCULATION_BATCH_SIZE = 100;
 const BACKTEST_RESULT_BATCH_SIZE = 100;
-
-/**
- * Per-run compiled plan union: the evaluator selected by `backtest_runs.kind`.
- * `rule_dsl` keeps the existing compiled-rule path; `chan_bsp` carries the
- * shared Chan buy/sell point plan. Both expose `requiredBarCount`.
- */
-type ReplayPlan =
-  | { kind: 'rule_dsl'; plan: CompiledStrategyExecutionPlan }
-  | { kind: typeof STRATEGY_KINDS.CHAN_BSP; plan: ChanBspPlan }
-  | {
-      kind: typeof STRATEGY_KINDS.DECISION_FLOW;
-      flow: DecisionFlowNode;
-      requiredBarCount: number;
-    };
-
-const CHAN_BSP_REPLAY_LEVELS: readonly number[] = [1, 5, 15, 30, 60];
 
 class ReplayBudget {
   consumed = 0;
@@ -100,9 +67,6 @@ class ReplayBudget {
 @Injectable()
 export class BacktestRunExecutor {
   private readonly logger = new Logger(BacktestRunExecutor.name);
-  private readonly chanBspDetector = new ChanBspDetector();
-  private readonly chanBspCursors = new Map<number, ChanBspEpisodeCursor>();
-  private readonly decisionFlowEvaluator = new DecisionFlowEvaluator();
 
   constructor(
     @InjectRepository(BacktestRun)
@@ -122,7 +86,6 @@ export class BacktestRunExecutor {
   ) {}
 
   async execute(runId: number): Promise<void> {
-    this.chanBspCursors.clear();
     let claimed: BacktestRun | null;
     try {
       claimed = await this.claim(runId);
@@ -184,44 +147,16 @@ export class BacktestRunExecutor {
     });
     if (!definition) throw new BacktestRunFailure('BACKTEST_EXECUTION_FAILED');
 
-    const plan: ReplayPlan =
-      run.kind === StrategyKind.CHAN_BSP
-        ? {
-            kind: STRATEGY_KINDS.CHAN_BSP,
-            plan: compileChanBspConfig(
-              version.rule as Record<string, unknown>,
-              definition.periods,
-            ),
-          }
-        : run.kind === StrategyKind.DECISION_FLOW
-          ? {
-              kind: STRATEGY_KINDS.DECISION_FLOW,
-              flow: version.rule as unknown as DecisionFlowNode,
-              requiredBarCount:
-                typeof (version.rule as any)?.requiredBarCount === 'number'
-                  ? (version.rule as any).requiredBarCount
-                  : DEFAULT_REQUIRED_BARS_BI,
-            }
-          : {
-              kind: 'rule_dsl',
-              plan: compileStoredStrategyRule(
-                version.rule,
-                version.signalKind as
-                  | typeof SIGNAL_KINDS.ENTRY
-                  | typeof SIGNAL_KINDS.EXIT,
-              ),
-            };
-    if (
-      run.kind === StrategyKind.CHAN_BSP &&
-      !CHAN_BSP_REPLAY_LEVELS.includes(run.period)
-    ) {
-      throw new BacktestRunFailure('BACKTEST_CHAN_BSP_PERIOD_UNSUPPORTED');
-    }
-    if (plan.kind === STRATEGY_KINDS.CHAN_BSP) {
-      this.logger.log(
-        `backtest chan_bsp plan compiled runId=${run.id} level=${run.period} units=${plan.plan.units}`,
-      );
-    }
+    // 编译边界统一收口：run.kind 仅作 DB 快照语义，回放一律透明编译为
+    // decision_flow 统一计划（kernel 相位由 publicFrom 时间轴判定）。
+    const compiled: CompiledStoredDefinition = compileStoredDefinitionVersion({
+      kind: run.kind,
+      rule: version.rule as Record<string, unknown>,
+      signalKind: version.signalKind,
+    });
+    this.logger.log(
+      `backtest plan compiled runId=${run.id} sourceKind=${compiled.sourceKind} requiredBarCount=${compiled.requiredBarCount}`,
+    );
 
     const timeoutMs =
       this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS') ?? 1_800_000;
@@ -279,7 +214,7 @@ export class BacktestRunExecutor {
     for (const { code, security } of executable) {
       const outcome = await this.replaySecurity(
         run,
-        plan,
+        compiled,
         version.rule,
         code,
         security.id,
@@ -318,7 +253,7 @@ export class BacktestRunExecutor {
 
   private async replaySecurity(
     run: BacktestRun,
-    plan: ReplayPlan,
+    compiled: CompiledStoredDefinition,
     ruleSnapshot: Record<string, unknown>,
     securityCode: string,
     securityId: number,
@@ -327,214 +262,57 @@ export class BacktestRunExecutor {
     budget: ReplayBudget,
     onSignal: () => void,
   ): Promise<{ hasBars: boolean }> {
-    const imputer = new StrategySeriesImputer();
-    let afterTimestamp: Date | undefined;
-    let hasPublicBars = false;
-    const replayStart = replayStartFor(run, plan);
-    const replayEnd = new Date(run.endDate.getTime());
-    const cursor =
-      this.chanBspCursors.get(securityId) ?? new ChanBspEpisodeCursor();
-    this.chanBspCursors.set(securityId, cursor);
-
-    // ① 准备阶段：首个评估点前的初始窗口段，整段双向补齐定死。以 replayStart 为界
-    //    （而非 startDate）——对消费量价的分钟级 plan，replayStart = 当日开盘，initial
-    //    只取开盘前的历史，与 ② 的 replay page（从 replayStart 起）天然不重叠；锚点
-    //    全部 < replayStart，无 look-ahead。窗口不满时维持 insufficient_history
-    //    （builder 现有逻辑）。
-    const requiredBarCount =
-      plan.kind === 'decision_flow'
-        ? plan.requiredBarCount
-        : plan.plan.requiredBarCount;
-
-    const initial = await this.marketData.loadReplayWindow({
+    const preWarmEndAt = replayStartFor(run);
+    const kernel = new StrategyEvaluationKernel({
+      securityId,
+      securityCode,
+      period: run.period,
+      publicFrom: run.startDate,
+      plans: [
+        {
+          definitionId: run.strategyDefinitionId,
+          versionId: run.strategyVersionId,
+          flow: compiled.flow,
+          ruleSnapshot,
+          requiredBarCount: compiled.requiredBarCount,
+        },
+      ],
+    });
+    const source = new HistoricalBarSource(this.marketData, {
       securityId,
       source: run.source as StrategyRealtimeSource,
       period: run.period,
-      endAt: replayStart,
-      requiredBars: requiredBarCount,
+      preWarmEndAt,
+      publicFrom: run.startDate,
+      endAt: new Date(run.endDate.getTime()),
+      requiredBars: compiled.requiredBarCount,
     });
-    for (let index = 0; index < initial.bars.length; index += 1) {
+    const outcome = await source.drive(kernel, async (signal) => {
       budget.consume();
-    }
-    imputer.hydrate(initial.bars);
-
-    if (initial.bars.length > 0 && plan.kind === 'chan_bsp') {
-      const preEvents = this.chanBspDetector
-        .evaluate(imputer.read(), plan.plan)
-        .filter((e) => e.time.getTime() < run.startDate.getTime());
-      if (preEvents.length > 0) {
-        const identity: ChanBspEpisodeIdentity = {
-          definitionId: run.strategyDefinitionId,
-          securityId,
-          source: run.source as StrategyRealtimeSource,
-          level: run.period,
-          units: plan.plan.units,
-        };
-        cursor.advance(identity, preEvents);
-      }
-    }
-
-    // ② 计算阶段：逐根 append（只 forward-fill 新 bar）+ 滑动窗口 + 评估。
-    while (true) {
-      const page = await this.marketData.readReplayPage({
-        securityId,
-        source: run.source as StrategyMarketSource,
-        period: run.period,
-        startAt: replayStart,
-        endAt: replayEnd,
-        ...(afterTimestamp ? { afterTimestamp } : {}),
-      });
-      for (const bar of page.bars) {
-        budget.consume();
-        if (bar.timestamp >= run.startDate) hasPublicBars = true;
-        imputer.append(bar);
-        while (imputer.read().length > requiredBarCount) {
-          imputer.trim();
-        }
-        if (bar.timestamp >= run.startDate) {
-          if (plan.kind === 'chan_bsp') {
-            // 矫正层第一原则：detector 只吃 imputer.read() 的矫正视图。
-            const events = this.chanBspDetector.evaluate(
-              imputer.read(),
-              plan.plan,
-            );
-            const identity: ChanBspEpisodeIdentity = {
-              definitionId: run.strategyDefinitionId,
-              securityId,
-              source: run.source as StrategyRealtimeSource,
-              level: run.period,
-              units: plan.plan.units,
-            };
-            const fresh = cursor.advance(identity, events);
-            let freshEmitted = false;
-            for (const event of fresh) {
-              if (event.time.getTime() < run.startDate.getTime()) {
-                continue;
-              }
-              results.push(
-                this.resultRepository.create({
-                  backtestRunId: run.id,
-                  securityCode,
-                  signalTime: event.time,
-                  signalType: event.type,
-                  confidence: event.type.startsWith('first_')
-                    ? 92.0
-                    : event.type.startsWith('third_')
-                      ? 90.0
-                      : 86.0,
-                  confidenceLevel: 'HIGH',
-                  decisionTrace: {
-                    eventType: event.type,
-                    units: plan.plan.units,
-                    price: event.price,
-                  },
-                  contextSnapshot: serializeChanBspContextSnapshot(
-                    event,
-                    run.period,
-                  ) as Record<string, unknown>,
-                  ruleSnapshot,
-                }),
-              );
-              freshEmitted = true;
-            }
-            if (freshEmitted) {
-              matchedCodes.add(securityCode);
-              onSignal();
-              if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
-                await this.flushResults(results);
-            }
-          } else if (plan.kind === 'decision_flow') {
-            const factorContext: FactorContext = {
-              securityId,
-              securityCode,
-              timestamp: bar.timestamp,
-              period: run.period,
-              bars: imputer.read(),
-              attributes: new Map(),
-            };
-            const outcome = await this.decisionFlowEvaluator.evaluate(
-              plan.flow,
-              factorContext,
-            );
-            if (outcome.status === 'SIGNAL_EMITTED') {
-              const sigType =
-                (outcome.signalTag as string) ??
-                outcome.action ??
-                'decision_flow';
-              results.push(
-                this.resultRepository.create({
-                  backtestRunId: run.id,
-                  securityCode,
-                  signalTime: bar.timestamp,
-                  signalType: sigType,
-                  confidence: outcome.confidence,
-                  confidenceLevel: outcome.confidenceLevel,
-                  decisionTrace: {
-                    status: outcome.status,
-                    signalTag: outcome.signalTag,
-                    reason: outcome.reason,
-                    trace: outcome.trace,
-                  },
-                  contextSnapshot: {
-                    action: outcome.action,
-                    confidence: outcome.confidence,
-                    signalTag: outcome.signalTag,
-                    reason: outcome.reason,
-                  },
-                  ruleSnapshot,
-                }),
-              );
-              matchedCodes.add(securityCode);
-              onSignal();
-              if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
-                await this.flushResults(results);
-            }
-          } else {
-            const evaluation = evaluateStrategyPlan(plan.plan, imputer.read());
-            if (evaluation.status === 'evaluated' && evaluation.matched) {
-              const sigType = plan.plan.signalKind ?? 'rule_dsl';
-              results.push(
-                this.resultRepository.create({
-                  backtestRunId: run.id,
-                  securityCode,
-                  signalTime: bar.timestamp,
-                  signalType: sigType,
-                  confidence: 80.0,
-                  confidenceLevel: 'HIGH',
-                  decisionTrace: {
-                    signalKind: plan.plan.signalKind,
-                    matched: true,
-                  },
-                  contextSnapshot: serializeStrategyContextSnapshot(
-                    plan.plan,
-                    evaluation.context,
-                  ) as Record<string, unknown>,
-                  ruleSnapshot,
-                }),
-              );
-              matchedCodes.add(securityCode);
-              onSignal();
-              if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
-                await this.flushResults(results);
-            }
-          }
-        }
-        await budget.checkpoint();
-      }
-
-      await budget.checkpoint(true);
-      if (!page.nextAfterTimestamp) break;
-      const lastBar = page.bars.at(-1);
-      if (
-        !lastBar ||
-        page.nextAfterTimestamp < lastBar.timestamp ||
-        (afterTimestamp && page.nextAfterTimestamp <= afterTimestamp)
-      ) {
-        throw new BacktestRunFailure('BACKTEST_EXECUTION_FAILED');
-      }
-      afterTimestamp = page.nextAfterTimestamp;
-    }
-    return { hasBars: hasPublicBars };
+      results.push(
+        this.resultRepository.create({
+          backtestRunId: run.id,
+          securityCode,
+          signalTime: signal.signalTime,
+          pivotTime: signal.pivotTime ? new Date(signal.pivotTime) : null,
+          signalType: signal.signalType,
+          confidence: signal.confidence,
+          confidenceLevel: signal.confidenceLevel,
+          decisionTrace: signal.decisionTrace,
+          contextSnapshot: signal.contextSnapshot,
+          ruleSnapshot,
+        }),
+      );
+      matchedCodes.add(securityCode);
+      onSignal();
+      if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
+        await this.flushResults(results);
+    }, async () => {
+      budget.consume();
+      await budget.checkpoint();
+    });
+    await budget.checkpoint(true);
+    return { hasBars: outcome.publicBarCount > 0 };
   }
 
   private async flushResults(results: BacktestSignalResult[]): Promise<void> {
@@ -618,14 +396,8 @@ function uniqueIssues(
   });
 }
 
-function replayStartFor(run: BacktestRun, plan: ReplayPlan): Date {
-  if (
-    run.period >= PERIOD_MINUTES['1d'] ||
-    (plan.kind === 'rule_dsl' &&
-      !plan.plan.fields.some(
-        (field) => field === 'k.volume' || field === 'k.amount',
-      ))
-  ) {
+function replayStartFor(run: BacktestRun): Date {
+  if (run.period >= PERIOD_MINUTES['1d']) {
     return new Date(run.startDate.getTime());
   }
   const parts = new Intl.DateTimeFormat('en-CA', {
