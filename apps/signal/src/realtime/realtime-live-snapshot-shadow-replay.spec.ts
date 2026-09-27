@@ -101,10 +101,10 @@ describe.each(REALTIME_LIVE_SNAPSHOT_FIXTURES)(
               params: {
                 plan: compileStoredStrategyRule(
                   {
-                field: 'k.close',
-                operator: 'gt',
-                value: fixture.expectedPrices.last - 0.01,
-              },
+                    field: 'k.close',
+                    operator: 'gt',
+                    value: fixture.expectedPrices.last - 0.01,
+                  },
                   'entry',
                 ),
               },

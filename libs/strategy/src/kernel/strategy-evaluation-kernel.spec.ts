@@ -2,16 +2,10 @@ import type { StrategyBar } from '@app/market-data';
 import { StrategyEvaluationKernel } from './strategy-evaluation-kernel';
 import type { KernelConfig, KernelPlan } from './kernel.types';
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
-import {
-  createChanBspDecisionFlow,
-} from '../simulation/standard-simulation-flows';
+import { createChanBspDecisionFlow } from '../simulation/standard-simulation-flows';
 import { normalizeExternalDecimalText } from '../../../decimal/src/decimal8';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
-import type {
-  FactorContext,
-  FactorOpinion,
-  FactorPlugin,
-} from '../factor/factor.types';
+import type { FactorOpinion, FactorPlugin } from '../factor/factor.types';
 
 /** 恒真测试插件：每根 Bar 都 BUY（验证内核无投递级去重）。 */
 class AlwaysBuyPlugin implements FactorPlugin {
@@ -22,9 +16,7 @@ class AlwaysBuyPlugin implements FactorPlugin {
   public readonly description = '测试专用：恒定返回 BUY';
   public readonly paramSchema = {};
 
-  public async evaluate(
-    _context: FactorContext,
-  ): Promise<FactorOpinion> {
+  public async evaluate(): Promise<FactorOpinion> {
     return { action: 'BUY', confidence: 0.9, reason: 'always buy (test)' };
   }
 }
@@ -122,7 +114,9 @@ describe('StrategyEvaluationKernel（统一 push 内核）', () => {
   it('按 publicFrom 划分相位：预热相不发射、公开相发射', async () => {
     const bars = makeMockBars(40);
     const publicFrom = bars[20].timestamp;
-    const kernel = new StrategyEvaluationKernel(makeKernelConfig({ publicFrom }));
+    const kernel = new StrategyEvaluationKernel(
+      makeKernelConfig({ publicFrom }),
+    );
 
     for (let i = 0; i < 20; i += 1) {
       const signals = await kernel.push(bars[i]);
@@ -135,7 +129,9 @@ describe('StrategyEvaluationKernel（统一 push 内核）', () => {
 
   it('重复/乱序 Bar 静默忽略', async () => {
     const bars = makeMockBars(30);
-    const kernel = new StrategyEvaluationKernel(makeKernelConfig({ publicFrom: new Date(0) }));
+    const kernel = new StrategyEvaluationKernel(
+      makeKernelConfig({ publicFrom: new Date(0) }),
+    );
 
     await kernel.push(bars[0]);
     const duplicate = await kernel.push(bars[0]);
@@ -148,7 +144,9 @@ describe('StrategyEvaluationKernel（统一 push 内核）', () => {
 
   it('窗口不足 windowBudget 期间不判定不发射（insufficient_history 语义）', async () => {
     const bars = makeMockBars(15);
-    const kernel = new StrategyEvaluationKernel(makeKernelConfig({ publicFrom: new Date(0) }));
+    const kernel = new StrategyEvaluationKernel(
+      makeKernelConfig({ publicFrom: new Date(0) }),
+    );
     for (const bar of bars) {
       const signals = await kernel.push(bar);
       expect(signals).toEqual([]);
@@ -192,7 +190,9 @@ describe('StrategyEvaluationKernel（统一 push 内核）', () => {
 
   it('公开相信号满足双时间戳契约：signalTime=确认 Bar、pivotTime<=signalTime', async () => {
     const bars = makeMockBars(60);
-    const kernel = new StrategyEvaluationKernel(makeKernelConfig({ publicFrom: new Date(0) }));
+    const kernel = new StrategyEvaluationKernel(
+      makeKernelConfig({ publicFrom: new Date(0) }),
+    );
     let sawSignal = false;
     for (const bar of bars) {
       const signals = await kernel.push(bar);
@@ -206,7 +206,9 @@ describe('StrategyEvaluationKernel（统一 push 内核）', () => {
             signal.signalTime.getTime(),
           );
         }
-        expect(signal.signalKind === 'entry' || signal.signalKind === 'exit').toBe(true);
+        expect(
+          signal.signalKind === 'entry' || signal.signalKind === 'exit',
+        ).toBe(true);
       }
     }
     // 合成行情 + 20 根窗口预算下允许无信号，但门禁契约本身必须可执行

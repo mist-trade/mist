@@ -1,15 +1,10 @@
-import type {
-  KernelSignal,
-} from '../kernel/kernel.types';
+import type { KernelSignal } from '../kernel/kernel.types';
 import type { SimulationSignal } from './strategy-simulation.types';
 
 /**
  * 缠论买卖点类型 → 前端徽标文案。旧 StrategySimulationEngine 的展示映射整体迁移。
  */
-export function formatBadgeText(
-  signalType: string,
-  isBuy: boolean,
-): string {
+export function formatBadgeText(signalType: string, isBuy: boolean): string {
   switch (signalType) {
     case 'first_buy':
       return '1买';

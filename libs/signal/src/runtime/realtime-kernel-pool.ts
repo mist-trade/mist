@@ -50,7 +50,10 @@ export class RealtimeKernelPool {
       this.groups.set(key, group);
     }
 
-    if (group.lastPushedMs !== null && bar.timestamp.getTime() <= group.lastPushedMs) {
+    if (
+      group.lastPushedMs !== null &&
+      bar.timestamp.getTime() <= group.lastPushedMs
+    ) {
       this.lastOutcome = 'evaluated_not_matched';
       return Object.freeze([]);
     }
@@ -154,7 +157,9 @@ function dedupeHydration(
         bar.timestamp.getTime() < anchor.timestamp.getTime() &&
         bar.period === anchor.period,
     )
-    .sort((left, right) => left.timestamp.getTime() - right.timestamp.getTime());
+    .sort(
+      (left, right) => left.timestamp.getTime() - right.timestamp.getTime(),
+    );
   for (let index = 1; index < ordered.length; index += 1) {
     const previous = ordered[index - 1];
     const current = ordered[index];

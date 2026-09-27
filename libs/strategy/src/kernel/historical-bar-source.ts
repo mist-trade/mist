@@ -3,10 +3,7 @@ import type {
   StrategyRealtimeSource,
   StrategyReplayMarketDataPort,
 } from '@app/market-data';
-import type {
-  KernelSignal,
-  PrewarmStatus,
-} from './kernel.types';
+import type { KernelSignal, PrewarmStatus } from './kernel.types';
 import type { StrategyEvaluationKernel } from './strategy-evaluation-kernel';
 
 export interface HistoricalReplayCriteria {

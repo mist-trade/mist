@@ -66,7 +66,7 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
         action: 'BUY',
         signalTag: 'MOMENTUM_BREAKOUT',
         reason: '动量突破确认买入',
-        requiredBarCount: 3,
+        requiredBarCount: 1,
       },
       signalKind: 'entry',
       createdAt: new Date(),

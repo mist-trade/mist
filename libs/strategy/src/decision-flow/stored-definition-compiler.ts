@@ -6,7 +6,10 @@ import {
 import { compileStoredStrategyRuleWithNormalized } from '../rules/strategy-rule.compiler';
 import type { StrategySignalKind } from '../rules/strategy-rule.types';
 
-export type StoredDefinitionSourceKind = 'rule_dsl' | 'chan_bsp' | 'decision_flow';
+export type StoredDefinitionSourceKind =
+  | 'rule_dsl'
+  | 'chan_bsp'
+  | 'decision_flow';
 
 export interface StoredDefinitionCompileInput {
   readonly kind: StoredDefinitionSourceKind;
@@ -103,7 +106,8 @@ export function compileStoredDefinitionVersion(
     }
     case 'chan_bsp': {
       const chanPlan = validateChanBspRule(input.rule);
-      const flow = LegacyStrategyCompiler.compileChanBspToDecisionFlow(chanPlan);
+      const flow =
+        LegacyStrategyCompiler.compileChanBspToDecisionFlow(chanPlan);
       return {
         flow,
         requiredBarCount:
@@ -123,7 +127,9 @@ export function compileStoredDefinitionVersion(
 
 const DEFAULT_REQUIRED_BAR_COUNT = 60;
 
-function validateChanBspRule(rule: Record<string, unknown>): LegacyChanBspPlanLike {
+function validateChanBspRule(
+  rule: Record<string, unknown>,
+): LegacyChanBspPlanLike {
   const units = rule.units;
   if (typeof units !== 'string' || !CHAN_BSP_UNITS.has(units)) {
     throw new StoredDefinitionCompileError(
@@ -132,21 +138,14 @@ function validateChanBspRule(rule: Record<string, unknown>): LegacyChanBspPlanLi
     );
   }
   const direction = rule.direction;
-  if (
-    typeof direction !== 'string' ||
-    !CHAN_BSP_DIRECTIONS.has(direction)
-  ) {
+  if (typeof direction !== 'string' || !CHAN_BSP_DIRECTIONS.has(direction)) {
     throw new StoredDefinitionCompileError(
       'CHAN_BSP_CONFIG_INVALID',
       `chan_bsp config direction must be 'buy' | 'sell' | 'both', got: ${String(direction)}`,
     );
   }
   const rawPoints = rule.points;
-  if (
-    !rawPoints ||
-    typeof rawPoints !== 'object' ||
-    Array.isArray(rawPoints)
-  ) {
+  if (!rawPoints || typeof rawPoints !== 'object' || Array.isArray(rawPoints)) {
     throw new StoredDefinitionCompileError(
       'CHAN_BSP_CONFIG_INVALID',
       'chan_bsp config points must be an object of booleans',

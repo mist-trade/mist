@@ -193,9 +193,7 @@ export class StrategySimulationSession {
 
     const bar = this.publicBars[next];
     const kernelSignals =
-      next >= this.pushedPublicCount
-        ? await this.kernel.push(bar)
-        : [];
+      next >= this.pushedPublicCount ? await this.kernel.push(bar) : [];
     this.pushedPublicCount = Math.max(this.pushedPublicCount, next + 1);
 
     const latestSignals = kernelSignals.map((signal) =>

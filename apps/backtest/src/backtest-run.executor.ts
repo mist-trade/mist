@@ -287,30 +287,34 @@ export class BacktestRunExecutor {
       endAt: new Date(run.endDate.getTime()),
       requiredBars: compiled.requiredBarCount,
     });
-    const outcome = await source.drive(kernel, async (signal) => {
-      budget.consume();
-      results.push(
-        this.resultRepository.create({
-          backtestRunId: run.id,
-          securityCode,
-          signalTime: signal.signalTime,
-          pivotTime: signal.pivotTime ? new Date(signal.pivotTime) : null,
-          signalType: signal.signalType,
-          confidence: signal.confidence,
-          confidenceLevel: signal.confidenceLevel,
-          decisionTrace: signal.decisionTrace,
-          contextSnapshot: signal.contextSnapshot,
-          ruleSnapshot,
-        }),
-      );
-      matchedCodes.add(securityCode);
-      onSignal();
-      if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
-        await this.flushResults(results);
-    }, async () => {
-      budget.consume();
-      await budget.checkpoint();
-    });
+    const outcome = await source.drive(
+      kernel,
+      async (signal) => {
+        budget.consume();
+        results.push(
+          this.resultRepository.create({
+            backtestRunId: run.id,
+            securityCode,
+            signalTime: signal.signalTime,
+            pivotTime: signal.pivotTime ? new Date(signal.pivotTime) : null,
+            signalType: signal.signalType,
+            confidence: signal.confidence,
+            confidenceLevel: signal.confidenceLevel,
+            decisionTrace: signal.decisionTrace,
+            contextSnapshot: signal.contextSnapshot,
+            ruleSnapshot,
+          }),
+        );
+        matchedCodes.add(securityCode);
+        onSignal();
+        if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
+          await this.flushResults(results);
+      },
+      async () => {
+        budget.consume();
+        await budget.checkpoint();
+      },
+    );
     await budget.checkpoint(true);
     return { hasBars: outcome.publicBarCount > 0 };
   }

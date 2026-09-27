@@ -158,18 +158,17 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
       value: 1,
     });
 
-    type ComparableSimulationSignal = ReturnType<
-      typeof mapKernelSignalToSimulationSignal
-    > extends never
-      ? never
-      : {
-          signalTime: string;
-          triggerTime: string;
-          pivotTime: string;
-          triggerPrice: number;
-          signalType: string;
-          isBuy: boolean;
-        };
+    type ComparableSimulationSignal =
+      ReturnType<typeof mapKernelSignalToSimulationSignal> extends never
+        ? never
+        : {
+            signalTime: string;
+            triggerTime: string;
+            pivotTime: string;
+            triggerPrice: number;
+            signalType: string;
+            isBuy: boolean;
+          };
 
     function toComparable(simulation: ComparableSimulationSignal) {
       return {
@@ -219,10 +218,12 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
         },
       );
       await source.drive(kernelA, (signal) => {
-        laneA.push(mapKernelSignalToSimulationSignal(signal, {
-          securityCode: '600000.SH',
-          period: 1,
-        }));
+        laneA.push(
+          mapKernelSignalToSimulationSignal(signal, {
+            securityCode: '600000.SH',
+            period: 1,
+          }),
+        );
       });
 
       // Lane B：实时（封存 bar 逐根触发）— hydration 预热段 + 逐根公开 bar
@@ -253,7 +254,8 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
           laneB.push({
             signalTime: candidate.signalTime.toISOString(),
             triggerTime: candidate.triggerTime,
-            pivotTime: candidate.pivotTime ?? candidate.signalTime.toISOString(),
+            pivotTime:
+              candidate.pivotTime ?? candidate.signalTime.toISOString(),
             triggerPrice: candidate.triggerPrice,
             signalType: candidate.signalType,
             isBuy: candidate.signalKind === 'entry',

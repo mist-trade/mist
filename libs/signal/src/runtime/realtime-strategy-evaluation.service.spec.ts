@@ -67,7 +67,8 @@ function fakePool(signals: readonly KernelSignal[] = []) {
       groupCount: 1,
       rawBarCount: 10,
       derivedBarCount: 0,
-      lastOutcome: signals.length > 0 ? 'evaluated_matched' : 'evaluated_not_matched',
+      lastOutcome:
+        signals.length > 0 ? 'evaluated_matched' : 'evaluated_not_matched',
     }),
   };
   return pool;
@@ -97,7 +98,8 @@ describe('RealtimeStrategyEvaluationService（统一内核单通路）', () => {
 
     const poolMock = pool.push as jest.Mock;
     expect(poolMock).toHaveBeenCalledTimes(1);
-    const pushedPlans = poolMock.mock.calls[0][1] as RealtimeStrategyExecutionPlan[];
+    const pushedPlans = poolMock.mock
+      .calls[0][1] as RealtimeStrategyExecutionPlan[];
     expect(pushedPlans.map((p) => p.definitionId)).toEqual([1, 3]);
 
     expect(candidates).toHaveLength(2);
@@ -123,7 +125,10 @@ describe('RealtimeStrategyEvaluationService（统一内核单通路）', () => {
     const pool = fakePool();
     const service = new RealtimeStrategyEvaluationService(pool);
 
-    const candidates = await service.evaluate(bar('2026-08-04T06:44:00.000Z'), []);
+    const candidates = await service.evaluate(
+      bar('2026-08-04T06:44:00.000Z'),
+      [],
+    );
 
     expect(candidates).toEqual([]);
     expect(pool.push).not.toHaveBeenCalled();

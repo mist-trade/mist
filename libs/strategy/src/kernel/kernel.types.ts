@@ -1,4 +1,7 @@
-import type { DecisionFlowNode, ConfidenceLevel } from '../decision-flow/decision-flow.types';
+import type {
+  DecisionFlowNode,
+  ConfidenceLevel,
+} from '../decision-flow/decision-flow.types';
 import type { FactorPluginRegistry } from '../factor/factor-plugin-registry';
 
 /**

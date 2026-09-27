@@ -114,6 +114,7 @@ function candidate() {
     triggerPrice: 28,
     pivotTime: null,
     pivotPrice: null,
+    signalType: 'LEGACY_DSL',
     barType: 'incomplete' as const,
     confidence: 85.5,
     confidenceLevel: 'HIGH' as const,

@@ -102,7 +102,7 @@ export class BacktestRunCommandService {
 
     // 编译边界统一收口：kind 仅用于落库（DB 历史语义），回放一律走
     // compileStoredDefinitionVersion 透明编译出的 decision_flow 统一计划。
-    let kind: StrategyKind;
+    const kind: StrategyKind = definition.kind;
     try {
       compileStoredDefinitionVersion({
         kind: definition.kind,
@@ -118,7 +118,6 @@ export class BacktestRunCommandService {
       }
       throw error;
     }
-    kind = definition.kind;
 
     const run = await this.runRepository.save(
       this.runRepository.create({

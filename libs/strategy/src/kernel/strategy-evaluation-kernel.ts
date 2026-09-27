@@ -51,7 +51,9 @@ export class StrategyEvaluationKernel {
 
   constructor(config: KernelConfig) {
     if (config.plans.length === 0) {
-      throw new TypeError('StrategyEvaluationKernel requires at least one plan');
+      throw new TypeError(
+        'StrategyEvaluationKernel requires at least one plan',
+      );
     }
     this.securityId = config.securityId;
     this.securityCode = config.securityCode;
@@ -61,8 +63,7 @@ export class StrategyEvaluationKernel {
     this.windowBudget = Math.max(
       ...config.plans.map((plan) => plan.requiredBarCount),
     );
-    const registry =
-      config.registry ?? new InMemoryFactorPluginRegistry();
+    const registry = config.registry ?? new InMemoryFactorPluginRegistry();
     this.evaluator = new DecisionFlowEvaluator({ registry });
   }
 
@@ -134,8 +135,7 @@ export class StrategyEvaluationKernel {
     return {
       windowSize: this.imputer.read().length,
       windowBudget: this.windowBudget,
-      lastPushedTimestamp:
-        this.lastPushedTimestamp?.toISOString() ?? null,
+      lastPushedTimestamp: this.lastPushedTimestamp?.toISOString() ?? null,
       prewarmStatus: this.preWarmEvaluated
         ? this.preWarmStatus
         : this.preWarmActual === 0
@@ -154,9 +154,7 @@ export class StrategyEvaluationKernel {
     }
   }
 
-  private buildContext(
-    timestamp: Date,
-  ): FactorContext {
+  private buildContext(timestamp: Date): FactorContext {
     return {
       securityId: this.securityId,
       securityCode: this.securityCode,
@@ -198,8 +196,7 @@ export class StrategyEvaluationKernel {
     const projected = this.imputer.read();
     const lastProjected: ProjectedStrategyBar | undefined =
       projected[projected.length - 1];
-    const triggerPrice =
-      lastProjected?.ohlc.effective?.close ?? bar.close;
+    const triggerPrice = lastProjected?.ohlc.effective?.close ?? bar.close;
     const pivot =
       extractPivotEvidence(decision) ??
       extractPivotEvidenceFromReason(decision);

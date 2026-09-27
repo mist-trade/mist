@@ -174,9 +174,11 @@ describe('StrategyDefinitionService', () => {
   it('rejects enabling a chan_bsp definition with CHAN_BSP_KIND_RETIRED', async () => {
     const { service } = createHarness();
     // 透传既有 chan_bsp 定义（绕过 create 的退役门禁，模拟存量数据）
-    const repository = (service as unknown as {
-      definitionRepository: { findOne: jest.Mock; save: jest.Mock };
-    }).definitionRepository;
+    const repository = (
+      service as unknown as {
+        definitionRepository: { findOne: jest.Mock; save: jest.Mock };
+      }
+    ).definitionRepository;
     repository.findOne.mockResolvedValue({
       id: 1,
       kind: StrategyKind.CHAN_BSP,
