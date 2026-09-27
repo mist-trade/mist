@@ -1,359 +1,149 @@
-import {
-  compileStoredStrategyRule,
-  LegacyStrategyCompiler,
-  type DecisionFlowNode,
-  type StrategyBar,
-  type StrategyRealtimeMarketDataPort,
-} from '@app/strategy';
+import type { StrategyBar } from '@app/market-data';
+import type { KernelSignal } from '@app/strategy';
 import {
   RealtimeStrategyEvaluationService,
+  type RealtimeKernelPoolLike,
   type RealtimeStrategyExecutionPlan,
+  type RealtimeWindowGroupIdentity,
 } from './realtime-strategy-evaluation.service';
-import { ChanBspEpisodeCursor } from './chan-bsp/chan-bsp.episode';
-import type { ChanBspEvent, ChanBspPlan } from './chan-bsp/chan-bsp.types';
 
-function makeBar(timestamp: string, close = 10, period = 30): StrategyBar {
+function bar(timestamp: string, close = 10.5): StrategyBar {
   return {
     securityId: 9,
     source: 'tdx',
-    period,
+    period: 5,
     timestamp: new Date(timestamp),
     open: close - 0.2,
     high: close + 0.5,
     low: close - 0.5,
     close,
-    volume: '100',
-    amount: '200',
+    volume: '1000',
+    amount: '10000',
     type: 'complete',
   };
 }
 
-function makeWindow(
-  count: number,
-  startTime = '2026-08-01T01:30:00.000Z',
-): StrategyBar[] {
-  return Array.from({ length: count }, (_, index) =>
-    makeBar(
-      new Date(
-        new Date(startTime).getTime() + index * 30 * 60_000,
-      ).toISOString(),
-      10 + index * 0.1,
-    ),
-  );
-}
-
-function ruleDslPlan(
-  overrides: Partial<RealtimeStrategyExecutionPlan> = {},
-): RealtimeStrategyExecutionPlan {
+function plan(overrides?: Partial<RealtimeStrategyExecutionPlan>) {
   return {
     definitionId: 3,
     versionId: 7,
-    source: 'tdx',
-    period: 30,
-    kind: 'rule_dsl',
-    plan: compileStoredStrategyRule(
-      { field: 'k.close', operator: 'gt', value: 10 },
-      'entry',
-    ),
-    ruleSnapshot: { field: 'k.close', operator: 'gt', value: 10 },
-    ...overrides,
-  } as RealtimeStrategyExecutionPlan;
-}
-
-function chanBspPlan(overrides: Partial<ChanBspPlan> = {}): ChanBspPlan {
-  return {
-    units: 'duan',
-    points: { first: true, second: true, third: true },
-    direction: 'both',
-    requiredBarCount: 100,
+    source: 'tdx' as const,
+    period: 5,
+    ruleSnapshot: Object.freeze({}),
+    kind: 'decision_flow' as const,
+    flow: { id: 'term', type: 'TERMINAL' } as never,
+    signalKind: 'entry' as const,
+    requiredBarCount: 50,
     ...overrides,
   };
 }
 
-function chanBspExecutionPlan(
-  plan: ChanBspPlan,
-  overrides: Partial<RealtimeStrategyExecutionPlan> = {},
-): RealtimeStrategyExecutionPlan {
+function kernelSignal(overrides?: Partial<KernelSignal>): KernelSignal {
   return {
-    definitionId: 4,
-    versionId: 8,
-    source: 'tdx',
-    period: 30,
-    kind: 'chan_bsp',
-    plan,
-    ruleSnapshot: { units: 'duan' },
-    ...overrides,
-  } as RealtimeStrategyExecutionPlan;
-}
-
-function chanBspEvent(overrides: Partial<ChanBspEvent> = {}): ChanBspEvent {
-  return {
-    type: 'third_buy',
-    units: 'duan',
-    time: new Date('2026-08-04T06:00:00.000Z'),
-    price: 12.5,
-    zhongshuIndex: 0,
-    zg: 10,
-    zd: 9,
-    unitIndex: 3,
+    definitionId: 3,
+    versionId: 7,
+    signalKind: 'entry',
+    signalTime: new Date('2026-08-04T06:44:00.000Z'),
+    triggerTime: '2026-08-04T06:44:00.000Z',
+    triggerPrice: 10.5,
+    pivotTime: '2026-08-04T06:40:00.000Z',
+    pivotPrice: 10.1,
+    signalType: 'LEGACY_DSL',
+    confidence: 85,
+    confidenceLevel: 'HIGH',
+    decisionTrace: { status: 'SIGNAL_EMITTED' },
+    contextSnapshot: { action: 'BUY' },
+    ruleSnapshot: Object.freeze({}),
     ...overrides,
   };
 }
 
-function marketDataWithWindow(
-  bars: StrategyBar[],
-): StrategyRealtimeMarketDataPort {
-  return {
-    loadRealtimeWindow: jest.fn().mockResolvedValue({ bars }),
-    resolveRealtimeObservation: jest.fn(),
-  } as unknown as StrategyRealtimeMarketDataPort;
+function fakePool(signals: readonly KernelSignal[] = []) {
+  const pool: RealtimeKernelPoolLike = {
+    push: jest.fn().mockResolvedValue(signals),
+    retainGroups: jest.fn(),
+    reset: jest.fn(),
+    diagnostics: jest.fn().mockReturnValue({
+      groupCount: 1,
+      rawBarCount: 10,
+      derivedBarCount: 0,
+      lastOutcome: signals.length > 0 ? 'evaluated_matched' : 'evaluated_not_matched',
+    }),
+  };
+  return pool;
 }
 
-describe('RealtimeStrategyEvaluationService dispatch', () => {
-  it('evaluates a rule_dsl plan through the existing DSL path', async () => {
-    const window = makeWindow(20);
-    const service = new RealtimeStrategyEvaluationService(
-      marketDataWithWindow(window),
-    );
-    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
+describe('RealtimeStrategyEvaluationService（统一内核单通路）', () => {
+  it('eligible 过滤与排序后委托内核池，映射候选', async () => {
+    const signals = [
+      kernelSignal(),
+      kernelSignal({
+        definitionId: 1,
+        versionId: 2,
+        signalKind: 'exit',
+        signalType: 'CHAN_BSP',
+      }),
+    ];
+    const pool = fakePool(signals);
+    const service = new RealtimeStrategyEvaluationService(pool);
 
-    const candidates = await service.evaluate(bar, [ruleDslPlan()]);
+    const candidates = await service.evaluate(bar('2026-08-04T06:44:00.000Z'), [
+      plan(),
+      plan({ definitionId: 1, versionId: 2, signalKind: 'exit' }),
+      // 非 eligible：source/period 不匹配，必须被过滤
+      plan({ definitionId: 5, source: 'qmt' }),
+      plan({ definitionId: 6, period: 15 }),
+    ]);
 
-    // k.close(20) > 10 matches
-    expect(candidates).toHaveLength(1);
+    const poolMock = pool.push as jest.Mock;
+    expect(poolMock).toHaveBeenCalledTimes(1);
+    const pushedPlans = poolMock.mock.calls[0][1] as RealtimeStrategyExecutionPlan[];
+    expect(pushedPlans.map((p) => p.definitionId)).toEqual([1, 3]);
+
+    expect(candidates).toHaveLength(2);
+    // 双时间戳契约：signalTime = 确认 Bar timestamp，pivot 透传
     expect(candidates[0]).toMatchObject({
       definitionId: 3,
+      versionId: 7,
+      securityId: 9,
+      source: 'tdx',
+      period: 5,
       signalKind: 'entry',
-      triggerPrice: 20,
-    });
-  });
-
-  it('dispatches a chan_bsp plan through the detector and emits fresh events', async () => {
-    const window = makeWindow(120);
-    const detector = {
-      evaluate: jest.fn().mockReturnValue([chanBspEvent()]),
-    };
-    const cursors = new ChanBspEpisodeCursor();
-    const service = new RealtimeStrategyEvaluationService(
-      marketDataWithWindow(window),
-      undefined,
-      undefined,
-      detector as never,
-      cursors,
-    );
-    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
-
-    const candidates = await service.evaluate(bar, [
-      chanBspExecutionPlan(chanBspPlan()),
-    ]);
-
-    expect(detector.evaluate).toHaveBeenCalledTimes(1);
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({
-      definitionId: 4,
-      signalKind: 'entry', // third_buy → entry
-      signalTime: new Date('2026-08-04T06:00:00.000Z'),
-      triggerTime: '2026-08-04T06:00:00.000Z',
-      triggerPrice: 12.5,
+      signalTime: new Date('2026-08-04T06:44:00.000Z'),
+      triggerTime: '2026-08-04T06:44:00.000Z',
+      triggerPrice: 10.5,
+      pivotTime: '2026-08-04T06:40:00.000Z',
+      pivotPrice: 10.1,
       barType: 'complete',
     });
-    expect(candidates[0].contextSnapshot).toEqual({
-      triggerPrice: 12.5,
-      chanBsp: {
-        type: 'third_buy',
-        units: 'duan',
-        level: 30,
-        zhongshuIndex: 0,
-        zg: 10,
-        zd: 9,
-      },
-    });
+    expect(candidates[1].signalKind).toBe('exit');
   });
 
-  it('maps a sell event to exit signal kind', async () => {
-    const detector = {
-      evaluate: jest
-        .fn()
-        .mockReturnValue([chanBspEvent({ type: 'first_sell' })]),
-    };
-    const service = new RealtimeStrategyEvaluationService(
-      marketDataWithWindow(makeWindow(120)),
-      undefined,
-      undefined,
-      detector as never,
-      new ChanBspEpisodeCursor(),
-    );
+  it('空计划时短路返回，不触碰内核池', async () => {
+    const pool = fakePool();
+    const service = new RealtimeStrategyEvaluationService(pool);
 
-    const candidates = await service.evaluate(
-      makeBar('2026-08-04T06:30:00.000Z', 20, 30),
-      [chanBspExecutionPlan(chanBspPlan())],
-    );
-
-    expect(candidates[0].signalKind).toBe('exit');
-  });
-
-  it('does not re-emit events at or below the cursor (incremental)', async () => {
-    const detector = {
-      evaluate: jest
-        .fn()
-        .mockReturnValueOnce([chanBspEvent()])
-        .mockReturnValue([chanBspEvent()]),
-    };
-    const cursors = new ChanBspEpisodeCursor();
-    const service = new RealtimeStrategyEvaluationService(
-      marketDataWithWindow(makeWindow(120)),
-      undefined,
-      undefined,
-      detector as never,
-      cursors,
-    );
-    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
-    const plan = [chanBspExecutionPlan(chanBspPlan())];
-
-    const first = await service.evaluate(bar, plan);
-    const second = await service.evaluate(bar, plan);
-
-    expect(first).toHaveLength(1);
-    expect(second).toHaveLength(0);
-  });
-
-  it('produces no candidate when the detector confirms nothing', async () => {
-    const detector = { evaluate: jest.fn().mockReturnValue([]) };
-    const service = new RealtimeStrategyEvaluationService(
-      marketDataWithWindow(makeWindow(120)),
-      undefined,
-      undefined,
-      detector as never,
-      new ChanBspEpisodeCursor(),
-    );
-
-    const candidates = await service.evaluate(
-      makeBar('2026-08-04T06:30:00.000Z', 20, 30),
-      [chanBspExecutionPlan(chanBspPlan())],
-    );
+    const candidates = await service.evaluate(bar('2026-08-04T06:44:00.000Z'), []);
 
     expect(candidates).toEqual([]);
-    // 结构不足不是 unavailable：不抛错、无 candidate
+    expect(pool.push).not.toHaveBeenCalled();
   });
 
-  it('resets chan_bsp cursors on reset', async () => {
-    const detector = {
-      evaluate: jest
-        .fn()
-        .mockReturnValueOnce([chanBspEvent()])
-        .mockReturnValue([chanBspEvent()]),
-    };
-    const cursors = new ChanBspEpisodeCursor();
-    const service = new RealtimeStrategyEvaluationService(
-      marketDataWithWindow(makeWindow(120)),
-      undefined,
-      undefined,
-      detector as never,
-      cursors,
-    );
-    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
-    const plan = [chanBspExecutionPlan(chanBspPlan())];
+  it('retainRegistryScopes/reset/diagnostics 透传到内核池', () => {
+    const pool = fakePool();
+    const service = new RealtimeStrategyEvaluationService(pool);
 
-    await service.evaluate(bar, plan);
-    expect(await service.evaluate(bar, plan)).toHaveLength(0);
+    const groups: RealtimeWindowGroupIdentity[] = [
+      { securityId: 9, source: 'tdx', period: 5 },
+    ];
+    service.retainRegistryScopes(groups);
+    expect(pool.retainGroups).toHaveBeenCalledWith(groups);
 
     service.reset();
-    expect(await service.evaluate(bar, plan)).toHaveLength(1);
-  });
+    expect(pool.reset).toHaveBeenCalled();
 
-  it('uses the chan_bsp plan budget in the shared window requirement', async () => {
-    const window = makeWindow(500, '2026-07-20T01:30:00.000Z');
-    const marketData = marketDataWithWindow(window);
-    const service = new RealtimeStrategyEvaluationService(marketData);
-    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
-
-    await service.evaluate(bar, [
-      chanBspExecutionPlan(chanBspPlan({ requiredBarCount: 500 })),
-    ]);
-
-    expect(marketData.loadRealtimeWindow).toHaveBeenCalledWith(
-      expect.objectContaining({ requiredBars: 500 }),
-    );
-  });
-
-  it('evaluates a native decision_flow plan and emits candidate with confidence and trace', async () => {
-    const window = makeWindow(20);
-    const service = new RealtimeStrategyEvaluationService(
-      marketDataWithWindow(window),
-    );
-    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
-
-    const flow: DecisionFlowNode = {
-      id: 'term_direct_buy',
-      type: 'TERMINAL',
-      action: 'BUY',
-      signalTag: 'DIRECT_ENTRY',
-      reason: '直接发射买入信号',
-    };
-
-    const plan: RealtimeStrategyExecutionPlan = {
-      definitionId: 10,
-      versionId: 20,
-      source: 'tdx',
-      period: 30,
-      kind: 'decision_flow',
-      flow,
-      signalKind: 'entry',
-      requiredBarCount: 20,
-      ruleSnapshot: { type: 'flow' },
-    };
-
-    const candidates = await service.evaluate(bar, [plan]);
-
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({
-      definitionId: 10,
-      versionId: 20,
-      signalKind: 'entry',
-      triggerPrice: 20,
-      confidence: 85,
-      confidenceLevel: 'HIGH',
-    });
-    expect(candidates[0].decisionTrace).toMatchObject({
-      status: 'SIGNAL_EMITTED',
-      signalTag: 'DIRECT_ENTRY',
-    });
-  });
-
-  it('evaluates legacy rule plan compiled via LegacyStrategyCompiler with exact parity', async () => {
-    const window = makeWindow(20);
-    const service = new RealtimeStrategyEvaluationService(
-      marketDataWithWindow(window),
-    );
-    const bar = makeBar('2026-08-04T06:30:00.000Z', 20, 30);
-
-    const compiledRule = compileStoredStrategyRule(
-      { field: 'k.close', operator: 'gt', value: 10 },
-      'entry',
-    );
-    const flow = LegacyStrategyCompiler.compileRuleToDecisionFlow(compiledRule);
-
-    const plan: RealtimeStrategyExecutionPlan = {
-      definitionId: 11,
-      versionId: 21,
-      source: 'tdx',
-      period: 30,
-      kind: 'decision_flow',
-      flow,
-      signalKind: 'entry',
-      requiredBarCount: 20,
-      ruleSnapshot: { field: 'k.close', operator: 'gt', value: 10 },
-    };
-
-    const candidates = await service.evaluate(bar, [plan]);
-
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0].definitionId).toBe(11);
-    expect(candidates[0].confidence).toBe(80);
-    expect(candidates[0].confidenceLevel).toBe('HIGH');
-    expect(candidates[0].decisionTrace).toMatchObject({
-      status: 'SIGNAL_EMITTED',
-      signalTag: 'LEGACY_DSL',
-    });
+    const diagnostics = service.diagnostics();
+    expect(diagnostics.groupCount).toBe(1);
+    expect(diagnostics.lastOutcome).toBe('evaluated_not_matched');
   });
 });

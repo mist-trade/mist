@@ -9,6 +9,7 @@ import {
   RealtimeStrategyEvaluationService,
   decodeCandleFinalizedTriggerV1,
   toStrategyTrigger,
+  RealtimeKernelPool,
   type RealtimeStrategyExecutionPlan,
   type ShadowStrategyCandidate,
 } from '@app/signal';
@@ -65,7 +66,7 @@ export class CandleFinalizedJobProcessor {
     private readonly now: () => Date,
     private readonly periodBuilder = new RealtimePeriodBuilder(),
     private readonly evaluation = new RealtimeStrategyEvaluationService(
-      marketData,
+      new RealtimeKernelPool(marketData),
     ),
     private readonly jobTimeoutMs = STRATEGY_TRIGGER_JOB_TIMEOUT_MS,
     private readonly mode: 'shadow' | 'on' = 'shadow',
@@ -185,7 +186,6 @@ export class CandleFinalizedJobProcessor {
             throw error;
           }
         }
-        this.evaluation.activate(candidate);
         candidates.push(candidate);
       }
     }
@@ -248,14 +248,6 @@ export class CandleFinalizedJobProcessor {
       source: 'tdx' | 'qmt';
       period: number;
     }> = [];
-    const episodes: Array<{
-      definitionId: number;
-      versionId: number;
-      securityId: number;
-      source: 'tdx' | 'qmt';
-      period: number;
-      signalKind: 'entry' | 'exit';
-    }> = [];
     for (const definition of snapshot.definitions.values()) {
       for (const source of definition.sources) {
         if (source !== 'tdx' && source !== 'qmt') continue;
@@ -263,21 +255,12 @@ export class CandleFinalizedJobProcessor {
           for (const period of definition.periods) {
             if (![1, 5, 15, 30, 60].includes(period)) continue;
             groups.push({ securityId, source, period });
-            episodes.push({
-              definitionId: definition.definitionId,
-              versionId: definition.versionId,
-              securityId,
-              source,
-              period,
-              signalKind: definition.signalKind,
-            });
           }
         }
       }
     }
     this.periodBuilder.retainGroups(groups);
-    // 过渡形态：episode 游标保留身份将在实时内核化重构中随 episode store 一并移除
-    this.evaluation.retainRegistryScopes(groups, episodes, []);
+    this.evaluation.retainRegistryScopes(groups);
     if (this.runtimeObservability) {
       const after = this.evaluation.diagnostics().groupCount;
       this.runtimeObservability.recordConsumerRemoval(before - after);

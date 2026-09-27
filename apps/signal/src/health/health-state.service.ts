@@ -47,7 +47,6 @@ export class HealthStateService {
     lastEvaluatedAt: null,
     lastOutcome: null,
     lastPersistenceOutcome: null,
-    activeEpisodeCount: 0,
     lastFailureCode: null,
   };
 
@@ -98,7 +97,6 @@ export class HealthStateService {
     windowGroupCount: number;
     rawBarCount: number;
     derivedBarCount: number;
-    activeEpisodeCount: number;
     evaluationOutcome: Exclude<
       SignalHealthVo['evaluation']['lastOutcome'],
       'failed'
@@ -135,7 +133,6 @@ export class HealthStateService {
             lastPersistenceOutcome: input.persistenceOutcome,
           }
         : {}),
-      activeEpisodeCount: input.activeEpisodeCount,
       lastFailureCode: null,
     };
   }
@@ -148,7 +145,6 @@ export class HealthStateService {
     windowGroupCount: number;
     rawBarCount: number;
     derivedBarCount: number;
-    activeEpisodeCount: number;
     persistenceOutcome: SignalHealthVo['evaluation']['lastPersistenceOutcome'];
   }): void {
     this.queue = {
@@ -178,7 +174,6 @@ export class HealthStateService {
           lastEvaluatedAt: input.failedAt,
           lastOutcome: 'failed',
           lastPersistenceOutcome: input.persistenceOutcome,
-          activeEpisodeCount: input.activeEpisodeCount,
           lastFailureCode: input.failureCode,
         }
       : { ...this.evaluation, state: 'idle' };

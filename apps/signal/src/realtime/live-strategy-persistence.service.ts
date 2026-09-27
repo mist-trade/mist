@@ -45,6 +45,7 @@ export class LiveStrategyPersistenceService {
           period: candidate.period as Period,
           source: candidate.source as MarketDataSource,
           signalTime: candidate.signalTime,
+          pivotTime: candidate.pivotTime ? new Date(candidate.pivotTime) : null,
           signalSource: StrategySignalSource.LIVE,
           signalKind: candidate.signalKind as StrategySignalKind,
           confidence: candidate.confidence,

@@ -10,6 +10,7 @@ import {
   StrategyVersion,
 } from '@app/shared-data';
 import type { Repository } from 'typeorm';
+import { StoredDefinitionCompileError } from '@app/strategy';
 import { HealthStateService } from './health/health-state.service';
 import { SignalRegistryService } from './signal-registry.service';
 import { SignalRuntimeMutex } from './signal-runtime-mutex.service';
@@ -81,7 +82,7 @@ describe('SignalRegistryService', () => {
     expect(repository.findOne).toHaveBeenCalledTimes(1);
   });
 
-  it('compiles a chan_bsp definition into a chan_bsp execution plan', async () => {
+  it('transparently compiles a legacy chan_bsp definition into a decision flow plan', async () => {
     process.env.REALTIME_STRATEGY_MODE = 'off';
     const repository = {
       find: jest.fn().mockResolvedValue([chanBspDefinition(1, 11)]),
@@ -98,17 +99,20 @@ describe('SignalRegistryService', () => {
 
     const plans = registry.executionPlansFor(9, 'tdx');
     expect(plans).toHaveLength(1);
+    const flow = plans[0].flow as unknown as Record<string, unknown>;
     expect(plans[0]).toMatchObject({
-      kind: 'chan_bsp',
+      kind: 'decision_flow',
       definitionId: 1,
       period: 30,
       source: 'tdx',
-      plan: {
-        units: 'duan',
-        points: { first: true, second: true, third: false },
-        direction: 'buy',
-        requiredBarCount: 600,
-      },
+      sourceKind: 'chan_bsp',
+    });
+    // 编译产物为 plugin.chan.bsp 门禁树，存量 chan_bsp 参数原样保留
+    expect(flow.pluginId).toBe('plugin.chan.bsp');
+    expect(flow.params).toMatchObject({
+      units: 'duan',
+      points: { first: true, second: true, third: false },
+      direction: 'buy',
     });
   });
 
@@ -128,7 +132,7 @@ describe('SignalRegistryService', () => {
     );
 
     await expect(registry.onApplicationBootstrap()).rejects.toThrow(
-      'chan_bsp strategy config is invalid',
+      StoredDefinitionCompileError,
     );
     expect(registry.capture().generation).toBe(0);
   });

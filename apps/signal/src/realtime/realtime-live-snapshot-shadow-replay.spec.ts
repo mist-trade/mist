@@ -92,15 +92,39 @@ describe.each(REALTIME_LIVE_SNAPSHOT_FIXTURES)(
               operator: 'gt',
               value: fixture.expectedPrices.last - 0.01,
             },
-            kind: 'rule_dsl',
-            plan: compileStoredStrategyRule(
-              {
+            kind: 'decision_flow',
+            flow: {
+              id: 'guard_legacy_rule',
+              type: 'GUARD',
+              name: '存量规则门禁',
+              pluginId: 'plugin.legacy.rule-dsl',
+              params: {
+                plan: compileStoredStrategyRule(
+                  {
                 field: 'k.close',
                 operator: 'gt',
                 value: fixture.expectedPrices.last - 0.01,
               },
-              'entry',
-            ),
+                  'entry',
+                ),
+              },
+              requiredAction: 'BUY',
+              minConfidence: 0.5,
+              onPass: {
+                id: 'term_pass',
+                type: 'TERMINAL',
+                action: 'BUY',
+                signalTag: 'LEGACY_DSL',
+                reason: 'matched',
+              },
+              onFail: {
+                id: 'term_fail',
+                type: 'TERMINAL',
+                action: 'ABORT',
+                reason: 'unmatched',
+              },
+            },
+            requiredBarCount: 1,
           },
         ],
         () => new Date(fixture.expectedEventTime),

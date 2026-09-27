@@ -1,5 +1,5 @@
-import type { ChanBspUnitLevel } from '../chan-bsp-plan';
-export type { ChanBspPlan } from '../chan-bsp-plan';
+import type { ChanBspUnitLevel } from './chan-bsp-plan';
+export type { ChanBspPlan } from './chan-bsp-plan';
 
 /**
  * Chan buy/sell point (缠论三类买卖点) realtime strategy kind.

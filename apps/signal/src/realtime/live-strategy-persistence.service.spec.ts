@@ -112,15 +112,12 @@ function candidate() {
     signalTime: new Date('2026-08-04T06:44:00.000Z'),
     triggerTime: '2026-08-04T06:44:00.000Z',
     triggerPrice: 28,
+    pivotTime: null,
+    pivotPrice: null,
     barType: 'incomplete' as const,
     confidence: 85.5,
     confidenceLevel: 'HIGH' as const,
     decisionTrace: { flowId: 'test_flow' },
-    evaluation: {
-      status: 'evaluated' as const,
-      matched: true,
-      context: {} as never,
-    },
     contextSnapshot: { k: { type: 'incomplete', close: 28 } },
     ruleSnapshot: { field: 'k.close', operator: 'gt', value: 27 },
   };

@@ -55,7 +55,6 @@ describe('HealthStateService (signal)', () => {
         lastEvaluatedAt: null,
         lastOutcome: null,
         lastPersistenceOutcome: null,
-        activeEpisodeCount: 0,
         lastFailureCode: null,
       },
       runtime: {
@@ -82,7 +81,6 @@ describe('HealthStateService (signal)', () => {
       windowGroupCount: 2,
       rawBarCount: 14,
       derivedBarCount: 1,
-      activeEpisodeCount: 1,
       evaluationOutcome: 'evaluated_matched',
       persistenceOutcome: null,
     });
@@ -103,7 +101,6 @@ describe('HealthStateService (signal)', () => {
       evaluation: {
         state: 'idle',
         lastOutcome: 'evaluated_matched',
-        activeEpisodeCount: 1,
       },
     });
   });
@@ -120,7 +117,6 @@ describe('HealthStateService (signal)', () => {
       windowGroupCount: 0,
       rawBarCount: 0,
       derivedBarCount: 0,
-      activeEpisodeCount: 0,
       evaluationOutcome: null,
       persistenceOutcome: null,
     });
@@ -144,7 +140,6 @@ describe('HealthStateService (signal)', () => {
       windowGroupCount: 0,
       rawBarCount: 0,
       derivedBarCount: 0,
-      activeEpisodeCount: 0,
       persistenceOutcome: null,
     });
 

@@ -57,6 +57,14 @@ export class StrategySignal {
   @Column({ name: 'signal_time', type: 'datetime' })
   signalTime: Date = new Date();
 
+  /**
+   * 双时间戳契约：形态几何极值时刻（图表 Marker 定位用），无 pivot 语义为 NULL。
+   * signal_time 保持决策触发（确认 Bar）语义；存量行由 migration 026 回填
+   * pivot_time = signal_time。
+   */
+  @Column({ name: 'pivot_time', type: 'datetime', nullable: true })
+  pivotTime?: Date | null;
+
   @Column({
     name: 'signal_source',
     type: 'enum',

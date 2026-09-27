@@ -42,45 +42,13 @@ export {
   RealtimePeriodBuilder,
 } from './runtime/realtime-period.builder';
 export type { RealtimeStrategyPeriod } from './runtime/realtime-period.builder';
-export { RealtimeEpisodeStore } from './runtime/realtime-episode.store';
-export type {
-  RealtimeEpisodeDecision,
-  RealtimeEpisodeIdentity,
-} from './runtime/realtime-episode.store';
-export { SharedStrategyWindowStore } from './runtime/shared-strategy-window.store';
-export type { WindowAppendOutcome } from './runtime/shared-strategy-window.store';
 export { RealtimeStrategyEvaluationService } from './runtime/realtime-strategy-evaluation.service';
 export type {
   RealtimeStrategyExecutionPlan,
+  RealtimeWindowGroupIdentity,
   ShadowStrategyCandidate,
 } from './runtime/realtime-strategy-evaluation.service';
-export type {
-  ChanBspDirection,
-  ChanBspPlan,
-  ChanBspPointSelection,
-  ChanBspUnitLevel,
-} from './runtime/chan-bsp-plan';
-export {
-  CHAN_BSP_WINDOW_BUDGET,
-  REALTIME_CHAN_BSP_LEVELS,
-} from './runtime/chan-bsp/chan-bsp.types';
-export type {
-  ChanBspEvent,
-  ChanBspEventType,
-} from './runtime/chan-bsp/chan-bsp.types';
-export { ChanBspDetector } from './runtime/chan-bsp/chan-bsp.detector';
-export { serializeChanBspContextSnapshot } from './runtime/chan-bsp/chan-bsp.snapshot.serializer';
-export {
-  ChanBspEpisodeCursor,
-  chanBspIdentityKey,
-} from './runtime/chan-bsp/chan-bsp.episode';
-export type { ChanBspEpisodeIdentity } from './runtime/chan-bsp/chan-bsp.episode';
-export {
-  compileChanBspConfig,
-  ChanBspConfigError,
-} from './runtime/chan-bsp/chan-bsp.config';
-export {
-  runChanBspPipeline,
-  toZhongshu,
-} from './runtime/chan-bsp/chan-bsp.pipeline';
-export type { ChanBspPipelineInput } from './runtime/chan-bsp/chan-bsp.pipeline';
+export { RealtimeKernelPool } from './runtime/realtime-kernel-pool';
+export type { RealtimeLastOutcome } from './runtime/realtime-kernel-pool';
+export { toZhongshu } from './runtime/chan-bsp-pipeline';
+export type { ChanBspPipelineInput } from './runtime/chan-bsp-pipeline';

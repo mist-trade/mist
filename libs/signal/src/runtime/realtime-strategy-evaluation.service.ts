@@ -1,30 +1,13 @@
-import {
-  evaluateStrategyPlan,
-  serializeStrategyContextSnapshot,
-  StrategyAnalysisObservationCache,
-  DecisionFlowEvaluator,
-  type CompiledStrategyExecutionPlan,
-  type DecisionFlowNode,
-  type FactorContext,
-  type StrategyEvaluationOutcome,
-  type StrategyRealtimeMarketDataPort,
-  type StrategyRealtimeSource,
+import type { StrategyBar } from '@app/market-data';
+import type {
+  DecisionFlowNode,
+  KernelSignal,
+  StrategyRealtimeSource,
 } from '@app/strategy';
-import type { ProjectedStrategyBar, StrategyBar } from '@app/market-data';
 import {
-  RealtimeEpisodeStore,
-  type RealtimeEpisodeIdentity,
-} from './realtime-episode.store';
-import { SharedStrategyWindowStore } from './shared-strategy-window.store';
-import type { RealtimeWindowGroupIdentity } from './shared-strategy-window.store';
-import { ChanBspDetector } from './chan-bsp/chan-bsp.detector';
-import {
-  ChanBspEpisodeCursor,
-  chanBspIdentityKey,
-  type ChanBspEpisodeIdentity,
-} from './chan-bsp/chan-bsp.episode';
-import type { ChanBspEvent, ChanBspPlan } from './chan-bsp/chan-bsp.types';
-import { serializeChanBspContextSnapshot } from './chan-bsp/chan-bsp.snapshot.serializer';
+  RealtimeKernelPool,
+  type RealtimeLastOutcome,
+} from './realtime-kernel-pool';
 
 export type RealtimeStrategyExecutionPlan = {
   readonly definitionId: number;
@@ -32,22 +15,12 @@ export type RealtimeStrategyExecutionPlan = {
   readonly source: StrategyRealtimeSource;
   readonly period: number;
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
-} & (
-  | {
-      readonly kind: 'rule_dsl';
-      readonly plan: CompiledStrategyExecutionPlan;
-    }
-  | {
-      readonly kind: 'chan_bsp';
-      readonly plan: ChanBspPlan;
-    }
-  | {
-      readonly kind: 'decision_flow';
-      readonly flow: DecisionFlowNode;
-      readonly signalKind?: 'entry' | 'exit';
-      readonly requiredBarCount: number;
-    }
-);
+  /** 统一求值计划：编译边界已把全部来源 kind 透明编译为决策流树 */
+  readonly kind: 'decision_flow';
+  readonly flow: DecisionFlowNode;
+  readonly signalKind?: 'entry' | 'exit';
+  readonly requiredBarCount: number;
+};
 
 export interface ShadowStrategyCandidate {
   readonly definitionId: number;
@@ -56,35 +29,52 @@ export interface ShadowStrategyCandidate {
   readonly source: StrategyRealtimeSource;
   readonly period: number;
   readonly signalKind: 'entry' | 'exit';
+  /** 决策触发时刻 = 当前确认 Bar timestamp（撮合/游标唯一认可时刻） */
   readonly signalTime: Date;
+  /** 与 signalTime 严格等价（ISO） */
   readonly triggerTime: string;
   readonly triggerPrice: number;
+  /** 形态几何极值时刻（图表 Marker 定位），无 pivot 语义为 null */
+  readonly pivotTime: string | null;
+  /** 形态几何极值点价格（止损参考），无 pivot 语义为 null */
+  readonly pivotPrice: number | null;
   readonly barType: StrategyBar['type'];
-  readonly evaluation: Extract<
-    StrategyEvaluationOutcome,
-    { status: 'evaluated' }
-  >;
-  readonly confidence?: number | null;
-  readonly confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
-  readonly decisionTrace?: Record<string, unknown> | null;
+  readonly confidence: number;
+  readonly confidenceLevel: 'HIGH' | 'MEDIUM' | 'LOW' | null;
+  readonly decisionTrace: Record<string, unknown> | null;
   readonly contextSnapshot: Readonly<Record<string, unknown>>;
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
 }
 
+export type RealtimeWindowGroupIdentity = {
+  readonly securityId: number;
+  readonly source: StrategyRealtimeSource;
+  readonly period: number;
+};
+
+export interface RealtimeKernelPoolLike {
+  push(
+    bar: StrategyBar,
+    plans: readonly RealtimeStrategyExecutionPlan[],
+  ): Promise<readonly KernelSignal[]>;
+  retainGroups(groups: readonly RealtimeWindowGroupIdentity[]): void;
+  reset(): void;
+  diagnostics(): Readonly<{
+    groupCount: number;
+    rawBarCount: number;
+    derivedBarCount: number;
+    lastOutcome: RealtimeLastOutcome;
+  }>;
+}
+
+/**
+ * 实时链路求值服务（统一内核单通路）：
+ * 滑窗与组内计划共享由 RealtimeKernelPool 承担（每 `(securityId, source, period)`
+ * 组一个内核实例），求值只做「bar 输入 → 策略树 → 当期增量信号」，
+ * 输出层不做投递级去重（RealtimeEpisodeStore 已随独立分支一并退役）。
+ */
 export class RealtimeStrategyEvaluationService {
-  private lastOutcome:
-    | 'evaluated_matched'
-    | 'evaluated_not_matched'
-    | 'unavailable'
-    | null = null;
-  constructor(
-    private readonly marketData: StrategyRealtimeMarketDataPort,
-    private readonly windows = new SharedStrategyWindowStore(),
-    private readonly episodes = new RealtimeEpisodeStore(),
-    private readonly chanBspDetector = new ChanBspDetector(),
-    private readonly chanBspCursors = new ChanBspEpisodeCursor(),
-    private readonly decisionFlowEvaluator = new DecisionFlowEvaluator(),
-  ) {}
+  constructor(private readonly kernelPool: RealtimeKernelPoolLike) {}
 
   async evaluate(
     bar: StrategyBar,
@@ -102,280 +92,57 @@ export class RealtimeStrategyEvaluationService {
       );
     if (eligible.length === 0) return Object.freeze([]);
 
-    const requiredBars = Math.max(
-      ...eligible.map((candidate) =>
-        candidate.kind === 'decision_flow'
-          ? candidate.requiredBarCount
-          : candidate.plan.requiredBarCount,
-      ),
+    const signals = await this.kernelPool.push(bar, eligible);
+    return Object.freeze(
+      signals.map((signal) => toCandidate(signal, bar, eligible)),
     );
-    const append = await this.windows.prepare(
-      this.marketData,
-      bar,
-      requiredBars,
-    );
-    if (append === 'duplicate') return Object.freeze([]);
-
-    const projected = this.windows.read(
-      bar.securityId,
-      requireRealtimeSource(bar.source),
-      bar.period,
-    );
-    const candidates: ShadowStrategyCandidate[] = [];
-    const analysis = new StrategyAnalysisObservationCache();
-    for (const execution of eligible) {
-      if (execution.kind === 'chan_bsp') {
-        this.evaluateChanBsp(execution, bar, projected, candidates);
-        continue;
-      }
-      if (execution.kind === 'decision_flow') {
-        await this.evaluateDecisionFlow(execution, bar, projected, candidates);
-        continue;
-      }
-      const outcome = evaluateStrategyPlan(execution.plan, projected, analysis);
-      this.lastOutcome =
-        outcome.status === 'unavailable'
-          ? 'unavailable'
-          : outcome.matched
-            ? 'evaluated_matched'
-            : 'evaluated_not_matched';
-      const identity: RealtimeEpisodeIdentity = {
-        definitionId: execution.definitionId,
-        versionId: execution.versionId,
-        securityId: bar.securityId,
-        source: execution.source,
-        period: execution.period,
-        signalKind: execution.plan.signalKind,
-      };
-      const decision = this.episodes.decide(identity, outcome);
-      if (decision !== 'emit' || outcome.status !== 'evaluated') continue;
-      const candidate = Object.freeze({
-        definitionId: execution.definitionId,
-        versionId: execution.versionId,
-        securityId: bar.securityId,
-        source: execution.source,
-        period: execution.period,
-        signalKind: execution.plan.signalKind,
-        signalTime: bar.timestamp,
-        triggerTime: bar.timestamp.toISOString(),
-        triggerPrice: bar.close,
-        barType: bar.type,
-        evaluation: outcome,
-        confidence: 80.0,
-        confidenceLevel: 'HIGH' as const,
-        decisionTrace: {
-          flowId: 'legacy_rule_dsl',
-          matched: true,
-          signalKind: execution.plan.signalKind,
-        },
-        contextSnapshot: serializeStrategyContextSnapshot(
-          execution.plan,
-          outcome.context,
-        ),
-        ruleSnapshot: execution.ruleSnapshot,
-      });
-      candidates.push(candidate);
-    }
-    return Object.freeze(candidates);
   }
 
-  private evaluateChanBsp(
-    execution: Extract<RealtimeStrategyExecutionPlan, { kind: 'chan_bsp' }>,
-    bar: StrategyBar,
-    projected: readonly ProjectedStrategyBar[],
-    out: ShadowStrategyCandidate[],
-  ): void {
-    const events = this.chanBspDetector.evaluate(projected, execution.plan);
-    const identity: ChanBspEpisodeIdentity = {
-      definitionId: execution.definitionId,
-      securityId: bar.securityId,
-      source: execution.source,
-      level: bar.period,
-      units: execution.plan.units,
-    };
-    const fresh = this.chanBspCursors.advance(identity, events);
-    for (const event of fresh) {
-      this.lastOutcome = 'evaluated_matched';
-      const anchor = projected.at(-1);
-      if (!anchor) continue;
-      const candidate = Object.freeze({
-        definitionId: execution.definitionId,
-        versionId: execution.versionId,
-        securityId: bar.securityId,
-        source: execution.source,
-        period: bar.period,
-        signalKind: chanBspSignalKind(event),
-        signalTime: event.time,
-        triggerTime: event.time.toISOString(),
-        triggerPrice: event.price,
-        barType: bar.type,
-        evaluation: Object.freeze({
-          status: 'evaluated',
-          matched: true,
-          context: Object.freeze({
-            anchor,
-            barType: bar.type,
-            fields: Object.freeze({}),
-          }),
-        }),
-        confidence: event.type.startsWith('first_')
-          ? 92.0
-          : event.type.startsWith('third_')
-            ? 90.0
-            : 86.0,
-        confidenceLevel: 'HIGH' as const,
-        decisionTrace: {
-          flowId: 'legacy_chan_bsp',
-          matched: true,
-          eventType: event.type,
-          price: event.price,
-        },
-        contextSnapshot: serializeChanBspContextSnapshot(event, bar.period),
-        ruleSnapshot: execution.ruleSnapshot,
-      });
-      out.push(candidate);
-    }
-  }
-
-  private async evaluateDecisionFlow(
-    execution: Extract<
-      RealtimeStrategyExecutionPlan,
-      { kind: 'decision_flow' }
-    >,
-    bar: StrategyBar,
-    projected: readonly ProjectedStrategyBar[],
-    out: ShadowStrategyCandidate[],
-  ): Promise<void> {
-    const factorContext: FactorContext = {
-      securityId: bar.securityId,
-      securityCode: String(bar.securityId),
-      timestamp: bar.timestamp,
-      period: bar.period,
-      bars: projected,
-      attributes: new Map(),
-    };
-
-    const decisionResult = await this.decisionFlowEvaluator.evaluate(
-      execution.flow,
-      factorContext,
-    );
-
-    const signalKind: 'entry' | 'exit' =
-      execution.signalKind ??
-      (decisionResult.action === 'SELL' ? 'exit' : 'entry');
-
-    const identity: RealtimeEpisodeIdentity = {
-      definitionId: execution.definitionId,
-      versionId: execution.versionId,
-      securityId: bar.securityId,
-      source: execution.source,
-      period: execution.period,
-      signalKind,
-    };
-
-    const anchor = projected.at(-1);
-    if (!anchor) return;
-
-    const isMatched = decisionResult.status === 'SIGNAL_EMITTED';
-    const mockOutcome: Extract<
-      StrategyEvaluationOutcome,
-      { status: 'evaluated' }
-    > = Object.freeze({
-      status: 'evaluated',
-      matched: isMatched,
-      context: Object.freeze({
-        anchor,
-        barType: bar.type,
-        fields: Object.freeze({}),
-      }),
-    });
-
-    this.lastOutcome = isMatched
-      ? 'evaluated_matched'
-      : 'evaluated_not_matched';
-
-    const decision = this.episodes.decide(identity, mockOutcome);
-    if (decision !== 'emit' || !isMatched) return;
-
-    const candidate = Object.freeze({
-      definitionId: execution.definitionId,
-      versionId: execution.versionId,
-      securityId: bar.securityId,
-      source: execution.source,
-      period: execution.period,
-      signalKind,
-      signalTime: bar.timestamp,
-      triggerTime: bar.timestamp.toISOString(),
-      triggerPrice: bar.close,
-      barType: bar.type,
-      evaluation: mockOutcome,
-      confidence: decisionResult.confidence,
-      confidenceLevel: decisionResult.confidenceLevel,
-      decisionTrace: {
-        status: decisionResult.status,
-        action: decisionResult.action,
-        confidence: decisionResult.confidence,
-        confidenceLevel: decisionResult.confidenceLevel,
-        signalTag: decisionResult.signalTag,
-        reason: decisionResult.reason,
-        trace: decisionResult.trace,
-      },
-      contextSnapshot: {
-        decisionResult: {
-          action: decisionResult.action,
-          confidence: decisionResult.confidence,
-          confidenceLevel: decisionResult.confidenceLevel,
-          signalTag: decisionResult.signalTag,
-          reason: decisionResult.reason,
-        },
-      },
-      ruleSnapshot: execution.ruleSnapshot,
-    });
-    out.push(candidate);
-  }
-
-  activate(candidate: ShadowStrategyCandidate): void {
-    this.episodes.activate(candidate);
+  retainRegistryScopes(groups: readonly RealtimeWindowGroupIdentity[]): void {
+    this.kernelPool.retainGroups(groups);
   }
 
   reset(): void {
-    this.windows.reset();
-    this.episodes.reset();
-    this.chanBspCursors.reset();
-    this.lastOutcome = null;
+    this.kernelPool.reset();
   }
 
   diagnostics() {
-    return Object.freeze({
-      ...this.windows.diagnostics(),
-      activeEpisodeCount: this.episodes.activeCount,
-      activeChanBspCursorCount: this.chanBspCursors.activeCount,
-      lastOutcome: this.lastOutcome,
-    });
-  }
-
-  retainRegistryScopes(
-    groups: readonly RealtimeWindowGroupIdentity[],
-    episodes: readonly RealtimeEpisodeIdentity[],
-    chanBspIdentities: readonly ChanBspEpisodeIdentity[],
-  ): void {
-    this.windows.retainGroups(groups);
-    this.episodes.retainIdentities(episodes);
-    this.chanBspCursors.retainIdentities(
-      new Set(chanBspIdentities.map(chanBspIdentityKey)),
-    );
+    return this.kernelPool.diagnostics();
   }
 }
 
-function requireRealtimeSource(
-  source: StrategyBar['source'],
-): StrategyRealtimeSource {
-  if (source !== 'tdx' && source !== 'qmt') {
-    throw new TypeError('shadow evaluation source must be tdx or qmt');
-  }
-  return source;
-}
+export { RealtimeKernelPool };
 
-function chanBspSignalKind(event: ChanBspEvent): 'entry' | 'exit' {
-  return event.type.endsWith('_buy') ? 'entry' : 'exit';
+function toCandidate(
+  signal: KernelSignal,
+  bar: StrategyBar,
+  plans: readonly RealtimeStrategyExecutionPlan[],
+): ShadowStrategyCandidate {
+  const plan =
+    plans.find(
+      (candidate) =>
+        candidate.definitionId === signal.definitionId &&
+        candidate.versionId === signal.versionId,
+    ) ?? plans[0];
+  const signalKind: 'entry' | 'exit' =
+    plan.signalKind ?? (signal.signalKind === 'exit' ? 'exit' : 'entry');
+  return Object.freeze({
+    definitionId: signal.definitionId,
+    versionId: signal.versionId,
+    securityId: bar.securityId,
+    source: bar.source as StrategyRealtimeSource,
+    period: bar.period,
+    signalKind,
+    signalTime: bar.timestamp,
+    triggerTime: bar.timestamp.toISOString(),
+    triggerPrice: signal.triggerPrice,
+    pivotTime: signal.pivotTime,
+    pivotPrice: signal.pivotPrice,
+    barType: bar.type,
+    confidence: signal.confidence,
+    confidenceLevel: signal.confidenceLevel,
+    decisionTrace: signal.decisionTrace,
+    contextSnapshot: signal.contextSnapshot,
+    ruleSnapshot: signal.ruleSnapshot,
+  });
 }

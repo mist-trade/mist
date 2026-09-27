@@ -16,7 +16,7 @@ import {
 } from '@app/chancore';
 import { computeChanUnitForces } from '@app/indicators';
 import type { ChanBspEvent, ChanBspEventType } from './chan-bsp.types';
-import type { ChanBspUnitLevel } from '../chan-bsp-plan';
+import type { ChanBspUnitLevel } from './chan-bsp-plan';
 
 export interface ChanBspPipelineInput {
   readonly klines: readonly ChanK[];

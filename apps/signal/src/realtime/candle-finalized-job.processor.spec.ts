@@ -25,11 +25,35 @@ describe('CandleFinalizedJobProcessor', () => {
           source: 'tdx',
           period: 1,
           ruleSnapshot: { field: 'k.close', operator: 'gt', value: 27 },
-          kind: 'rule_dsl',
-          plan: compileStoredStrategyRule(
-            { field: 'k.close', operator: 'gt', value: 27 },
-            'entry',
-          ),
+          kind: 'decision_flow',
+          flow: {
+            id: 'guard_legacy_rule',
+            type: 'GUARD',
+            name: '存量规则门禁',
+            pluginId: 'plugin.legacy.rule-dsl',
+            params: {
+              plan: compileStoredStrategyRule(
+                { field: 'k.close', operator: 'gt', value: 27 },
+                'entry',
+              ),
+            },
+            requiredAction: 'BUY',
+            minConfidence: 0.5,
+            onPass: {
+              id: 'term_pass',
+              type: 'TERMINAL',
+              action: 'BUY',
+              signalTag: 'LEGACY_DSL',
+              reason: 'matched',
+            },
+            onFail: {
+              id: 'term_fail',
+              type: 'TERMINAL',
+              action: 'ABORT',
+              reason: 'unmatched',
+            },
+          },
+          requiredBarCount: 1,
         },
       ],
       () => new Date('2026-08-04T07:00:00.000Z'),
@@ -52,9 +76,12 @@ describe('CandleFinalizedJobProcessor', () => {
       signalTime: bar.timestamp,
       triggerTime: bar.timestamp.toISOString(),
       triggerPrice: 28,
+      pivotTime: null,
+      pivotPrice: null,
       barType: 'complete',
       contextSnapshot: {
-        k: { type: 'complete', close: 28 },
+        action: 'BUY',
+        signalTag: 'LEGACY_DSL',
       },
     });
     expect(marketData.resolveRealtimeObservation).toHaveBeenCalledTimes(1);
@@ -82,11 +109,35 @@ describe('CandleFinalizedJobProcessor', () => {
             operator: 'eq',
             value: 'incomplete',
           },
-          kind: 'rule_dsl',
-          plan: compileStoredStrategyRule(
-            { field: 'k.type', operator: 'eq', value: 'incomplete' },
-            'entry',
-          ),
+          kind: 'decision_flow',
+          flow: {
+            id: 'guard_legacy_rule',
+            type: 'GUARD',
+            name: '存量规则门禁',
+            pluginId: 'plugin.legacy.rule-dsl',
+            params: {
+              plan: compileStoredStrategyRule(
+                { field: 'k.type', operator: 'eq', value: 'incomplete' },
+                'entry',
+              ),
+            },
+            requiredAction: 'BUY',
+            minConfidence: 0.5,
+            onPass: {
+              id: 'term_pass',
+              type: 'TERMINAL',
+              action: 'BUY',
+              signalTag: 'LEGACY_DSL',
+              reason: 'matched',
+            },
+            onFail: {
+              id: 'term_fail',
+              type: 'TERMINAL',
+              action: 'ABORT',
+              reason: 'unmatched',
+            },
+          },
+          requiredBarCount: 1,
         },
       ],
       () => new Date('2026-08-04T07:00:00.000Z'),
@@ -296,7 +347,7 @@ describe('CandleFinalizedJobProcessor', () => {
     expect(marketData.resolveRealtimeObservation).toHaveBeenCalledTimes(1);
   });
 
-  it('activates shadow episodes without calling persistence', async () => {
+  it('emits raw candidates per matched bar in shadow mode (no delivery-level suppression)', async () => {
     const first = makeBar('2026-08-04T06:43:00.000Z', 28);
     const second = makeBar('2026-08-04T06:44:00.000Z', 29);
     const marketData = sequentialMarketData(first, second);
@@ -313,11 +364,11 @@ describe('CandleFinalizedJobProcessor', () => {
     ).resolves.toMatchObject({ candidates: [expect.any(Object)] });
     await expect(
       processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(second)),
-    ).resolves.toEqual({ outcome: 'completed', candidates: [] });
+    ).resolves.toMatchObject({ candidates: [expect.any(Object)] });
     expect(persistence.persist).not.toHaveBeenCalled();
   });
 
-  it('keeps an on-mode episode inactive after rollback and activates after commit', async () => {
+  it('persists every matched bar in on mode after a rollback (delivery dedup moved downstream)', async () => {
     const first = makeBar('2026-08-04T06:42:00.000Z', 28);
     const second = makeBar('2026-08-04T06:43:00.000Z', 29);
     const third = makeBar('2026-08-04T06:44:00.000Z', 30);
@@ -326,6 +377,7 @@ describe('CandleFinalizedJobProcessor', () => {
       persist: jest
         .fn()
         .mockRejectedValueOnce(failure)
+        .mockResolvedValueOnce('created')
         .mockResolvedValueOnce('created'),
     };
     const processor = modeProcessor(
@@ -343,28 +395,8 @@ describe('CandleFinalizedJobProcessor', () => {
     ).resolves.toMatchObject({ candidates: [expect.any(Object)] });
     await expect(
       processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(third)),
-    ).resolves.toEqual({ outcome: 'completed', candidates: [] });
-    expect(persistence.persist).toHaveBeenCalledTimes(2);
-  });
-
-  it('activates an on-mode episode after an approved duplicate skip', async () => {
-    const first = makeBar('2026-08-04T06:43:00.000Z', 28);
-    const second = makeBar('2026-08-04T06:44:00.000Z', 29);
-    const persistence = {
-      persist: jest.fn().mockResolvedValue('duplicate_skipped'),
-    };
-    const processor = modeProcessor(
-      sequentialMarketData(first, second),
-      'on',
-      persistence,
-      () => new Date('2026-08-04T07:00:00.000Z'),
-    );
-
-    await processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(first));
-    await expect(
-      processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(second)),
-    ).resolves.toEqual({ outcome: 'completed', candidates: [] });
-    expect(persistence.persist).toHaveBeenCalledTimes(1);
+    ).resolves.toMatchObject({ candidates: [expect.any(Object)] });
+    expect(persistence.persist).toHaveBeenCalledTimes(3);
   });
 
   it('clears episode continuity on the first trigger of a new Shanghai day', async () => {
@@ -406,11 +438,35 @@ describe('CandleFinalizedJobProcessor', () => {
           source: 'tdx',
           period: 1,
           ruleSnapshot: { field: 'k.volume', operator: 'gt', value: '0' },
-          kind: 'rule_dsl',
-          plan: compileStoredStrategyRule(
-            { field: 'k.volume', operator: 'gt', value: '0' },
-            'entry',
-          ),
+          kind: 'decision_flow',
+          flow: {
+            id: 'guard_legacy_rule',
+            type: 'GUARD',
+            name: '存量规则门禁',
+            pluginId: 'plugin.legacy.rule-dsl',
+            params: {
+              plan: compileStoredStrategyRule(
+                { field: 'k.volume', operator: 'gt', value: '0' },
+                'entry',
+              ),
+            },
+            requiredAction: 'BUY',
+            minConfidence: 0.5,
+            onPass: {
+              id: 'term_pass',
+              type: 'TERMINAL',
+              action: 'BUY',
+              signalTag: 'LEGACY_DSL',
+              reason: 'matched',
+            },
+            onFail: {
+              id: 'term_fail',
+              type: 'TERMINAL',
+              action: 'ABORT',
+              reason: 'unmatched',
+            },
+          },
+          requiredBarCount: 1,
         },
       ],
       () => new Date('2026-08-04T07:00:00.000Z'),
@@ -485,7 +541,7 @@ describe('CandleFinalizedJobProcessor', () => {
                 },
               },
               signalKind: StrategySignalKind.ENTRY,
-              requiredBarCount: 50,
+              requiredBarCount: 1,
               sourceKind: 'rule_dsl',
             },
             ruleSnapshot: { field: 'k.close', operator: 'gt', value: 1 },
@@ -501,30 +557,10 @@ describe('CandleFinalizedJobProcessor', () => {
       { securityId: 9, source: 'tdx', period: 1 },
       { securityId: 9, source: 'tdx', period: 5 },
     ]);
-    expect(evaluation.retainRegistryScopes).toHaveBeenCalledWith(
-      [
-        { securityId: 9, source: 'tdx', period: 1 },
-        { securityId: 9, source: 'tdx', period: 5 },
-      ],
-      [
-        {
-          definitionId: 1,
-          versionId: 3,
-          securityId: 9,
-          source: 'tdx',
-          period: 1,
-          signalKind: 'entry',
-        },
-        {
-          definitionId: 1,
-          versionId: 3,
-          securityId: 9,
-          source: 'tdx',
-          period: 5,
-          signalKind: 'entry',
-        },
-      ],
-    );
+    expect(evaluation.retainRegistryScopes).toHaveBeenCalledWith([
+      { securityId: 9, source: 'tdx', period: 1 },
+      { securityId: 9, source: 'tdx', period: 5 },
+    ]);
   });
 
   it('releases listener-bound cursor memory when a series leaves the registry', async () => {
@@ -539,11 +575,35 @@ describe('CandleFinalizedJobProcessor', () => {
           source: 'tdx',
           period: 1,
           ruleSnapshot: { field: 'k.close', operator: 'gt', value: 27 },
-          kind: 'rule_dsl',
-          plan: compileStoredStrategyRule(
-            { field: 'k.close', operator: 'gt', value: 27 },
-            'entry',
-          ),
+          kind: 'decision_flow',
+          flow: {
+            id: 'guard_legacy_rule',
+            type: 'GUARD',
+            name: '存量规则门禁',
+            pluginId: 'plugin.legacy.rule-dsl',
+            params: {
+              plan: compileStoredStrategyRule(
+                { field: 'k.close', operator: 'gt', value: 27 },
+                'entry',
+              ),
+            },
+            requiredAction: 'BUY',
+            minConfidence: 0.5,
+            onPass: {
+              id: 'term_pass',
+              type: 'TERMINAL',
+              action: 'BUY',
+              signalTag: 'LEGACY_DSL',
+              reason: 'matched',
+            },
+            onFail: {
+              id: 'term_fail',
+              type: 'TERMINAL',
+              action: 'ABORT',
+              reason: 'unmatched',
+            },
+          },
+          requiredBarCount: 1,
         },
       ],
       () => new Date('2026-08-04T07:00:00.000Z'),
@@ -633,11 +693,35 @@ function modeProcessor(
         source: 'tdx',
         period: 1,
         ruleSnapshot: { field: 'k.close', operator: 'gt', value: 27 },
-        kind: 'rule_dsl',
-        plan: compileStoredStrategyRule(
-          { field: 'k.close', operator: 'gt', value: 27 },
-          'entry',
-        ),
+        kind: 'decision_flow',
+        flow: {
+          id: 'guard_legacy_rule',
+          type: 'GUARD',
+          name: '存量规则门禁',
+          pluginId: 'plugin.legacy.rule-dsl',
+          params: {
+            plan: compileStoredStrategyRule(
+              { field: 'k.close', operator: 'gt', value: 27 },
+              'entry',
+            ),
+          },
+          requiredAction: 'BUY',
+          minConfidence: 0.5,
+          onPass: {
+            id: 'term_pass',
+            type: 'TERMINAL',
+            action: 'BUY',
+            signalTag: 'LEGACY_DSL',
+            reason: 'matched',
+          },
+          onFail: {
+            id: 'term_fail',
+            type: 'TERMINAL',
+            action: 'ABORT',
+            reason: 'unmatched',
+          },
+        },
+        requiredBarCount: 1,
       },
     ],
     now,

@@ -45,7 +45,6 @@ export class CandleFinalizedBullMqWorker extends WorkerHost {
         windowGroupCount: diagnostics.groupCount,
         rawBarCount: diagnostics.rawBarCount,
         derivedBarCount: diagnostics.derivedBarCount,
-        activeEpisodeCount: diagnostics.activeEpisodeCount,
         evaluationOutcome: diagnostics.lastOutcome,
         persistenceOutcome: diagnostics.lastPersistenceOutcome,
       });
@@ -60,7 +59,6 @@ export class CandleFinalizedBullMqWorker extends WorkerHost {
         windowGroupCount: diagnostics.groupCount,
         rawBarCount: diagnostics.rawBarCount,
         derivedBarCount: diagnostics.derivedBarCount,
-        activeEpisodeCount: diagnostics.activeEpisodeCount,
         persistenceOutcome: diagnostics.lastPersistenceOutcome,
       });
       throw error;
