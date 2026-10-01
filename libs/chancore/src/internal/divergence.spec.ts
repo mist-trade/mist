@@ -201,18 +201,104 @@ describe('DivergenceDetector (背驰，24课 A/B/C 三段结构，双口径)', (
       calc.detectDivergences(input),
     );
   });
+
+  it('reports down trend divergence and rejects non-breakout moves', () => {
+    // 下跌趋势链（方向为 Down）
+    const units = [
+      makeUnit('down', 0, 40, 30),
+      makeUnit('up', 1, 35, 25),
+      makeUnit('down', 2, 33, 23),
+      makeUnit('up', 3, 31, 21),
+      makeUnit('down', 4, 30, 20), // 中枢2 进入段 A
+      makeUnit('up', 5, 28, 18),
+      makeUnit('down', 6, 26, 16),
+      makeUnit('up', 7, 24, 14),
+      makeUnit('down', 8, 22, 10), // 离开段 C，跌破 zd 14 创出新低 10
+    ];
+    const zhongshus = [
+      makeZhongshu(units[1].startTime, units[3].endTime, 35, 21, 35, 21),
+      makeZhongshu(units[5].startTime, units[7].endTime, 28, 14, 28, 14),
+    ];
+    const forces = [
+      makeForce(5, 50),
+      makeForce(5, 50),
+      makeForce(5, 50),
+      makeForce(5, 50),
+      makeForce(8, 80), // u4 A
+      makeForce(5, 50),
+      makeForce(5, 50),
+      makeForce(5, 50),
+      makeForce(4, 40), // u8 C < A
+    ];
+
+    const result = calc.detectDivergences({ units, zhongshus, forces });
+    expect(result.some((d) => d.type === ChanDivergenceType.Trend)).toBe(true);
+
+    // 若离开段未跌破末中枢 zd (例如低点 15 >= zd 14)
+    const nonBreakUnits = [...units];
+    nonBreakUnits[8] = makeUnit('down', 8, 22, 15);
+    const nonBreakResult = calc.detectDivergences({
+      units: nonBreakUnits,
+      zhongshus,
+      forces,
+    });
+    expect(
+      nonBreakResult.some((d) => d.type === ChanDivergenceType.Trend),
+    ).toBe(false);
+
+    // 上涨趋势中离开段未突破末中枢 zg
+    const upInput = makeTrendInput();
+    const upNonBreakUnits = [...upInput.units];
+    upNonBreakUnits[8] = makeUnit('up', 8, 25, 20); // 末中枢 zg 为 30，25 <= 30
+    const upNonBreakResult = calc.detectDivergences({
+      ...upInput,
+      units: upNonBreakUnits,
+    });
+    expect(
+      upNonBreakResult.some((d) => d.type === ChanDivergenceType.Trend),
+    ).toBe(false);
+  });
+
+  it('compares against connecting segment B when C does not diverge from A but diverges from B', () => {
+    const input = makeTrendInput();
+    // A 段 (u4) 力度很弱 (3, 30)，B 段 (u0) 力度强 (8, 80)，C 段 (u8) 力度中等 (5, 50)
+    // C(5) > A(3) 不背驰，但 C(5) < B(8) 背驰！
+    const forces = [...input.forces];
+    forces[4] = makeForce(3, 30); // u4 A 弱
+    forces[0] = makeForce(8, 80); // u0 强
+    forces[8] = makeForce(5, 50); // u8 中等
+
+    const result = calc.detectDivergences({ ...input, forces });
+    const trend = result.find((d) => d.type === ChanDivergenceType.Trend);
+    expect(trend).toBeDefined();
+    expect(trend!.enterIndex).toBe(0); // 回退比较段 B (u0)
+  });
+
+  it('returns false for progressesInTrend when direction is None', () => {
+    const span: any = { gg: 20, dd: 10 };
+    expect(
+      (calc as any).progressesInTrend(span, span, TrendDirection.None),
+    ).toBe(false);
+  });
 });
 
 // ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 
-function makeUnit(trend: 'up' | 'down', index: number): ChanDivergenceUnit {
+function makeUnit(
+  trend: 'up' | 'down',
+  index: number,
+  high?: number,
+  low?: number,
+): ChanDivergenceUnit {
   const time = new Date(2026, 6, 1, 9, index * 10, 0, 0);
   return {
     startTime: time,
     endTime: new Date(time.getTime() + 60_000),
     trend: trend === 'up' ? TrendDirection.Up : TrendDirection.Down,
+    high,
+    low,
   };
 }
 

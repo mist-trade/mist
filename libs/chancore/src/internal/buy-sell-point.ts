@@ -1,12 +1,73 @@
-import { ChanBspType, ChanDivergenceType, TrendDirection } from '../contracts';
+import {
+  ChanBspType,
+  ChanDivergenceType,
+  ChannelType,
+  TrendDirection,
+} from '../contracts';
 import type {
+  ChanBi,
   ChanBspInput,
   ChanBspUnit,
   ChanBuySellPoint,
+  ChanChannel,
   ChanDivergenceInput,
   ChanDivergenceZhongshu,
+  ChanDuan,
+  ChanDuanChannel,
 } from '../contracts';
 import { DivergenceDetector } from './divergence';
+
+/**
+ * 将笔或段转换为 ChanBspUnit 最小结构单元
+ */
+export function chanUnitToBspUnit(unit: ChanBi | ChanDuan): ChanBspUnit {
+  return {
+    startTime: unit.startTime,
+    endTime: unit.endTime,
+    high: unit.high,
+    low: unit.low,
+    trend: unit.trend,
+  };
+}
+
+/**
+ * 将笔中枢或段中枢转换为 ChanDivergenceZhongshu 最小定位中枢。
+ *
+ * 构件粒度与中枢生命周期核心原则：
+ * - 笔级中枢：进入笔（b0）+ 3内部构件（b1..b3）+ 离开笔（b4）。bis[0] 为进入笔，核心区间始于 bis[1]，
+ *   封存中枢（>= 5笔）核心终止于倒数第2笔。
+ * - 段级中枢：3段对称重叠即可独立作为完整基本单元（duans[0..2]），无需强求离开段。duans[0] 即为首个核心构件段。
+ *   若段中枢吸收延伸满奇数段且包含离开段（>= 5段），核心终止于倒数第2段；若为3段基础单元，核心自然终止于 duans[2]。
+ */
+export function chanChannelToZhongshu(
+  channel: ChanChannel | ChanDuanChannel,
+): ChanDivergenceZhongshu {
+  const isBi = 'bis' in channel;
+  const units = isBi ? channel.bis : channel.duans;
+  if (!units || units.length === 0) {
+    throw new RangeError('chan channel must contain at least one unit');
+  }
+
+  const first = isBi && units.length >= 4 ? units[1] : units[0];
+
+  let last = units[units.length - 1];
+  if (
+    channel.type === ChannelType.Complete &&
+    units.length >= 5 &&
+    units.length % 2 === 1
+  ) {
+    last = units[units.length - 2];
+  }
+
+  return Object.freeze({
+    firstUnitTime: first.startTime,
+    lastUnitTime: last.endTime,
+    zg: channel.zg,
+    zd: channel.zd,
+    gg: channel.gg,
+    dd: channel.dd,
+  });
+}
 
 /** 中枢在 units 中的定位结果（供三类判定）。 */
 interface BspChannelSpan {

@@ -3,16 +3,11 @@ import {
   BiType,
   ChanCore,
   ChanBspType,
-  ChannelType,
   DuanStatus,
   DuanType,
   FenxingType,
-  type ChanBi,
   type ChanBspUnit,
-  type ChanChannel,
   type ChanDivergenceZhongshu,
-  type ChanDuan,
-  type ChanDuanChannel,
   type ChanK,
 } from '@app/chancore';
 import { computeChanUnitForces } from '@app/indicators';
@@ -370,15 +365,15 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         (d) => d.type === DuanType.Complete && d.status === DuanStatus.Valid,
       );
       const duanChannels = ChanCore.createDuanChannels(duans);
-      bspUnits = validDuans.map(toBspUnit);
-      zhongshus = duanChannels.phaseB.map(toZhongshu);
+      bspUnits = validDuans.map(ChanCore.toBspUnit);
+      zhongshus = duanChannels.phaseB.map(ChanCore.toZhongshu);
     } else {
       const validBis = phaseB.filter(
         (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
       );
       const channels = ChanCore.createChannels(klines);
-      bspUnits = validBis.map(toBspUnit);
-      zhongshus = channels.phaseB.map(toZhongshu);
+      bspUnits = validBis.map(ChanCore.toBspUnit);
+      zhongshus = channels.phaseB.map(ChanCore.toZhongshu);
     }
 
     const forces = computeChanUnitForces(klines, bspUnits);
@@ -456,54 +451,4 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         return type;
     }
   }
-}
-
-function toBspUnit(
-  unit: Pick<
-    ChanBi | ChanDuan,
-    'startTime' | 'endTime' | 'high' | 'low' | 'trend'
-  >,
-): ChanBspUnit {
-  return {
-    startTime: unit.startTime,
-    endTime: unit.endTime,
-    high: unit.high,
-    low: unit.low,
-    trend: unit.trend,
-  };
-}
-
-function toZhongshu(
-  channel: ChanChannel | ChanDuanChannel,
-): ChanDivergenceZhongshu {
-  const isBi = 'bis' in channel;
-  const units = isBi ? channel.bis : channel.duans;
-  if (!units || units.length === 0) {
-    throw new RangeError('chan channel must contain at least one unit');
-  }
-
-  // 笔级中枢：bis[0] 为进入笔（b0），中枢核心区间始于 bis[1]（至少4笔：1进入 + 3构件）。
-  // 段级中枢：duans[0] 即为首个对称重叠构件段。
-  const first = isBi && units.length >= 4 ? units[1] : units[0];
-
-  // 末单元切片：
-  // 笔级已封存中枢（奇数笔 >= 5）：最后一笔为离开笔，中枢核心终止于倒数第2笔。
-  // 段级已封存中枢（奇数段 >= 5）：最后一段为离开段，中枢核心终止于倒数第2段。
-  let last = units[units.length - 1];
-  if (
-    channel.type === ChannelType.Complete &&
-    units.length >= 5 &&
-    units.length % 2 === 1
-  ) {
-    last = units[units.length - 2];
-  }
-
-  return {
-    firstUnitTime: first.startTime,
-    lastUnitTime: last.endTime,
-    zg: channel.zg,
-    zd: channel.zd,
-    gg: channel.gg,
-    dd: channel.dd,
-  };
 }

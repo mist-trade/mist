@@ -262,4 +262,44 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
     const op30m = await plugin.evaluate(makeContext(30) as any);
     expect(op30m.action).toBe('BUY');
   });
+
+  it('支持 units: "duan" 线段级买卖点判定，正确输出线段级买卖点与双时间戳', async () => {
+    const barTime = new Date('2025-09-15T11:30:00.000Z');
+    const pivotTime = new Date('2025-09-15T10:45:00.000Z');
+
+    const context = {
+      securityId: 1,
+      securityCode: '000001',
+      timestamp: barTime,
+      period: 5,
+      bars: Array.from({ length: 60 }, (_, i) =>
+        makeMockProjectedBar(new Date(barTime.getTime() - (60 - i) * 60000), 5),
+      ),
+      attributes: new Map(),
+    };
+
+    jest.spyOn(plugin as any, 'detectEvents').mockReturnValue([
+      {
+        type: 'third_buy' as const,
+        units: 'duan' as const,
+        time: pivotTime,
+        price: 3900,
+        zhongshuIndex: 0,
+        zg: 3880,
+        zd: 3820,
+        unitIndex: 4,
+      },
+    ]);
+
+    const op = await plugin.evaluate(context as any, {
+      units: 'duan',
+      requiredBarCount: 30,
+    });
+    expect(op.action).toBe('BUY');
+    expect(op.reason).toContain('缠论线段级三买确认');
+    expect(op.evidence?.units).toBe('duan');
+    expect(op.evidence?.triggerTime).toBe(barTime.toISOString());
+    expect(op.evidence?.pivotTime).toBe(pivotTime.toISOString());
+    expect(op.evidence?.pivotPrice).toBe(3900);
+  });
 });

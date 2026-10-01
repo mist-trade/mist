@@ -234,11 +234,15 @@ describe('ChanCore full-output differential characterization', () => {
     const { phaseA, phaseB } = ChanCore.createDuanChannels(duans);
 
     expect(phaseA.length).toBeGreaterThan(0);
-    expect(phaseB).toHaveLength(2);
-    expect(phaseB[0].zd).toBe(7);
-    expect(phaseB[0].zg).toBe(9);
-    expect(phaseB[1].zd).toBe(2);
-    expect(phaseB[1].zg).toBe(4);
+    expect(phaseB).toHaveLength(3);
+    const nonExpanded = phaseB.filter((c) => !c.expanded);
+    expect(nonExpanded).toHaveLength(2);
+    expect(nonExpanded[0].zd).toBe(7);
+    expect(nonExpanded[0].zg).toBe(9);
+    expect(nonExpanded[1].zd).toBe(2);
+    expect(nonExpanded[1].zg).toBe(4);
+    const expandedBox = phaseB.find((c) => c.expanded);
+    expect(expandedBox).toBeDefined();
 
     const payload = {
       algorithmVersion: 7,
@@ -293,11 +297,11 @@ describe('ChanCore full-output differential characterization', () => {
 
 /** Duan-level central-extension fingerprint（add-chan-central-extension 新增）。 */
 const EXPECTED_DUAN_EXPANSION_SHA256 =
-  '44a43b29c9cfda8f4f7776c6b569953565a125dd32e81acf8a8ac3826bae8d65';
+  '1ec94b9651216e819031bfad08a9a9fde6c97b7b29e4985c0afdcf742f758ea7';
 
 /** Duan lesson-65 minimum 3-bi axiom fingerprint（restore-chan-duan-three-bi-axiom 更新）。 */
 const EXPECTED_DUAN_71_SHA256 =
-  'b952eca1efefc5ac4a8ee2f0e5f344268ef9a2c423c01d8cab03268089511bc6';
+  '6d5da95b6fdf6087bd7ee62e2bd39683165a4126b793c93aed0c5b65bd16929e';
 
 function toContractDuan(duan: ChanDuan) {
   return {

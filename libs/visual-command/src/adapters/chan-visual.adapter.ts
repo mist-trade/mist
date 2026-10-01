@@ -4,6 +4,7 @@ import {
   ChanCore,
   ChannelType,
   DuanStatus,
+  DuanType,
   ChanBspType,
   TrendDirection,
   type ChanBspUnit,
@@ -11,7 +12,6 @@ import {
   type ChanK,
 } from '@app/chancore';
 import { computeChanUnitForces } from '@app/indicators';
-import { toZhongshu } from '@app/signal';
 import type {
   BandVisualCommand,
   LineVisualCommand,
@@ -224,8 +224,11 @@ export class ChanVisualAdapter {
     }
 
     // 4. Compute Duan Channels (Zhongshu)
+    const duanChannels =
+      duans.length > 0
+        ? ChanCore.createDuanChannels(duans)
+        : { phaseA: [], phaseB: [] };
     if (includeZhongshu && duans.length > 0) {
-      const duanChannels = ChanCore.createDuanChannels(duans);
       duanChannels.phaseB.forEach((zs, i) => {
         // 防御：中枢构成单元须全部确认且有效（chancore 已保证；防旧版本/外部数据）
         if (zs.duans.some((d) => d.status !== DuanStatus.Valid)) return;
@@ -281,15 +284,9 @@ export class ChanVisualAdapter {
         (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
       );
       const biChannels = ChanCore.createChannels(klines);
-      const bspUnits: readonly ChanBspUnit[] = validBis.map((b) => ({
-        startTime: b.startTime,
-        endTime: b.endTime,
-        high: b.high,
-        low: b.low,
-        trend: b.trend,
-      }));
+      const bspUnits: readonly ChanBspUnit[] = validBis.map(ChanCore.toBspUnit);
       const zhongshus: readonly ChanDivergenceZhongshu[] =
-        biChannels.phaseB.map(toZhongshu);
+        biChannels.phaseB.map(ChanCore.toZhongshu);
 
       const forces = computeChanUnitForces(klines, bspUnits);
       const points = ChanCore.detectBuySellPoints({
@@ -319,6 +316,43 @@ export class ChanVisualAdapter {
         };
         commands.push(textCmd);
       });
+
+      // 5.2 Compute Duan-level Buy/Sell Points (Duan BSP)
+      if (duans.length >= 3 && duanChannels.phaseB.length > 0) {
+        const validDuans = duans.filter(
+          (d) => d.type === DuanType.Complete && d.status === DuanStatus.Valid,
+        );
+        const duanBspUnits = validDuans.map(ChanCore.toBspUnit);
+        const duanZhongshus = duanChannels.phaseB.map(ChanCore.toZhongshu);
+        const duanForces = computeChanUnitForces(klines, duanBspUnits);
+        const duanPoints = ChanCore.detectBuySellPoints({
+          units: duanBspUnits,
+          zhongshus: duanZhongshus,
+          forces: duanForces,
+        });
+
+        duanPoints.forEach((pt, i) => {
+          const unit = duanBspUnits[pt.unitIndex];
+          if (!unit) return;
+          const idx = getKIndex(unit.endTime);
+          if (idx === null) return;
+          const label = formatDuanBspLabel(pt.type);
+          const isSell = isSellBsp(pt.type);
+
+          const textCmd: TextVisualCommand = {
+            id: `chan_bsp_duan_${i}_${pt.type}_${idx}`,
+            type: 'text',
+            layer: 'chan_bsp_duan',
+            index: idx,
+            time: new Date(unit.endTime).toISOString(),
+            price: pt.price,
+            text: label,
+            color: isSell ? '#15803D' : '#DC2626',
+            position: isSell ? 'above' : 'below',
+          };
+          commands.push(textCmd);
+        });
+      }
     }
 
     return Object.freeze(commands);
@@ -341,6 +375,25 @@ function formatBspLabel(type: ChanBspType): string {
       return '3卖';
     default:
       return String(type);
+  }
+}
+
+function formatDuanBspLabel(type: ChanBspType): string {
+  switch (type) {
+    case ChanBspType.FirstBuy:
+      return '段1买';
+    case ChanBspType.FirstSell:
+      return '段1卖';
+    case ChanBspType.SecondBuy:
+      return '段2买';
+    case ChanBspType.SecondSell:
+      return '段2卖';
+    case ChanBspType.ThirdBuy:
+      return '段3买';
+    case ChanBspType.ThirdSell:
+      return '段3卖';
+    default:
+      return `段${String(type)}`;
   }
 }
 

@@ -1,11 +1,30 @@
-import { ChanBspType, TrendDirection } from '../contracts';
+import {
+  BiStatus,
+  BiType,
+  ChanBspType,
+  ChannelLevel,
+  ChannelStatus,
+  ChannelType,
+  DuanStatus,
+  DuanType,
+  TrendDirection,
+} from '../contracts';
 import type {
+  ChanBi,
   ChanBspInput,
   ChanBspUnit,
+  ChanChannel,
   ChanDivergenceZhongshu,
+  ChanDuan,
+  ChanDuanChannel,
   ChanUnitForce,
 } from '../contracts';
-import { BuySellPointDetector } from './buy-sell-point';
+import { ChanCore } from '../chan-core';
+import {
+  BuySellPointDetector,
+  chanChannelToZhongshu,
+  chanUnitToBspUnit,
+} from './buy-sell-point';
 
 describe('BuySellPointDetector', () => {
   const calc = new BuySellPointDetector();
@@ -333,6 +352,224 @@ describe('BuySellPointDetector', () => {
       calc.detectBuySellPoints({ units: [], zhongshus: [], forces: [] }),
     ).toEqual([]);
   });
+
+  // -------------------------------------------------------------------------
+  // 段级买卖点（Duan BSP，3段独立基本单元与次级别回抽确认）
+  // -------------------------------------------------------------------------
+
+  describe('Duan-level Buy/Sell Points (段级买卖点)', () => {
+    it('段三买：3段基本单元段中枢离开后回抽不破中枢上沿 ZG → ThirdBuy', () => {
+      // 段 0..2 形成 3 段基本单元段中枢：zg=20, zd=14
+      // 段 3 向上离开突破至 30
+      // 段 4 向下次回抽低点 21 > zg 20
+      const duans: ChanDuan[] = [
+        makeMockDuan('up', 12, 8, 0),
+        makeMockDuan('down', 20, 10, 1),
+        makeMockDuan('up', 24, 14, 2),
+        makeMockDuan('down', 22, 12, 3), // d1..d3 形成 3 段段中枢
+        makeMockDuan('up', 30, 24, 4), // 离开段
+        makeMockDuan('down', 28, 21, 5), // 回抽段低点 21 > zg 20
+      ];
+
+      const duanChannels: ChanDuanChannel[] = [
+        {
+          duans: [duans[1], duans[2], duans[3]], // 3 段基本单元
+          zg: 20,
+          zd: 14,
+          gg: 24,
+          dd: 10,
+          level: ChannelLevel.Duan,
+          type: ChannelType.Complete,
+          status: ChannelStatus.Valid,
+          startId: 1,
+          endId: 3,
+          displayStartId: 1,
+          displayEndId: 3,
+          expanded: false,
+        },
+      ];
+
+      const points = ChanCore.detectDuanBuySellPoints({ duans, duanChannels });
+      expect(points).toHaveLength(1);
+      expect(points[0]).toMatchObject({
+        type: ChanBspType.ThirdBuy,
+        unitIndex: 5,
+        price: 21,
+        zhongshuIndex: 0,
+      });
+    });
+
+    it('段三卖：3段基本单元段中枢离开后反抽不破中枢下沿 ZD → ThirdSell', () => {
+      // 段 1..3 形成 3 段基本单元段中枢：zg=20, zd=14
+      // 段 4 向下离开跌破至 6
+      // 段 5 向上反抽高点 12 < zd 14
+      const duans: ChanDuan[] = [
+        makeMockDuan('down', 12, 8, 0),
+        makeMockDuan('up', 24, 14, 1),
+        makeMockDuan('down', 22, 10, 2),
+        makeMockDuan('up', 20, 8, 3),
+        makeMockDuan('down', 14, 6, 4), // 离开段
+        makeMockDuan('up', 12, 6, 5), // 反抽段高点 12 < zd 14
+      ];
+
+      const duanChannels: ChanDuanChannel[] = [
+        {
+          duans: [duans[1], duans[2], duans[3]], // 3 段基本单元
+          zg: 20,
+          zd: 14,
+          gg: 24,
+          dd: 8,
+          level: ChannelLevel.Duan,
+          type: ChannelType.Complete,
+          status: ChannelStatus.Valid,
+          startId: 1,
+          endId: 3,
+          displayStartId: 1,
+          displayEndId: 3,
+          expanded: false,
+        },
+      ];
+
+      const points = ChanCore.detectDuanBuySellPoints({ duans, duanChannels });
+      expect(points).toHaveLength(1);
+      expect(points[0]).toMatchObject({
+        type: ChanBspType.ThirdSell,
+        unitIndex: 5,
+        price: 12,
+        zhongshuIndex: 0,
+      });
+    });
+
+    it('段一买与段二买：下跌趋势段背驰产生 FirstBuy，随后反弹并再次回踩不破前低产生 SecondBuy', () => {
+      const input = makeFirstBuyThenPullbackInput();
+      const duans: ChanDuan[] = input.units.map((u, i) =>
+        makeMockDuan(
+          u.trend === TrendDirection.Up ? 'up' : 'down',
+          u.high,
+          u.low,
+          i,
+        ),
+      );
+      const duanChannels: ChanDuanChannel[] = input.zhongshus.map((z, i) => ({
+        duans: [duans[i * 4 + 1], duans[i * 4 + 2], duans[i * 4 + 3]],
+        zg: z.zg,
+        zd: z.zd,
+        gg: z.gg,
+        dd: z.dd,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: i * 4 + 1,
+        endId: i * 4 + 3,
+        displayStartId: i * 4 + 1,
+        displayEndId: i * 4 + 3,
+        expanded: false,
+      }));
+
+      const points = ChanCore.detectDuanBuySellPoints({
+        duans,
+        duanChannels,
+        forces: input.forces,
+      });
+
+      expect(points.length).toBeGreaterThanOrEqual(2);
+      const firstBuy = points.find((p) => p.type === ChanBspType.FirstBuy);
+      const secondBuy = points.find((p) => p.type === ChanBspType.SecondBuy);
+      expect(firstBuy).toBeDefined();
+      expect(firstBuy!.unitIndex).toBe(8);
+      expect(secondBuy).toBeDefined();
+      expect(secondBuy!.unitIndex).toBe(10);
+      expect(secondBuy!.firstTypeIndex).toBe(points.indexOf(firstBuy!));
+    });
+  });
+
+  describe('chanUnitToBspUnit & chanChannelToZhongshu', () => {
+    it('chanUnitToBspUnit accurately converts ChanBi and ChanDuan to ChanBspUnit', () => {
+      const duan = makeMockDuan('up', 100, 50, 0);
+      const bspUnit = chanUnitToBspUnit(duan);
+      expect(bspUnit.startTime).toEqual(duan.startTime);
+      expect(bspUnit.endTime).toEqual(duan.endTime);
+      expect(bspUnit.high).toBe(100);
+      expect(bspUnit.low).toBe(50);
+      expect(bspUnit.trend).toBe(TrendDirection.Up);
+    });
+
+    it('chanChannelToZhongshu correctly slices 3-Duan fundamental unit channel', () => {
+      const d0 = makeMockDuan('up', 20, 10, 0);
+      const d1 = makeMockDuan('down', 18, 12, 1);
+      const d2 = makeMockDuan('up', 17, 13, 2);
+      const channel: ChanDuanChannel = {
+        duans: [d0, d1, d2],
+        zg: 17,
+        zd: 12,
+        gg: 20,
+        dd: 10,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: 1,
+        endId: 3,
+        displayStartId: 1,
+        displayEndId: 3,
+        expanded: false,
+      };
+
+      const zs = chanChannelToZhongshu(channel);
+      expect(zs.firstUnitTime).toEqual(d0.startTime);
+      expect(zs.lastUnitTime).toEqual(d2.endTime);
+      expect(zs.zg).toBe(17);
+      expect(zs.zd).toBe(12);
+    });
+
+    it('chanChannelToZhongshu correctly handles Bi channel with 5 elements (first=b1, last=b3)', () => {
+      const b0 = makeMockBi('up', 15, 5, 0);
+      const b1 = makeMockBi('down', 20, 10, 1);
+      const b2 = makeMockBi('up', 18, 12, 2);
+      const b3 = makeMockBi('down', 17, 11, 3);
+      const b4 = makeMockBi('up', 25, 14, 4); // 离开笔
+      const biChannel: ChanChannel = {
+        bis: [b0, b1, b2, b3, b4],
+        zg: 17,
+        zd: 12,
+        gg: 20,
+        dd: 10,
+        level: ChannelLevel.Bi,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: 1,
+        endId: 5,
+        displayStartId: 2,
+        displayEndId: 4,
+        trend: TrendDirection.Up,
+        extended: false,
+        expanded: false,
+      };
+
+      const zs = chanChannelToZhongshu(biChannel);
+      expect(zs.firstUnitTime).toEqual(b1.startTime);
+      expect(zs.lastUnitTime).toEqual(b3.endTime);
+    });
+
+    it('chanChannelToZhongshu throws RangeError for empty channel', () => {
+      const emptyChannel = {
+        duans: [],
+        zg: 10,
+        zd: 5,
+        gg: 12,
+        dd: 2,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: 1,
+        endId: 2,
+        displayStartId: 1,
+        displayEndId: 2,
+        expanded: false,
+      } as unknown as ChanDuanChannel;
+
+      expect(() => chanChannelToZhongshu(emptyChannel)).toThrow(RangeError);
+    });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -547,4 +784,51 @@ function makeThirdSellInput(): ChanBspInput {
   ];
   const forces = units.map(() => makeBspForce(5, 50));
   return { units, zhongshus, forces };
+}
+
+function makeMockBi(
+  trend: 'up' | 'down',
+  high: number,
+  low: number,
+  id: number,
+): ChanBi {
+  const startTime = new Date(2026, 6, 1, 9, id * 10, 0, 0);
+  const endTime = new Date(2026, 6, 1, 9, (id + 1) * 10, 0, 0);
+  return {
+    startTime,
+    endTime,
+    high,
+    low,
+    trend: trend === 'up' ? TrendDirection.Up : TrendDirection.Down,
+    type: BiType.Complete,
+    status: BiStatus.Valid,
+    independentCount: 1,
+    originIds: [id * 10 + 1],
+    originData: [],
+    startFenxing: null,
+    endFenxing: null,
+  };
+}
+
+function makeMockDuan(
+  trend: 'up' | 'down',
+  high: number,
+  low: number,
+  id: number,
+): ChanDuan {
+  const startBi = makeMockBi(trend, high, low, id);
+  return {
+    startTime: startBi.startTime,
+    endTime: startBi.endTime,
+    high,
+    low,
+    trend: trend === 'up' ? TrendDirection.Up : TrendDirection.Down,
+    type: DuanType.Complete,
+    status: DuanStatus.Valid,
+    independentCount: 1,
+    originIds: [id * 10 + 1, id * 10 + 2],
+    originBis: [startBi],
+    startBi,
+    endBi: startBi,
+  };
 }

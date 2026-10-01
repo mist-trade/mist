@@ -24,6 +24,7 @@ describe('ChanCore public facade', () => {
     );
     expect(ChanCore.algorithmVersion).toBe(8);
     expect('analyze' in ChanCore).toBe(false);
+    expect(Reflect.construct(ChanCore, [])).toBeInstanceOf(ChanCore);
   });
 
   it('returns the approved empty results', () => {
@@ -39,6 +40,56 @@ describe('ChanCore public facade', () => {
     expect(
       ChanCore.detectBuySellPoints({ units: [], zhongshus: [], forces: [] }),
     ).toEqual([]);
+    expect(
+      ChanCore.detectDuanBuySellPoints({ duans: [], duanChannels: [] }),
+    ).toEqual([]);
+    const time = new Date(2026, 6, 1);
+    const mockDuan: any = {
+      startTime: time,
+      endTime: time,
+      high: 10,
+      low: 5,
+      trend: 1,
+      status: 'valid',
+    };
+    expect(
+      ChanCore.detectDuanBuySellPoints({
+        duans: [mockDuan],
+        duanChannels: [],
+      }),
+    ).toEqual([]);
+  });
+
+  it('delegates toBspUnit and toZhongshu to pure helpers', () => {
+    const time = new Date(2026, 6, 1);
+    const bi: any = {
+      startTime: time,
+      endTime: time,
+      high: 10,
+      low: 5,
+      trend: 1,
+    };
+    expect(ChanCore.toBspUnit(bi)).toEqual({
+      startTime: time,
+      endTime: time,
+      high: 10,
+      low: 5,
+      trend: 1,
+    });
+
+    const channel: any = {
+      duans: [bi, bi, bi],
+      zg: 8,
+      zd: 6,
+      gg: 10,
+      dd: 5,
+    };
+    expect(ChanCore.toZhongshu(channel)).toMatchObject({
+      zg: 8,
+      zd: 6,
+      gg: 10,
+      dd: 5,
+    });
   });
 
   it.each([

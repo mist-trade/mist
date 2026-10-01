@@ -1,21 +1,31 @@
+import { DuanStatus } from './contracts';
 import type {
   ChanBi,
   ChanBiOptions,
   ChanBiTwoPhaseResult,
   ChanBspInput,
+  ChanBspUnit,
   ChanBuySellPoint,
+  ChanChannel,
   ChanChannelTwoPhaseResult,
   ChanDivergence,
   ChanDivergenceInput,
+  ChanDivergenceZhongshu,
   ChanDuan,
+  ChanDuanChannel,
   ChanDuanChannelTwoPhaseResult,
   ChanFenxing,
   ChanK,
   ChanMergedK,
+  ChanUnitForce,
 } from './contracts';
 import { assertChanKSeries } from './internal/assert-chan-k-series';
 import { BiCalculator } from './internal/bi';
-import { BuySellPointDetector } from './internal/buy-sell-point';
+import {
+  BuySellPointDetector,
+  chanChannelToZhongshu,
+  chanUnitToBspUnit,
+} from './internal/buy-sell-point';
 import { ChannelCalculator } from './internal/channel';
 import { DivergenceDetector } from './internal/divergence';
 import { DuanCalculator } from './internal/duan';
@@ -108,5 +118,34 @@ export class ChanCore {
    */
   static detectBuySellPoints(input: ChanBspInput): readonly ChanBuySellPoint[] {
     return new BuySellPointDetector().detectBuySellPoints(input);
+  }
+
+  /**
+   * 段级买卖点（Duan-level BSP）便捷门面纯函数：
+   * 自动过滤有效确认段并转换为 units，将 duanChannels 转换为 zhongshus，支持可选 forces。
+   */
+  static detectDuanBuySellPoints(input: {
+    readonly duans: readonly ChanDuan[];
+    readonly duanChannels: readonly ChanDuanChannel[];
+    readonly forces?: readonly ChanUnitForce[];
+  }): readonly ChanBuySellPoint[] {
+    const validDuans = input.duans.filter((d) => d.status === DuanStatus.Valid);
+    const units = validDuans.map(chanUnitToBspUnit);
+    const zhongshus = input.duanChannels.map(chanChannelToZhongshu);
+    return new BuySellPointDetector().detectBuySellPoints({
+      units,
+      zhongshus,
+      forces: input.forces ?? [],
+    });
+  }
+
+  static toBspUnit(unit: ChanBi | ChanDuan): ChanBspUnit {
+    return chanUnitToBspUnit(unit);
+  }
+
+  static toZhongshu(
+    channel: ChanChannel | ChanDuanChannel,
+  ): ChanDivergenceZhongshu {
+    return chanChannelToZhongshu(channel);
   }
 }

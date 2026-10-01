@@ -43,27 +43,7 @@ export class DuanCalculator {
     if (bis.length < 3) {
       return [];
     }
-    return this.segment(bis, this.findValidSegmentStart(bis));
-  }
-
-  /**
-   * 有效起始点选择（镜像 tomcat123a/-chanlun 的 check_init_seg）：
-   * 跳过无效起始，找第一个满足 4 笔有效结构的起点——
-   * 上升段：bi[i].high < bi[i+2].high（高点更高）且 bi[i].low < bi[i+1].low（低点更高）；
-   * 下降段：bi[i].low > bi[i+2].low（低点更低）且 bi[i].high > bi[i+1].high（高点更低）。
-   * 找不到时回退到 0（保持旧行为）。
-   */
-  private findValidSegmentStart(bis: readonly ChanBi[]): number {
-    for (let i = 0; i <= bis.length - 4; i++) {
-      if (bis[i].trend === TrendDirection.Up) {
-        if (bis[i].high < bis[i + 2].high && bis[i].low < bis[i + 1].low) {
-          return i;
-        }
-      } else if (bis[i].low > bis[i + 2].low && bis[i].high > bis[i + 1].high) {
-        return i;
-      }
-    }
-    return 0;
+    return this.segment(bis, 0);
   }
 
   /** 切分整条笔序列为确认后的段序列（case-1 直接确认 + case-2 倒推确认），从 startIdx 起。 */
@@ -188,17 +168,26 @@ export class DuanCalculator {
       const rev: FeatureElement = { high: bi.high, low: bi.low, biIndex: i };
       if (prev !== null) {
         const first = stdSeq.length > 0 ? stdSeq[stdSeq.length - 1] : null;
-        if (
-          first !== null &&
-          this.isDirectionalFenxing(first, prev, rev, reverseDir)
-        ) {
-          return true; // 任意分型即确认
+        if (first !== null && this.hasAnyFenxing(first, prev, rev)) {
+          return true; // 67课明确规定: 出现任意分型(顶分型或底分型)即确认
         }
-        stdSeq = this.mergeFeatureInclusion(stdSeq, prev, reverseDir);
+        // 78课明确规定: 第二特征序列的方向与原线段一致，必须按照原线段方向进行包含关系处理
+        stdSeq = this.mergeFeatureInclusion(stdSeq, prev, originalDir);
       }
       prev = rev;
     }
     return false;
+  }
+
+  /** 67课第二特征序列分型判定: 任意分型(顶分型或底分型)均可。 */
+  private hasAnyFenxing(
+    first: FeatureElement,
+    second: FeatureElement,
+    third: FeatureElement,
+  ): boolean {
+    const isTop = second.high > first.high && second.high > third.high;
+    const isBottom = second.low < first.low && second.low < third.low;
+    return isTop || isBottom;
   }
 
   /**

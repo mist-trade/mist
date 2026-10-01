@@ -8,7 +8,7 @@ import {
   DuanType,
   TrendDirection,
 } from '../contracts';
-import type { ChanBi, ChanDuan } from '../contracts';
+import type { ChanBi, ChanDuan, ChanDuanChannel } from '../contracts';
 import { DuanChannelCalculator } from './duan-channel';
 
 describe('DuanChannelCalculator (段级中枢，对称重叠无方向)', () => {
@@ -171,6 +171,188 @@ describe('DuanChannelCalculator (段级中枢，对称重叠无方向)', () => {
       expect(secondChannel.dd).toBe(4002.78);
     }
   });
+
+  describe('Duan Channel Extension & Expansion (段中枢延伸与扩展)', () => {
+    it('merges adjacent Duan Channels with overlapping [ZD, ZG] into an extended Channel in Phase B', () => {
+      // 中枢1 (d0..d2): d0 up(0..10), d1 dn(2..8), d2 up(3..9) -> [ZD=3, ZG=8]
+      // 连接段 d3: dn(4..7)
+      // 中枢2 (d3..d5): d3 dn(4..7), d4 up(4..8), d5 dn(5..7) -> [ZD=5, ZG=7]
+      // 两中枢共享连接段 d3，且核心区间 [3,8] 与 [5,7] 存在公共交集 [5,7]
+      // Phase B 应该延伸合并为包含全部段的单一大段中枢
+      const duans: ChanDuan[] = [
+        makeDuan('up', 10, 0, 0),
+        makeDuan('down', 8, 2, 1),
+        makeDuan('up', 9, 3, 2),
+        makeDuan('down', 7, 4, 3), // 连接段
+        makeDuan('up', 8, 4, 4),
+        makeDuan('down', 7, 5, 5),
+      ];
+
+      const result = new DuanChannelCalculator().createDuanChannels(duans);
+
+      // Phase B 应具备延伸合并产物
+      expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
+      const extended = result.phaseB.find((c) => c.duans.length >= 5);
+      expect(extended).toBeDefined();
+      expect(extended!.zg).toBe(7); // min(8, 7)
+      expect(extended!.zd).toBe(5); // max(3, 5)
+    });
+
+    it('generates an expanded outer Channel when adjacent Duan Channels have disjoint [ZD, ZG] but overlapping [DD, GG]', () => {
+      // 场景:
+      // 中枢1 (d0..d4): 基础区间 [2, 8]，d4 向上离开突破至 14，极值波动 [0, 10] (或 [0, 14])
+      // 中枢2 (d5..d7): 在上方形成新中枢 [11, 14]，但次回拉探至 9 (极值波动 [9, 15])
+      // 两中枢 [ZD, ZG] 不重叠: [2, 8] 与 [11, 14] 无交集
+      // 但 [DD, GG] 产生重叠: 中枢1波动高点 10 > 中枢2回探低点 9，符合缠论定理二的中枢扩展（形成高一级中枢大框）
+      const duans: ChanDuan[] = [
+        makeDuan('up', 10, 0, 0),
+        makeDuan('down', 10, 2, 1),
+        makeDuan('up', 8, 2, 2),
+        makeDuan('down', 8, 6, 3),
+        makeDuan('up', 14, 6, 4), // 顺势突破中枢1封存离开
+        makeDuan('down', 14, 9, 5), // 回拉探至 9 (进入中枢1极值重叠区)
+        makeDuan('up', 15, 9, 6),
+        makeDuan('down', 15, 11, 7),
+      ];
+
+      const result = new DuanChannelCalculator().createDuanChannels(duans);
+
+      // Phase B 必须根据缠论扩展定理，生成 expanded: true 的高一级扩展中枢大框
+      const expandedChannel = result.phaseB.find((c) => c.expanded === true);
+      expect(expandedChannel).toBeDefined();
+      expect(expandedChannel!.zg).toBe(11); // 高一级中枢上沿
+      expect(expandedChannel!.zd).toBe(8); // 高一级中枢下沿
+    });
+
+    it('merges adjacent channels with overlapping [ZD, ZG] via applyDuanChannelExtensionAndExpansion', () => {
+      const calc = new DuanChannelCalculator();
+      const d0 = makeDuan('up', 10, 0, 0);
+      const d1 = makeDuan('down', 8, 2, 1);
+      const d2 = makeDuan('up', 9, 3, 2);
+      const d3 = makeDuan('down', 7, 4, 3);
+      const d4 = makeDuan('up', 8, 5, 4);
+
+      const c1: ChanDuanChannel = {
+        duans: [d0, d1, d2],
+        zg: 8,
+        zd: 3,
+        gg: 10,
+        dd: 0,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: 1,
+        endId: 202,
+        displayStartId: 101,
+        displayEndId: 201,
+        expanded: false,
+      };
+
+      const c2: ChanDuanChannel = {
+        duans: [d2, d3, d4], // d2 共享重叠
+        zg: 7,
+        zd: 5,
+        gg: 9,
+        dd: 4,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: 201,
+        endId: 402,
+        displayStartId: 301,
+        displayEndId: 401,
+        expanded: false,
+      };
+
+      const merged = calc.applyDuanChannelExtensionAndExpansion([c1, c2]);
+      expect(merged).toHaveLength(1);
+      expect(merged[0].zg).toBe(7); // min(8, 7)
+      expect(merged[0].zd).toBe(5); // max(3, 5)
+      expect(merged[0].duans).toHaveLength(5); // d0, d1, d2, d3, d4 (d2 去重)
+    });
+
+    it('handles multiple channels chain expansion and single-element bounds', () => {
+      const calc = new DuanChannelCalculator();
+      const empty = calc.applyDuanChannelExtensionAndExpansion([]);
+      expect(empty).toEqual([]);
+
+      const d0 = makeDuan('up', 10, 0, 0);
+      const c1: ChanDuanChannel = {
+        duans: [d0, d0, d0],
+        zg: 8,
+        zd: 3,
+        gg: 10,
+        dd: 0,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: 1,
+        endId: 2,
+        displayStartId: 1,
+        displayEndId: 2,
+        expanded: false,
+      };
+      const single = calc.applyDuanChannelExtensionAndExpansion([c1]);
+      expect(single).toHaveLength(1);
+
+      // 3 个连续中枢极值交集扩展
+      const c2: ChanDuanChannel = {
+        ...c1,
+        zg: 15,
+        zd: 12,
+        gg: 16,
+        dd: 9, // 与 c1(gg:10) 重叠于 [9, 10]
+      };
+      const c3: ChanDuanChannel = {
+        ...c1,
+        zg: 20,
+        zd: 18,
+        gg: 21,
+        dd: 9.5, // 与 c1/c2 重叠
+      };
+      const multiExpanded = calc.applyDuanChannelExtensionAndExpansion([
+        c1,
+        c2,
+        c3,
+      ]);
+      const expandedBox = multiExpanded.find((c) => c.expanded === true);
+      expect(expandedBox).toBeDefined();
+    });
+
+    it('validates candidate channel correctly with isCandidateChannelValid', () => {
+      const calc = new DuanChannelCalculator();
+      const d0 = makeDuan('up', 10, 0, 0);
+      const validChannel: ChanDuanChannel = {
+        duans: [d0, d0, d0],
+        zg: 10,
+        zd: 5,
+        gg: 12,
+        dd: 2,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: 1,
+        endId: 2,
+        displayStartId: 1,
+        displayEndId: 2,
+        expanded: false,
+      };
+      expect(calc.isCandidateChannelValid(validChannel)).toBe(true);
+
+      const invalidLen: ChanDuanChannel = {
+        ...validChannel,
+        duans: [d0, d0],
+      };
+      expect(calc.isCandidateChannelValid(invalidLen)).toBe(false);
+
+      const invalidOverlap: ChanDuanChannel = {
+        ...validChannel,
+        zg: 5,
+        zd: 5,
+      };
+      expect(calc.isCandidateChannelValid(invalidOverlap)).toBe(false);
+    });
+  });
 });
 
 /** 构造最小 ChanDuan（段级中枢只读 startTime/endTime/high/low/trend/originIds）。 */
@@ -180,10 +362,11 @@ function makeDuan(
   low: number,
   id: number,
 ): ChanDuan {
-  const time = new Date(2026, 6, 1, 9, id * 10, 0, 0);
+  const startTime = new Date(2026, 6, 1, 9, id * 10, 0, 0);
+  const endTime = new Date(2026, 6, 1, 9, (id + 1) * 10, 0, 0);
   const startBi: ChanBi = {
-    startTime: time,
-    endTime: time,
+    startTime,
+    endTime,
     high,
     low,
     trend: trend === 'up' ? TrendDirection.Up : TrendDirection.Down,
@@ -196,8 +379,8 @@ function makeDuan(
     endFenxing: null,
   };
   return {
-    startTime: time,
-    endTime: new Date(time.getTime() + 60_000),
+    startTime,
+    endTime,
     high,
     low,
     trend: trend === 'up' ? TrendDirection.Up : TrendDirection.Down,

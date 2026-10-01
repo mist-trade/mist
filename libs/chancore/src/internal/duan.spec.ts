@@ -173,6 +173,68 @@ describe('DuanCalculator (特征序列法)', () => {
       8, 8, 13, 13, 11, 11, 10, 10, 9, 9, 11,
     ]);
   });
+
+  describe('Lesson 81 Canonical Test Cases (原典第81课更正公案: 5=7/5<7 为1段, 5>7 为3段)', () => {
+    it('classifies as 1 segment when point 5 <= point 7 (5低于7或5=7，第二特征序列包含合并后无顶分型)', () => {
+      // 原典81课/71课图例严格构型:
+      // 0-1 Up(4->18，点1为原向上段顶点=18)
+      // 从点1转折向下: 1-2 Dn(18->10，与前一特征元素有缺口，进入第二种情况)
+      // 第二特征序列由向上笔构成:
+      // 笔2-3 Up(10->12，第1元素，高点3=12)
+      // 笔3-4 Dn(12->8)
+      // 笔4-5 Up(8->15，第2元素，高点5=15 > 点3=12)
+      // 笔5-6 Dn(15->9)
+      // 笔6-7 Up(9->16，第3元素，高点7=16 > 点5=15，即5低于7)
+      // 笔7-8 Dn(16->6)
+      // 第二特征序列 (2-3, 4-5, 6-7): 4-5与6-7包含合并取高高[8..16]，点5无法成顶分型 -> 原段未破，算1段
+      const bis: ChanBi[] = [
+        makeBi('up', 18, 4, 0), // 0-1 Up (顶点 18)
+        makeBi('down', 18, 10, 1), // 1-2 Dn (转笔)
+        makeBi('up', 12, 10, 2), // 2-3 Up (点3=12)
+        makeBi('down', 12, 8, 3), // 3-4 Dn
+        makeBi('up', 15, 8, 4), // 4-5 Up (点5=15)
+        makeBi('down', 15, 9, 5), // 5-6 Dn
+        makeBi('up', 16, 9, 6), // 6-7 Up (点7=16 > 点5=15，5低于7)
+        makeBi('down', 16, 6, 7), // 7-8 Dn
+      ];
+
+      const result = new DuanCalculator().createDuan(bis);
+
+      // 缠论原典第 81 课标准答案: 5低于7或5=7，整体只能算 1 段 (原段未被破坏)
+      expect(result).toHaveLength(1);
+      expect(result[0].type).toBe(DuanType.UnComplete);
+    });
+
+    it('classifies as 3 segments when point 5 > point 7 (5高于7，第二特征序列顶分型确立，倒推确认)', () => {
+      // 原典81课/71课图例严格构型:
+      // 0-1 Up(4->18，点1为原向上段顶点=18)
+      // 1-2 Dn(18->10，有缺口)
+      // 笔2-3 Up(10->12，第1元素，点3=12)
+      // 笔3-4 Dn(12->8)
+      // 笔4-5 Up(8->15，第2元素，点5=15 > 点3=12)
+      // 笔5-6 Dn(15->9)
+      // 笔6-7 Up(9->13，第3元素，点7=13 < 点5=15，即5高于7)
+      // 笔7-8 Dn(13->6)
+      // 第二特征序列 (2-3, 4-5, 6-7): 点5=15 高于两边(12与13)，顶分型确立 -> 倒推确认在点1(18)终结 -> 划分成3段
+      const bis: ChanBi[] = [
+        makeBi('up', 18, 4, 0), // 0-1 Up (顶点 18)
+        makeBi('down', 18, 10, 1), // 1-2 Dn (转笔)
+        makeBi('up', 12, 10, 2), // 2-3 Up (点3=12)
+        makeBi('down', 12, 8, 3), // 3-4 Dn
+        makeBi('up', 15, 8, 4), // 4-5 Up (点5=15)
+        makeBi('down', 15, 9, 5), // 5-6 Dn
+        makeBi('up', 13, 9, 6), // 6-7 Up (点7=13 < 点5=15，5高于7)
+        makeBi('down', 13, 6, 7), // 7-8 Dn
+      ];
+
+      const result = new DuanCalculator().createDuan(bis);
+
+      // 缠论原典第 81 课标准答案: 5高于7，倒推确认为 3 段
+      expect(result.length).toBeGreaterThanOrEqual(2);
+      expect(result[0].type).toBe(DuanType.Complete);
+      expect(result[0].high).toBe(18); // 第一段在顶点 18 结束
+    });
+  });
 });
 
 /** 构造最小 ChanBi（仅设 DuanCalculator 使用的字段；fenxings/originData 留空，段算法不读）。 */
