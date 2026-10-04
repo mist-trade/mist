@@ -66,8 +66,10 @@ export interface ChanDuan {
   endBi: ChanBi | null;
 }
 
-export interface ChanDuanChannel {
-  duans: ChanDuan[];
+export interface ChanBiChannel {
+  bis: ChanBi[];
+  entryBi: ChanBi;
+  leaveBi?: ChanBi;
   zg: number;
   zd: number;
   gg: number;
@@ -75,11 +77,36 @@ export interface ChanDuanChannel {
   level: ChannelLevel;
   type: ChannelType;
   status: ChannelStatus;
-  expanded: boolean; // 中枢扩张合并产物标志（true=更高级别中枢）
+  trend: TrendDirection;
+  extended?: boolean;
+  expanded: boolean;
+  upgradedLevel?: ChannelLevel;
   startId: number;
   endId: number;
-  displayStartId: number;
-  displayEndId: number;
+}
+
+export interface ChanBiChannelTwoPhaseResult {
+  phaseA: ChanBiChannel[];
+  phaseB: ChanBiChannel[];
+}
+
+export interface ChanDuanChannel {
+  duans: ChanDuan[];
+  entryDuan: ChanDuan;
+  leaveDuan?: ChanDuan;
+  zg: number;
+  zd: number;
+  gg: number;
+  dd: number;
+  level: ChannelLevel;
+  type: ChannelType;
+  status: ChannelStatus;
+  trend: TrendDirection;
+  extended?: boolean;
+  expanded: boolean; // 中枢扩展外层大框标志
+  upgradedLevel?: ChannelLevel;
+  startId: number;
+  endId: number;
 }
 
 export interface ChanDuanChannelTwoPhaseResult {

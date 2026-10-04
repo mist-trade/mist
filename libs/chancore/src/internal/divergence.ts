@@ -1,4 +1,4 @@
-import { ChanDivergenceType, TrendDirection } from '../contracts';
+import { ChanDivergenceType, ChannelLevel, TrendDirection } from '../contracts';
 import type {
   ChanDivergence,
   ChanDivergenceInput,
@@ -14,6 +14,7 @@ interface ChannelSpan {
   readonly zd: number;
   readonly gg: number;
   readonly dd: number;
+  readonly level?: ChannelLevel;
 }
 
 interface Chain {
@@ -39,10 +40,10 @@ interface Chain {
 export class DivergenceDetector {
   /**
    * 入参 = 最小结构接口（units/zhongshus/forces 按索引对齐）；调用方把 ChanBi[]/ChanDuan[]、
-   * ChanChannel[]/ChanDuanChannel[] 与 @app/indicators 力度计算结果映射而来。
+   * ChanBiChannel[]/ChanDuanChannel[] 与 @app/indicators 力度计算结果映射而来。
    */
   detectDivergences(input: ChanDivergenceInput): ChanDivergence[] {
-    const { units, zhongshus, forces } = input;
+    const { units, zhongshus, forces, level } = input;
     if (units.length === 0 || zhongshus.length === 0 || forces.length === 0) {
       return [];
     }
@@ -52,7 +53,7 @@ export class DivergenceDetector {
 
     // 盘整背驰（每中枢独立，无趋势前提）
     for (const span of spans) {
-      const divergence = this.detectConsolidation(span, units, forces);
+      const divergence = this.detectConsolidation(span, units, forces, level);
       if (divergence) {
         results.push(divergence);
       }
@@ -61,7 +62,7 @@ export class DivergenceDetector {
     // 趋势链构造 → 趋势背驰
     const chains = this.buildChains(spans, units);
     for (const chain of chains) {
-      const divergence = this.detectTrend(chain, units, forces);
+      const divergence = this.detectTrend(chain, units, forces, level);
       if (divergence) {
         results.push(divergence);
       }
@@ -92,6 +93,7 @@ export class DivergenceDetector {
         zd: zhongshu.zd,
         gg: zhongshu.gg,
         dd: zhongshu.dd,
+        level: zhongshu.level,
       });
     }
     return spans;
@@ -128,6 +130,7 @@ export class DivergenceDetector {
     span: ChannelSpan,
     units: readonly ChanDivergenceUnit[],
     forces: readonly ChanUnitForce[],
+    inputLevel?: ChannelLevel,
   ): ChanDivergence | null {
     const enter = span.firstIndex - 1;
     const leave = span.lastIndex + 1;
@@ -163,8 +166,10 @@ export class DivergenceDetector {
       }
     }
     if (this.isWeaker(forces[leave], forces[enter])) {
+      const resolvedLevel = span.level ?? inputLevel ?? ChannelLevel.Bi;
       return {
         type: ChanDivergenceType.Consolidation,
+        level: resolvedLevel,
         zhongshuIndex: span.zhongshuIndex,
         enterIndex: enter,
         leaveIndex: leave,
@@ -261,6 +266,7 @@ export class DivergenceDetector {
     chain: Chain,
     units: readonly ChanDivergenceUnit[],
     forces: readonly ChanUnitForce[],
+    inputLevel?: ChannelLevel,
   ): ChanDivergence | null {
     const lastSpan = chain.spans[chain.spans.length - 1];
     const firstSpan = chain.spans[0];
@@ -306,8 +312,10 @@ export class DivergenceDetector {
       }
     }
 
+    const resolvedLevel = lastSpan.level ?? inputLevel ?? ChannelLevel.Bi;
     return {
       type: ChanDivergenceType.Trend,
+      level: resolvedLevel,
       zhongshuIndex: lastSpan.zhongshuIndex,
       enterIndex: enter,
       leaveIndex: leave,

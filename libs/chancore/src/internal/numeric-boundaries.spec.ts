@@ -9,14 +9,14 @@ import {
 } from '../contracts';
 import type {
   ChanBi,
-  ChanChannel,
+  ChanBiChannel,
   ChanFenxing,
   ChanK,
   ChanMergedK,
 } from '../contracts';
 import { ChanCore } from '../chan-core';
 import { BiCalculator } from './bi';
-import { ChannelCalculator } from './channel';
+import { BiChannelCalculator } from './bi-channel';
 
 describe('ChanCore numeric boundaries', () => {
   it('does not merge equal-center containment while preserving input order', () => {
@@ -86,12 +86,14 @@ describe('ChanCore numeric boundaries', () => {
   });
 
   it('rejects a touching Channel zone where zg equals zd', () => {
-    const calculator = new ChannelCalculator();
+    const calculator = new BiChannelCalculator();
     const bi = makeBi(
       makeFenxing(1, FenxingType.Bottom, 5, 0),
       makeFenxing(2, FenxingType.Top, 10, 2),
     );
-    const channel: ChanChannel = {
+    const channel: ChanBiChannel = {
+      entryBi: bi,
+      leaveBi: bi,
       bis: [bi, bi, bi],
       zg: 10,
       zd: 10,
@@ -105,8 +107,6 @@ describe('ChanCore numeric boundaries', () => {
       expanded: false,
       startId: 1,
       endId: 2,
-      displayStartId: 1,
-      displayEndId: 2,
     };
 
     expect(calculator['isCandidateChannelValid'](channel)).toBe(false);

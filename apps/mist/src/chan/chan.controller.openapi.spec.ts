@@ -2,7 +2,7 @@ import 'reflect-metadata';
 import { DECORATORS } from '@nestjs/swagger/dist/constants';
 import { getSchemaPath } from '@nestjs/swagger';
 import { ChanController } from './chan.controller';
-import { ChannelTwoPhaseVo, ChannelVo } from './vo/channel.vo';
+import { BiChannelTwoPhaseVo, BiChannelVo } from './vo/bi-channel.vo';
 import { BiTwoPhaseVo, BiVo } from './vo/bi.vo';
 import { DuanChannelTwoPhaseVo } from './vo/duan-channel.vo';
 import { DuanVo } from './vo/duan.vo';
@@ -16,7 +16,7 @@ describe('ChanController OpenAPI contract', () => {
       | 'postMergeK'
       | 'postIndexBi'
       | 'postFenxing'
-      | 'postChannel'
+      | 'postBiChannel'
       | 'postDuan'
       | 'postDuanChannel',
   ) {
@@ -38,11 +38,11 @@ describe('ChanController OpenAPI contract', () => {
         data: { $ref: getSchemaPath(BiTwoPhaseVo) },
       },
     });
-    expect(responseSchema('postChannel').allOf[1]).toEqual({
+    expect(responseSchema('postBiChannel').allOf[1]).toEqual({
       properties: {
         success: { type: 'boolean', enum: [true] },
         statusCode: { type: 'integer', enum: [200] },
-        data: { $ref: getSchemaPath(ChannelTwoPhaseVo) },
+        data: { $ref: getSchemaPath(BiChannelTwoPhaseVo) },
       },
     });
     expect(responseSchema('postDuan').allOf[1].properties.data).toEqual({
@@ -107,7 +107,7 @@ describe('ChanController OpenAPI contract', () => {
       (property) =>
         Reflect.getMetadata(
           DECORATORS.API_MODEL_PROPERTIES,
-          ChannelVo.prototype,
+          BiChannelVo.prototype,
           property,
         ),
     );
@@ -119,7 +119,7 @@ describe('ChanController OpenAPI contract', () => {
     expect(responseSchema('postIndexBi').allOf[0].$ref).toBe(
       '#/components/schemas/ApiResponseDto',
     );
-    expect(responseSchema('postChannel').allOf[0].$ref).toBe(
+    expect(responseSchema('postBiChannel').allOf[0].$ref).toBe(
       '#/components/schemas/ApiResponseDto',
     );
   });

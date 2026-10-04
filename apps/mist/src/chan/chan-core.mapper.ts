@@ -1,6 +1,6 @@
 import type {
   ChanBi,
-  ChanChannel,
+  ChanBiChannel,
   ChanDuan,
   ChanDuanChannel,
   ChanFenxing,
@@ -9,7 +9,7 @@ import type {
 } from '@app/chancore';
 import type { KVo } from '../indicator/vo/k.vo';
 import type { BiVo } from './vo/bi.vo';
-import type { ChannelVo } from './vo/channel.vo';
+import type { BiChannelVo } from './vo/bi-channel.vo';
 import type { DuanChannelVo } from './vo/duan-channel.vo';
 import type { DuanVo } from './vo/duan.vo';
 import type { FenxingVo } from './vo/fenxing.vo';
@@ -80,9 +80,11 @@ export function toBiVo(bi: ChanBi): BiVo {
   };
 }
 
-export function toChannelVo(channel: ChanChannel): ChannelVo {
+export function toBiChannelVo(channel: ChanBiChannel): BiChannelVo {
   return {
     bis: channel.bis.map(toBiVo),
+    entryBi: toBiVo(channel.entryBi),
+    leaveBi: channel.leaveBi ? toBiVo(channel.leaveBi) : undefined,
     zg: channel.zg,
     zd: channel.zd,
     gg: channel.gg,
@@ -93,10 +95,9 @@ export function toChannelVo(channel: ChanChannel): ChannelVo {
     trend: channel.trend,
     extended: channel.extended,
     expanded: channel.expanded,
+    upgradedLevel: channel.upgradedLevel,
     startId: channel.startId,
     endId: channel.endId,
-    displayStartId: channel.displayStartId,
-    displayEndId: channel.displayEndId,
   };
 }
 
@@ -120,6 +121,8 @@ export function toDuanVo(duan: ChanDuan): DuanVo {
 export function toDuanChannelVo(channel: ChanDuanChannel): DuanChannelVo {
   return {
     duans: channel.duans.map(toDuanVo),
+    entryDuan: toDuanVo(channel.entryDuan),
+    leaveDuan: channel.leaveDuan ? toDuanVo(channel.leaveDuan) : undefined,
     zg: channel.zg,
     zd: channel.zd,
     gg: channel.gg,
@@ -127,11 +130,12 @@ export function toDuanChannelVo(channel: ChanDuanChannel): DuanChannelVo {
     level: channel.level,
     type: channel.type,
     status: channel.status,
+    trend: channel.trend ?? channel.entryDuan.trend,
+    extended: channel.extended,
     expanded: channel.expanded,
+    upgradedLevel: channel.upgradedLevel,
     startId: channel.startId,
     endId: channel.endId,
-    displayStartId: channel.displayStartId,
-    displayEndId: channel.displayEndId,
   };
 }
 

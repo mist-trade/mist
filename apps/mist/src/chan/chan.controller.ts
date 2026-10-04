@@ -3,7 +3,7 @@ import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { ApiEnvelopeResponse } from '@app/transport/http';
 import { Throttle } from '@nestjs/throttler';
 import { ChanService } from './chan.service';
-import { ChannelTwoPhaseVo } from './vo/channel.vo';
+import { BiChannelTwoPhaseVo } from './vo/bi-channel.vo';
 import { BiTwoPhaseVo } from './vo/bi.vo';
 import { DuanChannelTwoPhaseVo } from './vo/duan-channel.vo';
 import { DuanVo } from './vo/duan.vo';
@@ -113,22 +113,22 @@ export class ChanController {
     return this.chanService.getFenxings({ k });
   }
 
-  @Post('channel')
-  @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 requests per minute for channel creation
+  @Post('bi-channel')
+  @Throttle({ default: { limit: 20, ttl: 60000 } }) // 20 requests per minute for bi-channel creation
   @ApiOperation({
-    summary: 'Create Channels (Zhongshu)',
+    summary: 'Create Bi-level Channels (笔级中枢)',
     description:
-      'Identifies and creates channels (central regions) from Bi data. Returns a two-phase result: phaseA (all enumerated base channels) and phaseB (merged final channels).',
+      'Identifies and creates bi-level channels (central regions) from Bi data. Returns a two-phase result: phaseA (all enumerated base channels) and phaseB (merged final channels).',
   })
   @ApiEnvelopeResponse({
     status: 200,
     description:
-      'Returns an API envelope whose data contains the two-phase channel result { phaseA, phaseB }',
-    type: ChannelTwoPhaseVo,
+      'Returns an API envelope whose data contains the two-phase bi-channel result { phaseA, phaseB }',
+    type: BiChannelTwoPhaseVo,
   })
-  async postChannel(@Body() queryDto: IndicatorQueryDto) {
+  async postBiChannel(@Body() queryDto: IndicatorQueryDto) {
     const k = await this.getChanKData(queryDto);
-    return this.chanService.createChannels({
+    return this.chanService.createBiChannels({
       k,
       filterFenxingContainment: queryDto.filterFenxingContainment,
     });

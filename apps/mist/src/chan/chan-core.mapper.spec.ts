@@ -11,7 +11,7 @@ import {
 } from '@app/chancore';
 import type {
   ChanBi,
-  ChanChannel,
+  ChanBiChannel,
   ChanDuan,
   ChanDuanChannel,
   ChanFenxing,
@@ -20,7 +20,7 @@ import type {
 import {
   toBiVo,
   toChanK,
-  toChannelVo,
+  toBiChannelVo,
   toDuanChannelVo,
   toDuanVo,
   toFenxingVo,
@@ -107,8 +107,10 @@ describe('ChanCore HTTP mapper', () => {
       startFenxing: start,
       endFenxing: end,
     };
-    const channel: ChanChannel = {
+    const channel: ChanBiChannel = {
       bis: [bi],
+      entryBi: bi,
+      leaveBi: bi,
       zg: 12,
       zd: 9,
       gg: 15,
@@ -121,19 +123,21 @@ describe('ChanCore HTTP mapper', () => {
       expanded: false,
       startId: 1,
       endId: 2,
-      displayStartId: 1,
-      displayEndId: 2,
     };
 
     const biVo = toBiVo(bi);
-    const channelVo = toChannelVo(channel);
+    const channelVo = toBiChannelVo(channel);
     biVo.originIds.push(3);
     channelVo.bis[0].originIds.push(4);
 
     expect(biVo).toMatchObject({ high: 15, low: 5 });
     expect(biVo.startFenxing).toMatchObject({ high: 10, low: 5 });
     expect(channelVo.bis[0]).toMatchObject({ high: 15, low: 5 });
+    expect(channelVo.entryBi).toMatchObject({ high: 15, low: 5 });
+    expect(channelVo.leaveBi).toMatchObject({ high: 15, low: 5 });
     expect(channelVo.expanded).toBe(false);
+    expect(channelVo).not.toHaveProperty('displayStartId');
+    expect(channelVo).not.toHaveProperty('displayEndId');
     expect(biVo).not.toHaveProperty('highest');
     expect(biVo).not.toHaveProperty('lowest');
     expect(bi.originIds).toEqual([1, 2]);
@@ -218,6 +222,8 @@ describe('ChanCore HTTP mapper', () => {
     };
     const duanChannel: ChanDuanChannel = {
       duans: [duan],
+      entryDuan: duan,
+      leaveDuan: duan,
       zg: 18,
       zd: 6,
       gg: 20,
@@ -225,11 +231,10 @@ describe('ChanCore HTTP mapper', () => {
       level: ChannelLevel.Duan,
       type: ChannelType.Complete,
       status: ChannelStatus.Valid,
+      trend: TrendDirection.Up,
       expanded: false,
       startId: 1,
       endId: 3,
-      displayStartId: 2,
-      displayEndId: 2,
     };
 
     const vo = toDuanChannelVo(duanChannel);
@@ -239,9 +244,13 @@ describe('ChanCore HTTP mapper', () => {
     expect(vo.level).toBe(ChannelLevel.Duan);
     expect(vo.expanded).toBe(false);
     expect(vo.duans[0]).toMatchObject({ high: 20, low: 4 });
-    expect(vo).not.toHaveProperty('trend'); // 中枢无方向
+    expect(vo.entryDuan).toMatchObject({ high: 20, low: 4 });
+    expect(vo.leaveDuan).toMatchObject({ high: 20, low: 4 });
+    expect(vo.trend).toBe(TrendDirection.Up);
     expect(vo).not.toHaveProperty('highest');
     expect(vo).not.toHaveProperty('lowest');
+    expect(vo).not.toHaveProperty('displayStartId');
+    expect(vo).not.toHaveProperty('displayEndId');
     expect(duanChannel.duans[0].originIds).toEqual([1, 2, 3]);
   });
 });

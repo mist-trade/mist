@@ -41,7 +41,7 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
     name: '中枢延伸与合并未取全量构件公共重叠交集',
     rootCause:
       '中枢延伸仅取首尾段交集导致区间漂移穿透。修复为触及延伸必须维持所有构件全量动态公共交集 (min(high) > max(low))。',
-    specFile: 'internal/channel.spec.ts',
+    specFile: 'internal/bi-channel.spec.ts',
     testCasePatterns: [
       'updates to dynamic common intersection',
       'terminates extension when dynamic common intersection becomes empty',
@@ -52,7 +52,7 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
     name: '5M 级别第 1 号中枢假突破过早封存导致 0.86 微型中枢',
     rootCause:
       '顺势笔突破中枢上沿 ZG 但未突破前期历史极值 GG 时被误判为离开封存。确立规则 1：必须顺势突破极值 GG 并确认 3 类买卖点或反穿后才能封存。',
-    specFile: 'internal/channel.spec.ts',
+    specFile: 'internal/bi-channel.spec.ts',
     testCasePatterns: [
       '5M 实盘经典用例一：01-07~01-13 第 1 号中枢避免 b[10] 假突破过早封存',
     ],
@@ -62,7 +62,7 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
     name: '5M 级别 1月22日长中枢 11 笔贪婪吞噬与 departure < GG 倒挂',
     rootCause:
       '顺势突破极值后，未检测后续走势自身已独立构成新中枢，旧中枢无限吸附后续上涨。确立规则 4：新中枢核心成立时触发旧中枢在离开端点强制封存。',
-    specFile: 'internal/channel.spec.ts',
+    specFile: 'internal/bi-channel.spec.ts',
     testCasePatterns: [
       '5M 实盘经典用例二：01-21~01-26 1月22日中枢与后续高台阶中枢拆分',
     ],

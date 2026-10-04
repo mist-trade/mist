@@ -368,20 +368,20 @@ describe('ChanVisualAdapter', () => {
     expect(duanCommands.length).toBe(0);
   });
 
-  it('renders bi-centrals spanning from entry stroke end to exit stroke start', () => {
+  it('renders bi-centrals spanning strictly from first internal oscillation stroke start to last internal stroke end', () => {
     const klines = generateRealKlines();
     const commands = ChanVisualAdapter.convert(klines);
     const zsCommands = commands.filter((c) => c.layer === 'chan_zs_bi');
 
-    const { phaseB: channels } = ChanCore.createChannels(klines);
+    const { phaseB: channels } = ChanCore.createBiChannels(klines);
     if (channels.length > 0 && zsCommands.length > 0) {
       const firstZs = channels[0];
       const firstCmd = zsCommands[0] as any;
-      // fromTime must equal bis[1].startTime (entry bi end), not bis[0].startTime
+      // fromTime must strictly equal bis[0].startTime (first internal oscillation stroke)
       expect(firstCmd.fromTime).toBe(
-        new Date(firstZs.bis[1].startTime).toISOString(),
+        new Date(firstZs.bis[0].startTime).toISOString(),
       );
-      // If central is uncomplete, it extends to the latest K-line; otherwise to exit bi start
+      // If central is uncomplete, it extends to the latest K-line; otherwise to last internal stroke end
       if (firstZs.type === ChannelType.UnComplete) {
         expect(firstCmd.toTime).toBe(
           new Date(klines[klines.length - 1].time).toISOString(),
@@ -390,10 +390,19 @@ describe('ChanVisualAdapter', () => {
         expect(firstCmd.status).toBe('uncomplete');
       } else {
         expect(firstCmd.toTime).toBe(
-          new Date(firstZs.bis[firstZs.bis.length - 1].startTime).toISOString(),
+          new Date(firstZs.bis[firstZs.bis.length - 1].endTime).toISOString(),
         );
         expect(firstCmd.style).toBe('solid');
       }
+    }
+  });
+
+  it('renders bi BSP with layer chan_bsp_bi and duan BSP with layer chan_bsp_duan', () => {
+    const klines = generateSampleKlines(60);
+    const commands = ChanVisualAdapter.convert(klines, { includeBsp: true });
+    const bspBiCommands = commands.filter((c) => c.layer === 'chan_bsp_bi');
+    if (bspBiCommands.length > 0) {
+      expect(bspBiCommands[0].id).toMatch(/^chan_bsp_bi_/);
     }
   });
 });

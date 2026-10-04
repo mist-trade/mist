@@ -2,6 +2,8 @@ import { TrendDirection } from '../contracts';
 import type { ChanK, ChanMergedK } from '../contracts';
 import { TrendCalculator } from './trend';
 
+import { mergePriceInterval } from './interval-inclusion';
+
 type MutableMergedK = {
   startTime: Date;
   endTime: Date;
@@ -16,57 +18,13 @@ type MutableMergedK = {
 export class KMergeCalculator {
   constructor(private readonly trend = new TrendCalculator()) {}
 
-  // 处理包含关系
+  // 处理包含关系：复用通用包含合并算子
   private handleContainedState(
     current: ChanMergedK,
     next: ChanK,
     trend: TrendDirection,
   ): { merged: boolean; newHigh: number; newLow: number } {
-    // 判断包含关系的方向
-    // 前包含后：当前K线包含下一根K线
-    const currentContainsNext =
-      current.high >= next.high && current.low <= next.low;
-    // 后包含前：下一根K线包含当前K线
-    const nextContainsCurrent =
-      next.high >= current.high && next.low <= current.low;
-
-    // 没有包含关系，不合并
-    if (!currentContainsNext && !nextContainsCurrent) {
-      return { merged: false, newHigh: 0, newLow: 0 };
-    }
-
-    // 当趋势为None时，根据包含关系的方向来判断
-    let actualTrend = trend;
-    if (actualTrend === TrendDirection.None) {
-      // 比较中心点位置来决定方向
-      const currentMiddle = (current.high + current.low) / 2;
-      const nextMiddle = (next.high + next.low) / 2;
-
-      if (nextMiddle < currentMiddle) {
-        actualTrend = TrendDirection.Down;
-      } else if (nextMiddle > currentMiddle) {
-        actualTrend = TrendDirection.Up;
-      } else {
-        // 中心点相等，不合并
-        return { merged: false, newHigh: 0, newLow: 0 };
-      }
-    }
-
-    // 处理向上趋势, 高高取高
-    if (actualTrend === TrendDirection.Up) {
-      return {
-        merged: true,
-        newHigh: Math.max(current.high, next.high),
-        newLow: Math.max(current.low, next.low),
-      };
-    }
-
-    // 处理向下趋势, 低低取低
-    return {
-      merged: true,
-      newHigh: Math.min(current.high, next.high),
-      newLow: Math.min(current.low, next.low),
-    };
+    return mergePriceInterval(current, next, trend);
   }
 
   // 合并k线

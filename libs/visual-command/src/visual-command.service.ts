@@ -47,20 +47,25 @@ export class VisualCommandService {
       layerSet.has('chan_zs_bi') ||
       layerSet.has('chan_zs_duan');
 
+    const hasBsp =
+      layerSet.has('chan_bsp') ||
+      layerSet.has('chan_bsp_bi') ||
+      layerSet.has('chan_bsp_duan');
+
     // 1. Chan Layer
     if (
       layerSet.has('chan') ||
       layerSet.has('chan_bi') ||
       layerSet.has('chan_duan') ||
       hasZs ||
-      layerSet.has('chan_bsp')
+      hasBsp
     ) {
       const chanCmds = ChanVisualAdapter.convert(klines, {
         ...chanOptions,
         includeBi: !layerSet.has('chan') ? layerSet.has('chan_bi') : true,
         includeDuan: !layerSet.has('chan') ? layerSet.has('chan_duan') : true,
         includeZhongshu: !layerSet.has('chan') ? hasZs : true,
-        includeBsp: !layerSet.has('chan') ? layerSet.has('chan_bsp') : true,
+        includeBsp: !layerSet.has('chan') ? hasBsp : true,
       });
       allCommands.push(...chanCmds);
     }

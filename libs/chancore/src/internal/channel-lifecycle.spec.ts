@@ -1,11 +1,12 @@
 import { TrendDirection } from '../contracts';
 import {
-  ChannelLifecycleEngine,
+  BiChannelLifecycleEngine,
+  BiStateMachine,
   computeSymmetricGeometry,
   resolveChannelAnchorIds,
   validateTrendAlternating,
   type ChannelElement,
-  type ChannelLifecycleStrategy,
+  type BiChannelLifecycleStrategy,
 } from './channel-lifecycle';
 
 interface MockElement extends ChannelElement {
@@ -27,7 +28,7 @@ function makeElem(
   };
 }
 
-describe('ChannelLifecycle Utilities & Engine', () => {
+describe('ChannelLifecycle Utilities & BiStateMachine Engine (Batch 2 TDD)', () => {
   describe('validateTrendAlternating', () => {
     it('returns true when trends alternate strictly', () => {
       const items = [
@@ -73,8 +74,8 @@ describe('ChannelLifecycle Utilities & Engine', () => {
     });
   });
 
-  describe('resolveChannelAnchorIds', () => {
-    it('picks correct startId, endId, displayStartId, displayEndId', () => {
+  describe('resolveChannelAnchorIds (Physically purged displayStartId/displayEndId)', () => {
+    it('picks correct startId and endId, and strictly omits displayStartId/displayEndId', () => {
       const items = [
         makeElem(0, TrendDirection.Up, 0, 10),
         makeElem(1, TrendDirection.Down, 2, 8),
@@ -84,18 +85,44 @@ describe('ChannelLifecycle Utilities & Engine', () => {
       expect(ids).toEqual({
         startId: 0,
         endId: 22,
-        displayStartId: 1, // middle of [0, 1, 2]
-        displayEndId: 21, // middle of [20, 21, 22]
       });
+      expect('displayStartId' in ids).toBe(false);
+      expect('displayEndId' in ids).toBe(false);
     });
   });
 
-  describe('Bidirectional Rules 1..4 in Lifecycle Engine', () => {
-    const mockStrategy: ChannelLifecycleStrategy<MockElement, any> = {
-      minCoreLength: 3,
-      minSealedLength: 3,
+  describe('BiStateMachine direct unit tests', () => {
+    it('initializes with 4-element core and manages candidate departures', () => {
+      const core = [
+        makeElem(0, TrendDirection.Up, 0, 10),
+        makeElem(1, TrendDirection.Down, 2, 8),
+        makeElem(2, TrendDirection.Up, 3, 9),
+        makeElem(3, TrendDirection.Down, 4, 8),
+      ];
+      const fsm = new BiStateMachine<MockElement>(0, core, {
+        geometry: { zg: 8, zd: 4, gg: 10, dd: 0 },
+        isUp: true,
+      });
+
+      expect(fsm.zg).toBe(8);
+      expect(fsm.zd).toBe(4);
+      expect(fsm.isComplete).toBe(false);
+
+      const candidateBi = makeElem(4, TrendDirection.Up, 5, 15);
+      const recorded = fsm.recordCandidateDeparture(candidateBi, 4, 15, 0);
+      expect(recorded).not.toBeNull();
+      expect(fsm.candidateDepartures).toHaveLength(1);
+
+      fsm.sealAtLatestCandidate();
+      expect(fsm.isComplete).toBe(true);
+    });
+  });
+
+  describe('Bidirectional Rules in BiChannelLifecycleEngine', () => {
+    const mockStrategy: BiChannelLifecycleStrategy<MockElement, any> = {
+      allowUncomplete: false,
       validateCore: (window) => {
-        const geo = computeSymmetricGeometry(window);
+        const geo = computeSymmetricGeometry(window.slice(1));
         if (!geo) return null;
         return { geometry: geo, isUp: window[0].trend === TrendDirection.Up };
       },
@@ -117,11 +144,6 @@ describe('ChannelLifecycle Utilities & Engine', () => {
     };
 
     it('Down Central: Rule 1 seals when 3S forms and stroke1 breaks below DD', () => {
-      // Core: d0 Down (100 -> 85), d1 Up (85 -> 95), d2 Down (75 -> 90) -> zg=90, zd=85, dd=75, gg=100
-      // d3 Up (75 -> 88) retracement
-      // d4 Down (60 -> 88) breakout below DD(75) to 60!
-      // d5 Up (60 -> 82) pullback stays below ZD(85) -> 3S!
-      // d6 Down (50 -> 82) stroke1 after 3S breaks below 60 to 50 -> Rule 1!
       const duans = [
         makeElem(0, TrendDirection.Down, 85, 100),
         makeElem(1, TrendDirection.Up, 85, 95),
@@ -132,7 +154,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
         makeElem(6, TrendDirection.Down, 50, 82),
       ];
 
-      const res = ChannelLifecycleEngine.runSequentialLifecycle(
+      const res = BiChannelLifecycleEngine.runSequentialLifecycle(
         duans,
         mockStrategy,
       );
@@ -143,10 +165,6 @@ describe('ChannelLifecycle Utilities & Engine', () => {
     });
 
     it('Down Central: Rule 2 seals when 3S forms and stroke2 pierces ZG (90)', () => {
-      // d4 Down to 60 (breakout)
-      // d5 Up to 78 (3S)
-      // d6 Down to 65 (fails to make new low)
-      // d7 Up to 95 (pierces ZG=90) -> Rule 2!
       const duans = [
         makeElem(0, TrendDirection.Down, 80, 100),
         makeElem(1, TrendDirection.Up, 80, 95),
@@ -158,7 +176,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
         makeElem(7, TrendDirection.Up, 65, 95),
       ];
 
-      const res = ChannelLifecycleEngine.runSequentialLifecycle(
+      const res = BiChannelLifecycleEngine.runSequentialLifecycle(
         duans,
         mockStrategy,
       );
@@ -169,8 +187,6 @@ describe('ChannelLifecycle Utilities & Engine', () => {
     });
 
     it('Down Central: Rule 3 seals when No 3S and pullback pierces ZG (90)', () => {
-      // d4 Down to 60 (breakout)
-      // d5 Up to 105 (no 3S, directly pierces GG=100!) -> Rule 3!
       const duans = [
         makeElem(0, TrendDirection.Down, 80, 100),
         makeElem(1, TrendDirection.Up, 80, 95),
@@ -180,7 +196,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
         makeElem(5, TrendDirection.Up, 60, 105),
       ];
 
-      const res = ChannelLifecycleEngine.runSequentialLifecycle(
+      const res = BiChannelLifecycleEngine.runSequentialLifecycle(
         duans,
         mockStrategy,
       );
@@ -191,10 +207,6 @@ describe('ChannelLifecycle Utilities & Engine', () => {
     });
 
     it('Down Central: Rule 4 seals when new core forms after breakout', () => {
-      // d4 Down to 60 (breakout)
-      // d5 Up (50 -> 68)
-      // d6 Down (45 -> 65)
-      // [d4, d5, d6] forms new core [45, 68]
       const duans = [
         makeElem(0, TrendDirection.Down, 80, 100),
         makeElem(1, TrendDirection.Up, 80, 95),
@@ -205,7 +217,7 @@ describe('ChannelLifecycle Utilities & Engine', () => {
         makeElem(6, TrendDirection.Down, 45, 65),
       ];
 
-      const res = ChannelLifecycleEngine.runSequentialLifecycle(
+      const res = BiChannelLifecycleEngine.runSequentialLifecycle(
         duans,
         mockStrategy,
       );

@@ -118,10 +118,18 @@ describe('Mist API path standardization', () => {
   it('registers only preferred Chan routes', () => {
     const routes = getRoutes(ChanController);
 
-    for (const suffix of ['merge-k', 'bi', 'fenxing', 'channel']) {
+    for (const suffix of [
+      'merge-k',
+      'bi',
+      'fenxing',
+      'bi-channel',
+      'duan',
+      'duan-channel',
+    ]) {
       expectRoute(routes, RequestMethod.POST, `/v1/chan/${suffix}`);
       expectNoRoute(routes, RequestMethod.POST, `/chan/${suffix}`);
     }
+    expectNoRoute(routes, RequestMethod.POST, '/v1/chan/channel');
   });
 
   it('keeps the collector collection route unchanged', () => {

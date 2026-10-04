@@ -1,4 +1,4 @@
-import { DuanStatus } from './contracts';
+import { BiStatus, ChannelLevel, DuanStatus } from './contracts';
 import type {
   ChanBi,
   ChanBiOptions,
@@ -6,8 +6,8 @@ import type {
   ChanBspInput,
   ChanBspUnit,
   ChanBuySellPoint,
-  ChanChannel,
-  ChanChannelTwoPhaseResult,
+  ChanBiChannel,
+  ChanBiChannelTwoPhaseResult,
   ChanDivergence,
   ChanDivergenceInput,
   ChanDivergenceZhongshu,
@@ -26,7 +26,7 @@ import {
   chanChannelToZhongshu,
   chanUnitToBspUnit,
 } from './internal/buy-sell-point';
-import { ChannelCalculator } from './internal/channel';
+import { BiChannelCalculator } from './internal/bi-channel';
 import { DivergenceDetector } from './internal/divergence';
 import { DuanCalculator } from './internal/duan';
 import { DuanChannelCalculator } from './internal/duan-channel';
@@ -69,16 +69,16 @@ export class ChanCore {
     return new BiCalculator(options).getBi(mergedK);
   }
 
-  static createChannels(
+  static createBiChannels(
     orderedK: readonly ChanK[],
     options?: {
       readonly allowUncomplete?: boolean;
     } & ChanBiOptions,
-  ): ChanChannelTwoPhaseResult {
+  ): ChanBiChannelTwoPhaseResult {
     assertChanKSeries(orderedK);
     const mergedK = new KMergeCalculator().merge(orderedK);
     const bis = new BiCalculator(options).getBi(mergedK);
-    return new ChannelCalculator().createChannels(bis.phaseB, {
+    return new BiChannelCalculator().createBiChannels(bis.phaseB, {
       allowUncomplete: options?.allowUncomplete,
     });
   }
@@ -136,6 +136,27 @@ export class ChanCore {
       units,
       zhongshus,
       forces: input.forces ?? [],
+      level: ChannelLevel.Duan,
+    });
+  }
+
+  /**
+   * 笔级买卖点（Bi-level BSP）便捷门面纯函数：
+   * 自动过滤有效确认笔并转换为 units，将 biChannels 转换为 zhongshus，支持可选 forces。
+   */
+  static detectBiBuySellPoints(input: {
+    readonly bis: readonly ChanBi[];
+    readonly biChannels: readonly ChanBiChannel[];
+    readonly forces?: readonly ChanUnitForce[];
+  }): readonly ChanBuySellPoint[] {
+    const validBis = input.bis.filter((b) => b.status === BiStatus.Valid);
+    const units = validBis.map(chanUnitToBspUnit);
+    const zhongshus = input.biChannels.map(chanChannelToZhongshu);
+    return new BuySellPointDetector().detectBuySellPoints({
+      units,
+      zhongshus,
+      forces: input.forces ?? [],
+      level: ChannelLevel.Bi,
     });
   }
 
@@ -144,7 +165,7 @@ export class ChanCore {
   }
 
   static toZhongshu(
-    channel: ChanChannel | ChanDuanChannel,
+    channel: ChanBiChannel | ChanDuanChannel,
   ): ChanDivergenceZhongshu {
     return chanChannelToZhongshu(channel);
   }

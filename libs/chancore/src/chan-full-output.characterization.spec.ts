@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto';
 import { BiStatus, BiType, ChanCore } from './index';
 import type {
   ChanBi,
-  ChanChannel,
+  ChanBiChannel,
   ChanDuan,
   ChanDuanChannel,
   ChanFenxing,
@@ -80,7 +80,7 @@ function toContractBi(bi: ChanBi) {
   };
 }
 
-function toContractChannel(channel: ChanChannel) {
+function toContractChannel(channel: ChanBiChannel) {
   return {
     bis: channel.bis.map(toContractBi),
     zg: channel.zg,
@@ -94,8 +94,6 @@ function toContractChannel(channel: ChanChannel) {
     expanded: channel.expanded,
     startId: channel.startId,
     endId: channel.endId,
-    displayStartId: channel.displayStartId,
-    displayEndId: channel.displayEndId,
   };
 }
 
@@ -104,7 +102,7 @@ function runCoreFullPipeline(options?: ChanBiOptions) {
   const merged = ChanCore.mergeK(input);
   const fenxings = ChanCore.findFenxings(input);
   const bis = ChanCore.createBi(input, options);
-  const channels = ChanCore.createChannels(input);
+  const channels = ChanCore.createBiChannels(input);
 
   return {
     input,
@@ -229,7 +227,8 @@ describe('ChanCore full-output differential characterization', () => {
     });
   });
 
-  it('locks Duan-level sequential resolution (adjacent wave overlap retains separate sequential units in phaseB)', () => {
+  // 临时跳过：段中枢扩张与延伸逻辑已按用户指令临时注释
+  it.skip('locks Duan-level sequential resolution (adjacent wave overlap retains separate sequential units in phaseB)', () => {
     const duans = createDuanExpansionFixture();
     const { phaseA, phaseB } = ChanCore.createDuanChannels(duans);
 
@@ -266,21 +265,30 @@ describe('ChanCore full-output differential characterization', () => {
     const { phaseB: bis } = ChanCore.createBi(k);
     const duans = ChanCore.createDuan(bis);
 
-    // 语义断言：
-    // 1) 存在合规的 Complete Up 段 (originBis >= 3)，其峰值 = 4175.35 顶
-    const topIdx = duans.findIndex(
+    // 语义断言（防 SHA 失效时无法定位）：
+    // 1) 存在单笔 Complete Up 段，其终点 = 2026-06-23 10:40 上海（02:40Z，4175.35 顶）
+    expect(duans.length).toBeGreaterThan(0);
+    const anchorTime = new Date('2026-06-23T02:40:00.000Z');
+    const singleIdx = duans.findIndex(
       (d) =>
         d.type === DuanType.Complete &&
         d.trend === TrendDirection.Up &&
-        d.originBis.length >= 3 &&
+        d.originBis.length === 1 &&
+        d.endBi?.endTime.getTime() === anchorTime.getTime() &&
         d.high === 4175.35,
     );
-    expect(topIdx).toBeGreaterThanOrEqual(0);
-    // 2) 确保所有 Complete 线段 originBis >= 3
+    expect(singleIdx).toBeGreaterThanOrEqual(0);
+    // 2) 该单笔段的后一段从同一时刻起（10:40 顶是段边界）
+    expect(duans[singleIdx + 1].startBi!.startTime.getTime()).toBe(
+      anchorTime.getTime(),
+    );
+    // 3) 没有任何段跨过 4175.35 极值（该极值只作为段端点出现）
     for (const d of duans) {
-      if (d.type === DuanType.Complete) {
-        expect(d.originBis.length).toBeGreaterThanOrEqual(3);
-      }
+      if (d.high !== 4175.35) continue;
+      const endAtAnchor = d.endBi?.endTime.getTime() === anchorTime.getTime();
+      const startAtAnchor =
+        d.startBi!.startTime.getTime() === anchorTime.getTime();
+      expect(endAtAnchor || startAtAnchor).toBe(true);
     }
 
     const payload = {
@@ -299,9 +307,9 @@ describe('ChanCore full-output differential characterization', () => {
 const EXPECTED_DUAN_EXPANSION_SHA256 =
   '1ec94b9651216e819031bfad08a9a9fde6c97b7b29e4985c0afdcf742f758ea7';
 
-/** Duan lesson-65 minimum 3-bi axiom fingerprint（restore-chan-duan-three-bi-axiom 更新）。 */
+/** Duan lesson-71 first-Bi-break fingerprint（restore-chan-duan-first-bi-break 更新）。 */
 const EXPECTED_DUAN_71_SHA256 =
-  '6d5da95b6fdf6087bd7ee62e2bd39683165a4126b793c93aed0c5b65bd16929e';
+  '129c99d23823a54ef337c2c229973b25198c916f089d7ddb5dbd089824ccc297';
 
 function toContractDuan(duan: ChanDuan) {
   return {
@@ -329,8 +337,6 @@ function toContractDuanChannel(channel: ChanDuanChannel) {
     expanded: channel.expanded,
     startId: channel.startId,
     endId: channel.endId,
-    displayStartId: channel.displayStartId,
-    displayEndId: channel.displayEndId,
   };
 }
 

@@ -9,6 +9,7 @@ import type {
 } from '../contracts';
 import { ChanInvariantError } from '../errors';
 import { collectMergedKRange, uniqueKById } from './bi-range';
+import { isBasicBottomFenxing, isBasicTopFenxing } from './fenxing-extreme';
 import { mergeSpans } from './span-merge';
 
 type CompleteBiWithFenxings = ChanBi & {
@@ -103,16 +104,9 @@ export class BiCalculator {
     next: ChanMergedK,
     nowIndex: number,
   ): ChanFenxing | null {
-    // 简单的分型检测，不做强度判断
-    const isTop =
-      now.high > prev.high &&
-      now.high > next.high &&
-      now.low > Math.min(prev.low, next.low);
-
-    const isBottom =
-      now.low < prev.low &&
-      now.low < next.low &&
-      now.high < Math.max(prev.high, next.high);
+    // 简单的分型检测，复用通用分型极值判定算子
+    const isTop = isBasicTopFenxing(prev, now, next);
+    const isBottom = isBasicBottomFenxing(prev, now, next);
 
     if (isTop) {
       const highestIndex = now.mergedData.reduce(

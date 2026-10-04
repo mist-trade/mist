@@ -321,19 +321,19 @@ const mockRuns: DevBacktestRun[] = [
   {
     id: 3,
     strategyDefinitionId: 1,
-    strategyName: '贵州茅台 日线 历史基准回测',
+    strategyName: '上证指数 5m 缠论策略树决策流回测',
     strategyVersionId: 1,
     status: 'completed',
-    source: 'tdx',
-    targetUniverse: ['600519'],
-    period: 1440,
-    startDate: '2024-01-01T00:00:00.000Z',
-    endDate: '2026-08-21T00:00:00.000Z',
-    signalCount: 18,
+    source: 'qmt',
+    targetUniverse: ['000001'],
+    period: 5,
+    startDate: '2025-07-03T05:30:00.000Z',
+    endDate: '2026-09-24T07:00:00.000Z',
+    signalCount: 4,
     matchedSecurityCount: 1,
-    startedAt: '2026-09-25T04:40:00.000Z',
-    completedAt: '2026-09-25T04:40:01.000Z',
-    createdAt: '2026-09-25T04:40:00.000Z',
+    startedAt: '2026-09-25T04:45:00.000Z',
+    completedAt: '2026-09-25T04:45:01.000Z',
+    createdAt: '2026-09-25T04:45:00.000Z',
   },
 ];
 
@@ -381,6 +381,39 @@ async function runUnifiedSimulationBacktest(options: {
     };
   }
 
+  // 优先尝试读取磁盘预计算回测信号快照（加速大数据集冷启动）
+  const diskSignalPath = path.resolve(
+    __dirname,
+    `data/signals/${options.code}_${options.period}m_full.json`,
+  );
+  if (fs.existsSync(diskSignalPath)) {
+    try {
+      const fileRaw = JSON.parse(fs.readFileSync(diskSignalPath, 'utf-8'));
+      if (Array.isArray(fileRaw)) {
+        let filtered = fileRaw;
+        if (options.startDate) {
+          const startMs = new Date(options.startDate).getTime();
+          filtered = filtered.filter(
+            (s) => new Date(s.signalTime).getTime() >= startMs,
+          );
+        }
+        if (options.endDate) {
+          const endMs = new Date(options.endDate).getTime();
+          filtered = filtered.filter(
+            (s) => new Date(s.signalTime).getTime() <= endMs,
+          );
+        }
+        backtestSignalsCache.set(cacheKey, filtered);
+        return {
+          signals: filtered,
+          kernel: null,
+        };
+      }
+    } catch {
+      // 容错降级
+    }
+  }
+
   const fullKlines = loadCanonicalKlines({
     code: options.code,
     period: options.period,
@@ -389,6 +422,15 @@ async function runUnifiedSimulationBacktest(options: {
   if (options.endDate) {
     const endMs = new Date(options.endDate).getTime();
     bars = bars.filter((bar) => bar.timestamp.getTime() <= endMs);
+  }
+  if (options.startDate) {
+    const startMs = new Date(options.startDate).getTime();
+    const startIndex = bars.findIndex((b) => b.timestamp.getTime() >= startMs);
+    if (startIndex > 0) {
+      // 预留充足的预热 K 线（200 根），确保技术指标与缠论窗口充分收敛，避免无意义遍历更早历史
+      const prewarmCut = Math.max(0, startIndex - 200);
+      bars = bars.slice(prewarmCut);
+    }
   }
   const tactics = DynamicTacticsLoader.reloadTactics();
   const flow = createTacticsDecisionFlow(tactics);
@@ -572,11 +614,12 @@ const server = http.createServer(async (req, res) => {
           );
         }
       }
+      const includeBsp = parsedUrl.query.includeBsp !== 'false';
       const commands = ChanVisualAdapter.convert(targetKlines, {
         includeBi: true,
         includeDuan: true,
         includeZhongshu: true,
-        includeBsp: false,
+        includeBsp,
         filterFenxingContainment,
       });
 

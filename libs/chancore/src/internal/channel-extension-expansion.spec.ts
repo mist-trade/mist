@@ -7,8 +7,8 @@ import {
   FenxingType,
   TrendDirection,
 } from '../contracts';
-import type { ChanBi, ChanChannel } from '../contracts';
-import { ChannelCalculator } from './channel';
+import type { ChanBi, ChanBiChannel } from '../contracts';
+import { BiChannelCalculator } from './bi-channel';
 
 /**
  * 构造用于测试的单笔对象
@@ -67,10 +67,12 @@ function makeMockChannel(params: {
   type?: ChannelType;
   extended?: boolean;
   expanded?: boolean;
-}): ChanChannel {
+}): ChanBiChannel {
   const firstBi = params.bis[0];
   const lastBi = params.bis[params.bis.length - 1];
   return {
+    entryBi: firstBi,
+    leaveBi: lastBi,
     bis: params.bis,
     zg: params.zg,
     zd: params.zd,
@@ -81,8 +83,6 @@ function makeMockChannel(params: {
     status: ChannelStatus.Valid,
     startId: firstBi.originIds[0],
     endId: lastBi.originIds[lastBi.originIds.length - 1],
-    displayStartId: firstBi.originIds[0],
-    displayEndId: lastBi.originIds[lastBi.originIds.length - 1],
     trend: params.trend,
     extended: params.extended ?? false,
     expanded: params.expanded ?? false,
@@ -90,10 +90,10 @@ function makeMockChannel(params: {
 }
 
 describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与扩展)', () => {
-  let calculator: ChannelCalculator;
+  let calculator: BiChannelCalculator;
 
   beforeEach(() => {
-    calculator = new ChannelCalculator();
+    calculator = new BiChannelCalculator();
   });
 
   describe('中枢延伸（Central Extension）', () => {
@@ -201,6 +201,74 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       // 触发保底：zg = min(27, 28) = 27; zd = max(25, 26) = 26
       expect(result[0].zg).toBe(27);
       expect(result[0].zd).toBe(26);
+    });
+
+    it('两相邻同向上涨中枢使用纯内部构件契约（bis仅含内部构件，entryBi/leaveBi解耦）时，延伸融合正确保留连接笔且不错误二次切片', () => {
+      const b0 = makeTestBi(0, TrendDirection.Up, 10, 30);
+      const b1 = makeTestBi(1, TrendDirection.Down, 18, 28);
+      const b2 = makeTestBi(2, TrendDirection.Up, 20, 32);
+      const b3 = makeTestBi(3, TrendDirection.Down, 19, 29);
+      const b4 = makeTestBi(4, TrendDirection.Up, 22, 38); // 连接笔 (c1离开笔, c2进入笔)
+
+      const b5 = makeTestBi(5, TrendDirection.Down, 23, 35);
+      const b6 = makeTestBi(6, TrendDirection.Up, 24, 37);
+      const b7 = makeTestBi(7, TrendDirection.Down, 22, 34);
+      const b8 = makeTestBi(8, TrendDirection.Up, 26, 45); // c2离开笔
+
+      // 生产环境契约：bis 仅含纯内部构件
+      const c1: ChanBiChannel = {
+        entryBi: b0,
+        leaveBi: b4,
+        bis: [b1, b2, b3],
+        zg: 28,
+        zd: 20,
+        gg: 32,
+        dd: 18,
+        level: ChannelLevel.Bi,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: b0.originIds[0],
+        endId: b4.originIds[b4.originIds.length - 1],
+        trend: TrendDirection.Up,
+        extended: false,
+        expanded: false,
+      };
+
+      const c2: ChanBiChannel = {
+        entryBi: b4,
+        leaveBi: b8,
+        bis: [b5, b6, b7],
+        zg: 34,
+        zd: 24,
+        gg: 37,
+        dd: 22,
+        level: ChannelLevel.Bi,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: b4.originIds[0],
+        endId: b8.originIds[b8.originIds.length - 1],
+        trend: TrendDirection.Up,
+        extended: false,
+        expanded: false,
+      };
+
+      const result = calculator.applyBiChannelExtensionAndExpansion([c1, c2]);
+
+      expect(result.length).toBe(1);
+      const extended = result[0];
+
+      // 纯内部构件融合：[b1, b2, b3] + [b4] + [b5, b6, b7]，共 7 笔内部构件
+      expect(extended.bis.length).toBe(7);
+      expect(extended.bis).toEqual([b1, b2, b3, b4, b5, b6, b7]);
+      expect(extended.entryBi).toBe(b0);
+      expect(extended.leaveBi).toBe(b8);
+
+      // 内部构件极值与收窄区间
+      expect(extended.gg).toBe(38);
+      expect(extended.dd).toBe(18);
+      expect(extended.zg).toBe(28);
+      expect(extended.zd).toBe(24);
+      expect(extended.extended).toBe(true);
     });
 
     it('支持连续 3 个同向中枢的贪婪链式延伸融合（A + B + C -> ABC）', () => {

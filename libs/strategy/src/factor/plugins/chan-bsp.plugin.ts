@@ -371,7 +371,7 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       const validBis = phaseB.filter(
         (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
       );
-      const channels = ChanCore.createChannels(klines);
+      const channels = ChanCore.createBiChannels(klines);
       bspUnits = validBis.map(ChanCore.toBspUnit);
       zhongshus = channels.phaseB.map(ChanCore.toZhongshu);
     }

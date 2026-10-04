@@ -24,6 +24,7 @@ export enum BiStatus {
 export enum ChannelLevel {
   Bi = 'bi',
   Duan = 'duan',
+  Macro = 'macro',
 }
 
 export enum ChannelType {
@@ -111,27 +112,41 @@ export interface ChanBiTwoPhaseResult {
   readonly phaseB: readonly ChanBi[];
 }
 
-export interface ChanChannel {
-  readonly bis: readonly ChanBi[];
-  readonly zg: number;
-  readonly zd: number;
-  readonly gg: number;
-  readonly dd: number;
-  readonly level: ChannelLevel;
-  readonly type: ChannelType;
-  readonly status: ChannelStatus;
-  readonly trend: TrendDirection;
-  readonly extended: boolean; // 中枢延伸融合产物=true；普通中枢=false
-  readonly expanded: boolean; // 中枢扩展外层大框=true；普通同级中枢=false
-  readonly startId: number;
-  readonly endId: number;
-  readonly displayStartId: number;
-  readonly displayEndId: number;
+/**
+ * 缠论中枢公共抽象几何基底（消灭冗余，彻底删除 displayStartId/displayEndId）
+ */
+export interface BaseChanChannel {
+  readonly zg: number; // 中枢上沿
+  readonly zd: number; // 中枢下沿
+  readonly gg: number; // 纯内部振荡极值高点
+  readonly dd: number; // 纯内部振荡极值低点
+  readonly level: ChannelLevel; // 物理构造型级别（血统永不变异）：Bi | Duan
+  readonly type: ChannelType; // Complete | UnComplete
+  readonly status: ChannelStatus; // Valid
+  readonly expanded: boolean; // 中枢扩展标志（内部构件 >= 9 或 Phase B 扩展）
+  readonly upgradedLevel?: ChannelLevel; // 升级目标级别（未升级为 undefined，升级后为 ChannelLevel.Macro 高一级中枢）
+  readonly extended?: boolean; // Phase B 延伸融合产物标志
+  readonly startId: number; // 真实物理起始 K 线 ID
+  readonly endId: number; // 真实物理终止 K 线 ID
 }
 
-export interface ChanChannelTwoPhaseResult {
-  readonly phaseA: readonly ChanChannel[];
-  readonly phaseB: readonly ChanChannel[];
+/**
+ * 笔级中枢（Bi-level Channel）
+ */
+export interface ChanBiChannel extends BaseChanChannel {
+  /** 纯中间内部振荡笔序列（基础 3 笔，延伸为 5, 7, 9... 笔） */
+  readonly bis: readonly ChanBi[];
+  /** 1 笔进入（独立解耦） */
+  readonly entryBi: ChanBi;
+  /** 1 笔离开（封存确立离开时为离开笔） */
+  readonly leaveBi?: ChanBi;
+  /** 中枢方向（由进入笔确立） */
+  readonly trend: TrendDirection;
+}
+
+export interface ChanBiChannelTwoPhaseResult {
+  readonly phaseA: readonly ChanBiChannel[];
+  readonly phaseB: readonly ChanBiChannel[];
 }
 
 /**
@@ -154,24 +169,22 @@ export interface ChanDuan {
 }
 
 /**
- * 段级中枢（Duan-level Channel）—— 以段为构成单元的中枢，镜像 ChanChannel。
- * 中枢是"至少三个连续次级别走势类型所重叠的部分"（缠论原典17课）：无方向（无 trend）、
- * 几何为对称重叠（zg=min 段高点、zd=max 段低点、gg/dd 极值）。
+ * 段级中枢（Duan-level Channel）—— 以段为构成单元的中枢，继承 BaseChanChannel。
+ * 遵循原典第 17、18、20 课公理与 a + 3 + b 架构同构：
+ * 1. entryDuan: 1 段进入（独立解耦挂载）；
+ * 2. duans: 纯内部振荡段序列（基础至少 3 段，延伸为 4, 5, 6... 段）；
+ * 3. leaveDuan: 1 段离开（确认离开封存时挂载，未完结为 undefined）；
+ * 4. trend: 中枢形成方向（回升形成 Up 或 回调形成 Down，遵循第 20 课 Z 走势段逻辑）。
  */
-export interface ChanDuanChannel {
-  readonly duans: readonly ChanDuan[]; // 构成中枢的段（枚举窗口/延伸后）
-  readonly zg: number; // 中枢上沿 = min(duans 高点)
-  readonly zd: number; // 中枢下沿 = max(duans 低点)
-  readonly gg: number; // 中枢最高 = max(duans 高点)
-  readonly dd: number; // 中枢最低 = min(duans 低点)
-  readonly level: ChannelLevel; // = ChannelLevel.Duan（接线）
-  readonly type: ChannelType;
-  readonly status: ChannelStatus;
-  readonly expanded: boolean; // 中枢扩张合并产物=true；普通同级中枢=false
-  readonly startId: number; // 原始 K id（首段起点）
-  readonly endId: number; // 原始 K id（末段终点）
-  readonly displayStartId: number; // 首段中间位置原始 K id
-  readonly displayEndId: number; // 末段中间位置原始 K id
+export interface ChanDuanChannel extends BaseChanChannel {
+  /** 纯内部振荡段序列（基础至少 3 段，延伸为 4, 5, 6... 段） */
+  readonly duans: readonly ChanDuan[];
+  /** 1 段进入（独立解耦） */
+  readonly entryDuan: ChanDuan;
+  /** 1 段离开（封存确立离开时为真正离开段） */
+  readonly leaveDuan?: ChanDuan;
+  /** 中枢形成方向（由进入段或首根内部段确立） */
+  readonly trend: TrendDirection;
 }
 
 export interface ChanDuanChannelTwoPhaseResult {
@@ -210,6 +223,7 @@ export interface ChanDivergenceZhongshu {
   readonly zd: number; // 中枢下沿
   readonly gg: number; // 中枢最高（位置递进用）
   readonly dd: number; // 中枢最低
+  readonly level?: ChannelLevel;
 }
 
 /** 每单元力度（双分量，均为"越大越强"正向标量）：area=方向柱面积、peak=黄白线(DIF)极值绝对值。 */
@@ -223,10 +237,12 @@ export interface ChanDivergenceInput {
   readonly units: readonly ChanDivergenceUnit[];
   readonly zhongshus: readonly ChanDivergenceZhongshu[];
   readonly forces: readonly ChanUnitForce[];
+  readonly level?: ChannelLevel;
 }
 
 export interface ChanDivergence {
   readonly type: ChanDivergenceType;
+  readonly level: ChannelLevel;
   readonly zhongshuIndex: number; // 相关中枢在 zhongshus 中的位置
   readonly enterIndex: number; // 进入段在 units 中的位置
   readonly leaveIndex: number; // 离开段在 units 中的位置
@@ -264,6 +280,7 @@ export interface ChanBspInput {
   readonly units: readonly ChanBspUnit[];
   readonly zhongshus: readonly ChanDivergenceZhongshu[];
   readonly forces: readonly ChanUnitForce[]; // 空数组 → 一类不输出；二三类照常
+  readonly level?: ChannelLevel;
 }
 
 /**
@@ -275,6 +292,7 @@ export interface ChanBspInput {
  */
 export interface ChanBuySellPoint {
   readonly type: ChanBspType;
+  readonly level: ChannelLevel;
   readonly zhongshuIndex: number | null;
   readonly unitIndex: number;
   readonly price: number;

@@ -3,9 +3,9 @@ import { ChanCore } from '@app/chancore';
 import { ERROR_MESSAGES } from '@app/constants';
 import { CreateBiDto } from './dto/create-bi.dto';
 import {
+  toBiChannelVo,
   toBiVo,
   toChanK,
-  toChannelVo,
   toDuanChannelVo,
   toDuanVo,
   toFenxingVo,
@@ -36,7 +36,7 @@ export class ChanService {
     );
   }
 
-  createChannels(createBiDto: CreateBiDto) {
+  createBiChannels(createBiDto: CreateBiDto) {
     if (createBiDto.k.length === 0) {
       throw new HttpException(
         ERROR_MESSAGES.BI_ARRAY_EMPTY,
@@ -45,13 +45,13 @@ export class ChanService {
     }
 
     const biOptions = this.toBiOptions(createBiDto);
-    const result = ChanCore.createChannels(
+    const result = ChanCore.createBiChannels(
       createBiDto.k.map(toChanK),
       biOptions,
     );
     return {
-      phaseA: result.phaseA.map(toChannelVo),
-      phaseB: result.phaseB.map(toChannelVo),
+      phaseA: result.phaseA.map(toBiChannelVo),
+      phaseB: result.phaseB.map(toBiChannelVo),
     };
   }
 

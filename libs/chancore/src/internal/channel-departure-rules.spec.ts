@@ -23,37 +23,22 @@ import {
 } from '../contracts';
 import type {
   ChanBi,
+  ChanBiChannel,
   ChanBspUnit,
-  ChanChannel,
   ChanDivergenceZhongshu,
   ChanDuan,
   ChanDuanChannel,
 } from '../contracts';
 import { BuySellPointDetector } from './buy-sell-point';
-import { ChannelCalculator } from './channel';
+import { BiChannelCalculator } from './bi-channel';
 import { DuanChannelCalculator } from './duan-channel';
 
 function toTestZhongshu(
-  channel: ChanChannel | ChanDuanChannel,
+  channel: ChanBiChannel | ChanDuanChannel,
 ): ChanDivergenceZhongshu {
   const units = 'bis' in channel ? channel.bis : channel.duans;
   const first = units[0];
-  let last = units[units.length - 1];
-  if (channel.type === ChannelType.Complete && !channel.expanded) {
-    if (
-      'bis' in channel &&
-      channel.bis.length >= 5 &&
-      channel.bis.length % 2 === 1
-    ) {
-      last = channel.bis[channel.bis.length - 2];
-    } else if (
-      'duans' in channel &&
-      channel.duans.length >= 4 &&
-      channel.duans.length % 2 === 0
-    ) {
-      last = channel.duans[channel.duans.length - 2];
-    }
-  }
+  const last = units[units.length - 1];
   return {
     firstUnitTime: first.startTime,
     lastUnitTime: last.endTime,
@@ -126,7 +111,7 @@ function makeDuan(
 }
 
 describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules 1-4 Suite)', () => {
-  const biService = new ChannelCalculator();
+  const biService = new BiChannelCalculator();
   const duanService = new DuanChannelCalculator();
 
   // -------------------------------------------------------------------------
@@ -144,10 +129,12 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(6, TrendDirection.Up, 145, 170), // 顺势突破 GG(160) 达到 170 触发规则 1
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
-      expect(c.bis).toHaveLength(5); // 离开笔包含在 b4
+      expect(c.bis).toHaveLength(3);
+      expect(c.entryBi).toBe(bis[0]);
+      expect(c.leaveBi).toBe(bis[4]);
       expect(c.gg).toBe(150);
       expect(c.zg).toBe(140);
       expect(c.zd).toBe(120);
@@ -164,10 +151,12 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(6, TrendDirection.Down, 130, 155), // 顺势跌破 DD(140) 达到 130 触发规则 1
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
-      expect(c.bis).toHaveLength(5);
+      expect(c.bis).toHaveLength(3);
+      expect(c.entryBi).toBe(bis[0]);
+      expect(c.leaveBi).toBe(bis[4]);
       expect(c.dd).toBe(150);
       expect(c.zg).toBe(180);
       expect(c.zd).toBe(160);
@@ -186,7 +175,8 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
 
       const result = duanService.createDuanChannels(duans);
       expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
-      expect(result.phaseB[0].gg).toBe(160);
+      expect(result.phaseB[0].gg).toBe(150);
+      expect(result.phaseB[0].leaveDuan?.high).toBe(160);
     });
   });
 
@@ -206,9 +196,9 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(7, TrendDirection.Down, 110, 155), // 反向第 2 笔跌到 110，击穿 ZD(120) 触发规则 2
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
-      expect(result.phaseB[0].bis).toHaveLength(5);
+      expect(result.phaseB[0].bis).toHaveLength(3);
       expect(result.phaseB[0].gg).toBe(150);
     });
 
@@ -224,9 +214,9 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(7, TrendDirection.Up, 145, 190), // 反向第 2 笔冲到 190，冲破 ZG(180) 触发规则 2
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
-      expect(result.phaseB[0].bis).toHaveLength(5);
+      expect(result.phaseB[0].bis).toHaveLength(3);
       expect(result.phaseB[0].dd).toBe(150);
     });
   });
@@ -245,10 +235,10 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(5, TrendDirection.Down, 95, 160), // 反向单笔直接暴跌至 95 < DD(100)，无 3B，触发规则 3 封存
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
-      expect(c.bis).toHaveLength(5);
+      expect(c.bis).toHaveLength(3);
       expect(c.gg).toBe(150);
       expect(c.zg).toBe(140);
       expect(c.zd).toBe(120);
@@ -264,10 +254,10 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(5, TrendDirection.Up, 140, 205), // 反向单笔直接暴力拉升至 205 > GG(200)，无 3S，触发规则 3 封存
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
-      expect(c.bis).toHaveLength(5);
+      expect(c.bis).toHaveLength(3);
       expect(c.dd).toBe(150);
       expect(c.zg).toBe(180);
       expect(c.zd).toBe(160);
@@ -291,11 +281,11 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(7, TrendDirection.Down, 148, 158), // 新核心 [152, 158] (ZG=158 > ZD=152)
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
       const c1 = result.phaseB[0];
       // 旧中枢在 b4 顺利封存为 5 笔，离开冲高至 160，中枢内部 GG 为 150
-      expect(c1.bis).toHaveLength(5);
+      expect(c1.bis).toHaveLength(3);
       expect(c1.gg).toBe(150);
       expect(c1.zg).toBe(140);
       expect(c1.zd).toBe(120);
@@ -314,10 +304,10 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(7, TrendDirection.Up, 142, 152), // 新核心 [142, 148] (ZG=148 > ZD=142)
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB.length).toBeGreaterThanOrEqual(1);
       const c1 = result.phaseB[0];
-      expect(c1.bis).toHaveLength(5);
+      expect(c1.bis).toHaveLength(3);
       expect(c1.dd).toBe(150);
       expect(c1.zg).toBe(180);
       expect(c1.zd).toBe(160);
@@ -338,7 +328,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(5, TrendDirection.Down, 90, 135), // 暴跌至 90，直接砸穿 ZD(120) 与 DD(100)
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       // 未离开便反向崩塌，向上候选中枢失效作废，杜绝输出包含 b0 的向上中枢
       expect(result.phaseB.some((c) => c.trend === TrendDirection.Up)).toBe(
         false,
@@ -355,7 +345,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(5, TrendDirection.Up, 165, 210), // 暴拉至 210，直接冲破 ZG(180) 与 GG(200)
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       // 未离开便反向崩塌，向下候选中枢失效作废，杜绝输出包含 b0 的向下中枢
       expect(result.phaseB.some((c) => c.trend === TrendDirection.Down)).toBe(
         false,
@@ -380,7 +370,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(9, TrendDirection.Down, 130, 155),
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       // 包含 b0 的向上候选中枢必须失效作废，绝不能产出 DD(100) < b0.low(120) 的中枢
       const invalidCentral = result.phaseB.find(
         (c) => c.trend === TrendDirection.Up && c.bis[0].low === 120,
@@ -409,7 +399,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(9, TrendDirection.Up, 150, 185),
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       const invalidCentral = result.phaseB.find(
         (c) => c.trend === TrendDirection.Down && c.bis[0].high === 200,
       );
@@ -437,7 +427,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(6, TrendDirection.Up, 130, 138),
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       // b4 绝不能作为 5 笔 Complete 离开笔封存输出
       const sealedAtB4 = result.phaseB.find(
         (c) => c.type === ChannelType.Complete && c.bis.length === 5,
@@ -456,7 +446,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(6, TrendDirection.Down, 162, 170),
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       const sealedAtB4 = result.phaseB.find(
         (c) => c.type === ChannelType.Complete && c.bis.length === 5,
       );
@@ -475,7 +465,7 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(7, TrendDirection.Down, 90, 125), // 跌穿起点 100
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       // 绝不能产出包含 b5 且将 b4/b5 错误吸纳的向上中枢
       expect(
         result.phaseB.some(
@@ -494,7 +484,9 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(4, TrendDirection.Up, 115, 145), // 末笔 145 > ZG(140)，但 145 < GG(150)，且序列结束无 pullback
       ];
 
-      const result = biService.createChannels(bis, { allowUncomplete: false });
+      const result = biService.createBiChannels(bis, {
+        allowUncomplete: false,
+      });
       // 封闭切片末端未突破 GG 且无 3B，绝不能封存为 Complete 离开笔
       expect(
         result.phaseB.some(
@@ -518,11 +510,11 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(3, TrendDirection.Down, 115, 140), // 核心 [120, 140]
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
       expect(c.type).toBe(ChannelType.UnComplete);
-      expect(c.bis).toHaveLength(4);
+      expect(c.bis).toHaveLength(3);
       expect(c.zg).toBe(140);
       expect(c.zd).toBe(120);
       expect(c.gg).toBe(150);
@@ -540,11 +532,11 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       ];
 
       // 1. 中枢计算：3B 确立后中枢封存
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
       expect(c.type).toBe(ChannelType.Complete);
-      expect(c.bis).toHaveLength(5); // 核心构件与离开笔共 5 笔
+      expect(c.bis).toHaveLength(3); // 核心构件 3 笔
       expect(c.zg).toBe(140);
       expect(c.zd).toBe(120);
 
@@ -583,11 +575,11 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(5, TrendDirection.Up, 140, 155), // 反抽 155 < ZD(160) 成立 3S
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
       expect(c.type).toBe(ChannelType.Complete);
-      expect(c.bis).toHaveLength(5);
+      expect(c.bis).toHaveLength(3);
       expect(c.zg).toBe(180);
       expect(c.zd).toBe(160);
 
@@ -626,11 +618,11 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
         makeBi(6, TrendDirection.Up, 145, 170), // 冲破 GG(160) 触发规则 1 封存
       ];
 
-      const result = biService.createChannels(bis);
+      const result = biService.createBiChannels(bis);
       expect(result.phaseB).toHaveLength(1);
       const c = result.phaseB[0];
       expect(c.type).toBe(ChannelType.Complete);
-      expect(c.bis).toHaveLength(5); // 已封存包含离开笔 b4
+      expect(c.bis).toHaveLength(3); // 核心构件 3 笔
 
       const units: readonly ChanBspUnit[] = bis.map((b) => ({
         startTime: b.startTime,
@@ -651,11 +643,12 @@ describe('中枢离开与封存规则完备测试集合 (Channel Departure Rules
       expect(thirdBuys[0].unitIndex).toBe(5);
     });
 
-    it('段级别末端 3 段基础核心：赋予 ChannelType.UnComplete 标识', () => {
+    it('段级别末端 4 段基础核心：赋予 ChannelType.UnComplete 标识', () => {
       const duans: ChanDuan[] = [
         makeDuan(0, TrendDirection.Up, 100, 150),
         makeDuan(1, TrendDirection.Down, 120, 150),
         makeDuan(2, TrendDirection.Up, 120, 140),
+        makeDuan(3, TrendDirection.Down, 120, 140),
       ];
 
       const result = duanService.createDuanChannels(duans);

@@ -1,15 +1,15 @@
 import {
   ChanBspType,
   ChanDivergenceType,
-  ChannelType,
+  ChannelLevel,
   TrendDirection,
 } from '../contracts';
 import type {
   ChanBi,
+  ChanBiChannel,
   ChanBspInput,
   ChanBspUnit,
   ChanBuySellPoint,
-  ChanChannel,
   ChanDivergenceInput,
   ChanDivergenceZhongshu,
   ChanDuan,
@@ -33,14 +33,13 @@ export function chanUnitToBspUnit(unit: ChanBi | ChanDuan): ChanBspUnit {
 /**
  * 将笔中枢或段中枢转换为 ChanDivergenceZhongshu 最小定位中枢。
  *
- * 构件粒度与中枢生命周期核心原则：
- * - 笔级中枢：进入笔（b0）+ 3内部构件（b1..b3）+ 离开笔（b4）。bis[0] 为进入笔，核心区间始于 bis[1]，
- *   封存中枢（>= 5笔）核心终止于倒数第2笔。
- * - 段级中枢：3段对称重叠即可独立作为完整基本单元（duans[0..2]），无需强求离开段。duans[0] 即为首个核心构件段。
- *   若段中枢吸收延伸满奇数段且包含离开段（>= 5段），核心终止于倒数第2段；若为3段基础单元，核心自然终止于 duans[2]。
+ * 构件纯化契约（Master Whitepaper v11.0）：
+ * - bis 与 duans 纯净化为仅存放中枢内部振荡构件！
+ * - 彻底拔除历史切片补丁（units[1] 与 units.length - 2 彻底作废），
+ *   直接取 units[0] 至 units[units.length - 1]。
  */
 export function chanChannelToZhongshu(
-  channel: ChanChannel | ChanDuanChannel,
+  channel: ChanBiChannel | ChanDuanChannel,
 ): ChanDivergenceZhongshu {
   const isBi = 'bis' in channel;
   const units = isBi ? channel.bis : channel.duans;
@@ -48,16 +47,8 @@ export function chanChannelToZhongshu(
     throw new RangeError('chan channel must contain at least one unit');
   }
 
-  const first = isBi && units.length >= 4 ? units[1] : units[0];
-
-  let last = units[units.length - 1];
-  if (
-    channel.type === ChannelType.Complete &&
-    units.length >= 5 &&
-    units.length % 2 === 1
-  ) {
-    last = units[units.length - 2];
-  }
+  const first = units[0];
+  const last = units[units.length - 1];
 
   return Object.freeze({
     firstUnitTime: first.startTime,
@@ -66,6 +57,7 @@ export function chanChannelToZhongshu(
     zd: channel.zd,
     gg: channel.gg,
     dd: channel.dd,
+    level: channel.level,
   });
 }
 
@@ -76,6 +68,7 @@ interface BspChannelSpan {
   readonly lastIndex: number; // 中枢末单元下标（= e）
   readonly zg: number;
   readonly zd: number;
+  readonly level?: ChannelLevel;
 }
 
 const SIDE_ORDER: Record<ChanBspType, number> = {
@@ -107,6 +100,7 @@ export class BuySellPointDetector {
       units: input.units,
       zhongshus: input.zhongshus,
       forces: input.forces,
+      level: input.level,
     };
     const divergences = new DivergenceDetector().detectDivergences(divInput);
 
@@ -182,6 +176,7 @@ export class BuySellPointDetector {
       seenLeaves.add(div.leaveIndex);
       out.push({
         type: isBuy ? ChanBspType.FirstBuy : ChanBspType.FirstSell,
+        level: div.level ?? input.level ?? ChannelLevel.Bi,
         zhongshuIndex: div.zhongshuIndex,
         unitIndex: div.leaveIndex,
         price: isBuy ? leaveUnit.low : leaveUnit.high,
@@ -222,6 +217,7 @@ export class BuySellPointDetector {
       ) {
         out.push({
           type: ChanBspType.SecondBuy,
+          level: input.level ?? ChannelLevel.Bi,
           zhongshuIndex: null,
           unitIndex: i + 2,
           price: c.low,
@@ -236,6 +232,7 @@ export class BuySellPointDetector {
       ) {
         out.push({
           type: ChanBspType.SecondSell,
+          level: input.level ?? ChannelLevel.Bi,
           zhongshuIndex: null,
           unitIndex: i + 2,
           price: c.high,
@@ -263,6 +260,7 @@ export class BuySellPointDetector {
       ) {
         out.push({
           type: ChanBspType.ThirdBuy,
+          level: span.level ?? input.level ?? ChannelLevel.Bi,
           zhongshuIndex: span.zhongshuIndex,
           unitIndex: pull,
           price: P.low,
@@ -275,6 +273,7 @@ export class BuySellPointDetector {
       ) {
         out.push({
           type: ChanBspType.ThirdSell,
+          level: span.level ?? input.level ?? ChannelLevel.Bi,
           zhongshuIndex: span.zhongshuIndex,
           unitIndex: pull,
           price: P.high,
@@ -303,6 +302,7 @@ export class BuySellPointDetector {
         lastIndex: e,
         zg: zhongshu.zg,
         zd: zhongshu.zd,
+        level: zhongshu.level,
       });
     }
     return spans;

@@ -3,6 +3,7 @@ import {
   BiType,
   ChanCore,
   ChannelType,
+  ChannelLevel,
   DuanStatus,
   DuanType,
   ChanBspType,
@@ -114,14 +115,13 @@ export class ChanVisualAdapter {
 
     // 2. Compute Bi Channels (Zhongshu)
     if (includeZhongshu) {
-      const biChannels = ChanCore.createChannels(klines, {
+      const biChannels = ChanCore.createBiChannels(klines, {
         filterFenxingContainment: options.filterFenxingContainment,
       });
       biChannels.phaseB.forEach((zs, i) => {
-        // 防御：中枢构成单元须全部确认且有效（chancore 已保证；防旧版本/外部数据）
-        // 中枢真实区间：从启动笔终点（第1根构件笔起点）到离开笔起点（最后一根构件笔终点）
+        // 中枢真实区间：从首根内部振荡笔起点到末根内部振荡笔终点
         const isUncomplete = zs.type === ChannelType.UnComplete;
-        const centralStartBi = zs.bis.length >= 2 ? zs.bis[1] : zs.bis[0];
+        const centralStartBi = zs.bis[0];
         const centralExitBi = zs.bis[zs.bis.length - 1];
         if (!centralStartBi || !centralExitBi) return;
 
@@ -137,10 +137,10 @@ export class ChanVisualAdapter {
           toTime = new Date(klines[klines.length - 1].time).toISOString();
         } else {
           toIdx = getKIndex(
-            centralExitBi.startTime,
-            centralExitBi.originIds[0],
+            centralExitBi.endTime,
+            centralExitBi.originIds[centralExitBi.originIds.length - 1],
           );
-          toTime = new Date(centralExitBi.startTime).toISOString();
+          toTime = new Date(centralExitBi.endTime).toISOString();
         }
 
         if (fromIdx === null || toIdx === null || toIdx < fromIdx) return;
@@ -161,7 +161,7 @@ export class ChanVisualAdapter {
           bottom: zs.zd,
           gg: zs.gg,
           dd: zs.dd,
-          color: zhongshuBiColor,
+          color: zs.expanded ? '#F59E0B' : zhongshuBiColor,
           fill: true,
           style: isUncomplete ? 'dashed' : 'solid',
           status: isUncomplete ? 'uncomplete' : 'complete',
@@ -251,6 +251,8 @@ export class ChanVisualAdapter {
 
         if (fromIdx === null || toIdx === null || toIdx < fromIdx) return;
 
+        const isMacro =
+          Boolean(zs.expanded) || zs.upgradedLevel === ChannelLevel.Macro;
         const bandCmd: BandVisualCommand = {
           id: `chan_zs_duan_${i}_${fromIdx}_${toIdx}`,
           type: 'band',
@@ -267,12 +269,12 @@ export class ChanVisualAdapter {
           bottom: zs.zd,
           gg: zs.gg,
           dd: zs.dd,
-          color: zhongshuDuanColor,
+          color: isMacro ? '#E879F9' : zhongshuDuanColor,
           fill: true,
           style: isUncomplete ? 'dashed' : 'solid',
           status: isUncomplete ? 'uncomplete' : 'complete',
-          extended: false,
-          expanded: zs.expanded,
+          extended: zs.extended,
+          expanded: isMacro,
         };
         commands.push(bandCmd);
       });
@@ -283,7 +285,7 @@ export class ChanVisualAdapter {
       const validBis = bis.filter(
         (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
       );
-      const biChannels = ChanCore.createChannels(klines);
+      const biChannels = ChanCore.createBiChannels(klines);
       const bspUnits: readonly ChanBspUnit[] = validBis.map(ChanCore.toBspUnit);
       const zhongshus: readonly ChanDivergenceZhongshu[] =
         biChannels.phaseB.map(ChanCore.toZhongshu);
@@ -304,9 +306,9 @@ export class ChanVisualAdapter {
         const isSell = isSellBsp(pt.type);
 
         const textCmd: TextVisualCommand = {
-          id: `chan_bsp_${i}_${pt.type}_${idx}`,
+          id: `chan_bsp_bi_${i}_${pt.type}_${idx}`,
           type: 'text',
-          layer: 'chan_bsp',
+          layer: 'chan_bsp_bi',
           index: idx,
           time: new Date(unit.endTime).toISOString(),
           price: pt.price,

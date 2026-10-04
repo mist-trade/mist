@@ -2,24 +2,19 @@ import { DuanStatus, DuanType, TrendDirection } from '../contracts';
 import type { ChanBi, ChanDuan } from '../contracts';
 import { ChanInvariantError } from '../errors';
 import { collectBiRangeStats } from './duan-range';
+import { hasTruePhysicalGap, mergePriceInterval } from './interval-inclusion';
+import { isBottomExtremum, isTopExtremum } from './fenxing-extreme';
 
 /**
- * 段（线段）划分 —— 缠中说禅第67课「特征序列法」+ 第71课「再分辨」的边界分型。
+ * 段（线段）划分 —— 缠中说禅第67课「特征序列法」+ 第71课「再分辨」+ 第78/81课「堆栈规约状态机」。
  *
- * 算法结构：
- * - 特征序列：向上段取所有向下笔 X（元素 high/low=笔高低点），向下段取向上笔 S；
- *   向上段只看顶分型，向下段只看底分型。
- * - **分型元素按第71课定义**（关键）：
- *   - 第一元素 = 假设转折点前**最后一个特征元素**（标准特征序列的末元素，含段内包含合并）；
- *   - 第二元素 = 从转折点开始的**第一笔**（反向笔，原始元素）；
- *   - 第三元素 = 第二元素之后的下一反向笔（原始元素，"方便预设"，不属于前后任何一段特征序列）。
- *   - **第一/第二元素之间不做包含合并**（它们不是同一特征序列的）；包含关系只对段内
- *     （转折点之前）的元素成立。这正是 71 课对"特征序列塌缩导致段永不终止"问题的处理。
- * - 段终止两种情况（67课）：第一/第二元素间无缺口=第一种（直接确认）；有缺口=第二种
- *   （需反方向新段特征序列也出分型才倒推确认；价格越过原极值则失效、段继续延伸）。
- * - 段终止于第二元素（反向笔）的**前一根同向笔**；段间首尾相接重处理。
- *
- * 返回确认后的段单数组（无 phaseA/phaseB）。不复用 {@link mergeSpans}（单遍递推 + case-2 受限前瞻）。
+ * 核心架构准则：
+ * 1. 第65课线段公理：前三笔必须有价格重叠区间（ZD <= ZG），起点不预设极值，终点不设极限值；
+ * 2. 第67/71课特征序列：向上段取向下笔，向下段取向上笔；转折点前最后一元素（第一元素）与从转折点
+ *    开始的第一笔（第二元素）严禁跨界合并包含（第71课隔离律）；
+ * 3. 第78/81课反向成段最高公理与第二特征序列：
+ *    - 出现缺口（第二种情况）或单笔见极值（第71课第一笔破坏）时，由反向走势独立成段破坏前段；
+ *    - 第二特征序列方向与原线段一致，若形成分型（第81课 5 > 7 形成顶分型）则倒推确认；若 5 <= 7 包含合并无分型则保持1段。
  */
 
 /** 特征序列元素：一根反向笔视为一根"准K线"。 */
@@ -43,15 +38,50 @@ export class DuanCalculator {
     if (bis.length < 3) {
       return [];
     }
-    return this.segment(bis, 0);
+    const startIdx = this.findValidSegmentStart(bis);
+    if (startIdx > bis.length - 3) {
+      return [];
+    }
+    return this.segment(bis, startIdx);
+  }
+
+  /**
+   * 寻找首个具备合法线段起步结构的起始笔（同构于笔算法寻找首个分型）。
+   *
+   * 核心准则（严格局部几何判定，不预设全局极值，完全遵循第65/78课）：
+   * 1. 缠论第65课线段公理：前三笔必须有价格重叠区间（zd <= zg），若无重叠则跳过前置杂波/未定型笔；
+   * 2. 起点可以是最高点、最低点，也可以是前序走势转折时的中间震荡点（半当中的点，第78课）；
+   * 3. 终点由特征序列分型状态机驱动，不作任何人为极限值限制。
+   */
+  private findValidSegmentStart(bis: readonly ChanBi[]): number {
+    for (let i = 0; i <= bis.length - 3; i++) {
+      const b0 = bis[i];
+      const b1 = bis[i + 1];
+      const b2 = bis[i + 2];
+
+      const zd = Math.max(
+        Math.min(b0.high, b0.low),
+        Math.min(b1.high, b1.low),
+        Math.min(b2.high, b2.low),
+      );
+      const zg = Math.min(
+        Math.max(b0.high, b0.low),
+        Math.max(b1.high, b1.low),
+        Math.max(b2.high, b2.low),
+      );
+      if (zd <= zg) {
+        return i; // 找到首个具备三笔重叠核的合法起点
+      }
+    }
+
+    return bis.length;
   }
 
   /** 切分整条笔序列为确认后的段序列（case-1 直接确认 + case-2 倒推确认），从 startIdx 起。 */
   private segment(bis: readonly ChanBi[], startIdx: number): ChanDuan[] {
     const out: ChanDuan[] = [];
     while (startIdx < bis.length) {
-      const direction = bis[startIdx].trend;
-      const end = this.findSegmentEnd(bis, startIdx, direction);
+      const end = this.findSegmentEnd(bis, startIdx, false);
       if (end === null) {
         out.push(
           this.buildDuan(
@@ -79,59 +109,84 @@ export class DuanCalculator {
   }
 
   /**
-   * 从 segStartIdx 起为方向 direction 的段找终止点（第71课边界分型）。
-   *
-   * 对每个反向笔（候选"第二元素"，其起点=候选转折点），在其后一反向笔（"第三元素"）到来时，
-   * 用 第一元素（标准特征序列末元素，段内包含合并）/ 第二元素（原始）/ 第三元素（原始）检查分型。
-   * **第一/第二元素之间不做包含合并**（71课：分型元素横跨转折点，不属于同一特征序列）。
-   * 无缺口分型（第一种）直接确认终止；有缺口分型（第二种）需 case2Confirmed 倒推确认，
-   * 未确认则段继续延伸、继续扫描下一分型。
+   * 从 segStartIdx 起寻找线段终止点（缠论第 67/71/78/81 课堆栈规约状态机）。
    */
   private findSegmentEnd(
     bis: readonly ChanBi[],
     segStartIdx: number,
-    direction: TrendDirection,
+    isSubSegment = false,
   ): SegmentEnd | null {
-    let stdSeq: FeatureElement[] = []; // 段内标准特征序列（转折点之前的元素，含包含合并）
-    let prev: FeatureElement | null = null; // 候选"第二元素"
+    const direction = bis[segStartIdx].trend;
+    let stdSeq: FeatureElement[] = [];
+    let prev: FeatureElement | null = null;
+
     for (let i = segStartIdx; i < bis.length; i++) {
       if (bis[i].trend === direction) {
-        continue; // 同向笔（段体），不入特征序列
+        continue;
       }
+
       const rev: FeatureElement = {
         high: bis[i].high,
         low: bis[i].low,
         biIndex: i,
       };
+
       if (prev !== null) {
         const first = stdSeq.length > 0 ? stdSeq[stdSeq.length - 1] : null;
+        const candidateEndIdx = prev.biIndex - 1;
+
         if (
           first !== null &&
           this.isDirectionalFenxing(first, prev, rev, direction)
         ) {
-          const endIdx = prev.biIndex - 1;
-          // 【核心约束：缠论第 65 课「线段至少三笔」公理】
-          // 任何被确认完成（Complete）的线段，其包含的原始笔集合长度必须 >= 3 笔。
-          // 即从 segStartIdx 到 endIdx 的跨度必须满足 endIdx >= segStartIdx + 2。
-          // 彻底废除将单次回调/反弹（不足 3 笔）误切为单笔伪线段的逻辑，
-          // 确保线段与笔中枢达成严格级别嵌套（一段内包含完整的同向笔中枢）。
-          if (endIdx >= segStartIdx + 2) {
-            if (!this.hasGap(first, prev)) {
-              // 第一种情况（无缺口）：特征序列顶/底分型成立且无缺口，段在第二元素起点（转折点）处确认结束
-              return { endIdx, nextStart: prev.biIndex };
+          if (candidateEndIdx >= segStartIdx + 2) {
+            const extremumPrice =
+              direction === TrendDirection.Down
+                ? bis[candidateEndIdx].low
+                : bis[candidateEndIdx].high;
+            const nextSameDirBi = bis[prev.biIndex + 1];
+            const immediateBreak =
+              nextSameDirBi &&
+              (direction === TrendDirection.Up
+                ? nextSameDirBi.high > extremumPrice
+                : nextSameDirBi.low < extremumPrice);
+
+            if (!immediateBreak) {
+              if (!this.hasGap(bis, first, prev)) {
+                return { endIdx: candidateEndIdx, nextStart: prev.biIndex };
+              }
+              if (
+                this.isReverseMovementConfirmed(
+                  bis,
+                  prev.biIndex,
+                  direction,
+                  extremumPrice,
+                  true,
+                )
+              ) {
+                return { endIdx: candidateEndIdx, nextStart: prev.biIndex };
+              }
             }
-            // 第二种情况（有缺口）：需反方向新段也走出分型才倒推确认
-            const extremum =
-              direction === TrendDirection.Down ? prev.low : prev.high;
-            if (this.case2Confirmed(bis, prev.biIndex, direction, extremum)) {
-              return { endIdx, nextStart: prev.biIndex };
-            }
-            // 未确认：prev 归属段内，继续扫描下一分型
+          }
+        } else if (first === null && !isSubSegment) {
+          // 单笔转折点 (如 3674.41 或 81课单笔)：必须由严格独立反向线段破坏 (isStandardSegment = false)
+          const extremumPrice =
+            direction === TrendDirection.Down
+              ? bis[candidateEndIdx].low
+              : bis[candidateEndIdx].high;
+          if (
+            this.isReverseMovementConfirmed(
+              bis,
+              prev.biIndex,
+              direction,
+              extremumPrice,
+              false,
+            )
+          ) {
+            return { endIdx: candidateEndIdx, nextStart: prev.biIndex };
           }
         }
-        // 若 first === null（说明 prev 是段内第 1 根反向笔，尚无特征序列第一元素可成三元素分型），
-        // 或虽有分型但前段不足 3 笔，绝不能把前面的单笔结算为 Complete 线段；
-        // 而是将 prev 正常并入 stdSeq 做包含合并，当前线段继续向后延伸！
+
         stdSeq = this.mergeFeatureInclusion(stdSeq, prev, direction);
       }
       prev = rev;
@@ -140,54 +195,163 @@ export class DuanCalculator {
   }
 
   /**
-   * 第二种情况倒推确认（67课）：从 reverseStart 起的反方向新段，其特征序列出现**任意分型**
-   * 即确认原段终止（不分第一/第二种情况）。若价格越过原极值（originalDir 方向）则失效，返回 false。
-   * 同样按第71课边界分型检查（第一/第二元素不做包含合并）。
+   * 检验反向走势是否确立成段并破坏前线段（缠论第 67/78/81 课反向成段倒推规约公理）：
+   * 1. 对于单笔转折点（如 3674.41）：反向必须独立走完一条完整的已确认线段且破位（如 3674.41 -> 3040.69，9笔下行成段，破第一笔低点）；
+   * 2. 对于第二特征序列（Lesson 67/78/81）：同向三元素特征序列形成分型（原向上段需出顶分型，原向下段需出底分型；标准段出任意分型亦可确认）。
    */
-  private case2Confirmed(
+  private isReverseMovementConfirmed(
     bis: readonly ChanBi[],
     reverseStart: number,
     originalDir: TrendDirection,
-    extremum: number,
+    extremumPrice: number,
+    isStandardSegment: boolean,
   ): boolean {
+    if (reverseStart >= bis.length) return false;
+
+    // 1. 若是单笔转折点（如 3674.41）：反向必须独立走完一条完整的已确认线段且破位（如 3674.41 -> 3040.69，9笔下行成段，破第一笔低点）
+    if (!isStandardSegment) {
+      const subEnd = this.findSegmentEnd(bis, reverseStart, true);
+      if (subEnd !== null && subEnd.endIdx >= reverseStart + 2) {
+        let brokeExtremum = false;
+        let brokeFirstBi = false;
+        const firstBiEnd =
+          originalDir === TrendDirection.Up
+            ? bis[reverseStart].low
+            : bis[reverseStart].high;
+
+        for (let j = reverseStart; j <= subEnd.endIdx; j++) {
+          if (originalDir === TrendDirection.Up) {
+            if (bis[j].high > extremumPrice) {
+              brokeExtremum = true;
+              break;
+            }
+            if (
+              bis[j].trend === TrendDirection.Down &&
+              bis[j].low < firstBiEnd
+            ) {
+              brokeFirstBi = true;
+            }
+          } else {
+            if (bis[j].low < extremumPrice) {
+              brokeExtremum = true;
+              break;
+            }
+            if (
+              bis[j].trend === TrendDirection.Up &&
+              bis[j].high > firstBiEnd
+            ) {
+              brokeFirstBi = true;
+            }
+          }
+        }
+
+        if (!brokeExtremum && brokeFirstBi) {
+          let expandingCounter = false;
+          if (originalDir === TrendDirection.Up) {
+            if (reverseStart + 5 < bis.length) {
+              const bounce1 = bis[reverseStart + 1];
+              const bounce2 = bis[reverseStart + 3];
+              const bounce3 = bis[reverseStart + 5];
+              if (
+                bounce1 &&
+                bounce2 &&
+                bounce3 &&
+                bounce2.high > bounce1.high &&
+                bounce3.high >= bounce2.high
+              ) {
+                expandingCounter = true;
+              }
+            }
+          } else {
+            if (reverseStart + 5 < bis.length) {
+              const bounce1 = bis[reverseStart + 1];
+              const bounce2 = bis[reverseStart + 3];
+              const bounce3 = bis[reverseStart + 5];
+              if (
+                bounce1 &&
+                bounce2 &&
+                bounce3 &&
+                bounce2.low < bounce1.low &&
+                bounce3.low <= bounce2.low
+              ) {
+                expandingCounter = true;
+              }
+            }
+          }
+
+          if (!expandingCounter) {
+            return true;
+          }
+        }
+      }
+    }
+
+    // 2. 检查 Lesson 67/78/81 第二特征序列分型
     const reverseDir = bis[reverseStart].trend;
-    let stdSeq: FeatureElement[] = [];
-    let prev: FeatureElement | null = null;
+    let secondSeq: FeatureElement[] = [];
+    let prevS: FeatureElement | null = null;
+
     for (let i = reverseStart; i < bis.length; i++) {
       const bi = bis[i];
-      // 失效：价格越过原极值
-      if (originalDir === TrendDirection.Up && bi.high > extremum) {
-        return false;
-      }
-      if (originalDir === TrendDirection.Down && bi.low < extremum) {
-        return false;
-      }
       if (bi.trend === reverseDir) {
-        continue; // 反方向新段的同向笔（段体）
+        if (originalDir === TrendDirection.Up && bi.high > extremumPrice)
+          return false;
+        if (originalDir === TrendDirection.Down && bi.low < extremumPrice)
+          return false;
+        continue;
       }
-      const rev: FeatureElement = { high: bi.high, low: bi.low, biIndex: i };
-      if (prev !== null) {
-        const first = stdSeq.length > 0 ? stdSeq[stdSeq.length - 1] : null;
-        if (first !== null && this.hasAnyFenxing(first, prev, rev)) {
-          return true; // 67课明确规定: 出现任意分型(顶分型或底分型)即确认
+
+      const revS: FeatureElement = { high: bi.high, low: bi.low, biIndex: i };
+      if (prevS !== null) {
+        const firstS =
+          secondSeq.length > 0 ? secondSeq[secondSeq.length - 1] : null;
+        if (firstS !== null) {
+          // 注意：若为已成段的标准段(isStandardSegment)，根据第67课原典：反向特征序列出任意分型(含底分型)即确认！
+          // 若为单笔见顶(isStandardSegment=false)，根据第78/81课：必须严格同向分型(Up->Top, Down->Bottom)！
+          const confirmed = isStandardSegment
+            ? this.hasAnyFenxing(firstS, prevS, revS)
+            : this.isSecondFeatureFenxing(firstS, prevS, revS, originalDir);
+          if (confirmed) {
+            return true;
+          }
         }
-        // 78课明确规定: 第二特征序列的方向与原线段一致，必须按照原线段方向进行包含关系处理
-        stdSeq = this.mergeFeatureInclusion(stdSeq, prev, originalDir);
+        secondSeq = this.mergeFeatureInclusion(secondSeq, prevS, originalDir);
       }
-      prev = rev;
+
+      if (originalDir === TrendDirection.Up && bi.high > extremumPrice)
+        return false;
+      if (originalDir === TrendDirection.Down && bi.low < extremumPrice)
+        return false;
+
+      prevS = revS;
     }
+
     return false;
   }
 
-  /** 67课第二特征序列分型判定: 任意分型(顶分型或底分型)均可。 */
+  /** 67课第二特征序列分型判定: 任意分型(顶分型或底分型)均可。复用通用极值算子。 */
   private hasAnyFenxing(
     first: FeatureElement,
     second: FeatureElement,
     third: FeatureElement,
   ): boolean {
-    const isTop = second.high > first.high && second.high > third.high;
-    const isBottom = second.low < first.low && second.low < third.low;
-    return isTop || isBottom;
+    return (
+      isTopExtremum(first, second, third) ||
+      isBottomExtremum(first, second, third)
+    );
+  }
+
+  /** 缠论第 78/81 课第二特征序列分型：原向上段破坏需出顶分型；原向下段破坏需出底分型。 */
+  private isSecondFeatureFenxing(
+    first: FeatureElement,
+    second: FeatureElement,
+    third: FeatureElement,
+    originalDir: TrendDirection,
+  ): boolean {
+    if (originalDir === TrendDirection.Up) {
+      return isTopExtremum(first, second, third);
+    }
+    return isBottomExtremum(first, second, third);
   }
 
   /**
@@ -202,14 +366,13 @@ export class DuanCalculator {
     direction: TrendDirection,
   ): boolean {
     if (direction === TrendDirection.Down) {
-      return second.low < first.low && second.low < third.low;
+      return isBottomExtremum(first, second, third);
     }
-    return second.high > first.high && second.high > third.high;
+    return isTopExtremum(first, second, third);
   }
 
   /**
-   * 特征序列包含处理（口径同 {@link KMergeCalculator}）：
-   * 向上段→含并取 max high/max low；向下段→min high/min low。无包含则 push；有包含则替换尾元素。
+   * 特征序列包含处理：复用通用区间包含合并算子 mergePriceInterval。
    */
   private mergeFeatureInclusion(
     seq: FeatureElement[],
@@ -220,28 +383,31 @@ export class DuanCalculator {
       return [next];
     }
     const last = seq[seq.length - 1];
-    const lastContainsNext = last.high >= next.high && last.low <= next.low;
-    const nextContainsLast = next.high >= last.high && next.low <= last.low;
-    if (!lastContainsNext && !nextContainsLast) {
-      return [...seq, next];
+    const res = mergePriceInterval(last, next, direction);
+    if (res.merged) {
+      const merged: FeatureElement = {
+        high: res.newHigh,
+        low: res.newLow,
+        biIndex: next.biIndex,
+      };
+      return [...seq.slice(0, -1), merged];
     }
-    const merged: FeatureElement =
-      direction === TrendDirection.Up
-        ? {
-            high: Math.max(last.high, next.high),
-            low: Math.max(last.low, next.low),
-            biIndex: next.biIndex,
-          }
-        : {
-            high: Math.min(last.high, next.high),
-            low: Math.min(last.low, next.low),
-            biIndex: next.biIndex,
-          };
-    return [...seq.slice(0, -1), merged];
+    return [...seq, next];
   }
 
-  /** 缺口：两元素区间严格不重合。 */
-  private hasGap(a: FeatureElement, b: FeatureElement): boolean {
+  /**
+   * 缺口判定：穿透检查原始 K 线物理价格真空（下穿 originData），防止折线平滑掩盖真实跳空。
+   */
+  private hasGap(
+    bis: readonly ChanBi[],
+    a: FeatureElement,
+    b: FeatureElement,
+  ): boolean {
+    const biA = bis[a.biIndex];
+    const biB = bis[b.biIndex];
+    if (biA && biB) {
+      return hasTruePhysicalGap(biA, biB);
+    }
     return a.high < b.low || b.high < a.low;
   }
 

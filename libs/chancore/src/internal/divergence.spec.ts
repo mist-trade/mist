@@ -1,4 +1,4 @@
-import { ChanDivergenceType, TrendDirection } from '../contracts';
+import { ChanDivergenceType, ChannelLevel, TrendDirection } from '../contracts';
 import type {
   ChanDivergenceInput,
   ChanDivergenceUnit,
@@ -279,6 +279,48 @@ describe('DivergenceDetector (背驰，24课 A/B/C 三段结构，双口径)', (
     expect(
       (calc as any).progressesInTrend(span, span, TrendDirection.None),
     ).toBe(false);
+  });
+
+  describe('双级别背驰求值与 level 契约', () => {
+    it('用例 1（笔级别背驰）：默认或传入 Bi 级别时输出 level === ChannelLevel.Bi', () => {
+      const input = makeConsolidationInput(5, {
+        forces: [
+          makeForce(9, 90),
+          makeForce(5, 50),
+          makeForce(5, 50),
+          makeForce(5, 50),
+          makeForce(3, 30),
+        ],
+      });
+      const result = calc.detectDivergences(input);
+      expect(result).toHaveLength(1);
+      expect(result[0].level).toBe(ChannelLevel.Bi);
+    });
+
+    it('用例 2（段级别背驰）：传入 Duan 级别中枢时输出 level === ChannelLevel.Duan', () => {
+      const input = makeConsolidationInput(5, {
+        forces: [
+          makeForce(9, 90),
+          makeForce(5, 50),
+          makeForce(5, 50),
+          makeForce(5, 50),
+          makeForce(3, 30),
+        ],
+      });
+      const duanZhongshus: ChanDivergenceZhongshu[] = input.zhongshus.map(
+        (z) => ({
+          ...z,
+          level: ChannelLevel.Duan,
+        }),
+      );
+      const result = calc.detectDivergences({
+        ...input,
+        zhongshus: duanZhongshus,
+        level: ChannelLevel.Duan,
+      });
+      expect(result).toHaveLength(1);
+      expect(result[0].level).toBe(ChannelLevel.Duan);
+    });
   });
 });
 

@@ -1,56 +1,65 @@
+/**
+ * 段级走势中枢计算引擎（DuanChannelCalculator）
+ *
+ * ======================================================================================
+ * 核心架构与职责定位（缠论第一性原理与 a + 3 + b 同构架构）：
+ * ======================================================================================
+ * 1. 本模块是段级走势中枢构建与生命周期状态机的统一核心门面；
+ * 2. 状态机内生推进全生命周期管理，笔与段完全共享 ChannelLifecycleEngine 统一内核；
+ * 3. 严格遵循缠论第 17、18、20 课公理：
+ *    - 宏观结构：1 段进入（entryDuan）+ 中间内部振荡段（duans，3, 4, 5... 段）+ 1 段离开（leaveDuan，封存时确立）；
+ *    - duans 构件数组严格只放纯内部振荡段（>= 3 段），进入段与离开段独立解耦挂载；
+ *    - 内部段动态收窄（Dynamic Narrowing）：取内部段公共重叠区间；
+ *    - 极值 [DD, GG] 仅取内部振荡构件极值，绝不受离开段冲高冲低污染；
+ *    - trend: 中枢形成方向（回升形成 Up 或 回调形成 Down，遵循第 20 课 Z 走势段逻辑）；
+ *    - 彻底物理剔除废弃的 displayStartId 与 displayEndId。
+ * ======================================================================================
+ */
+
 import {
   ChannelLevel,
   ChannelStatus,
   ChannelType,
   DuanStatus,
-  TrendDirection,
 } from '../contracts';
 import type {
   ChanDuan,
   ChanDuanChannel,
   ChanDuanChannelTwoPhaseResult,
 } from '../contracts';
-
 import {
-  DuanChannelLifecycleEngine,
-  type DuanChannelLifecycleStrategy,
-  computeSymmetricGeometry,
-  resolveChannelAnchorIds,
+  ChannelLifecycleEngine,
+  isSameChannelElement,
 } from './channel-lifecycle';
+import { DuanChannelLifecyclePolicy } from './duan-channel-policy';
 
-/**
- * 段级中枢（Duan-level Channel）—— 以段为构成单元的中枢。缠论原典 17 课：
- * 中枢 = "至少三个连续次级别走势类型所重叠的部分"，是**无方向的区域**。
- *
- * 采用顺序确认生命周期状态机（委托至通用的 ChannelLifecycleEngine）：
- * - 顺序确认扫描：从左至右顺序寻找 3 段基础中枢核心（趋势交替 + 对称重叠 zg > zd）。
- * - 动态区间延伸：内部震荡段保持动态公共交集更新 [ZD, ZG]。
- * - 离开突破与规则 1～4 状态机封存：顺势离开突破极值后，通过 3买/3卖确认、反向击穿或新中枢成立触发旧中枢封存。
- * - 9 段结合扩展：持续震荡满 9 段时触发中枢扩展（expanded: true）并闭合。
- */
 export class DuanChannelCalculator {
+  /**
+   * 段级走势中枢：入参 = `ChanDuan[]`（通常来自 `createDuan`）。
+   * 必须严格经过【Phase A（原始候选）+ Phase B（延伸合并）】双阶段输出。
+   */
   createDuanChannels(
     duans: readonly ChanDuan[],
     options?: { allowUncomplete?: boolean },
   ): ChanDuanChannelTwoPhaseResult {
-    // 仅确认且有效的段构成中枢（status !== Valid 的未确认尾段不参与：
-    // 18 课"次级别前三个走势类型都是完成的才构成中枢"；统一 status 判据，
-    // 现时 status=Unknown ⇔ endBi===null；数据层 createDuan 输出不变）。
+    // 缠论第 18 课："次级别前三个走势类型都是完成的才构成中枢"
+    // 仅确认且有效的段参与中枢运算
     const confirmed = duans.filter((d) => d.status === DuanStatus.Valid);
+
     const { phaseA, sequential } = this.sequentiallyConfirmChannels(
       confirmed,
       options,
     );
 
-    // Phase B：采用顺序确认中枢序列，并应用段中枢延伸（Extension）与扩展（Expansion）算法
+    // Phase B：采用状态机全生命周期自洽确认的中枢序列，并应用段中枢延伸算法
     const phaseB = this.applyDuanChannelExtensionAndExpansion(sequential);
+
     return { phaseA, phaseB };
   }
 
   /**
-   * 对顺序生成的段中枢应用延伸（Extension）与扩展（Expansion）逻辑：
-   * 1. 延伸合并：相邻段中枢 [ZD, ZG] 存在真实价格重叠且相连，链式贪婪吸收合并为单一延伸段中枢；
-   * 2. 扩展大框：相邻段中枢 [ZD, ZG] 无交集但 [DD, GG] 存在极值价格交集，双层叠加生成 expanded: true 的外层大框。
+   * 对顺序生成的段中枢应用延伸（Extension）逻辑（原典第 35 课定理三）：
+   * 相邻段中枢 [ZD, ZG] 存在真实价格重叠且相连，链式吸收合并为单一延伸段中枢。
    */
   applyDuanChannelExtensionAndExpansion(
     channels: readonly ChanDuanChannel[],
@@ -65,16 +74,21 @@ export class DuanChannelCalculator {
     while (i < channels.length) {
       let current = channels[i];
 
-      // 阶段 1：向后贪婪吸收满足延伸条件（[ZD, ZG] 存在真实价格交集）的段中枢
+      // 向后贪婪吸收满足延伸条件（[ZD, ZG] 存在真实价格交集）的段中枢
       while (i + 1 < channels.length) {
         const next = channels[i + 1];
-        const lastDuan = current.duans[current.duans.length - 1];
-        const firstDuan = next.duans[0];
+        if (next.type !== ChannelType.Complete) {
+          break;
+        }
+
+        const lastDuan =
+          current.leaveDuan ?? current.duans[current.duans.length - 1];
+        const firstDuan = next.entryDuan ?? next.duans[0];
         const isConnected =
-          this.isSameDuan(lastDuan, firstDuan) ||
+          isSameChannelElement(lastDuan, firstDuan) ||
           lastDuan.endTime.getTime() === firstDuan.startTime.getTime();
 
-        if (!isConnected) {
+        if (!isConnected || current.trend !== next.trend) {
           break;
         }
 
@@ -88,41 +102,89 @@ export class DuanChannelCalculator {
         i++;
       }
 
-      // 阶段 2：检查是否满足扩展条件（[DD, GG] 存在极值价格交集）
-      if (i + 1 < channels.length) {
+      // 阶段 2：检查是否与后续中枢满足扩展条件（[DD, GG] 存在极值价格交集，原典第 35 课定理二/三）
+      // 用户核心规则：
+      // 1. 如果前一个中枢是 Macro，后一个中枢是普通的，就不进行中枢扩展
+      // 2. 如果两个中枢都是普通的，再判断中枢扩展，如果扩展了，就把两个中枢一起框起来，单独生成一个玫红色
+      // 3. 所有参与扩展的内容均被消耗，不进入下一次判断扩展
+      const isCurrentMacro =
+        current.upgradedLevel === ChannelLevel.Macro ||
+        current.duans.length >= 9;
+
+      if (!isCurrentMacro && i + 1 < channels.length) {
         const next = channels[i + 1];
-        const hasExtremeOverlap =
-          Math.max(current.dd, next.dd) < Math.min(current.gg, next.gg);
+        const isNextMacro =
+          next.upgradedLevel === ChannelLevel.Macro || next.duans.length >= 9;
 
-        if (hasExtremeOverlap) {
-          const expansionGroup: ChanDuanChannel[] = [current, next];
-          let commonDD = Math.max(current.dd, next.dd);
-          let commonGG = Math.min(current.gg, next.gg);
-          i++;
+        if (!isNextMacro) {
+          const connectingCurrent =
+            current.leaveDuan ?? current.duans[current.duans.length - 1];
+          const connectingNext = next.entryDuan ?? next.duans[0];
+          const sharesConnectingDuan = isSameChannelElement(
+            connectingCurrent,
+            connectingNext,
+          );
+          const isSameTrend = current.trend === next.trend;
 
-          while (i + 1 < channels.length) {
-            const cand = channels[i + 1];
-            const candCommonDD = Math.max(commonDD, cand.dd);
-            const candCommonGG = Math.min(commonGG, cand.gg);
-            if (candCommonDD >= candCommonGG) {
-              break;
+          const hasExtremeOverlap =
+            sharesConnectingDuan &&
+            isSameTrend &&
+            Math.max(current.dd, next.dd) < Math.min(current.gg, next.gg);
+
+          if (hasExtremeOverlap) {
+            const expansionGroup: ChanDuanChannel[] = [current, next];
+            let commonDD = Math.max(current.dd, next.dd);
+            let commonGG = Math.min(current.gg, next.gg);
+            i++;
+
+            // 尝试向后连续扩展（候选必须同样为非 Macro 普通中枢）
+            while (i + 1 < channels.length) {
+              const cand = channels[i + 1];
+              const isCandMacro =
+                cand.upgradedLevel === ChannelLevel.Macro ||
+                cand.duans.length >= 9;
+              if (isCandMacro) {
+                break;
+              }
+
+              const prevInGroup = expansionGroup[expansionGroup.length - 1];
+              const prevConn =
+                prevInGroup.leaveDuan ??
+                prevInGroup.duans[prevInGroup.duans.length - 1];
+              const candConn = cand.entryDuan ?? cand.duans[0];
+
+              if (
+                !isSameChannelElement(prevConn, candConn) ||
+                cand.trend !== expansionGroup[0].trend
+              ) {
+                break;
+              }
+
+              const candCommonDD = Math.max(commonDD, cand.dd);
+              const candCommonGG = Math.min(commonGG, cand.gg);
+              const canContinuouslyExpand = candCommonDD < candCommonGG;
+
+              if (!canContinuouslyExpand) {
+                break;
+              }
+
+              expansionGroup.push(cand);
+              commonDD = candCommonDD;
+              commonGG = candCommonGG;
+              i++;
             }
 
-            expansionGroup.push(cand);
-            commonDD = candCommonDD;
-            commonGG = candCommonGG;
+            result.push(expansionGroup[0]);
+            const expandedBox =
+              this.buildExpandedDuanBoundingBox(expansionGroup);
+            result.push(expandedBox);
+            for (let k = 1; k < expansionGroup.length; k++) {
+              result.push(expansionGroup[k]);
+            }
+
             i++;
+            continue;
           }
-
-          result.push(expansionGroup[0]);
-          const expandedBox = this.buildExpandedBoundingBox(expansionGroup);
-          result.push(expandedBox);
-          for (let k = 1; k < expansionGroup.length; k++) {
-            result.push(expansionGroup[k]);
-          }
-
-          i++;
-          continue;
         }
       }
 
@@ -133,11 +195,59 @@ export class DuanChannelCalculator {
     return result;
   }
 
-  private isSameDuan(a: ChanDuan, b: ChanDuan): boolean {
-    return (
-      a.startTime.getTime() === b.startTime.getTime() &&
-      a.endTime.getTime() === b.endTime.getTime()
-    );
+  /**
+   * 构造段中枢扩展外层大框（原典第 35 课高一级宏观中枢，标记为 Macro 级别）
+   */
+  private buildExpandedDuanBoundingBox(
+    channels: readonly ChanDuanChannel[],
+  ): ChanDuanChannel {
+    const first = channels[0];
+    const last = channels[channels.length - 1];
+
+    const mergedDuans: ChanDuan[] = [...first.duans];
+    for (let i = 1; i < channels.length; i++) {
+      const prev = channels[i - 1];
+      const next = channels[i];
+      const connectingDuan = prev.leaveDuan ?? next.entryDuan;
+      if (
+        connectingDuan &&
+        !mergedDuans.some((d) => isSameChannelElement(d, connectingDuan))
+      ) {
+        mergedDuans.push(connectingDuan);
+      }
+      for (const d of next.duans) {
+        if (
+          !mergedDuans.some((existing) => isSameChannelElement(existing, d))
+        ) {
+          mergedDuans.push(d);
+        }
+      }
+    }
+
+    const isComplete = channels.every((c) => c.type === ChannelType.Complete);
+    const zg = Math.max(...channels.map((c) => c.zg));
+    const zd = Math.min(...channels.map((c) => c.zd));
+    const gg = Math.max(...channels.map((c) => c.gg));
+    const dd = Math.min(...channels.map((c) => c.dd));
+
+    return {
+      duans: mergedDuans,
+      zg,
+      zd,
+      gg,
+      dd,
+      level: ChannelLevel.Duan,
+      type: isComplete ? ChannelType.Complete : ChannelType.UnComplete,
+      status: ChannelStatus.Valid,
+      startId: first.startId,
+      endId: last.endId,
+      trend: first.trend,
+      extended: false,
+      expanded: true,
+      upgradedLevel: ChannelLevel.Macro,
+      entryDuan: first.entryDuan,
+      leaveDuan: last.leaveDuan ?? first.leaveDuan,
+    };
   }
 
   private mergeExtendedDuanChannel(
@@ -145,8 +255,14 @@ export class DuanChannelCalculator {
     c2: ChanDuanChannel,
   ): ChanDuanChannel {
     const mergedDuans: ChanDuan[] = [...c1.duans];
+    if (
+      c1.leaveDuan &&
+      !mergedDuans.some((d) => isSameChannelElement(d, c1.leaveDuan!))
+    ) {
+      mergedDuans.push(c1.leaveDuan);
+    }
     for (const d of c2.duans) {
-      if (!mergedDuans.some((existing) => this.isSameDuan(existing, d))) {
+      if (!mergedDuans.some((existing) => isSameChannelElement(existing, d))) {
         mergedDuans.push(d);
       }
     }
@@ -156,8 +272,13 @@ export class DuanChannelCalculator {
     const gg = Math.max(c1.gg, c2.gg);
     const dd = Math.min(c1.dd, c2.dd);
 
+    const isNineDuans = mergedDuans.length >= 9;
+    const isExpanded = c1.expanded || c2.expanded || isNineDuans;
+
     return {
       duans: mergedDuans,
+      entryDuan: c1.entryDuan,
+      leaveDuan: c2.leaveDuan ?? c1.leaveDuan,
       zg,
       zd,
       gg,
@@ -170,136 +291,48 @@ export class DuanChannelCalculator {
       status: ChannelStatus.Valid,
       startId: c1.startId,
       endId: c2.endId,
-      displayStartId: c1.displayStartId,
-      displayEndId: c2.displayEndId,
-      expanded: false,
-    };
-  }
-
-  private buildExpandedBoundingBox(
-    channels: readonly ChanDuanChannel[],
-  ): ChanDuanChannel {
-    const first = channels[0];
-    const last = channels[channels.length - 1];
-
-    const mergedDuans: ChanDuan[] = [...first.duans];
-    for (let c = 1; c < channels.length; c++) {
-      for (const d of channels[c].duans) {
-        if (!mergedDuans.some((existing) => this.isSameDuan(existing, d))) {
-          mergedDuans.push(d);
-        }
-      }
-    }
-
-    const zg = Math.max(first.zg, last.zd);
-    const zd = Math.min(first.zg, last.zd);
-    const gg = Math.max(...channels.map((c) => c.gg));
-    const dd = Math.min(...channels.map((c) => c.dd));
-
-    return {
-      duans: mergedDuans,
-      zg,
-      zd,
-      gg,
-      dd,
-      level: ChannelLevel.Duan,
-      type: ChannelType.Complete,
-      status: ChannelStatus.Valid,
-      startId: first.startId,
-      endId: last.endId,
-      displayStartId: first.displayStartId,
-      displayEndId: last.displayEndId,
-      expanded: true,
+      trend: c1.trend,
+      extended: true,
+      expanded: isExpanded,
+      upgradedLevel:
+        c1.upgradedLevel || c2.upgradedLevel || isNineDuans
+          ? ChannelLevel.Macro
+          : undefined,
     };
   }
 
   /**
-   * 顺序确认扫描与生命周期状态机推进（委托至通用的 ChannelLifecycleEngine）
+   * 顺序确认扫描与通用生命周期状态机推进
    */
   private sequentiallyConfirmChannels(
-    duans: readonly ChanDuan[],
+    data: readonly ChanDuan[],
     options?: { allowUncomplete?: boolean },
   ): {
     phaseA: ChanDuanChannel[];
     sequential: ChanDuanChannel[];
   } {
-    const strategy: DuanChannelLifecycleStrategy<ChanDuan, ChanDuanChannel> = {
-      minCoreLength: 3,
-      minSealedLength: 3,
+    const policy = new DuanChannelLifecyclePolicy({
       allowUncomplete: options?.allowUncomplete,
-      validateCore: (window) => {
-        const geo = computeSymmetricGeometry(window);
-        if (!geo) return null;
-        return {
-          geometry: geo,
-          isUp: window[0].trend === TrendDirection.Up,
-        };
-      },
-      buildPhaseAChannel: (elements, original, startIndex, coreGeometry) => {
-        const baseThree = elements.slice(0, 3);
-        return this.buildChannelFromDuans(
-          baseThree,
-          original,
-          startIndex,
-          coreGeometry,
-          false,
-        );
-      },
-      buildSealedChannel: (
-        elements,
-        original,
-        startIndex,
-        geometry,
-        expanded,
-        isComplete = true,
-      ) => {
-        return this.buildChannelFromDuans(
-          elements,
-          original,
-          startIndex,
-          geometry,
-          expanded,
-          isComplete,
-        );
-      },
-    };
-
-    return DuanChannelLifecycleEngine.runSequentialLifecycle(duans, strategy);
-  }
-
-  /**
-   * 从 N 段序列和几何参数构建 ChanDuanChannel。
-   */
-  private buildChannelFromDuans(
-    duans: readonly ChanDuan[],
-    originalDuans: readonly ChanDuan[],
-    startIndex: number,
-    geometry: { zg: number; zd: number; gg: number; dd: number },
-    expanded = false,
-    isComplete = true,
-  ): ChanDuanChannel {
-    const endIndex = startIndex + duans.length - 1;
-    const { startId, endId, displayStartId, displayEndId } =
-      resolveChannelAnchorIds(originalDuans, startIndex, endIndex);
-
-    return {
-      duans: [...duans],
-      zg: geometry.zg,
-      zd: geometry.zd,
-      gg: geometry.gg,
-      dd: geometry.dd,
-      level: ChannelLevel.Duan,
-      type: isComplete ? ChannelType.Complete : ChannelType.UnComplete,
-      status: ChannelStatus.Valid,
-      expanded,
-      startId,
-      endId,
-      displayStartId,
-      displayEndId,
-    };
+    });
+    return ChannelLifecycleEngine.runSequentialLifecycle(data, policy);
   }
 
   isCandidateChannelValid(channel: ChanDuanChannel): boolean {
-    return channel.duans.length >= 3 && channel.zg > channel.zd;
+    if (channel.zg <= channel.zd) {
+      return false;
+    }
+    if (
+      channel.status !== undefined &&
+      channel.status !== ChannelStatus.Valid
+    ) {
+      return false;
+    }
+    if (channel.duans.length < 3) {
+      return false;
+    }
+    if (channel.type === ChannelType.Complete && !channel.leaveDuan) {
+      return false;
+    }
+    return true;
   }
 }

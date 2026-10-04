@@ -16,7 +16,7 @@ import {
   TrendDirection,
 } from '../contracts';
 import type { ChanBi, ChanDuan } from '../contracts';
-import { ChannelCalculator } from './channel';
+import { BiChannelCalculator } from './bi-channel';
 import { DuanChannelCalculator } from './duan-channel';
 
 /**
@@ -855,7 +855,7 @@ export const REAL_5M_APR2026_CENTRAL_BIS: readonly ChanBi[] = [
 ];
 
 describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Departure & Closure Cases)', () => {
-  const biCalc = new ChannelCalculator();
+  const biCalc = new BiChannelCalculator();
   const duanCalc = new DuanChannelCalculator();
 
   it('环境基准脚手架就绪：计算器与构件工厂可用', () => {
@@ -1439,7 +1439,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
 
   describe('5分钟级别前5个中枢端到端全量锁定门禁 (E2E Contract Guard)', () => {
     it('端到端全量锁定：前5个中枢总数严格为5，每一笔（共47笔）的方向、高低点、起止时间与全局引用严格完全一致，错一笔即不通过', () => {
-      const allRes = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      const allRes = biCalc.createBiChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
       expect(allRes.phaseB).toHaveLength(EXPECTED_5M_FIRST_5_CENTRALS.length);
 
       EXPECTED_5M_FIRST_5_CENTRALS.forEach((expected, cIdx) => {
@@ -1447,7 +1447,9 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
         expect(actual).toBeDefined();
         // 1. 中枢级别全局参数严格断言
         expect(actual.trend).toBe(expected.trend);
-        expect(actual.bis).toHaveLength(expected.count);
+        expect(actual.bis).toHaveLength(expected.count - 2);
+        expect(actual.entryBi).toBeDefined();
+        expect(actual.leaveBi).toBeDefined();
         expect(actual.zg).toBe(expected.zg);
         expect(actual.zd).toBe(expected.zd);
         expect(actual.gg).toBe(expected.gg);
@@ -1455,25 +1457,37 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
         expect(actual.expanded).toBe(expected.expanded);
         expect(actual.type).toBe(expected.type);
 
-        // 2. 中枢内每一笔的全部参数严格逐笔断言（每一笔都不能错）
-        expected.bis.forEach((expBi, bIdx) => {
+        // 2. 验证 entryBi
+        const expEntry = expected.bis[0];
+        expect(actual.entryBi).toBe(
+          REAL_5M_JAN2026_FIRST_CENTRAL_BIS[expEntry.globalBiIndex],
+        );
+        expect(actual.entryBi.startTime.toISOString()).toBe(expEntry.startTime);
+        expect(actual.entryBi.endTime.toISOString()).toBe(expEntry.endTime);
+
+        // 3. 验证 leaveBi
+        const expLeave = expected.bis[expected.bis.length - 1];
+        expect(actual.leaveBi).toBe(
+          REAL_5M_JAN2026_FIRST_CENTRAL_BIS[expLeave.globalBiIndex],
+        );
+        expect(actual.leaveBi?.startTime.toISOString()).toBe(
+          expLeave.startTime,
+        );
+        expect(actual.leaveBi?.endTime.toISOString()).toBe(expLeave.endTime);
+
+        // 4. 中枢内部每一笔的全部参数严格逐笔断言
+        const internalExpected = expected.bis.slice(1, -1);
+        internalExpected.forEach((expBi, bIdx) => {
           const actBi = actual.bis[bIdx];
           expect(actBi).toBeDefined();
-          // 局部与全局索引对齐
-          expect(bIdx).toBe(expBi.centralBiIndex);
           const globalIdx = REAL_5M_JAN2026_FIRST_CENTRAL_BIS.indexOf(actBi);
           expect(globalIdx).toBe(expBi.globalBiIndex);
-          // 笔对象真源引用同一性（确认消费的是全局序列中的同一物理笔）
           expect(actBi).toBe(
             REAL_5M_JAN2026_FIRST_CENTRAL_BIS[expBi.globalBiIndex],
           );
-
-          // 笔方向与高低点绝对一致
           expect(actBi.trend).toBe(expBi.trend);
           expect(actBi.low).toBe(expBi.low);
           expect(actBi.high).toBe(expBi.high);
-
-          // 笔时间戳毫秒级精确对齐
           expect(actBi.startTime.toISOString()).toBe(expBi.startTime);
           expect(actBi.endTime.toISOString()).toBe(expBi.endTime);
         });
@@ -1484,7 +1498,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
   // 用户测试用例准备区域
   describe('用例 1：2026年1月6日13:50至1月9日10:50九笔中枢基准与后续3买离开', () => {
     it('全量序列应精准识别为 9 笔中枢，起止时间严格对齐，后续走出 3 买与离开', () => {
-      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      const resAll = biCalc.createBiChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
       process.stderr.write(
         `\n=== ALL CHANNELS (${resAll.phaseB.length}) ===\n`,
       );
@@ -1502,13 +1516,17 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(resAll.phaseB.length).toBeGreaterThanOrEqual(1);
 
       const c0 = resAll.phaseB[0];
-      // 1. 中间一共 9 笔中枢
-      expect(c0.bis).toHaveLength(9);
+      // 1. 中间一共 7 笔内部中枢构件 (首尾有 entryBi 与 leaveBi 共 9 笔)
+      expect(c0.bis).toHaveLength(7);
+      expect(c0.entryBi).toBeDefined();
+      expect(c0.leaveBi).toBeDefined();
 
-      // 2. 起笔是 1月6日 13:50 (Bi 4)
-      expect(c0.bis[0].startTime).toEqual(new Date('2026-01-06T05:50:00.000Z'));
-      // 3. 终点是 1月9日 10:50 (Bi 12)
-      expect(c0.bis[8].endTime).toEqual(new Date('2026-01-09T02:50:00.000Z'));
+      // 2. 进入笔起笔是 1月6日 13:50 (Bi 4)
+      expect(c0.entryBi!.startTime).toEqual(
+        new Date('2026-01-06T05:50:00.000Z'),
+      );
+      // 3. 离开笔终点是 1月9日 10:50 (Bi 12)
+      expect(c0.leaveBi!.endTime).toEqual(new Date('2026-01-09T02:50:00.000Z'));
 
       // 4. 中枢状态与几何参数
       expect(c0.type).toBe(ChannelType.Complete);
@@ -1536,20 +1554,24 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
 
   describe('用例 2：2026年1月9日11:10至1月14日11:25上涨中枢（对应30分钟向上笔）', () => {
     it('全量序列应精准识别为 7 笔上涨中枢，起止时间严格吻合，方向判定为 Up', () => {
-      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      const resAll = biCalc.createBiChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
       expect(resAll.phaseB.length).toBeGreaterThanOrEqual(2);
 
       const c1 = resAll.phaseB[1];
       // 1. 方向严格为 Up (对齐 30 分钟向上笔)
       expect(c1.trend).toBe(TrendDirection.Up);
 
-      // 2. 中间一共 7 笔中枢 (1 进入 + 3 核心 + 2 延伸 + 1 顺势离开)
-      expect(c1.bis).toHaveLength(7);
+      // 2. 中间一共 5 笔内部中枢构件 (1 进入 + 5 内部 + 1 顺势离开 共 7 笔)
+      expect(c1.bis).toHaveLength(5);
+      expect(c1.entryBi).toBeDefined();
+      expect(c1.leaveBi).toBeDefined();
 
-      // 3. 起笔是 1月9日 11:10 (Bi 14)
-      expect(c1.bis[0].startTime).toEqual(new Date('2026-01-09T03:10:00.000Z'));
-      // 4. 终点是 1月14日 11:25 (Bi 20)
-      expect(c1.bis[6].endTime).toEqual(new Date('2026-01-14T03:25:00.000Z'));
+      // 3. 进入笔起笔是 1月9日 11:10 (Bi 14)
+      expect(c1.entryBi!.startTime).toEqual(
+        new Date('2026-01-09T03:10:00.000Z'),
+      );
+      // 4. 离开笔终点是 1月14日 11:25 (Bi 20)
+      expect(c1.leaveBi!.endTime).toEqual(new Date('2026-01-14T03:25:00.000Z'));
 
       // 5. 几何参数与区间
       expect(c1.type).toBe(ChannelType.Complete);
@@ -1562,29 +1584,29 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
     it('检验增量切片下该中枢的稳定状态（截取至 1月14日11:25 Bi 20 冲高顶端）', () => {
       // 截取至 Bi 20 (从 index 0 到 20 共 21 笔)
       const bisUpToBi20 = REAL_5M_JAN2026_FIRST_CENTRAL_BIS.slice(0, 21);
-      const resBi20 = biCalc.createChannels(bisUpToBi20, {
+      const resBi20 = biCalc.createBiChannels(bisUpToBi20, {
         allowUncomplete: true,
       });
       expect(resBi20.phaseB.length).toBeGreaterThanOrEqual(2);
       expect(resBi20.phaseB[1].trend).toBe(TrendDirection.Up);
-      expect(resBi20.phaseB[1].bis).toHaveLength(7);
+      expect(resBi20.phaseB[1].bis).toHaveLength(5);
       expect(resBi20.phaseB[1].type).toBe(ChannelType.Complete);
     });
   });
 
   describe('用例 3：2026年1月14日11:25至1月20日10:30双下跌中枢（分别对应两笔30分钟向下笔）', () => {
     it('全量序列应分别产出独立的第3个中枢(01-14 11:25~01-15 13:05)与第4个中枢(01-16 09:40~01-20 10:30)，严禁碎裂错乱', () => {
-      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      const resAll = biCalc.createBiChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
 
       // 1. 检验第 3 个中枢：1月14日 11:25 ~ 1月15日 13:05 下跌中枢 (对应 30分钟一笔下 4190.87 -> 4096.85)
       const c2 = resAll.phaseB.find(
         (c) =>
-          c.bis[0].startTime.getTime() ===
+          c.entryBi?.startTime.getTime() ===
           new Date('2026-01-14T03:25:00.000Z').getTime(),
       );
       expect(c2).toBeDefined();
       expect(c2?.trend).toBe(TrendDirection.Down);
-      expect(c2?.bis[c2.bis.length - 1].endTime).toEqual(
+      expect(c2?.leaveBi?.endTime).toEqual(
         new Date('2026-01-15T05:05:00.000Z'), // 01-15 13:05
       );
       expect(c2?.type).toBe(ChannelType.Complete);
@@ -1592,12 +1614,12 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       // 2. 检验第 4 个中枢：1月16日 09:40 ~ 1月20日 10:30 下跌中枢 (对应 30分钟一笔下 4140.23 -> 4080.29)
       const c3 = resAll.phaseB.find(
         (c) =>
-          c.bis[0].startTime.getTime() ===
+          c.entryBi?.startTime.getTime() ===
           new Date('2026-01-16T01:40:00.000Z').getTime(),
       );
       expect(c3).toBeDefined();
       expect(c3?.trend).toBe(TrendDirection.Down);
-      expect(c3?.bis[c3.bis.length - 1].endTime).toEqual(
+      expect(c3?.leaveBi?.endTime).toEqual(
         new Date('2026-01-20T02:30:00.000Z'), // 01-20 10:30
       );
       expect(c3?.type).toBe(ChannelType.Complete);
@@ -1606,15 +1628,19 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
 
   describe('用例 4：2026年1月20日10:30至1月26日10:40单一大中枢（对应30分钟向上笔）', () => {
     it('在1月20日10:30至1月26日10:40内应只有唯一下跌后转上的单一大中枢，起于01-20 14:35，离开起于01-23 14:40，严禁错误割裂为2个中枢', () => {
-      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      const resAll = biCalc.createBiChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
 
       // 筛选在 2026-01-20 10:30 至 2026-01-26 10:40 范围内的中枢
       const tStart = new Date('2026-01-20T02:30:00.000Z').getTime(); // 01-20 10:30
       const tEnd = new Date('2026-01-26T02:40:00.000Z').getTime(); // 01-26 10:40
 
       const channelsInRange = resAll.phaseB.filter((c) => {
-        const cStart = c.bis[0].startTime.getTime();
-        const cEnd = c.bis[c.bis.length - 1].endTime.getTime();
+        const cStart = c.entryBi
+          ? c.entryBi.startTime.getTime()
+          : c.bis[0].startTime.getTime();
+        const cEnd = c.leaveBi
+          ? c.leaveBi.endTime.getTime()
+          : c.bis[c.bis.length - 1].endTime.getTime();
         return cStart >= tStart && cEnd <= tEnd;
       });
 
@@ -1624,15 +1650,15 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       const bigChannel = channelsInRange[0];
       expect(bigChannel.trend).toBe(TrendDirection.Up);
       // 2. 进入笔起点：1月20日 14:35 (Bi 45)
-      expect(bigChannel.bis[0].startTime).toEqual(
+      expect(bigChannel.entryBi?.startTime).toEqual(
         new Date('2026-01-20T06:35:00.000Z'),
       );
       // 3. 离开笔终点：1月26日 10:40 (Bi 57)
-      expect(bigChannel.bis[bigChannel.bis.length - 1].endTime).toEqual(
+      expect(bigChannel.leaveBi?.endTime).toEqual(
         new Date('2026-01-26T02:40:00.000Z'),
       );
       // 4. 离开笔的起点：1月23日 14:40 (Bi 57.startTime)
-      const departureBi = bigChannel.bis[bigChannel.bis.length - 1];
+      const departureBi = bigChannel.leaveBi!;
       expect(departureBi.startTime).toEqual(
         new Date('2026-01-23T06:40:00.000Z'),
       );
@@ -1642,12 +1668,12 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
 
   describe('用例 5：2026年1月26日10:40至1月27日10:05三买转二卖中枢严禁延伸防污染', () => {
     it('前置大中枢必须在离开笔冲高极值(01-26 10:40)确定闭合封存，严禁将随后的 3 买与 2 卖吸收为中枢延伸', () => {
-      const resAll = biCalc.createChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
+      const resAll = biCalc.createBiChannels(REAL_5M_JAN2026_FIRST_CENTRAL_BIS);
 
       // 1. 查找起于 01-20 14:35 的单一大中枢
       const bigChannel = resAll.phaseB.find(
         (c) =>
-          c.bis[0].startTime.getTime() ===
+          c.entryBi?.startTime.getTime() ===
           new Date('2026-01-20T06:35:00.000Z').getTime(),
       );
       expect(bigChannel).toBeDefined();
@@ -1655,7 +1681,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(bigChannel?.type).toBe(ChannelType.Complete);
 
       // 2. 离开笔终点必须是 01-26 10:40 (4160.99)
-      const lastBi = bigChannel!.bis[bigChannel!.bis.length - 1];
+      const lastBi = bigChannel!.leaveBi!;
       expect(lastBi.endTime).toEqual(new Date('2026-01-26T02:40:00.000Z'));
       expect(lastBi.high).toBe(4160.99);
 
@@ -1688,7 +1714,7 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
 
   describe('用例 6：2026年4月1日13:35至4月7日13:20五笔下跌中枢（4月3日极值3871.30与3买转2买成立离开）', () => {
     it('在2026年4月全量序列上精准识别出5笔下跌中枢，中枢极值DD(3871.30)对齐4月3日低点，第5笔离开笔为3买转2买成立并闭合', () => {
-      const resAll = biCalc.createChannels(REAL_5M_APR2026_CENTRAL_BIS, {
+      const resAll = biCalc.createBiChannels(REAL_5M_APR2026_CENTRAL_BIS, {
         allowUncomplete: true,
       });
 
@@ -1701,16 +1727,18 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(central.type).toBe(ChannelType.Complete);
       expect(central.expanded).toBe(false);
 
-      // 1. 构件总数为 5 笔（奇偶同向公理：1 进入笔 + 3 核心构件 + 1 顺势离开笔）
-      expect(central.bis).toHaveLength(5);
+      // 1. 构件总数为 3 笔内部构件（奇偶同向公理：1 进入笔 + 3 核心构件 + 1 顺势离开笔）
+      expect(central.bis).toHaveLength(3);
+      expect(central.entryBi).toBeDefined();
+      expect(central.leaveBi).toBeDefined();
 
       // 2. 起止时间严格对齐
       // 进入笔起点：4月1日 13:35 (UTC 05:35)
-      expect(central.bis[0].startTime).toEqual(
+      expect(central.entryBi!.startTime).toEqual(
         new Date('2026-04-01T05:35:00.000Z'),
       );
       // 离开笔终点：4月7日 13:20 (UTC 05:20)
-      expect(central.bis[4].endTime).toEqual(
+      expect(central.leaveBi!.endTime).toEqual(
         new Date('2026-04-07T05:20:00.000Z'),
       );
 
@@ -1722,17 +1750,17 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       expect(central.gg).toBe(3929.53);
       expect(central.dd).toBe(3871.3);
 
-      // 4. 4月3日核心构件验证 (Bi #3)
-      const biApril3 = central.bis[2];
+      // 4. 4月3日核心构件验证 (内部 Bi 1，对应原 Bi #3)
+      const biApril3 = central.bis[1];
       expect(biApril3.trend).toBe(TrendDirection.Down);
       expect(biApril3.low).toBe(3871.3);
       expect(biApril3.low).toBe(central.dd);
       expect(biApril3.endTime).toEqual(new Date('2026-04-03T05:25:00.000Z')); // 4月3日 13:25
 
-      // 5. 第 5 笔顺势离开笔（Bi #5）：3买转2买成立离开笔
-      const departureBi = central.bis[4];
+      // 5. 第 5 笔顺势离开笔（central.leaveBi）：3买转2买成立离开笔
+      const departureBi = central.leaveBi!;
       expect(departureBi.trend).toBe(TrendDirection.Down);
-      expect(departureBi.trend).toBe(central.bis[0].trend); // 离开笔与进入笔严格同向
+      expect(departureBi.trend).toBe(central.entryBi!.trend); // 离开笔与进入笔严格同向
       expect(departureBi.high).toBe(3902.61); // 触碰 ZG (3902.61)
       expect(departureBi.low).toBe(3876.98); // 脱离中枢核心区间 [ZD, ZG] (3876.98 < ZD 3900.12)
       expect(departureBi.low).toBeGreaterThan(central.dd); // 回踩不破前低 3871.30 (3买转2买/2B买点成立)
@@ -1824,14 +1852,14 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
         ), // Bi 7: 继续下杀跌破 3000
       ];
 
-      const res = biCalc.createChannels(bis30m);
+      const res = biCalc.createBiChannels(bis30m);
 
       // 1. Bi 4 绝不能作为 5 笔 Complete 离开笔封存
       const sealedAtBi4 = res.phaseB.find(
         (c) =>
           c.type === ChannelType.Complete &&
-          c.bis.length === 5 &&
-          c.bis[4].high === 3340,
+          c.bis.length === 3 &&
+          c.leaveBi?.high === 3340,
       );
       expect(sealedAtBi4).toBeUndefined();
 
@@ -1850,7 +1878,8 @@ describe('中枢离开笔判定与闭合封存专项测试用例集 (Channel Dep
       // 3. 任何向上中枢的构件总数绝不能跨入日线下跌段
       for (const c of res.phaseB) {
         if (c.trend === TrendDirection.Up) {
-          expect(c.bis[c.bis.length - 1].startTime.getTime()).toBeLessThan(
+          const endBi = c.leaveBi ?? c.bis[c.bis.length - 1];
+          expect(endBi.startTime.getTime()).toBeLessThan(
             new Date('2026-05-05T05:00:00.000Z').getTime(),
           );
         }

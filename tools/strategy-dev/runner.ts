@@ -10,13 +10,7 @@
  *   pnpm dev:strategy --code 600519 --period 30m
  */
 
-import {
-  ChanCore,
-  ChannelType,
-  type ChanChannel,
-  type ChanDivergenceZhongshu,
-  type ChanK,
-} from '@app/chancore';
+import { ChanCore, type ChanK } from '@app/chancore';
 import { DynamicTacticsLoader } from '../../libs/strategy/src/tactics/dynamic-tactics-loader';
 import {
   TacticalQuadrant,
@@ -28,27 +22,6 @@ import {
   listAvailableDatasets,
   type KLineLoadOptions,
 } from './provider';
-
-function toDivergenceZhongshu(c: ChanChannel): ChanDivergenceZhongshu {
-  const units = c.bis;
-  const first = units.length >= 4 ? units[1] : units[0];
-  let last = units[units.length - 1];
-  if (
-    c.type === ChannelType.Complete &&
-    units.length >= 5 &&
-    units.length % 2 === 1
-  ) {
-    last = units[units.length - 2];
-  }
-  return {
-    firstUnitTime: first ? first.startTime : units[0].startTime,
-    lastUnitTime: last ? last.endTime : units[units.length - 1].endTime,
-    zg: c.zg,
-    zd: c.zd,
-    gg: c.gg,
-    dd: c.dd,
-  };
-}
 
 interface RunnerCliOptions extends KLineLoadOptions {
   subPeriod?: string;
@@ -138,7 +111,7 @@ async function runStrategyDev(): Promise<void> {
   const mergedK = ChanCore.mergeK(klines);
   const biResult = ChanCore.createBi(klines);
   const duans = ChanCore.createDuan(biResult.phaseB);
-  const channels = ChanCore.createChannels(klines);
+  const channels = ChanCore.createBiChannels(klines);
   const duanChannels = ChanCore.createDuanChannels(duans);
   const chanCalcDuration = Date.now() - t0;
 
@@ -194,7 +167,7 @@ async function runStrategyDev(): Promise<void> {
       duans: duans.filter((d) => d.endTime <= currentTime),
       zhongshus: channels.phaseB
         .filter((c) => c.bis[c.bis.length - 1].endTime <= currentTime)
-        .map(toDivergenceZhongshu),
+        .map((c) => ChanCore.toZhongshu(c)),
       lastPrice: currentK.close,
       timestamp: currentTime,
     };

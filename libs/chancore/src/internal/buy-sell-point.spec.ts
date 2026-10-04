@@ -11,9 +11,9 @@ import {
 } from '../contracts';
 import type {
   ChanBi,
+  ChanBiChannel,
   ChanBspInput,
   ChanBspUnit,
-  ChanChannel,
   ChanDivergenceZhongshu,
   ChanDuan,
   ChanDuanChannel,
@@ -374,6 +374,8 @@ describe('BuySellPointDetector', () => {
       const duanChannels: ChanDuanChannel[] = [
         {
           duans: [duans[1], duans[2], duans[3]], // 3 段基本单元
+          entryDuan: duans[0],
+          leaveDuan: duans[4],
           zg: 20,
           zd: 14,
           gg: 24,
@@ -381,10 +383,9 @@ describe('BuySellPointDetector', () => {
           level: ChannelLevel.Duan,
           type: ChannelType.Complete,
           status: ChannelStatus.Valid,
+          trend: TrendDirection.Up,
           startId: 1,
           endId: 3,
-          displayStartId: 1,
-          displayEndId: 3,
           expanded: false,
         },
       ];
@@ -415,6 +416,8 @@ describe('BuySellPointDetector', () => {
       const duanChannels: ChanDuanChannel[] = [
         {
           duans: [duans[1], duans[2], duans[3]], // 3 段基本单元
+          entryDuan: duans[0],
+          leaveDuan: duans[4],
           zg: 20,
           zd: 14,
           gg: 24,
@@ -422,10 +425,9 @@ describe('BuySellPointDetector', () => {
           level: ChannelLevel.Duan,
           type: ChannelType.Complete,
           status: ChannelStatus.Valid,
+          trend: TrendDirection.Down,
           startId: 1,
           endId: 3,
-          displayStartId: 1,
-          displayEndId: 3,
           expanded: false,
         },
       ];
@@ -452,6 +454,8 @@ describe('BuySellPointDetector', () => {
       );
       const duanChannels: ChanDuanChannel[] = input.zhongshus.map((z, i) => ({
         duans: [duans[i * 4 + 1], duans[i * 4 + 2], duans[i * 4 + 3]],
+        entryDuan: duans[i * 4],
+        leaveDuan: duans[i * 4 + 4],
         zg: z.zg,
         zd: z.zd,
         gg: z.gg,
@@ -459,10 +463,9 @@ describe('BuySellPointDetector', () => {
         level: ChannelLevel.Duan,
         type: ChannelType.Complete,
         status: ChannelStatus.Valid,
+        trend: TrendDirection.Down,
         startId: i * 4 + 1,
         endId: i * 4 + 3,
-        displayStartId: i * 4 + 1,
-        displayEndId: i * 4 + 3,
         expanded: false,
       }));
 
@@ -494,41 +497,45 @@ describe('BuySellPointDetector', () => {
       expect(bspUnit.trend).toBe(TrendDirection.Up);
     });
 
-    it('chanChannelToZhongshu correctly slices 3-Duan fundamental unit channel', () => {
+    it('chanChannelToZhongshu correctly handles Duan channel', () => {
       const d0 = makeMockDuan('up', 20, 10, 0);
       const d1 = makeMockDuan('down', 18, 12, 1);
       const d2 = makeMockDuan('up', 17, 13, 2);
       const channel: ChanDuanChannel = {
-        duans: [d0, d1, d2],
+        duans: [d1],
+        entryDuan: d0,
+        leaveDuan: d2,
         zg: 17,
         zd: 12,
-        gg: 20,
-        dd: 10,
+        gg: 18,
+        dd: 12,
         level: ChannelLevel.Duan,
         type: ChannelType.Complete,
         status: ChannelStatus.Valid,
+        trend: TrendDirection.Up,
         startId: 1,
         endId: 3,
-        displayStartId: 1,
-        displayEndId: 3,
         expanded: false,
       };
 
       const zs = chanChannelToZhongshu(channel);
-      expect(zs.firstUnitTime).toEqual(d0.startTime);
-      expect(zs.lastUnitTime).toEqual(d2.endTime);
+      expect(zs.firstUnitTime).toEqual(d1.startTime);
+      expect(zs.lastUnitTime).toEqual(d1.endTime);
       expect(zs.zg).toBe(17);
       expect(zs.zd).toBe(12);
+      expect(zs.level).toBe(ChannelLevel.Duan);
     });
 
-    it('chanChannelToZhongshu correctly handles Bi channel with 5 elements (first=b1, last=b3)', () => {
+    it('chanChannelToZhongshu correctly handles Bi channel with pure internal bis', () => {
       const b0 = makeMockBi('up', 15, 5, 0);
       const b1 = makeMockBi('down', 20, 10, 1);
       const b2 = makeMockBi('up', 18, 12, 2);
       const b3 = makeMockBi('down', 17, 11, 3);
       const b4 = makeMockBi('up', 25, 14, 4); // 离开笔
-      const biChannel: ChanChannel = {
-        bis: [b0, b1, b2, b3, b4],
+      const biChannel: ChanBiChannel = {
+        bis: [b1, b2, b3],
+        entryBi: b0,
+        leaveBi: b4,
         zg: 17,
         zd: 12,
         gg: 20,
@@ -538,8 +545,6 @@ describe('BuySellPointDetector', () => {
         status: ChannelStatus.Valid,
         startId: 1,
         endId: 5,
-        displayStartId: 2,
-        displayEndId: 4,
         trend: TrendDirection.Up,
         extended: false,
         expanded: false,
@@ -548,6 +553,7 @@ describe('BuySellPointDetector', () => {
       const zs = chanChannelToZhongshu(biChannel);
       expect(zs.firstUnitTime).toEqual(b1.startTime);
       expect(zs.lastUnitTime).toEqual(b3.endTime);
+      expect(zs.level).toBe(ChannelLevel.Bi);
     });
 
     it('chanChannelToZhongshu throws RangeError for empty channel', () => {
@@ -562,12 +568,86 @@ describe('BuySellPointDetector', () => {
         status: ChannelStatus.Valid,
         startId: 1,
         endId: 2,
-        displayStartId: 1,
-        displayEndId: 2,
         expanded: false,
       } as unknown as ChanDuanChannel;
 
       expect(() => chanChannelToZhongshu(emptyChannel)).toThrow(RangeError);
+    });
+  });
+
+  describe('双级别买卖点与 level 契约', () => {
+    it('用例 1（笔级别 BSP）：输入 Bi 级别时输出 level === ChannelLevel.Bi', () => {
+      const input = makeTrendDownInput();
+      const points = calc.detectBuySellPoints({
+        ...input,
+        level: ChannelLevel.Bi,
+      });
+      expect(points.length).toBeGreaterThanOrEqual(1);
+      for (const p of points) {
+        expect(p.level).toBe(ChannelLevel.Bi);
+      }
+    });
+
+    it('用例 2（段级别 BSP）：通过 detectDuanBuySellPoints 输出 level === ChannelLevel.Duan', () => {
+      const duans: ChanDuan[] = [
+        makeMockDuan('up', 18, 10, 0),
+        makeMockDuan('down', 16, 12, 1),
+        makeMockDuan('up', 17, 13, 2),
+        makeMockDuan('down', 15, 11, 3),
+        makeMockDuan('up', 25, 14, 4),
+        makeMockDuan('down', 23, 21, 5),
+      ];
+      const duanChannels: ChanDuanChannel[] = [
+        {
+          duans: [duans[1], duans[2], duans[3]],
+          entryDuan: duans[0],
+          leaveDuan: duans[4],
+          zg: 16,
+          zd: 13,
+          gg: 17,
+          dd: 11,
+          level: ChannelLevel.Duan,
+          type: ChannelType.Complete,
+          status: ChannelStatus.Valid,
+          trend: TrendDirection.Up,
+          startId: 1,
+          endId: 3,
+          expanded: false,
+        },
+      ];
+      const points = ChanCore.detectDuanBuySellPoints({ duans, duanChannels });
+      expect(points.length).toBeGreaterThanOrEqual(1);
+      for (const p of points) {
+        expect(p.level).toBe(ChannelLevel.Duan);
+      }
+    });
+
+    it('用例 3（直接进出对比）：买卖点与背驰在无任何历史切片偏移补丁下计算精准', () => {
+      const b0 = makeMockBi('up', 15, 5, 0);
+      const b1 = makeMockBi('down', 20, 10, 1);
+      const b2 = makeMockBi('up', 18, 12, 2);
+      const b3 = makeMockBi('down', 17, 11, 3);
+      const b4 = makeMockBi('up', 25, 14, 4);
+      const channel: ChanBiChannel = {
+        bis: [b1, b2, b3],
+        entryBi: b0,
+        leaveBi: b4,
+        zg: 17,
+        zd: 12,
+        gg: 20,
+        dd: 10,
+        level: ChannelLevel.Bi,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        startId: 1,
+        endId: 5,
+        trend: TrendDirection.Up,
+        expanded: false,
+      };
+      const zs = chanChannelToZhongshu(channel);
+      expect(zs.firstUnitTime).toEqual(b1.startTime);
+      expect(zs.lastUnitTime).toEqual(b3.endTime);
+      expect(zs.level).toBe(ChannelLevel.Bi);
     });
   });
 });

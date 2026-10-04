@@ -3,12 +3,11 @@ import {
   BiType,
   ChanCore,
   ChanBspType,
-  ChannelType,
   DuanStatus,
   DuanType,
   type ChanBi,
   type ChanBspUnit,
-  type ChanChannel,
+  type ChanBiChannel,
   type ChanDivergenceZhongshu,
   type ChanDuan,
   type ChanDuanChannel,
@@ -53,7 +52,7 @@ export function runChanBspPipeline(
     const validBis = phaseB.filter(
       (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
     );
-    const channels = ChanCore.createChannels(input.klines);
+    const channels = ChanCore.createBiChannels(input.klines);
     units = validBis.map(toBspUnit);
     zhongshus = channels.phaseB.map(toZhongshu);
   }
@@ -116,31 +115,7 @@ function toBspUnit(
 }
 
 export function toZhongshu(
-  channel: ChanChannel | ChanDuanChannel,
+  channel: ChanBiChannel | ChanDuanChannel,
 ): ChanDivergenceZhongshu {
-  const isBi = 'bis' in channel;
-  const units = isBi ? channel.bis : channel.duans;
-  if (!units || units.length === 0) {
-    throw new RangeError('chan channel must contain at least one unit');
-  }
-
-  // 笔级中枢：bis[0] 为进入笔（b0），中枢核心区间始于 bis[1]（至少4笔：1进入 + 3构件）。
-  // 段级中枢：duans[0] 即为首个对称重叠构件段。
-  const first = isBi && units.length >= 4 ? units[1] : units[0];
-
-  // 末单元切片：
-  // 笔级/段级已封存中枢（>= 5 构件）：最后一单元为离开段，中枢核心区间终止于倒数第 2 单元。
-  let last = units[units.length - 1];
-  if (channel.type === ChannelType.Complete && units.length >= 5) {
-    last = units[units.length - 2];
-  }
-
-  return Object.freeze({
-    firstUnitTime: first.startTime,
-    lastUnitTime: last.endTime,
-    zg: channel.zg,
-    zd: channel.zd,
-    gg: channel.gg,
-    dd: channel.dd,
-  });
+  return ChanCore.toZhongshu(channel);
 }

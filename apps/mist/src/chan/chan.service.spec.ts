@@ -9,7 +9,7 @@ describe('ChanService HTTP boundary', () => {
     let error: unknown;
 
     try {
-      service.createChannels({ k: [] });
+      service.createBiChannels({ k: [] });
     } catch (caught) {
       error = caught;
     }

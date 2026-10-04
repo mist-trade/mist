@@ -8,7 +8,7 @@ describe('ChannelLifecycle Verification', () => {
 
     // 1. 笔与笔中枢
     const biResult = ChanCore.createBi(k);
-    const biChannels = ChanCore.createChannels(k);
+    const biChannels = ChanCore.createBiChannels(k);
 
     console.log(
       '\n=================== [数据集 1: QMT 5m 真实行情 (000001)] ===================',
@@ -52,7 +52,7 @@ describe('ChannelLifecycle Verification', () => {
     const k = createChanFullOutputFixture();
 
     const biResult = ChanCore.createBi(k);
-    const biChannels = ChanCore.createChannels(k);
+    const biChannels = ChanCore.createBiChannels(k);
 
     console.log(
       '\n=================== [数据集 2: 贵州茅台 (600519) 日线行情] ===================',
