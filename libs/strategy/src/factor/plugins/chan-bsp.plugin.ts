@@ -10,7 +10,10 @@ import {
   type ChanDivergenceZhongshu,
   type ChanK,
 } from '@app/chancore';
-import { computeChanUnitForces } from '@app/indicators';
+import {
+  computeChanUnitForces,
+  checkZhongshuZeroRetracement,
+} from '@app/indicators';
 import type { ProjectedStrategyBar } from '@app/market-data';
 import {
   detectLatestConfirmedFenxing,
@@ -366,7 +369,11 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       );
       const duanChannels = ChanCore.createDuanChannels(duans);
       bspUnits = validDuans.map(ChanCore.toBspUnit);
-      zhongshus = duanChannels.phaseB.map(ChanCore.toZhongshu);
+      zhongshus = duanChannels.phaseB.map((ch) => {
+        const zs = ChanCore.toZhongshu(ch);
+        const difRetracedToZero = checkZhongshuZeroRetracement(klines, zs);
+        return ChanCore.toZhongshu(ch, difRetracedToZero);
+      });
     } else {
       const validBis = phaseB.filter(
         (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,

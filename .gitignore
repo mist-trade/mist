@@ -95,5 +95,4 @@ tools/strategy-dev/data/kline/*
 tools/strategy-dev/data/signals/
 tools/strategy-dev/*.log
 *.log
-
-
+scratch/

@@ -154,6 +154,11 @@ export class DecisionFlowEvaluator {
       }
 
       case 'CONSENSUS': {
+        const targetAction = node.targetAction ?? DECISION_ACTIONS.BUY;
+        const vetoAction =
+          targetAction === DECISION_ACTIONS.BUY
+            ? DECISION_ACTIONS.SELL
+            : DECISION_ACTIONS.BUY;
         let totalWeight = 0;
         let earnedScore = 0;
         let vetoTriggered = false;
@@ -171,15 +176,14 @@ export class DecisionFlowEvaluator {
         for (const { item, opinion } of results) {
           totalWeight += item.weight;
           const isVetoItem = item.isVeto === true;
-          const itemVetoTriggered =
-            isVetoItem && opinion.action === DECISION_ACTIONS.SELL;
+          const itemVetoTriggered = isVetoItem && opinion.action === vetoAction;
 
           if (itemVetoTriggered) {
             vetoTriggered = true;
             vetoReason = `插件[${pluginName(item.pluginId)}]行使一票否决权: ${opinion.reason}`;
           }
 
-          if (opinion.action === DECISION_ACTIONS.BUY) {
+          if (opinion.action === targetAction) {
             earnedScore += item.weight * opinion.confidence;
           }
 
@@ -209,6 +213,11 @@ export class DecisionFlowEvaluator {
         });
 
         const passed = !vetoTriggered && calculatedScore >= node.threshold;
+        const nextInheritedAction =
+          targetAction === DECISION_ACTIONS.BUY ||
+          targetAction === DECISION_ACTIONS.SELL
+            ? targetAction
+            : inheritedAction;
 
         if (passed) {
           return this.evaluateNode(
@@ -216,7 +225,7 @@ export class DecisionFlowEvaluator {
             context,
             trace,
             calculatedScore,
-            inheritedAction,
+            nextInheritedAction,
           );
         } else if (node.onFailure) {
           return this.evaluateNode(
@@ -224,7 +233,7 @@ export class DecisionFlowEvaluator {
             context,
             trace,
             calculatedScore,
-            inheritedAction,
+            nextInheritedAction,
           );
         }
 

@@ -58,8 +58,8 @@ describe('BuySellPointDetector', () => {
     });
   });
 
-  it('单中枢盘整背驰（离开段背驰）→ 产出一类点', () => {
-    // 单个中枢 + 进入段 vs 离开段双弱（Consolidation），产出离开段对应的一类买卖点
+  it('单中枢盘整背驰（离开段背驰）→ 严格不产出一类点（符合原典与 Live Spec：中枢震荡只归二类买卖点）', () => {
+    // 单个中枢 + 进入段 vs 离开段双弱（Consolidation），严格不产出离开段对应的一类买卖点
     const units = [
       makeBspUnit('up', 0, 20, 10),
       makeBspUnit('down', 1, 18, 12),
@@ -72,9 +72,12 @@ describe('BuySellPointDetector', () => {
     ];
     const forces = units.map((_, i) => makeBspForce(10 - i, 100 - i * 10));
     const points = calc.detectBuySellPoints({ units, zhongshus, forces });
-    expect(points).toHaveLength(1);
-    expect(points[0].type).toBe(ChanBspType.FirstSell);
-    expect(points[0].unitIndex).toBe(4);
+    expect(
+      points.filter(
+        (p) =>
+          p.type === ChanBspType.FirstBuy || p.type === ChanBspType.FirstSell,
+      ),
+    ).toHaveLength(0);
   });
 
   it('同中枢 Trend 与 Consolidation 并存 → 只产一个一类点（Trend）', () => {
@@ -256,6 +259,19 @@ describe('BuySellPointDetector', () => {
     };
     const points = calc.detectBuySellPoints({ ...input, units });
     expect(points.find((p) => p.type === ChanBspType.ThirdBuy)).toBeUndefined();
+  });
+
+  it('三买去重：当大级别扩展中枢与被吸收局部中枢共享离开笔时，被吸收中枢不产生三买', () => {
+    const input = makeThirdBuyInput();
+    const zhongshu0 = { ...input.zhongshus[0], absorbed: false };
+    const zhongshu1 = { ...input.zhongshus[0], absorbed: true };
+    const points = calc.detectBuySellPoints({
+      ...input,
+      zhongshus: [zhongshu0, zhongshu1],
+    });
+    const thirdBuys = points.filter((p) => p.type === ChanBspType.ThirdBuy);
+    expect(thirdBuys).toHaveLength(1);
+    expect(thirdBuys[0].zhongshuIndex).toBe(0);
   });
 
   it('无回抽段（e+2 越界）→ 跳过', () => {

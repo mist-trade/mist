@@ -124,4 +124,43 @@ describe('Dev Server Architecture & Boundary Guard (本地开发服务门禁)', 
       );
     });
   });
+
+  describe('3. CLI Runner 架构与边界守门 (tools/strategy-dev/runner.ts)', () => {
+    const runnerPath = join(
+      repositoryRoot,
+      'tools',
+      'strategy-dev',
+      'runner.ts',
+    );
+
+    it('runner.ts 必须存在且非空', () => {
+      expect(existsSync(runnerPath)).toBe(true);
+      const content = readFileSync(runnerPath, 'utf8');
+      expect(content.length).toBeGreaterThan(100);
+    });
+
+    it('runner.ts 必须复用生产统一求值内核 StrategyEvaluationKernel 与策略树流程，严禁私自手写全量计算与事后切片伪循环', () => {
+      const runnerSource = readFileSync(runnerPath, 'utf8');
+      expect(runnerSource).toMatch(/StrategyEvaluationKernel/);
+      expect(runnerSource).toMatch(/createTacticsDecisionFlow/);
+
+      // 严禁手写买卖点检测或事后切片伪循环
+      expect(runnerSource).not.toMatch(/function\s+detectBuySellPoints/);
+      expect(runnerSource).not.toMatch(/function\s+detectDivergence/);
+      expect(runnerSource).not.toMatch(/biResult\.phaseB\.filter\(/);
+    });
+
+    it('runner.ts 严禁引入已退役或未治理的第三方遗留计算库', () => {
+      const runnerSource = readFileSync(runnerPath, 'utf8');
+      const forbiddenLibraries = [
+        'technicalindicators',
+        'tulind',
+        'talib',
+        'pandas-js',
+      ];
+      for (const lib of forbiddenLibraries) {
+        expect(runnerSource).not.toContain(lib);
+      }
+    });
+  });
 });

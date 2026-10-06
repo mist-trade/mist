@@ -16,6 +16,7 @@ import type {
   ChanDuanChannel,
 } from '../contracts';
 import { DivergenceDetector } from './divergence';
+import { locateSpans } from './channel-span';
 
 /**
  * 将笔或段转换为 ChanBspUnit 最小结构单元
@@ -40,6 +41,7 @@ export function chanUnitToBspUnit(unit: ChanBi | ChanDuan): ChanBspUnit {
  */
 export function chanChannelToZhongshu(
   channel: ChanBiChannel | ChanDuanChannel,
+  difRetracedToZero?: boolean | unknown,
 ): ChanDivergenceZhongshu {
   const isBi = 'bis' in channel;
   const units = isBi ? channel.bis : channel.duans;
@@ -58,17 +60,10 @@ export function chanChannelToZhongshu(
     gg: channel.gg,
     dd: channel.dd,
     level: channel.level,
+    absorbed: channel.absorbed,
+    difRetracedToZero:
+      typeof difRetracedToZero === 'boolean' ? difRetracedToZero : undefined,
   });
-}
-
-/** 中枢在 units 中的定位结果（供三类判定）。 */
-interface BspChannelSpan {
-  readonly zhongshuIndex: number;
-  readonly firstIndex: number; // 中枢首单元下标（= s）
-  readonly lastIndex: number; // 中枢末单元下标（= e）
-  readonly zg: number;
-  readonly zd: number;
-  readonly level?: ChannelLevel;
 }
 
 const SIDE_ORDER: Record<ChanBspType, number> = {
@@ -125,22 +120,13 @@ export class BuySellPointDetector {
     const { units } = input;
     const seenLeaves = new Set<number>();
 
-    // 优先消费趋势背驰（Trend），再补充盘整背驰（Consolidation）
-    const sortedDivs = [...divergences].sort((a, b) => {
-      if (
-        a.type === ChanDivergenceType.Trend &&
-        b.type !== ChanDivergenceType.Trend
-      )
-        return -1;
-      if (
-        a.type !== ChanDivergenceType.Trend &&
-        b.type === ChanDivergenceType.Trend
-      )
-        return 1;
-      return a.zhongshuIndex - b.zhongshuIndex;
-    });
+    // 严格遵循 Live Spec 与原典第 24/29/108 课公理：一类买卖点仅由趋势背驰（Trend）产生，盘整背驰严禁产出一类点
+    const trendDivs = divergences
+      .filter((d) => d.type === ChanDivergenceType.Trend)
+      .slice()
+      .sort((a, b) => a.zhongshuIndex - b.zhongshuIndex);
 
-    for (const div of sortedDivs) {
+    for (const div of trendDivs) {
       if (seenLeaves.has(div.leaveIndex)) {
         continue;
       }
@@ -245,7 +231,7 @@ export class BuySellPointDetector {
   /** 三类：中枢离开段（e+1）后相邻回抽段（e+2），回抽段不回中枢区间（严格）。 */
   private detectThird(input: ChanBspInput, out: ChanBuySellPoint[]): void {
     const { units, zhongshus } = input;
-    for (const span of this.locateSpans(units, zhongshus)) {
+    for (const span of locateSpans(units, zhongshus)) {
       const leave = span.lastIndex + 1;
       const pull = leave + 1;
       if (leave >= units.length || pull >= units.length) {
@@ -281,52 +267,6 @@ export class BuySellPointDetector {
         });
       }
     }
-  }
-
-  /** 中枢定位（与背驰 locateSpans 同法）：按 firstUnitTime/lastUnitTime 精确匹配，失败跳过。 */
-  private locateSpans(
-    units: readonly ChanBspUnit[],
-    zhongshus: readonly ChanDivergenceZhongshu[],
-  ): BspChannelSpan[] {
-    const spans: BspChannelSpan[] = [];
-    for (let z = 0; z < zhongshus.length; z++) {
-      const zhongshu = zhongshus[z];
-      const s = this.indexOfUnitStart(units, zhongshu.firstUnitTime);
-      const e = this.indexOfUnitEnd(units, zhongshu.lastUnitTime);
-      if (s === -1 || e === -1 || e < s) {
-        continue; // 定位失败，跳过该中枢（不臆断）
-      }
-      spans.push({
-        zhongshuIndex: z,
-        firstIndex: s,
-        lastIndex: e,
-        zg: zhongshu.zg,
-        zd: zhongshu.zd,
-        level: zhongshu.level,
-      });
-    }
-    return spans;
-  }
-
-  private indexOfUnitStart(
-    units: readonly ChanBspUnit[],
-    target: Date,
-  ): number {
-    for (let i = 0; i < units.length; i++) {
-      if (units[i].startTime.getTime() === target.getTime()) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  private indexOfUnitEnd(units: readonly ChanBspUnit[], target: Date): number {
-    for (let i = 0; i < units.length; i++) {
-      if (units[i].endTime.getTime() === target.getTime()) {
-        return i;
-      }
-    }
-    return -1;
   }
 
   private comparePoints(a: ChanBuySellPoint, b: ChanBuySellPoint): number {

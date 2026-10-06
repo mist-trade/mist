@@ -5,17 +5,7 @@ import type {
   ChanDivergenceUnit,
   ChanUnitForce,
 } from '../contracts';
-
-interface ChannelSpan {
-  readonly zhongshuIndex: number;
-  readonly firstIndex: number; // 中枢首单元下标（units 中），= s
-  readonly lastIndex: number; // 中枢末单元下标（units 中），= e
-  readonly zg: number;
-  readonly zd: number;
-  readonly gg: number;
-  readonly dd: number;
-  readonly level?: ChannelLevel;
-}
+import { locateSpans, type ChannelSpan } from './channel-span';
 
 interface Chain {
   readonly spans: readonly ChannelSpan[]; // 长度 ≥2，方向一致 + 位置递进
@@ -48,7 +38,7 @@ export class DivergenceDetector {
       return [];
     }
 
-    const spans = this.locateSpans(units, zhongshus);
+    const spans = locateSpans(units, zhongshus);
     const results: ChanDivergence[] = [];
 
     // 盘整背驰（每中枢独立，无趋势前提）
@@ -69,60 +59,6 @@ export class DivergenceDetector {
     }
 
     return results.sort((a, b) => a.zhongshuIndex - b.zhongshuIndex);
-  }
-
-  /** 中枢定位：首单元按 firstUnitTime(=首段startTime) 匹配；末单元按 lastUnitTime(=末段endTime) 匹配。
-   *  找不到任一 → 跳过该中枢（不臆断）。 */
-  private locateSpans(
-    units: readonly ChanDivergenceUnit[],
-    zhongshus: ChanDivergenceInput['zhongshus'],
-  ): ChannelSpan[] {
-    const spans: ChannelSpan[] = [];
-    for (let z = 0; z < zhongshus.length; z++) {
-      const zhongshu = zhongshus[z];
-      const s = this.indexOfUnitStart(units, zhongshu.firstUnitTime);
-      const e = this.indexOfUnitEnd(units, zhongshu.lastUnitTime);
-      if (s === -1 || e === -1 || e < s) {
-        continue; // 定位失败，跳过该中枢（不臆断）
-      }
-      spans.push({
-        zhongshuIndex: z,
-        firstIndex: s,
-        lastIndex: e,
-        zg: zhongshu.zg,
-        zd: zhongshu.zd,
-        gg: zhongshu.gg,
-        dd: zhongshu.dd,
-        level: zhongshu.level,
-      });
-    }
-    return spans;
-  }
-
-  /** 按 startTime 精确匹配单元下标；找不到返回 -1。 */
-  private indexOfUnitStart(
-    units: readonly ChanDivergenceUnit[],
-    target: Date,
-  ): number {
-    for (let i = 0; i < units.length; i++) {
-      if (units[i].startTime.getTime() === target.getTime()) {
-        return i;
-      }
-    }
-    return -1;
-  }
-
-  /** 按 endTime 精确匹配单元下标；找不到返回 -1。 */
-  private indexOfUnitEnd(
-    units: readonly ChanDivergenceUnit[],
-    target: Date,
-  ): number {
-    for (let i = 0; i < units.length; i++) {
-      if (units[i].endTime.getTime() === target.getTime()) {
-        return i;
-      }
-    }
-    return -1;
   }
 
   /** 盘整背驰：进入段 units[s-1] vs 离开段 units[e+1]，双分量严格 <，且两者同向（24课 A/C 同向）。 */
@@ -313,6 +249,17 @@ export class DivergenceDetector {
     }
 
     const resolvedLevel = lastSpan.level ?? inputLevel ?? ChannelLevel.Bi;
+
+    // G1 前提门（原典第 56、108 课）：
+    // 笔级别（小级别）免除 G1（不强制要求中枢回抽 0 轴）；
+    // 段级别（大级别）及以上必须满足 difRetracedToZero !== false。
+    if (
+      resolvedLevel === ChannelLevel.Duan &&
+      lastSpan.difRetracedToZero === false
+    ) {
+      return null;
+    }
+
     return {
       type: ChanDivergenceType.Trend,
       level: resolvedLevel,
@@ -324,8 +271,13 @@ export class DivergenceDetector {
     };
   }
 
-  /** 动能弱判定：以 MACD 柱体累积面积为准（leave.area < enter.area，严格 <，无 epsilon）。 */
+  /**
+   * 动能弱判定（恢复 Live Spec 与第 24/34 课口径）：
+   * 1. G2 峰值否决门：黄白线 DIF 峰值不创新高/新低（leave.peak < enter.peak）；
+   * 2. G3 面积确认门：柱体累积面积衰竭（leave.area < enter.area）。
+   * 严格小于，无 epsilon，无加权参数。
+   */
   private isWeaker(leave: ChanUnitForce, enter: ChanUnitForce): boolean {
-    return leave.area < enter.area;
+    return leave.peak < enter.peak && leave.area < enter.area;
   }
 }

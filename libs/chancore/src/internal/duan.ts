@@ -29,6 +29,64 @@ interface SegmentEnd {
   readonly nextStart: number;
 }
 
+/**
+ * 检测反向反弹/回踩是否呈现逐级逆势抬高/降低的扩展结构（中枢震荡扩张或反向未能维持主导地位）。
+ *
+ * 缠论第 71/78 课：单笔转折后的走势若要独立成段破坏前段，反向走势必须确立其自身的主导方向。
+ * 若反向走势内部的反向调整笔（如向上段转折后的各次回弹笔）出现连续 3 次反向扩张（高点逐级抬高或低点逐级降低），
+ * 说明走势处于中枢宽幅震荡甚至重回原趋势，反向段尚未能独立确立破坏。
+ *
+ * @param bis 笔序列
+ * @param reverseStart 反向起始笔下标
+ * @param originalDir 原线段趋势方向
+ */
+export function hasExpandingCounterStructure(
+  bis: readonly ChanBi[],
+  reverseStart: number,
+  originalDir: TrendDirection,
+): boolean {
+  if (originalDir === TrendDirection.Up) {
+    // 原趋势向上，反向为向下；反弹笔下标为 reverseStart + 1, + 3, + 5
+    if (reverseStart + 5 < bis.length) {
+      const b1 = bis[reverseStart + 1];
+      const b2 = bis[reverseStart + 3];
+      const b3 = bis[reverseStart + 5];
+      if (
+        b1 &&
+        b2 &&
+        b3 &&
+        b1.trend === TrendDirection.Up &&
+        b2.trend === TrendDirection.Up &&
+        b3.trend === TrendDirection.Up &&
+        b2.high > b1.high &&
+        b3.high >= b2.high
+      ) {
+        return true;
+      }
+    }
+  } else if (originalDir === TrendDirection.Down) {
+    // 原趋势向下，反向为向上；回踩笔下标为 reverseStart + 1, + 3, + 5
+    if (reverseStart + 5 < bis.length) {
+      const b1 = bis[reverseStart + 1];
+      const b2 = bis[reverseStart + 3];
+      const b3 = bis[reverseStart + 5];
+      if (
+        b1 &&
+        b2 &&
+        b3 &&
+        b1.trend === TrendDirection.Down &&
+        b2.trend === TrendDirection.Down &&
+        b3.trend === TrendDirection.Down &&
+        b2.low < b1.low &&
+        b3.low <= b2.low
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export class DuanCalculator {
   /**
    * 入参 = `createBi` 返回值的 `phaseB`（`ChanBi[]`，最终笔数组）——段算法只消费最终笔，
@@ -246,39 +304,11 @@ export class DuanCalculator {
         }
 
         if (!brokeExtremum && brokeFirstBi) {
-          let expandingCounter = false;
-          if (originalDir === TrendDirection.Up) {
-            if (reverseStart + 5 < bis.length) {
-              const bounce1 = bis[reverseStart + 1];
-              const bounce2 = bis[reverseStart + 3];
-              const bounce3 = bis[reverseStart + 5];
-              if (
-                bounce1 &&
-                bounce2 &&
-                bounce3 &&
-                bounce2.high > bounce1.high &&
-                bounce3.high >= bounce2.high
-              ) {
-                expandingCounter = true;
-              }
-            }
-          } else {
-            if (reverseStart + 5 < bis.length) {
-              const bounce1 = bis[reverseStart + 1];
-              const bounce2 = bis[reverseStart + 3];
-              const bounce3 = bis[reverseStart + 5];
-              if (
-                bounce1 &&
-                bounce2 &&
-                bounce3 &&
-                bounce2.low < bounce1.low &&
-                bounce3.low <= bounce2.low
-              ) {
-                expandingCounter = true;
-              }
-            }
-          }
-
+          const expandingCounter = hasExpandingCounterStructure(
+            bis,
+            reverseStart,
+            originalDir,
+          );
           if (!expandingCounter) {
             return true;
           }
@@ -396,7 +426,8 @@ export class DuanCalculator {
   }
 
   /**
-   * 缺口判定：穿透检查原始 K 线物理价格真空（下穿 originData），防止折线平滑掩盖真实跳空。
+   * 缺口判定：特征序列元素价格区间无重叠判定（严格遵循缠论第 67 课基准）。
+   * 检查相邻两个特征序列元素对应笔区间 [low, high] 是否存在物理无重叠（即 high_A < low_B 或 high_B < low_A）。
    */
   private hasGap(
     bis: readonly ChanBi[],

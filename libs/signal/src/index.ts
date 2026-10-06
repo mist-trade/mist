@@ -51,4 +51,3 @@ export type {
 export { RealtimeKernelPool } from './runtime/realtime-kernel-pool';
 export type { RealtimeLastOutcome } from './runtime/realtime-kernel-pool';
 export { toZhongshu } from './runtime/chan-bsp-pipeline';
-export type { ChanBspPipelineInput } from './runtime/chan-bsp-pipeline';

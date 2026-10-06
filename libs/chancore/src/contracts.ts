@@ -124,6 +124,7 @@ export interface BaseChanChannel {
   readonly type: ChannelType; // Complete | UnComplete
   readonly status: ChannelStatus; // Valid
   readonly expanded: boolean; // 中枢扩展标志（内部构件 >= 9 或 Phase B 扩展）
+  readonly absorbed?: boolean; // 被大级别扩展中枢吸收的局部原初中枢标志（不发射买卖点，不绘制）
   readonly upgradedLevel?: ChannelLevel; // 升级目标级别（未升级为 undefined，升级后为 ChannelLevel.Macro 高一级中枢）
   readonly extended?: boolean; // Phase B 延伸融合产物标志
   readonly startId: number; // 真实物理起始 K 线 ID
@@ -224,6 +225,14 @@ export interface ChanDivergenceZhongshu {
   readonly gg: number; // 中枢最高（位置递进用）
   readonly dd: number; // 中枢最低
   readonly level?: ChannelLevel;
+  readonly absorbed?: boolean;
+  /**
+   * G1 前提门证据：中枢 B 跨度内 MACD 柱是否红绿交替（回抽 0 轴）。
+   * - true: 中枢期间能量有效贴合/穿越 0 轴，具备趋势背驰资格；
+   * - false: 明确违反（柱体单边未翻转），在段级别及以上一票否决趋势背驰；
+   * - undefined: 调用方未提供时默认放行（向后兼容/笔级别默认免除）。
+   */
+  readonly difRetracedToZero?: boolean;
 }
 
 /** 每单元力度（双分量，均为"越大越强"正向标量）：area=方向柱面积、peak=黄白线(DIF)极值绝对值。 */

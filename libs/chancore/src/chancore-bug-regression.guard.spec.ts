@@ -111,6 +111,19 @@ export const CHANCORE_BUG_REGISTRY: readonly ChancoreBugEntry[] = [
       '5M 实盘经典案例：2026年2月6日前后两独立上涨中枢极值交集判定',
     ],
   },
+  {
+    id: 'BUG-CHAN-009',
+    name: '背驰判定弃用黄白线峰值致脉冲假背驰与盘整背驰越权发射一类买卖点',
+    rootCause:
+      '2026-09-23 提交 4b2c05c6 单方面将 isWeaker 简化为仅比对 MACD 面积，弃用 DIF 极值 (peak) 并将峰值突破反向断言为毛刺，导致主升浪脉冲拉升误发一卖、暴跌飞刀误发一买；同时 buy-sell-point.ts 违背 live spec 消费盘整背驰发射一类点。修复为：1) 严格遵循原典与 live spec 恢复 G2 峰值否决门（leave.peak < enter.peak）；2) 区分级别：笔级别免除 G1，段级别必查 G1（中枢 B MACD 柱红绿交替回抽 0 轴）；3) 盘整背驰严禁发射一类买卖点。',
+    specFile: 'internal/divergence.spec.ts',
+    testCasePatterns: [
+      '严格遵循双分量门禁：peak 未衰竭（哪怕面积衰竭）绝对不背驰',
+      '主升浪脉冲突破反例防护',
+      '暴跌跳水离开段反例防护',
+      '用例 3（段级别背驰 G1 门禁）',
+    ],
+  },
 ];
 
 describe('缠论核心算法缺陷回归与测试集合门禁 (ChanCore Bug Fix Regression Guard)', () => {

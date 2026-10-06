@@ -375,14 +375,16 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       // 双层叠加保留：输出 [c1, expandedBox, c2]
       expect(result.length).toBe(3);
 
-      // 第 1 个是保留的 c1（小框，非扩展大框）
-      expect(result[0]).toBe(c1);
+      // 第 1 个是保留的 c1（小框，被大框吸收 absorbed=true）
+      expect(result[0]).toEqual({ ...c1, absorbed: true });
+      expect(result[0].absorbed).toBe(true);
       expect(result[0].expanded).toBe(false);
       expect(result[0].extended).toBe(false);
 
       // 第 2 个是外层扩展大框
       const expandedBox = result[1];
       expect(expandedBox.expanded).toBe(true);
+      expect(expandedBox.absorbed).toBe(false);
       expect(expandedBox.extended).toBe(false);
       // 包裹两中枢核心区间：ZG = max(93, 76) = 93; ZD = min(86, 69) = 69
       expect(expandedBox.zg).toBe(93);
@@ -394,8 +396,9 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(expandedBox.bis[0]).toBe(b0);
       expect(expandedBox.bis[8]).toBe(b8);
 
-      // 第 3 个是保留的 c2（小框，非扩展大框）
-      expect(result[2]).toBe(c2);
+      // 第 3 个是保留的 c2（小框，被大框吸收 absorbed=true）
+      expect(result[2]).toEqual({ ...c2, absorbed: true });
+      expect(result[2].absorbed).toBe(true);
       expect(result[2].expanded).toBe(false);
       expect(result[2].extended).toBe(false);
     });
@@ -445,8 +448,11 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       // 4. 结构断言：满足两中枢扩展，输出 [c1, expandedBox, c2]，长度严格为 3
       expect(result).toHaveLength(3);
 
-      // (1) 内层左侧小中枢 c1: 保持普通笔中枢，杜绝误标扩展
-      expect(result[0]).toBe(c1);
+      // (1) 内层左侧小中枢 c1: 保持普通笔中枢，标记 absorbed=true
+      expect(result[0]).toEqual(
+        expect.objectContaining({ zg: 3924.11, zd: 3891.86, absorbed: true }),
+      );
+      expect(result[0].absorbed).toBe(true);
       expect(result[0].expanded).toBe(false);
       expect(result[0].extended).toBe(false);
       expect(result[0].zg).toBe(3924.11);
@@ -457,6 +463,7 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       // (2) 外层包裹大框 expandedBox: 专属标记 expanded=true，完整包裹两中枢
       const expandedBox = result[1];
       expect(expandedBox.expanded).toBe(true);
+      expect(expandedBox.absorbed).toBe(false);
       expect(expandedBox.extended).toBe(false);
       // ZG = max(3924.11, 3995.00) = 3995.00
       expect(expandedBox.zg).toBe(3995.0);
@@ -471,8 +478,11 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(expandedBox.bis[0]).toBe(b0);
       expect(expandedBox.bis[11]).toBe(b11);
 
-      // (3) 内层右侧小中枢 c2: 保持普通笔中枢
-      expect(result[2]).toBe(c2);
+      // (3) 内层右侧小中枢 c2: 保持普通笔中枢，标记 absorbed=true
+      expect(result[2]).toEqual(
+        expect.objectContaining({ zg: 3995.0, zd: 3966.2, absorbed: true }),
+      );
+      expect(result[2].absorbed).toBe(true);
       expect(result[2].expanded).toBe(false);
       expect(result[2].extended).toBe(false);
       expect(result[2].zg).toBe(3995.0);
@@ -539,23 +549,31 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
 
       // 输出结构为: [c1, E(c1, c2), c2, c3]，长度严格为 4
       expect(result.length).toBe(4);
-      expect(result[0]).toBe(c1);
+      expect(result[0]).toEqual(
+        expect.objectContaining({ ...c1, absorbed: true }),
+      );
+      expect(result[0].absorbed).toBe(true);
       expect(result[0].expanded).toBe(false);
 
       // 外层扩展大框 E(c1, c2)
       expect(result[1].expanded).toBe(true);
+      expect(result[1].absorbed).toBe(false);
       expect(result[1].zg).toBe(93);
       expect(result[1].zd).toBe(69);
       expect(result[1].gg).toBe(100);
       expect(result[1].dd).toBe(45);
       expect(result[1].bis.length).toBe(9);
 
-      // c2 为内层普通中枢
-      expect(result[2]).toBe(c2);
+      // c2 为内层普通中枢，标记 absorbed=true
+      expect(result[2]).toEqual(
+        expect.objectContaining({ ...c2, absorbed: true }),
+      );
+      expect(result[2].absorbed).toBe(true);
       expect(result[2].expanded).toBe(false);
 
       // c3 保持独立中枢，杜绝被拆分的 c2 错误拉入 B+C 扩展大框
       expect(result[3]).toBe(c3);
+      expect(result[3].absorbed).toBeFalsy();
       expect(result[3].expanded).toBe(false);
       expect(result[3].extended).toBe(false);
     });
@@ -617,12 +635,16 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
 
       // 输出结构为: [c1, E(c1, c2, c3), c2, c3]，长度严格为 4
       expect(result.length).toBe(4);
-      expect(result[0]).toBe(c1);
+      expect(result[0]).toEqual(
+        expect.objectContaining({ ...c1, absorbed: true }),
+      );
+      expect(result[0].absorbed).toBe(true);
       expect(result[0].expanded).toBe(false);
 
       // 单一统一外层大框包裹 A+B+C
       const continuousBox = result[1];
       expect(continuousBox.expanded).toBe(true);
+      expect(continuousBox.absorbed).toBe(false);
       expect(continuousBox.extended).toBe(false);
       // ZG = max(93, 76, 80) = 93; ZD = min(86, 69, 71) = 69
       expect(continuousBox.zg).toBe(93);
@@ -635,10 +657,16 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       expect(continuousBox.bis[0]).toBe(b0);
       expect(continuousBox.bis[12]).toBe(b12);
 
-      // 内层各子中枢依次排列
-      expect(result[2]).toBe(c2);
+      // 内层各子中枢依次排列，全部被吸收
+      expect(result[2]).toEqual(
+        expect.objectContaining({ ...c2, absorbed: true }),
+      );
+      expect(result[2].absorbed).toBe(true);
       expect(result[2].expanded).toBe(false);
-      expect(result[3]).toBe(c3);
+      expect(result[3]).toEqual(
+        expect.objectContaining({ ...c3, absorbed: true }),
+      );
+      expect(result[3].absorbed).toBe(true);
       expect(result[3].expanded).toBe(false);
     });
 
@@ -710,22 +738,36 @@ describe('ChannelCalculator - Central Extension & Expansion (笔中枢延伸与�
       // c1 与 c2 扩展，c3 与 c4 扩展
       // 结构为: [c1, E(c1,c2), c2, c3, E(c3,c4), c4]，长度严格为 6
       expect(result.length).toBe(6);
-      expect(result[0]).toBe(c1);
+      expect(result[0]).toEqual(
+        expect.objectContaining({ ...c1, absorbed: true }),
+      );
+      expect(result[0].absorbed).toBe(true);
       expect(result[1].expanded).toBe(true);
+      expect(result[1].absorbed).toBe(false);
       expect(result[1].zg).toBe(93);
       expect(result[1].zd).toBe(69);
 
-      expect(result[2]).toBe(c2);
+      expect(result[2]).toEqual(
+        expect.objectContaining({ ...c2, absorbed: true }),
+      );
+      expect(result[2].absorbed).toBe(true);
       expect(result[2].expanded).toBe(false);
 
-      expect(result[3]).toBe(c3);
+      expect(result[3]).toEqual(
+        expect.objectContaining({ ...c3, absorbed: true }),
+      );
+      expect(result[3].absorbed).toBe(true);
       expect(result[3].expanded).toBe(false);
 
       expect(result[4].expanded).toBe(true);
+      expect(result[4].absorbed).toBe(false);
       expect(result[4].zg).toBe(56);
       expect(result[4].zd).toBe(33);
 
-      expect(result[5]).toBe(c4);
+      expect(result[5]).toEqual(
+        expect.objectContaining({ ...c4, absorbed: true }),
+      );
+      expect(result[5].absorbed).toBe(true);
       expect(result[5].expanded).toBe(false);
     });
   });

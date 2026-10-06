@@ -67,7 +67,17 @@ export class LegacyStrategyCompiler {
   public static compileChanBspToDecisionFlow(
     plan: LegacyChanBspPlanLike,
   ): DecisionFlowNode {
-    const action = plan.direction === 'sell' ? 'SELL' : 'BUY';
+    const isBoth = plan.direction === 'both';
+    const requiredAction = isBoth
+      ? 'BOTH'
+      : plan.direction === 'sell'
+        ? 'SELL'
+        : 'BUY';
+    const action = isBoth
+      ? 'INHERIT'
+      : plan.direction === 'sell'
+        ? 'SELL'
+        : 'BUY';
 
     return {
       id: 'guard_chan_bsp',
@@ -81,7 +91,7 @@ export class LegacyStrategyCompiler {
         requiredBarCount: plan.requiredBarCount,
         deduplicate: true,
       },
-      requiredAction: action,
+      requiredAction,
       minConfidence: 0.7,
       onPass: {
         id: 'term_chan_bsp_matched',

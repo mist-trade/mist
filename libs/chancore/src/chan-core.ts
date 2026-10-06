@@ -131,7 +131,7 @@ export class ChanCore {
   }): readonly ChanBuySellPoint[] {
     const validDuans = input.duans.filter((d) => d.status === DuanStatus.Valid);
     const units = validDuans.map(chanUnitToBspUnit);
-    const zhongshus = input.duanChannels.map(chanChannelToZhongshu);
+    const zhongshus = input.duanChannels.map((c) => chanChannelToZhongshu(c));
     return new BuySellPointDetector().detectBuySellPoints({
       units,
       zhongshus,
@@ -151,7 +151,7 @@ export class ChanCore {
   }): readonly ChanBuySellPoint[] {
     const validBis = input.bis.filter((b) => b.status === BiStatus.Valid);
     const units = validBis.map(chanUnitToBspUnit);
-    const zhongshus = input.biChannels.map(chanChannelToZhongshu);
+    const zhongshus = input.biChannels.map((c) => chanChannelToZhongshu(c));
     return new BuySellPointDetector().detectBuySellPoints({
       units,
       zhongshus,
@@ -166,7 +166,8 @@ export class ChanCore {
 
   static toZhongshu(
     channel: ChanBiChannel | ChanDuanChannel,
+    difRetracedToZero?: boolean | unknown,
   ): ChanDivergenceZhongshu {
-    return chanChannelToZhongshu(channel);
+    return chanChannelToZhongshu(channel, difRetracedToZero);
   }
 }

@@ -12,7 +12,10 @@ import {
   type ChanDivergenceZhongshu,
   type ChanK,
 } from '@app/chancore';
-import { computeChanUnitForces } from '@app/indicators';
+import {
+  computeChanUnitForces,
+  checkZhongshuZeroRetracement,
+} from '@app/indicators';
 import type {
   BandVisualCommand,
   LineVisualCommand,
@@ -167,6 +170,7 @@ export class ChanVisualAdapter {
           status: isUncomplete ? 'uncomplete' : 'complete',
           extended: zs.extended,
           expanded: zs.expanded,
+          absorbed: zs.absorbed,
         };
         commands.push(bandCmd);
       });
@@ -275,6 +279,7 @@ export class ChanVisualAdapter {
           status: isUncomplete ? 'uncomplete' : 'complete',
           extended: zs.extended,
           expanded: isMacro,
+          absorbed: zs.absorbed,
         };
         commands.push(bandCmd);
       });
@@ -325,7 +330,11 @@ export class ChanVisualAdapter {
           (d) => d.type === DuanType.Complete && d.status === DuanStatus.Valid,
         );
         const duanBspUnits = validDuans.map(ChanCore.toBspUnit);
-        const duanZhongshus = duanChannels.phaseB.map(ChanCore.toZhongshu);
+        const duanZhongshus = duanChannels.phaseB.map((ch) => {
+          const zs = ChanCore.toZhongshu(ch);
+          const difRetracedToZero = checkZhongshuZeroRetracement(klines, zs);
+          return ChanCore.toZhongshu(ch, difRetracedToZero);
+        });
         const duanForces = computeChanUnitForces(klines, duanBspUnits);
         const duanPoints = ChanCore.detectBuySellPoints({
           units: duanBspUnits,

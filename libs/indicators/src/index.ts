@@ -16,6 +16,7 @@ export {
   computeUnitForces,
   computeUnitDirectionalAreas,
   computeUnitLinePeaks,
+  checkZhongshuZeroRetracement,
 } from './force';
 export type {
   UnitLinePeaks,

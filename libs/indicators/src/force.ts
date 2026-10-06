@@ -176,3 +176,32 @@ function binaryUpperBound(times: readonly Date[], target: Date): number {
   }
   return low;
 }
+
+/**
+ * 检验中枢区间内 MACD 柱体是否发生红绿交替（回抽 0 轴）。
+ * 遍历中枢 [firstUnitTime, lastUnitTime] 范围内的 MACD histogram，若同时出现正值和负值返回 true，否则返回 false。
+ */
+export function checkZhongshuZeroRetracement(
+  klines: readonly { close: number; time: Date }[],
+  zhongshu: { firstUnitTime: Date; lastUnitTime: Date },
+): boolean {
+  if (klines.length === 0) return false;
+  const closes = klines.map((k) => k.close);
+  const kTimes = klines.map((k) => k.time);
+  const macd = computeMacdSeries(closes);
+  const start = binaryLowerBound(kTimes, zhongshu.firstUnitTime);
+  const end = binaryUpperBound(kTimes, zhongshu.lastUnitTime);
+
+  let hasPositive = false;
+  let hasNegative = false;
+  for (let i = start; i < end; i++) {
+    const idx = i - macd.begIndex;
+    if (idx >= 0 && idx < macd.histogram.length) {
+      const val = macd.histogram[idx];
+      if (val > 0) hasPositive = true;
+      if (val < 0) hasNegative = true;
+      if (hasPositive && hasNegative) return true;
+    }
+  }
+  return hasPositive && hasNegative;
+}

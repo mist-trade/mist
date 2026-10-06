@@ -180,11 +180,9 @@ export class DuanChannelLifecyclePolicy
         const nextCore = data.slice(nextIdx, nextIdx + CHANNEL_CORE_LENGTH);
         const isNextCoreValid = validateStandardCoreGeometry(nextCore);
         if (isNextCoreValid) {
-          const nextCoreHasNoOverlap = stateMachine.isUp
-            ? isNextCoreValid.geometry.zg < stateMachine.zd ||
-              isNextCoreValid.geometry.zd > stateMachine.zg
-            : isNextCoreValid.geometry.zd > stateMachine.zg ||
-              isNextCoreValid.geometry.zg < stateMachine.zd;
+          const nextCoreHasNoOverlap =
+            isNextCoreValid.geometry.zg < stateMachine.zd ||
+            isNextCoreValid.geometry.zd > stateMachine.zg;
           if (nextCoreHasNoOverlap) {
             // 在脱离点 curr 处收口封存前中枢
             this.ensureAndSealCandidate(

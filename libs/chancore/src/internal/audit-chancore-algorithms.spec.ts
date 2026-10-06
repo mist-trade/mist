@@ -70,7 +70,7 @@ describe('§6 Divergence Audit — 趋势/盘整双口径', () => {
       expect(c.leaveForce.area).toBeLessThan(c.enterForce.area);
     });
 
-    it('以 MACD 面积为核心：area 弱但 peak 极强（毛刺） → 依然判定背驰', () => {
+    it('严格遵循双分量门禁：area 弱但 peak 极强（创新高/新低） → 绝不判定背驰 (G2一票否决)', () => {
       const input = makeConsolidationCase();
       // 把离开段 peak 调高到 > 进入段
       const forces = [...input.forces];
@@ -81,7 +81,7 @@ describe('§6 Divergence Audit — 趋势/盘整双口径', () => {
       });
       expect(
         result.some((d) => d.type === ChanDivergenceType.Consolidation),
-      ).toBe(true);
+      ).toBe(false);
     });
 
     it('进入段 vs 离开段反向 → 不报告（24课 A/C 必须同向）', () => {
@@ -215,25 +215,27 @@ describe('§7 BuySellPoint Audit — 一/二/三类', () => {
       expect(firstBuys).toHaveLength(1);
     });
 
-    it('盘整背驰（单中枢离开段背驰）→ 产出一类点', () => {
+    it('盘整背驰（单中枢离开段背驰）→ 严格不产出一类点（符合原典与 Live Spec）', () => {
       const input = makeConsolidationOnlyBspCase();
       const points = bsp.detectBuySellPoints(input);
       const firstPoints = points.filter(
         (p) =>
           p.type === ChanBspType.FirstBuy || p.type === ChanBspType.FirstSell,
       );
-      expect(firstPoints).toHaveLength(1);
-      expect(firstPoints[0].type).toBe(ChanBspType.FirstSell);
+      expect(firstPoints).toHaveLength(0);
     });
   });
 
-  // §7.2 验证一类点：趋势背驰与盘整背驰均可产出一类点
-  describe('7.2 一类点由趋势/盘整背驰产出', () => {
-    it('盘整背驰 → 产出一类点（单中枢离开段顶背驰产出一卖）', () => {
+  // §7.2 验证一类点：严格仅由趋势背驰产出，盘整背驰禁发一类点
+  describe('7.2 一类点严格仅由趋势背驰产出（盘整背驰禁发一类点）', () => {
+    it('盘整背驰 → 严格不产出一类点（中枢震荡只归二类买卖点）', () => {
       const input = makeConsolidationOnlyBspCase();
       const points = bsp.detectBuySellPoints(input);
-      expect(points).toHaveLength(1);
-      expect(points[0].type).toBe(ChanBspType.FirstSell);
+      const firstPoints = points.filter(
+        (p) =>
+          p.type === ChanBspType.FirstBuy || p.type === ChanBspType.FirstSell,
+      );
+      expect(firstPoints).toHaveLength(0);
     });
 
     it('趋势背驰 → 产一类点', () => {

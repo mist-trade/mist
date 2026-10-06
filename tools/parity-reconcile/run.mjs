@@ -96,10 +96,13 @@ async function runBacktest(apiBase, versionId) {
     const detail = await fetch(
       `${apiBase}/v1/strategy-backtests/${runId}`,
     ).then((value) => value.json());
-    const status = detail?.data?.status;
+    const rawStatus = detail?.data?.status;
+    const status = typeof rawStatus === 'string' ? rawStatus.toUpperCase() : '';
     if (status === 'COMPLETED') return runId;
     if (status === 'FAILED') {
-      throw new Error(`backtest run ${runId} failed: ${detail?.data?.errorMessage}`);
+      throw new Error(
+        `backtest run ${runId} failed: ${detail?.data?.errorMessage}`,
+      );
     }
   }
   throw new Error(`backtest run ${runId} timed out`);
@@ -108,7 +111,8 @@ async function runBacktest(apiBase, versionId) {
 /** 逐条比对：signal_time + signal_kind 对齐后校验 pivot/type/confidence */
 function diff(realtime, backtest) {
   const mismatches = [];
-  const key = (row) => `${row.signal_time.toISOString?.() ?? row.signal_time}|${row.signal_kind ?? row.signal_kind_}`;
+  const key = (row) =>
+    `${row.signal_time.toISOString?.() ?? row.signal_time}|${row.signal_kind ?? row.signal_kind_}`;
   const rt = new Map(realtime.map((row) => [key(row), row]));
   const bt = new Map(
     backtest.map((row) => [
@@ -126,7 +130,11 @@ function diff(realtime, backtest) {
     const btPivot =
       counterpart.pivot_time?.toISOString?.() ?? counterpart.pivot_time ?? null;
     if (rtPivot !== btPivot) {
-      mismatches.push({ side: 'pivot_mismatch', realtime: row, backtest: counterpart });
+      mismatches.push({
+        side: 'pivot_mismatch',
+        realtime: row,
+        backtest: counterpart,
+      });
     }
   }
   for (const [k, row] of bt) {

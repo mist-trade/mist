@@ -162,11 +162,15 @@ export class BiChannelCalculator {
             i++;
           }
 
-          result.push(expansionGroup[0]);
+          const absorbedGroup = expansionGroup.map((c) => ({
+            ...c,
+            absorbed: true,
+          }));
           const expandedBox = this.buildExpandedBoundingBox(expansionGroup);
+          result.push(absorbedGroup[0]);
           result.push(expandedBox);
-          for (let k = 1; k < expansionGroup.length; k++) {
-            result.push(expansionGroup[k]);
+          for (let k = 1; k < absorbedGroup.length; k++) {
+            result.push(absorbedGroup[k]);
           }
 
           i++;
@@ -323,6 +327,7 @@ export class BiChannelCalculator {
       trend: first.trend,
       extended: false,
       expanded: true,
+      absorbed: false,
       entryBi: first.entryBi,
       leaveBi: last.leaveBi,
     };

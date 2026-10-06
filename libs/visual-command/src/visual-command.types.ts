@@ -39,6 +39,7 @@ export interface BandVisualCommand extends BaseVisualCommand {
   readonly status?: 'complete' | 'uncomplete';
   readonly extended?: boolean;
   readonly expanded?: boolean;
+  readonly absorbed?: boolean;
 }
 
 export interface TextVisualCommand extends BaseVisualCommand {

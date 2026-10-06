@@ -86,6 +86,8 @@ export interface ConsensusNode {
   readonly name: string;
   /** 综合置信度最低触发阈值 (0.0 ~ 100.0) */
   readonly threshold: number;
+  /** 期望共识达成动作（通常为 'BUY'，卖出/风控分支可指定为 'SELL'，默认为 'BUY'） */
+  readonly targetAction?: FactorAction;
   /** 挂载的投票插件列表 */
   readonly plugins: readonly ConsensusPluginWeight[];
   /** 打分达标后流向的下一个节点（通常为 TerminalNode） */

@@ -401,10 +401,14 @@ describe('DuanChannelCalculator (段级中枢 7 大场景全景与 TDD 套件 3)
       const result = calc.applyDuanChannelExtensionAndExpansion([c1, c2]);
 
       expect(result.length).toBe(3);
-      expect(result[0]).toBe(c1);
+      expect(result[0]).toEqual(
+        expect.objectContaining({ ...c1, absorbed: true }),
+      );
+      expect(result[0].absorbed).toBe(true);
 
       const expandedBox = result[1];
       expect(expandedBox.expanded).toBe(true);
+      expect(expandedBox.absorbed).toBe(false);
       expect(expandedBox.upgradedLevel).toBe(ChannelLevel.Macro);
       expect(expandedBox.level).toBe(ChannelLevel.Duan);
       expect(expandedBox.zg).toBe(93); // max(93, 76)
@@ -414,7 +418,10 @@ describe('DuanChannelCalculator (段级中枢 7 大场景全景与 TDD 套件 3)
       expect(expandedBox.entryDuan).toBe(d0);
       expect(expandedBox.leaveDuan).toBe(d8);
 
-      expect(result[2]).toBe(c2);
+      expect(result[2]).toEqual(
+        expect.objectContaining({ ...c2, absorbed: true }),
+      );
+      expect(result[2].absorbed).toBe(true);
     });
 
     it('前一个中枢是 Macro 级别，后一个中枢是普通段中枢时，不进行定理二跨中枢扩展', () => {
@@ -557,12 +564,19 @@ describe('DuanChannelCalculator (段级中枢 7 大场景全景与 TDD 套件 3)
 
       const calc = new DuanChannelCalculator();
       const result = calc.applyDuanChannelExtensionAndExpansion([c1, c2, c3]);
-      // c1 与 c2 扩展，生成 expandedBox 包裹两者。c2 已被消耗，不得与 c3 再次扩展。
       expect(result.length).toBe(4);
-      expect(result[0]).toBe(c1);
+      expect(result[0]).toEqual(
+        expect.objectContaining({ ...c1, absorbed: true }),
+      );
+      expect(result[0].absorbed).toBe(true);
       expect(result[1].expanded).toBe(true);
-      expect(result[2]).toBe(c2);
+      expect(result[1].absorbed).toBe(false);
+      expect(result[2]).toEqual(
+        expect.objectContaining({ ...c2, absorbed: true }),
+      );
+      expect(result[2].absorbed).toBe(true);
       expect(result[3]).toBe(c3);
+      expect(result[3].absorbed).toBeFalsy();
     });
 
     it('合并同级相邻重叠中枢（延伸 Extension）为 single extended channel', () => {

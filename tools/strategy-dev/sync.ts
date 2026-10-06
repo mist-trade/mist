@@ -32,7 +32,8 @@ function parseCliArgs(): SyncCliOptions {
     return undefined;
   };
 
-  const code = getArg('code') || '600519';
+  const rawCode = getArg('code') || '600519';
+  const code = rawCode.replace(/\.(SH|SZ|BJ|sh|sz|bj)$/, '');
   const periodStr = getArg('periods') || getArg('period') || '1d,30m';
   const limitStr = getArg('limit');
   let limit = 0; // 0 表示不设上限，拉取数据库最大存储范围

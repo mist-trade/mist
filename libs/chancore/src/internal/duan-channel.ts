@@ -174,12 +174,16 @@ export class DuanChannelCalculator {
               i++;
             }
 
-            result.push(expansionGroup[0]);
+            const absorbedGroup = expansionGroup.map((c) => ({
+              ...c,
+              absorbed: true,
+            }));
             const expandedBox =
               this.buildExpandedDuanBoundingBox(expansionGroup);
+            result.push(absorbedGroup[0]);
             result.push(expandedBox);
-            for (let k = 1; k < expansionGroup.length; k++) {
-              result.push(expansionGroup[k]);
+            for (let k = 1; k < absorbedGroup.length; k++) {
+              result.push(absorbedGroup[k]);
             }
 
             i++;
@@ -244,6 +248,7 @@ export class DuanChannelCalculator {
       trend: first.trend,
       extended: false,
       expanded: true,
+      absorbed: false,
       upgradedLevel: ChannelLevel.Macro,
       entryDuan: first.entryDuan,
       leaveDuan: last.leaveDuan ?? first.leaveDuan,

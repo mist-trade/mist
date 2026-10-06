@@ -72,20 +72,47 @@ describe('DivergenceDetector (背驰，24课 A/B/C 三段结构，双口径)', (
     expect(result[0].leaveForce).toEqual(makeForce(3, 30));
   });
 
-  it('以 MACD 面积为准：area 衰竭但 peak 未衰竭（毛刺） → 依然判定背驰', () => {
-    // 中枢 = [u1,u2,u3]；进入段 u0(area=9, peak=30) 离开段 u4(area=3<9, peak=40>30) → 面积衰竭即判定背驰
+  it('严格遵循双分量门禁：peak 未衰竭（哪怕面积衰竭）绝对不背驰 (G2 峰值一票否决)', () => {
+    // 中枢 = [u1,u2,u3]；进入段 u0(area=9, peak=30) 离开段 u4(area=3<9, peak=40>30) → peak 未衰竭坚决不背驰
     const input = makeConsolidationInput(5, {
       forces: [
         makeForce(9, 30), // u0 enter
         makeForce(5, 50), // u1
         makeForce(5, 50), // u2
         makeForce(5, 50), // u3
-        makeForce(3, 40), // u4 leave area 3 < 9
+        makeForce(3, 40), // u4 leave area 3 < 9, but peak 40 > 30 (DIF 创新高)
       ],
     });
     const result = calc.detectDivergences(input);
-    expect(result).toHaveLength(1);
-    expect(result[0].type).toBe(ChanDivergenceType.Consolidation);
+    expect(result).toHaveLength(0);
+  });
+
+  it('主升浪脉冲突破反例防护：离开段冲高使得 DIF 大幅突破 (peak 30 > 10)，虽根数少面积小 (area 20 < 50)，绝不判为背驰', () => {
+    const input = makeConsolidationInput(5, {
+      forces: [
+        makeForce(50, 10), // u0 enter: 慢慢爬升，根数多面积大
+        makeForce(20, 20),
+        makeForce(20, 20),
+        makeForce(20, 20),
+        makeForce(20, 30), // u4 leave: 主升浪脉冲，根数少面积小但速度极快 peak=30 > 10
+      ],
+    });
+    const result = calc.detectDivergences(input);
+    expect(result).toHaveLength(0);
+  });
+
+  it('暴跌跳水离开段反例防护：悬崖暴跌使得 DIF 暴跌破极值 (peak 30 > 10)，虽根数少面积小 (area 20 < 50)，绝不判为背驰（防接飞刀）', () => {
+    const input = makeConsolidationInput(5, {
+      forces: [
+        makeForce(50, 10), // u0 enter
+        makeForce(20, 20),
+        makeForce(20, 20),
+        makeForce(20, 20),
+        makeForce(20, 30), // u4 leave: 悬崖暴跌破极值
+      ],
+    });
+    const result = calc.detectDivergences(input);
+    expect(result).toHaveLength(0);
   });
 
   it('does NOT report on equality (strict less-than, no epsilon)', () => {
@@ -321,6 +348,108 @@ describe('DivergenceDetector (背驰，24课 A/B/C 三段结构，双口径)', (
       expect(result).toHaveLength(1);
       expect(result[0].level).toBe(ChannelLevel.Duan);
     });
+
+    it('用例 3（段级别背驰 G1 门禁）：段中枢 difRetracedToZero === false 时一票否决趋势背驰', () => {
+      const input = makeTrendInput();
+      const units = input.units;
+      const zhongshus: ChanDivergenceZhongshu[] = [
+        makeZhongshu(
+          units[1].startTime,
+          units[3].endTime,
+          20,
+          5,
+          20,
+          5,
+          ChannelLevel.Duan,
+        ),
+        makeZhongshu(
+          units[5].startTime,
+          units[7].endTime,
+          30,
+          10,
+          30,
+          10,
+          ChannelLevel.Duan,
+          false,
+        ), // difRetracedToZero = false
+      ];
+      const result = calc.detectDivergences({
+        ...input,
+        zhongshus,
+        level: ChannelLevel.Duan,
+      });
+      expect(result.some((d) => d.type === ChanDivergenceType.Trend)).toBe(
+        false,
+      );
+    });
+
+    it('用例 4（段级别背驰 G1 门禁）：段中枢 difRetracedToZero === true 且满足 G2/G3 时报告趋势背驰', () => {
+      const input = makeTrendInput();
+      const units = input.units;
+      const zhongshus: ChanDivergenceZhongshu[] = [
+        makeZhongshu(
+          units[1].startTime,
+          units[3].endTime,
+          20,
+          5,
+          20,
+          5,
+          ChannelLevel.Duan,
+        ),
+        makeZhongshu(
+          units[5].startTime,
+          units[7].endTime,
+          30,
+          10,
+          30,
+          10,
+          ChannelLevel.Duan,
+          true,
+        ), // difRetracedToZero = true
+      ];
+      const result = calc.detectDivergences({
+        ...input,
+        zhongshus,
+        level: ChannelLevel.Duan,
+      });
+      const trend = result.find((d) => d.type === ChanDivergenceType.Trend);
+      expect(trend).toBeDefined();
+      expect(trend?.level).toBe(ChannelLevel.Duan);
+    });
+
+    it('用例 5（笔级别背驰 G1 免除）：笔中枢即使 difRetracedToZero 为 false，满足 G2/G3 时仍报告趋势背驰', () => {
+      const input = makeTrendInput();
+      const units = input.units;
+      const zhongshus: ChanDivergenceZhongshu[] = [
+        makeZhongshu(
+          units[1].startTime,
+          units[3].endTime,
+          20,
+          5,
+          20,
+          5,
+          ChannelLevel.Bi,
+        ),
+        makeZhongshu(
+          units[5].startTime,
+          units[7].endTime,
+          30,
+          10,
+          30,
+          10,
+          ChannelLevel.Bi,
+          false,
+        ), // 笔级别免除 G1
+      ];
+      const result = calc.detectDivergences({
+        ...input,
+        zhongshus,
+        level: ChannelLevel.Bi,
+      });
+      const trend = result.find((d) => d.type === ChanDivergenceType.Trend);
+      expect(trend).toBeDefined();
+      expect(trend?.level).toBe(ChannelLevel.Bi);
+    });
   });
 });
 
@@ -358,8 +487,19 @@ function makeZhongshu(
   dd: number,
   zg = gg,
   zd = dd,
+  level?: ChannelLevel,
+  difRetracedToZero?: boolean,
 ): ChanDivergenceZhongshu {
-  return { firstUnitTime, lastUnitTime, gg, dd, zg, zd };
+  return {
+    firstUnitTime,
+    lastUnitTime,
+    gg,
+    dd,
+    zg,
+    zd,
+    level,
+    difRetracedToZero,
+  };
 }
 
 function makeForce(area: number, peak: number): ChanUnitForce {
