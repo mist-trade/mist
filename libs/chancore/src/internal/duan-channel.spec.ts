@@ -199,7 +199,7 @@ describe('DuanChannelCalculator (段级中枢 7 大场景全景与 TDD 套件 3)
       expect(channel.dd).toBe(2); // min(2, 3, 3, 4, 5)
     });
 
-    it('用例 4（场景 1 与级别升级）：内部段延伸达到 9 段，expanded 为 true 且 upgradedLevel 为 Macro，血统仍为 Duan', () => {
+    it('用例 4（场景 1 与级别升级）：内部段延伸达到 9 段，extended 为 true、expanded 为 false 且 upgradedLevel 为 Macro，血统仍为 Duan', () => {
       // d0 进入段 + 9 根内部震荡段 (d1..d9)，均触碰 [3, 8]
       const duans: ChanDuan[] = [
         makeDuan('up', 10, 0, 0),
@@ -219,7 +219,8 @@ describe('DuanChannelCalculator (段级中枢 7 大场景全景与 TDD 套件 3)
       const channel = result.phaseB[0];
 
       expect(channel.duans).toHaveLength(9);
-      expect(channel.expanded).toBe(true);
+      expect(channel.extended).toBe(true);
+      expect(channel.expanded).toBe(false);
       expect(channel.upgradedLevel).toBe(ChannelLevel.Macro);
       expect(channel.level).toBe(ChannelLevel.Duan); // 物理血统永不丢失
     });
@@ -942,6 +943,97 @@ describe('DuanChannelCalculator (段级中枢 7 大场景全景与 TDD 套件 3)
       expect(ch.leaveDuan).toBeDefined();
       expect(ch.leaveDuan!.originIds[0]).toBe(10101); // d101 离开
       expect(ch.leaveDuan!.trend).toBe(TrendDirection.Down); // 反向离开
+    });
+  });
+
+  describe('段中枢延伸升级（9段延伸升级）与多中枢波动扩展正交区分验证', () => {
+    it('单中枢内部震荡累积达 9 段时，标记为 extended: true 与 upgradedLevel: Macro，严禁标记 expanded: true', () => {
+      // a 进入段 (0) + 内部 9 段 (1..9)
+      const duans: ChanDuan[] = [
+        makeDuan('up', 150, 100, 0), // 进入段
+        makeDuan('down', 140, 110, 1), // 1
+        makeDuan('up', 135, 115, 2), // 2
+        makeDuan('down', 130, 120, 3), // 3 (核心确立 zd: 120, zg: 130)
+        makeDuan('up', 128, 122, 4), // 4
+        makeDuan('down', 127, 123, 5), // 5
+        makeDuan('up', 126, 124, 6), // 6
+        makeDuan('down', 126, 124, 7), // 7
+        makeDuan('up', 126, 124, 8), // 8
+        makeDuan('down', 126, 124, 9), // 9 (累计内部 9 段)
+      ];
+
+      const calc = new DuanChannelCalculator();
+      const result = calc.createDuanChannels(duans, { allowUncomplete: true });
+
+      expect(result.phaseB.length).toBe(1);
+      const ch = result.phaseB[0];
+      expect(ch.duans.length).toBe(9);
+      expect(ch.extended).toBe(true);
+      expect(ch.expanded).toBe(false); // ✅ 严禁污染 expanded！
+      expect(ch.upgradedLevel).toBe(ChannelLevel.Macro); // ✅ 正确标记级别升级为 Macro！
+      expect(ch.absorbed).toBeFalsy();
+    });
+
+    it('延伸吞并后累计达 9 段时，同样标记为 extended: true 与 upgradedLevel: Macro，expanded 保持 false', () => {
+      const calc = new DuanChannelCalculator();
+      const d0 = makeDuan('up', 150, 100, 0);
+      const d1 = makeDuan('down', 140, 110, 1);
+      const d2 = makeDuan('up', 135, 115, 2);
+      const d3 = makeDuan('down', 130, 120, 3);
+      const d4 = makeDuan('up', 128, 122, 4); // 连接段
+
+      const d5 = makeDuan('down', 128, 121, 5);
+      const d6 = makeDuan('up', 127, 122, 6);
+      const d7 = makeDuan('down', 126, 123, 7);
+      const d8 = makeDuan('up', 126, 123, 8);
+      const d9 = makeDuan('down', 126, 123, 9);
+
+      // c1: 内部 3 段 [d1, d2, d3]
+      const c1: ChanDuanChannel = {
+        duans: [d1, d2, d3],
+        entryDuan: d0,
+        leaveDuan: d4,
+        zg: 130,
+        zd: 120,
+        gg: 140,
+        dd: 110,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        trend: TrendDirection.Up,
+        extended: false,
+        expanded: false,
+        startId: 1,
+        endId: 4,
+      };
+
+      // c2: 内部 5 段 [d5, d6, d7, d8, d9]
+      const c2: ChanDuanChannel = {
+        duans: [d5, d6, d7, d8, d9],
+        entryDuan: d4,
+        leaveDuan: makeDuan('down', 115, 90, 10),
+        zg: 126,
+        zd: 123, // 与 c1 [120, 130] 核心重叠！
+        gg: 128,
+        dd: 121,
+        level: ChannelLevel.Duan,
+        type: ChannelType.Complete,
+        status: ChannelStatus.Valid,
+        trend: TrendDirection.Up,
+        extended: false,
+        expanded: false,
+        startId: 4,
+        endId: 10,
+      };
+
+      // 合并后构件段数: 3 + 1 (连接段) + 5 = 9 段！
+      const result = calc.applyDuanChannelExtensionAndExpansion([c1, c2]);
+      expect(result.length).toBe(1);
+      const merged = result[0];
+      expect(merged.duans.length).toBe(9);
+      expect(merged.extended).toBe(true);
+      expect(merged.expanded).toBe(false); // ✅ 绝非多中枢波动扩展！
+      expect(merged.upgradedLevel).toBe(ChannelLevel.Macro); // ✅ 正确标记 Macro 升级！
     });
   });
 });

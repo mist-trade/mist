@@ -278,7 +278,7 @@ export class DuanChannelCalculator {
     const dd = Math.min(c1.dd, c2.dd);
 
     const isNineDuans = mergedDuans.length >= 9;
-    const isExpanded = c1.expanded || c2.expanded || isNineDuans;
+    const isExpanded = c1.expanded || c2.expanded;
 
     return {
       duans: mergedDuans,
@@ -300,9 +300,9 @@ export class DuanChannelCalculator {
       extended: true,
       expanded: isExpanded,
       upgradedLevel:
-        c1.upgradedLevel || c2.upgradedLevel || isNineDuans
-          ? ChannelLevel.Macro
-          : undefined,
+        c1.upgradedLevel ||
+        c2.upgradedLevel ||
+        (isNineDuans ? ChannelLevel.Macro : undefined),
     };
   }
 

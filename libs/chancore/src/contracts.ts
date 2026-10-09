@@ -123,10 +123,10 @@ export interface BaseChanChannel {
   readonly level: ChannelLevel; // 物理构造型级别（血统永不变异）：Bi | Duan
   readonly type: ChannelType; // Complete | UnComplete
   readonly status: ChannelStatus; // Valid
-  readonly expanded: boolean; // 中枢扩展标志（内部构件 >= 9 或 Phase B 扩展）
-  readonly absorbed?: boolean; // 被大级别扩展中枢吸收的局部原初中枢标志（不发射买卖点，不绘制）
-  readonly upgradedLevel?: ChannelLevel; // 升级目标级别（未升级为 undefined，升级后为 ChannelLevel.Macro 高一级中枢）
-  readonly extended?: boolean; // Phase B 延伸融合产物标志
+  readonly expanded: boolean; // 中枢扩展标志（原典第 35 课多中枢极值波动扩展，expandedBox 外层大框）
+  readonly absorbed?: boolean; // 被大级别扩展中枢吸收的局部原初中枢标志（不发射买卖点，供图表衬托显示）
+  readonly upgradedLevel?: ChannelLevel; // 升级目标级别（段级别 >= 9 段延伸升级或多中枢扩展大框，均为 ChannelLevel.Macro 高一级中枢）
+  readonly extended?: boolean; // 中枢延伸标志（内部段数 >= 4 延伸震荡或 Phase B 核心区间延伸融合产物）
   readonly startId: number; // 真实物理起始 K 线 ID
   readonly endId: number; // 真实物理终止 K 线 ID
 }

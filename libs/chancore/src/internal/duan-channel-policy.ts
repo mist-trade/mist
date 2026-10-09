@@ -391,7 +391,7 @@ export class DuanChannelLifecyclePolicy
     const zd = geometry.zd;
 
     const isNineDuans = internalDuans.length >= 9;
-    const isExpanded = expanded || isNineDuans;
+    const isExtended = extended || internalDuans.length >= 4;
 
     return {
       duans: [...internalDuans],
@@ -405,9 +405,9 @@ export class DuanChannelLifecyclePolicy
       startId,
       endId,
       trend: entryDuan.trend,
-      extended,
-      expanded: isExpanded,
-      upgradedLevel: isExpanded ? ChannelLevel.Macro : undefined,
+      extended: isExtended,
+      expanded,
+      upgradedLevel: expanded || isNineDuans ? ChannelLevel.Macro : undefined,
       entryDuan,
       leaveDuan,
     };

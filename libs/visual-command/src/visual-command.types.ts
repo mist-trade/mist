@@ -1,3 +1,5 @@
+import type { ChannelLevel } from '@app/chancore';
+
 export type VisualCommandType = 'line' | 'band' | 'text' | 'icon';
 
 export interface BaseVisualCommand {
@@ -39,6 +41,7 @@ export interface BandVisualCommand extends BaseVisualCommand {
   readonly status?: 'complete' | 'uncomplete';
   readonly extended?: boolean;
   readonly expanded?: boolean;
+  readonly upgradedLevel?: ChannelLevel;
   readonly absorbed?: boolean;
 }
 

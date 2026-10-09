@@ -170,6 +170,7 @@ export class ChanVisualAdapter {
           status: isUncomplete ? 'uncomplete' : 'complete',
           extended: zs.extended,
           expanded: zs.expanded,
+          upgradedLevel: zs.upgradedLevel,
           absorbed: zs.absorbed,
         };
         commands.push(bandCmd);
@@ -255,8 +256,15 @@ export class ChanVisualAdapter {
 
         if (fromIdx === null || toIdx === null || toIdx < fromIdx) return;
 
-        const isMacro =
-          Boolean(zs.expanded) || zs.upgradedLevel === ChannelLevel.Macro;
+        const isExpanded = Boolean(zs.expanded);
+        const isUpgraded = zs.upgradedLevel === ChannelLevel.Macro;
+        let duanColor = zhongshuDuanColor;
+        if (isExpanded) {
+          duanColor = '#E879F9'; // 亮玫紫：波动扩展大框
+        } else if (isUpgraded) {
+          duanColor = '#A855F7'; // 深紫罗兰：9段延伸升级（方案A）
+        }
+
         const bandCmd: BandVisualCommand = {
           id: `chan_zs_duan_${i}_${fromIdx}_${toIdx}`,
           type: 'band',
@@ -273,12 +281,13 @@ export class ChanVisualAdapter {
           bottom: zs.zd,
           gg: zs.gg,
           dd: zs.dd,
-          color: isMacro ? '#E879F9' : zhongshuDuanColor,
+          color: duanColor,
           fill: true,
           style: isUncomplete ? 'dashed' : 'solid',
           status: isUncomplete ? 'uncomplete' : 'complete',
           extended: zs.extended,
-          expanded: isMacro,
+          expanded: isExpanded,
+          upgradedLevel: zs.upgradedLevel,
           absorbed: zs.absorbed,
         };
         commands.push(bandCmd);
