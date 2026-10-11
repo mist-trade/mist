@@ -8,3 +8,4 @@ export * from './plugins/northbound-capital.plugin';
 export * from './plugins/http-proxy.plugin';
 export * from './plugins/fibonacci.plugin';
 export * from './standard-plugins';
+export * from './external-plugin-loader';

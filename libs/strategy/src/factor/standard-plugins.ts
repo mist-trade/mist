@@ -8,6 +8,7 @@ import { VolumeBreakoutPlugin } from './plugins/volume-breakout.plugin';
 import { FinancialSafetyGuardPlugin } from './plugins/financial-guard.plugin';
 import { NorthboundCapitalPlugin } from './plugins/northbound-capital.plugin';
 import { FibonacciRetracementPlugin } from './plugins/fibonacci.plugin';
+import { ExternalFactorPluginLoader } from './external-plugin-loader';
 
 /**
  * 确保标准因子插件完成装配与注册
@@ -29,4 +30,7 @@ export function ensureStandardPluginsRegistered(
       registry.register(plugin);
     }
   }
+
+  // 自动探测并注册外部/私有因子插件（若存在）
+  ExternalFactorPluginLoader.registerExternalPlugins(registry);
 }

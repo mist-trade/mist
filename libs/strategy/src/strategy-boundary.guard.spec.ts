@@ -132,8 +132,12 @@ describe('Strategy domain boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('does not read environment configuration', () => {
+  it('does not read environment configuration except external-plugin-loader', () => {
+    const allowedEnvFiles = new Set([
+      join(sourceRoot, 'factor', 'external-plugin-loader.ts'),
+    ]);
     const violations = runtimeFiles
+      .filter((file) => !allowedEnvFiles.has(file))
       .filter((file) => /\bprocess\.env\b/.test(readFileSync(file, 'utf8')))
       .map((file) => relative(repositoryRoot, file));
 

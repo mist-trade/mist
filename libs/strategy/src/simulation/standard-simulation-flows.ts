@@ -1,6 +1,4 @@
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
-import type { ChanFourQuadrantTactics } from '../tactics/contracts/chan-four-quadrant-tactics.interface';
-import { DynamicTacticsLoader } from '../tactics/dynamic-tactics-loader';
 
 export interface ChanBspFlowOptions {
   readonly units?: 'bi' | 'duan';
@@ -67,38 +65,10 @@ export function createChanBspDecisionFlow(
 }
 
 /**
- * 构造四象限私有战术决策流树
- * 将动态加载的四象限战术与缠论买卖点无缝融合进同一棵决策流树
+ * 构造标准缠论决策流树（兼容别名）
  */
 export function createTacticsDecisionFlow(
-  tactics: ChanFourQuadrantTactics = DynamicTacticsLoader.getTactics(),
+  options?: ChanBspFlowOptions,
 ): DecisionFlowNode {
-  return {
-    id: 'guard_tactics_chan_bsp',
-    type: 'GUARD',
-    name: `四象限战术门禁 [${tactics.name} v${tactics.version}]`,
-    pluginId: 'plugin.chan.bsp',
-    params: {
-      units: 'bi',
-      direction: 'both',
-      points: { first: true, second: true, third: true },
-      requiredBarCount: 60,
-      deduplicate: true,
-    },
-    requiredAction: 'BOTH',
-    minConfidence: 0.5,
-    onPass: {
-      id: 'term_tactics_signal',
-      type: 'TERMINAL',
-      action: 'INHERIT',
-      signalTag: 'TACTICS_SIGNAL',
-      reason: `满足四象限战术 [${tactics.name}] 触发条件`,
-    },
-    onFail: {
-      id: 'term_tactics_abort',
-      type: 'TERMINAL',
-      action: 'ABORT',
-      reason: '未达四象限战术触发标准',
-    },
-  };
+  return createChanBspDecisionFlow(options);
 }

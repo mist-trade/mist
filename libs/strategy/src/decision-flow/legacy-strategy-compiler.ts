@@ -15,6 +15,7 @@ export interface LegacyChanBspPlanLike {
     readonly third: boolean;
   };
   readonly requiredBarCount?: number;
+  readonly minConfidence?: number;
 }
 
 /**
@@ -92,7 +93,7 @@ export class LegacyStrategyCompiler {
         deduplicate: true,
       },
       requiredAction,
-      minConfidence: 0.7,
+      minConfidence: plan.minConfidence ?? 0.5,
       onPass: {
         id: 'term_chan_bsp_matched',
         type: 'TERMINAL',

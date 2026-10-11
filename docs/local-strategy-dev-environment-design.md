@@ -10,16 +10,16 @@
 
 ### 1.1 现状与痛点
 - **远端依赖过重**：策略目前强依赖 `apps/signal`、`apps/backtest`、MySQL 数据库实体表（`strategy_definitions`, `strategy_versions`）、Redis 72h 桶和 BullMQ 队列。
-- **调参验证缓慢**：日常研发中只需调整 `my-secret-tactics.ts` 里的底分型过滤、次级别 MACD 穿越门禁或中枢数量，就必须经历：提交代码 ➔ 打包 Docker 镜像 ➔ 部署到 Windows Box ➔ 重启容器 ➔ 发起回测/等实盘 tick ➔ 查数据库。单次往返 5~15 分钟，严重制约量化策略迭代。
+- **调参验证缓慢**：日常研发中只需微调策略参数、过滤门禁或中枢数量，就必须经历：提交代码 ➔ 打包 Docker 镜像 ➔ 部署到 Windows Box ➔ 重启容器 ➔ 发起回测/等实盘 tick ➔ 查数据库。单次往返 5~15 分钟，严重制约量化策略迭代。
 - **前期资产碎片化**：
   - 几何算法期在 `mist-fe/__fixtures__` 沉淀了 5 组黄金 K 线快照（茅台、上证、创业板等）与 `tools/export-chan-bi-phases.cjs` 离线计算脚本，但**仅覆盖几何图形，没有策略买卖点抽象**；
   - 生产期在 `mist-deploy` 跑通了成熟的 `ssh mist-box` 免密取数机制，但**仅用于运维巡检与审计，未开放给日常开发**。
 
 ### 1.2 核心设计原则
-1. **轻重解耦**：重型集群留在远端作为生产托管，纯算力（Rust `nodejs-polars`、`@app/chancore`、`DynamicTacticsLoader`）全部在本地原生执行；
+1. **轻重解耦**：重型集群留在远端作为生产托管，纯算力（Rust `nodejs-polars`、`@app/chancore`、`StrategyEvaluationKernel`）全部在本地原生执行；
 2. **存量兼容与资产盘活**：100% 吸收复用前期的 5 套黄金基线数据与回归测试体系，支持「无网时跑存量快照，连网时同步最新生产数据」；
 3. **前后端标准化契约串联**：前端 `mist-fe` 零代码侵入，通过本地轻量 Dev API Server 模拟生产协议，直接在 TradingView 画布上呈现本地策略的实时买卖点图钉与归因抽屉；
-4. **物理级安全隔离**：本地 `.data/` 离线缓存与 `private/` 私有交易法宝受 `.gitignore` 严格保护，杜绝任何数据与独门战术泄露风险。
+4. **物理级安全隔离**：本地 `.data/` 离线缓存受 `.gitignore` 严格保护，杜绝任何数据泄露风险。
 
 ---
 
@@ -45,8 +45,8 @@
  ┌───────────────────────────────────────────────────────────────┐
  │ 本地核心算力层 (Local Core Engine)                             │
  │  - @app/chancore (Rust nodejs-polars 向量底座)                │
- │  - libs/strategy/DynamicTacticsLoader                         │
- │  - libs/strategy/src/tactics/private/my-secret-tactics.ts     │
+ │  - libs/strategy/StrategyEvaluationKernel                     │
+ │  - libs/strategy/FactorPluginRegistry                         │
  └───────────────┬───────────────────────────────┬───────────────┘
                  │                               │
                  │ ② 终端纯净调参                 │ ③ 前端联调 (HTTP 8001)
@@ -117,9 +117,9 @@ export function loadCanonicalKlines(options: KLineLoadOptions): ChanK[] {
 ### 3.3 存量回归测试升级：策略防退化黄金基线（Regression Guard）
 - **现状**：前端现有的 `shanghai-phase-fixture.test.ts` 只能断言笔的数量（如 Phase A=33 笔，Phase B=27 笔）。
 - **接入**：
-  - 基于已有的 5 套黄金走势快照，增加策略层回归测试套件 `test/tactics-regression.spec.ts`；
-  - 对经典走势下的买卖点输出建立黄金断言（例如：茅台 2024-2026 在特定底背驰位置**必须且只能**触发一次 LeftBuy）；
-  - **研发收益**：当你优化战术逻辑时，运行 `pnpm test:tactics` 能在 1 秒内确保本次修改**没有在历史经典用例上引起策略退化（Regression）**。
+  - 基于已有的 5 套黄金走势快照，增加策略层回归测试套件 `test/strategy-regression.spec.ts`；
+  - 对经典走势下的买卖点输出建立黄金断言；
+  - **研发收益**：当你优化策略逻辑时，运行 `pnpm test` 能在短时间内确保本次修改**没有在历史经典用例上引起策略退化（Regression）**。
 
 ---
 
@@ -131,7 +131,7 @@ export function loadCanonicalKlines(options: KLineLoadOptions): ChanK[] {
 | 前端请求路由 | `dev-server.ts` 响应行为 | 数据源 / 计算源 |
 |---|---|---|
 | `POST /api/mist/v1/indicators/k` | 返回指定标的与周期的 K 线数组 | 读取本地 `.data/kline/` 或 `__fixtures__/` |
-| `GET /api/mist/v1/visual/commands` | 返回折线（笔/段）、矩形（中枢）及买卖点图钉 | 调用 `@app/chancore` + `DynamicTacticsLoader` 现算 |
+| `GET /api/mist/v1/visual/commands` | 返回折线（笔/段）、矩形（中枢）及买卖点图钉 | 调用 `@app/chancore` + `ChanVisualAdapter` 现算 |
 | `GET /api/mist/v1/strategy-backtests/runs` | 返回虚拟本地运行任务列表 | 内存构造单个虚拟任务 `Local Dev Live Run` |
 | `GET /api/mist/v1/strategy-backtests/runs/:id/signals` | 返回策略触发的买卖点清单与归因细节 | 策略判决收集的信号明细 |
 
@@ -168,12 +168,10 @@ export function loadCanonicalKlines(options: KLineLoadOptions): ChanK[] {
 │   │       ├── 600519_30m.json              # 茅台30分钟离线缓存
 │   │       └── 600519_5m.json               # 茅台5分钟离线缓存
 │   ├── libs/strategy/
-│   │   └── src/tactics/
-│   │       ├── contracts/                   # 公共战术四象限接口 (已存在)
-│   │       ├── default/                     # 开源标准战术实现 (已存在)
-│   │       ├── private/                     # 个人独门交易法宝 (已存在，Git 严格忽略)
-│   │       │   └── my-secret-tactics.ts     # 核心调参文件
-│   │       └── dynamic-tactics-loader.ts    # 动态加载器 (已存在)
+│   │   └── src/factor/
+│   │       ├── factor.types.ts              # 因子插件标准抽象契约
+│   │       ├── external-plugin-loader.ts    # 通用外部插件动态加载器
+│   │       └── standard-plugins.ts          # 标准内置因子插件
 │   ├── tools/
 │   │   ├── dev-sync-data.ts                 # [新建] SSH 管道取数工具
 │   │   ├── dev-strategy-runner.ts           # [新建] 纯终端极速调参与模拟撮合运行器
@@ -201,6 +199,6 @@ export function loadCanonicalKlines(options: KLineLoadOptions): ChanK[] {
 | **Step 1** | **Git 规则加固** | 在 `mist/.gitignore` 中追加 `.data/` 与 `*.kline.json` | `git status` 确认本地数据不入库 |
 | **Step 2** | **取数与适配层** | 编写 `mist/tools/dev-sync-data.ts`，支持 `--code`、`--periods` 并自动解析为 `ChanK[]` | 执行同步命令 3 秒内抓取 2000 根数据落盘 |
 | **Step 3** | **统一适配器** | 编写数据加载逻辑，同时兼容 `__fixtures__` 存量用例与本地 `.data/` 缓存 | 能够免连网直接跑 `maotai-2024-2026` 存量用例 |
-| **Step 4** | **终端 Dev 引擎** | 编写 `mist/tools/dev-strategy-runner.ts`，支持滚动判决与 `--watch` 监听 | 修改 `my-secret-tactics.ts` 后终端 < 150ms 刷新结果 |
+| **Step 4** | **终端 Dev 引擎** | 编写 `mist/tools/dev-strategy-runner.ts`，支持滚动判决与 `--watch` 监听 | 策略更新后终端 < 150ms 刷新结果 |
 | **Step 5** | **前后端联调服务** | 编写 `mist/tools/dev-server.ts`，对接 `/v1/indicators/k` 与 `/v1/visual/commands` | 浏览器 `http://localhost:3000/backtests` 精确渲染买卖点图钉 |
-| **Step 6** | **存量防退化回归** | 编写 Jest 战术基线回归测试，以 5 套快照为基准防止逻辑退化 | `pnpm test:tactics` 全绿 |
+| **Step 6** | **存量防退化回归** | 编写 Jest 基线回归测试，以 5 套快照为基准防止逻辑退化 | 全量测试全绿 |

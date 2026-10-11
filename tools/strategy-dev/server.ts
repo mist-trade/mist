@@ -13,7 +13,6 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { ChanCore, type ChanK } from '@app/chancore';
 import { ChanVisualAdapter } from '../../libs/visual-command/src/adapters/chan-visual.adapter';
-import { DynamicTacticsLoader } from '../../libs/strategy/src/tactics/dynamic-tactics-loader';
 import {
   StrategySimulationSession,
   createTacticsDecisionFlow,
@@ -432,8 +431,7 @@ async function runUnifiedSimulationBacktest(options: {
       bars = bars.slice(prewarmCut);
     }
   }
-  const tactics = DynamicTacticsLoader.reloadTactics();
-  const flow = createTacticsDecisionFlow(tactics);
+  const flow = createTacticsDecisionFlow();
   const publicFrom = options.startDate
     ? new Date(options.startDate)
     : new Date(-8640000000000000);
@@ -660,8 +658,7 @@ const server = http.createServer(async (req, res) => {
 
       const fullKlines = loadCanonicalKlines({ code, period });
       const bars = fullKlines.map((k) => toStrategyBar(k, period));
-      const tactics = DynamicTacticsLoader.reloadTactics();
-      const flow = body.flow || createTacticsDecisionFlow(tactics);
+      const flow = body.flow || createTacticsDecisionFlow();
 
       const session = new StrategySimulationSession(bars, {
         securityCode: code,
@@ -950,17 +947,14 @@ const server = http.createServer(async (req, res) => {
 
   // 5. 策略列表: GET /v1/strategies
   if (pathname.endsWith('/v1/strategies') && req.method === 'GET') {
-    const tactics = DynamicTacticsLoader.reloadTactics();
-    const meta = DynamicTacticsLoader.getActiveMetadata();
     sendJson(res, [
       {
         id: 1,
-        name: `缠论策略树 [${tactics.name}]`,
-        description: `基于策略树决策流与四象限战术 (v${tactics.version})`,
+        name: '缠论标准策略树',
+        description: '基于策略树决策流与标准缠论买卖点',
         kind: 'decision_flow',
         status: 'active',
         activeVersionNumber: 1,
-        metadata: meta,
         periods: [1, 5, 15, 30, 60, 1440],
         sources: ['qmt', 'tdx'],
       },
@@ -973,7 +967,6 @@ const server = http.createServer(async (req, res) => {
     pathname.match(/\/v1\/strategies\/\d+\/versions$/) &&
     req.method === 'GET'
   ) {
-    const tactics = DynamicTacticsLoader.reloadTactics();
     sendJson(res, [
       {
         id: 1,
@@ -981,7 +974,7 @@ const server = http.createServer(async (req, res) => {
         versionNumber: 1,
         signalKind: 'entry',
         status: 'active',
-        description: `标准决策流版本 (集成四象限战术 v${tactics.version})`,
+        description: '标准决策流版本 (集成标准缠论)',
         config: {},
         createdAt: new Date('2026-09-01').toISOString(),
       },

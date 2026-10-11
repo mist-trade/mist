@@ -15,7 +15,6 @@
  */
 
 import type { ChanK } from '@app/chancore';
-import { DynamicTacticsLoader } from '../../libs/strategy/src/tactics/dynamic-tactics-loader';
 import {
   createTacticsDecisionFlow,
   type SimulationSignal,
@@ -139,10 +138,7 @@ async function runStrategyDev(): Promise<void> {
     klines[0]?.symbol || options.code || options.caseKey || '600519',
   );
 
-  // 1. 加载私有交易法宝 (或回退标准实现)
-  const tactics = DynamicTacticsLoader.reloadTactics();
-  const meta = DynamicTacticsLoader.getActiveMetadata();
-
+  // 1. 初始化标准决策流树
   console.log(
     `\n╔════════════════════════════════════════════════════════════════════════╗`,
   );
@@ -152,10 +148,7 @@ async function runStrategyDev(): Promise<void> {
   console.log(
     `╚════════════════════════════════════════════════════════════════════════╝`,
   );
-  console.log(` 战术引擎: ${tactics.name} (${tactics.id} v${tactics.version})`);
-  console.log(
-    ` 战术来源: ${meta.isPrivate ? '🔒 个人私有法宝 (private)' : '🌐 标准开源战术 (default)'}`,
-  );
+  console.log(` 决策引擎: 生产级策略树 (Decision Flow Tree)`);
   console.log(
     ` 标的代码: ${securityCode} | 周期: ${periodNum}m | 样本 K 线数: ${klines.length} 根`,
   );
@@ -167,7 +160,7 @@ async function runStrategyDev(): Promise<void> {
   );
 
   // 2. 编译策略树与初始化统一求值内核 (StrategyEvaluationKernel)
-  const flow = createTacticsDecisionFlow(tactics);
+  const flow = createTacticsDecisionFlow();
   const bars = klines.map((k) => toStrategyBar(k, periodNum));
 
   const kernel = new StrategyEvaluationKernel({
@@ -212,7 +205,7 @@ async function runStrategyDev(): Promise<void> {
   // 4. 打印信号明细表 (双时间戳与结构归因契约)
   if (signals.length === 0) {
     console.log(
-      `⚠️ 未触发任何买卖点信号。可以尝试放宽 ${tactics.name} 的触发门禁条件。\n`,
+      `⚠️ 未触发任何买卖点信号。可以尝试放宽策略树的触发门禁条件。\n`,
     );
   } else {
     console.log(`🎯 触发信号清单 (共 ${signals.length} 条信号):\n`);

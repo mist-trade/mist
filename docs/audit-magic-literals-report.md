@@ -1,108 +1,108 @@
 # Mist 全仓硬编码数字与字符串（魔法值）审计盘点报告
 
-> 生成时间：2026-09-27T01:24:32.098Z
-> 扫描文件总数：409 个
-> 检出硬编码总量：2095 处（数字 429 处，字符串 1666 处）
+> 生成时间：2026-10-11T11:11:34.347Z
+> 扫描文件总数：411 个
+> 检出硬编码总量：1994 处（数字 390 处，字符串 1604 处）
 
 ## 一、高频魔法数字汇总（Top 30）
 
 | 排名 | 硬编码数值 | 出现频次 | 典型分布位置 | 建议归宿分类 |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | `3` | 48 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:640`, `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:163`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:474` | 领域常量 (*.constants.ts) |
-| 2 | `8` | 20 次 | `apps/backtest/src/backtest-admission.service.ts:37`, `apps/backtest/src/backtest-startup.service.ts:47`, `apps/backtest/src/health/health-state.service.ts:11` | 领域常量 (*.constants.ts) |
-| 3 | `4` | 20 次 | `apps/mist/src/realtime/candle/candle-bucket.util.ts:109`, `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382` | 领域常量 (*.constants.ts) |
-| 4 | `60` | 20 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:119`, `apps/mist/src/visual/visual.controller.ts:87` | 领域常量 (*.constants.ts) |
-| 5 | `1000` | 18 次 | `apps/backtest/src/health/health-state.service.ts:173`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:51`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:80` | 环境超时/系统参数 (.env / @app/config) |
-| 6 | `5` | 17 次 | `apps/mist/src/collector/post-close-sync.service.ts:274`, `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:116` | 领域常量 (*.constants.ts) |
-| 7 | `500` | 17 次 | `apps/mist/src/realtime/realtime-redis.service.ts:91`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:177`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:235` | 领域常量 (*.constants.ts) |
+| 1 | `3` | 37 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:640`, `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:163`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:473` | 领域常量 (*.constants.ts) |
+| 2 | `60` | 20 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101`, `apps/mist/src/visual/visual.controller.ts:87`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:256` | 领域常量 (*.constants.ts) |
+| 3 | `8` | 19 次 | `apps/backtest/src/backtest-admission.service.ts:37`, `apps/backtest/src/backtest-startup.service.ts:47`, `apps/backtest/src/health/health-state.service.ts:11` | 领域常量 (*.constants.ts) |
+| 4 | `1000` | 18 次 | `apps/backtest/src/health/health-state.service.ts:173`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:51`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:80` | 环境超时/系统参数 (.env / @app/config) |
+| 5 | `4` | 17 次 | `apps/mist/src/realtime/candle/candle-bucket.util.ts:107`, `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382` | 领域常量 (*.constants.ts) |
+| 6 | `5` | 16 次 | `apps/mist/src/collector/post-close-sync.service.ts:274`, `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165`, `apps/schedule/src/data-collection.controller.ts:105` | 领域常量 (*.constants.ts) |
+| 7 | `500` | 16 次 | `apps/mist/src/realtime/realtime-redis.service.ts:91`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:166`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:224` | 领域常量 (*.constants.ts) |
 | 8 | `6` | 16 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `apps/mist/src/sources/tdx/tdx-source.service.ts:210` | 领域常量 (*.constants.ts) |
 | 9 | `10` | 15 次 | `apps/mist/src/app.module.ts:158`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:133`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:141` | 领域常量 (*.constants.ts) |
 | 10 | `5000` | 15 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1027`, `apps/mist/src/realtime/realtime-redis.service.ts:87`, `apps/mist/src/realtime/realtime-redis.service.ts:91` | 环境超时/系统参数 (.env / @app/config) |
-| 11 | `50` | 11 次 | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10`, `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27`, `apps/mist/src/strategy/services/backtest-run-query.service.ts:62` | 领域常量 (*.constants.ts) |
-| 12 | `30` | 10 次 | `apps/mist/src/strategy/services/backtest-run-command.service.ts:118`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:271`, `apps/signal/src/signal-registry.service.ts:146` | 领域常量 (*.constants.ts) |
-| 13 | `9` | 10 次 | `libs/chancore/src/internal/channel-lifecycle.ts:321`, `libs/chancore/src/internal/channel-lifecycle.ts:454`, `libs/chancore/src/internal/channel-lifecycle.ts:668` | 领域常量 (*.constants.ts) |
-| 14 | `200` | 9 次 | `apps/mist/src/collector/post-close-sync.service.ts:129`, `apps/mist/src/collector/post-close-sync.service.ts:198`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:41` | 领域常量 (*.constants.ts) |
-| 15 | `0.5` | 9 次 | `libs/indicators/src/fibonacci/fibonacci.ts:348`, `libs/indicators/src/fibonacci/fibonacci.ts:356`, `libs/indicators/src/time-series/ts-rank.ts:60` | 算法比例系数 (*.constants.ts) |
-| 16 | `60000` | 7 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1105`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:186`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:304` | 环境超时/系统参数 (.env / @app/config) |
-| 17 | `20` | 7 次 | `apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts:19`, `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:398` | 领域常量 (*.constants.ts) |
+| 11 | `200` | 10 次 | `apps/mist/src/collector/post-close-sync.service.ts:129`, `apps/mist/src/collector/post-close-sync.service.ts:198`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:41` | 领域常量 (*.constants.ts) |
+| 12 | `50` | 10 次 | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10`, `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27`, `apps/mist/src/strategy/services/backtest-run-query.service.ts:62` | 领域常量 (*.constants.ts) |
+| 13 | `0.5` | 9 次 | `libs/indicators/src/fibonacci/fibonacci.ts:347`, `libs/indicators/src/fibonacci/fibonacci.ts:355`, `libs/indicators/src/time-series/ts-rank.ts:60` | 算法比例系数 (*.constants.ts) |
+| 14 | `30` | 8 次 | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256`, `apps/signal/src/signal-registry.service.ts:144`, `libs/utils/src/services/k-boundary-calculator.ts:168` | 领域常量 (*.constants.ts) |
+| 15 | `9` | 8 次 | `libs/chancore/src/internal/duan-channel-policy.ts:393`, `libs/chancore/src/internal/duan-channel.ts:112`, `libs/chancore/src/internal/duan-channel.ts:117` | 领域常量 (*.constants.ts) |
+| 16 | `60000` | 7 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1105`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:186`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:303` | 环境超时/系统参数 (.env / @app/config) |
+| 17 | `20` | 7 次 | `apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts:19`, `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:397` | 领域常量 (*.constants.ts) |
 | 18 | `3000` | 6 次 | `apps/mist/src/realtime/realtime-redis.service.ts:88`, `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:51`, `apps/notification/src/delivery/alert-delivery-queue.service.ts:39` | 环境超时/系统参数 (.env / @app/config) |
 | 19 | `14` | 5 次 | `apps/mist/src/indicator/indicator.service.ts:79`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `libs/indicators/src/adx.ts:22` | 领域常量 (*.constants.ts) |
 | 20 | `10000` | 5 次 | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:35`, `apps/mist/src/sources/tdx/tdx-source.service.ts:353`, `libs/decimal/src/decimal8.ts:163` | 环境超时/系统参数 (.env / @app/config) |
-| 21 | `15` | 5 次 | `apps/mist/src/strategy/services/backtest-run-command.service.ts:117`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:271`, `apps/signal/src/signal-registry.service.ts:145` | 领域常量 (*.constants.ts) |
-| 22 | `11` | 5 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77` | 领域常量 (*.constants.ts) |
-| 23 | `1440` | 5 次 | `tools/strategy-dev/server.ts:306`, `tools/strategy-dev/server.ts:323`, `tools/strategy-dev/server.ts:876` | 环境超时/系统参数 (.env / @app/config) |
-| 24 | `30000` | 4 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:858`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:859`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:219` | 环境超时/系统参数 (.env / @app/config) |
-| 25 | `12` | 4 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `libs/indicators/src/macd.ts:41`, `libs/indicators/src/macd.ts:43` | 领域常量 (*.constants.ts) |
-| 26 | `37` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77`, `libs/decimal/src/decimal8.ts:19` | 领域常量 (*.constants.ts) |
-| 27 | `92` | 3 次 | `apps/backtest/src/backtest-run.executor.ts:421`, `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:222`, `libs/strategy/src/tactics/private/my-secret-tactics.ts:139` | 领域常量 (*.constants.ts) |
-| 28 | `90` | 3 次 | `apps/backtest/src/backtest-run.executor.ts:423`, `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:224`, `libs/strategy/src/tactics/private/my-secret-tactics.ts:209` | 领域常量 (*.constants.ts) |
-| 29 | `80` | 3 次 | `apps/backtest/src/backtest-run.executor.ts:502`, `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:164`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:334` | 领域常量 (*.constants.ts) |
-| 30 | `100000` | 3 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:84`, `tools/strategy-dev/runner.ts:83` | 环境超时/系统参数 (.env / @app/config) |
+| 21 | `11` | 5 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77` | 领域常量 (*.constants.ts) |
+| 22 | `30000` | 4 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:858`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:859`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:218` | 环境超时/系统参数 (.env / @app/config) |
+| 23 | `12` | 4 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `libs/indicators/src/macd.ts:41`, `libs/indicators/src/macd.ts:43` | 领域常量 (*.constants.ts) |
+| 24 | `15` | 4 次 | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256`, `apps/signal/src/signal-registry.service.ts:143`, `libs/utils/src/services/k-boundary-calculator.ts:176` | 领域常量 (*.constants.ts) |
+| 25 | `37` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77`, `libs/decimal/src/decimal8.ts:19` | 领域常量 (*.constants.ts) |
+| 26 | `1440` | 4 次 | `tools/strategy-dev/server.ts:311`, `tools/strategy-dev/server.ts:958`, `tools/strategy-dev/server.ts:1023` | 环境超时/系统参数 (.env / @app/config) |
+| 27 | `100000` | 3 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:84`, `tools/strategy-dev/runner.ts:70` | 环境超时/系统参数 (.env / @app/config) |
+| 28 | `0.95` | 3 次 | `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:121`, `libs/strategy/src/factor/plugins/northbound-capital.plugin.ts:70`, `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:111` | 算法比例系数 (*.constants.ts) |
+| 29 | `-8640000000000000` | 3 次 | `libs/strategy/src/simulation/strategy-simulation.session.ts:55`, `tools/strategy-dev/runner.ts:170`, `tools/strategy-dev/server.ts:437` | 领域常量 (*.constants.ts) |
+| 30 | `400` | 3 次 | `libs/transport/src/http/http-exception.filter.ts:36`, `libs/transport/src/http/http-exception.filter.ts:77`, `libs/transport/src/http/http-openapi.decorator.ts:79` | 领域常量 (*.constants.ts) |
 
 ## 二、高频魔法字符串汇总（Top 30）
 
 | 排名 | 硬编码字符串 | 出现频次 | 语法语境类别 | 典型分布位置 | 建议归宿分类 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
 | 1 | `qmt` | 21 次 | comparison, function-argument, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:275`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:367`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:856` | 契约字面量 (*.constants.ts) |
-| 2 | `tdx` | 20 次 | function-argument, comparison, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:855`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:870`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:886` | 契约字面量 (*.constants.ts) |
-| 3 | `unavailable` | 14 次 | comparison, object-property | `apps/backtest/src/health/health-state.service.ts:64`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:213`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:241` | 契约字面量 (*.constants.ts) |
-| 4 | `high` | 14 次 | function-argument | `libs/indicators/src/adx.ts:36`, `libs/indicators/src/adx.ts:41`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
-| 5 | `low` | 14 次 | function-argument | `libs/indicators/src/adx.ts:37`, `libs/indicators/src/adx.ts:42`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
-| 6 | `completed` | 13 次 | object-property, function-argument | `apps/backtest/src/observability/metrics.ts:76`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:141`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:193` | 契约字面量 (*.constants.ts) |
-| 7 | `discarded` | 13 次 | object-property, function-argument, comparison | `apps/mist/src/realtime/candle/candle-finalizer.ts:277`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:926`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:929` | 契约字面量 (*.constants.ts) |
-| 8 | `amount` | 13 次 | function-argument, comparison | `apps/mist/src/sources/east-money/east-money-source.service.ts:124`, `apps/mist/src/sources/east-money/east-money-source.service.ts:197`, `apps/mist/src/sources/qmt/qmt-source.service.ts:233` | 契约字面量 (*.constants.ts) |
+| 2 | `tdx` | 18 次 | function-argument, comparison, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:855`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:870`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:886` | 契约字面量 (*.constants.ts) |
+| 3 | `high` | 14 次 | function-argument | `libs/indicators/src/adx.ts:36`, `libs/indicators/src/adx.ts:41`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
+| 4 | `low` | 14 次 | function-argument | `libs/indicators/src/adx.ts:37`, `libs/indicators/src/adx.ts:42`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
+| 5 | `discarded` | 13 次 | object-property, function-argument, comparison | `apps/mist/src/realtime/candle/candle-finalizer.ts:277`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:926`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:929` | 契约字面量 (*.constants.ts) |
+| 6 | `amount` | 13 次 | function-argument, comparison | `apps/mist/src/sources/east-money/east-money-source.service.ts:124`, `apps/mist/src/sources/east-money/east-money-source.service.ts:197`, `apps/mist/src/sources/qmt/qmt-source.service.ts:233` | 契约字面量 (*.constants.ts) |
+| 7 | `unavailable` | 12 次 | comparison, object-property | `apps/backtest/src/health/health-state.service.ts:64`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:202`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:230` | 契约字面量 (*.constants.ts) |
+| 8 | `completed` | 12 次 | object-property, function-argument | `apps/backtest/src/observability/metrics.ts:76`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:142`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:193` | 契约字面量 (*.constants.ts) |
 | 9 | `failure` | 12 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:100`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:745`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:748` | 契约字面量 (*.constants.ts) |
 | 10 | `NEUTRAL` | 12 次 | object-property | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:77`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:87`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:115` | 业务状态枚举 (Enums / *.constants.ts) |
 | 11 | `off` | 11 次 | comparison | `apps/mist/src/app.module.ts:93`, `apps/mist/src/app.module.ts:107`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:209` | 契约字面量 (*.constants.ts) |
 | 12 | `sealed` | 10 次 | function-argument, object-property, comparison | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:919`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:920`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:996` | 契约字面量 (*.constants.ts) |
 | 13 | `volume` | 10 次 | function-argument | `apps/mist/src/sources/east-money/east-money-source.service.ts:120`, `apps/mist/src/sources/east-money/east-money-source.service.ts:195`, `apps/mist/src/sources/qmt/qmt-source.service.ts:214` | 契约字面量 (*.constants.ts) |
-| 14 | `up` | 10 次 | comparison | `libs/indicators/src/fibonacci/fibonacci.ts:254`, `libs/indicators/src/fibonacci/fibonacci.ts:271`, `libs/indicators/src/fibonacci/fibonacci.ts:336` | 契约字面量 (*.constants.ts) |
-| 15 | `TERMINAL` | 10 次 | switch-case, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:242`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:250`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:50` | 业务状态枚举 (Enums / *.constants.ts) |
-| 16 | `BUY` | 10 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:278`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:63`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:74` | 业务状态枚举 (Enums / *.constants.ts) |
-| 17 | `chan_bsp` | 9 次 | comparison, object-property, function-argument | `apps/backtest/src/backtest-run.executor.ts:361`, `apps/backtest/src/backtest-run.executor.ts:395`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:281` | 契约字面量 (*.constants.ts) |
-| 18 | `1m` | 9 次 | comparison, object-property | `apps/mist/src/collector/post-close-sync.service.ts:137`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:994`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:1010` | 契约字面量 (*.constants.ts) |
-| 19 | `queue_full` | 8 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:125`, `apps/backtest/src/backtest-admission.service.ts:145`, `apps/backtest/src/backtest-startup.service.ts:77` | 契约字面量 (*.constants.ts) |
-| 20 | `0.1.0` | 8 次 | function-argument | `apps/backtest/src/observability/metrics.ts:16`, `apps/mist/src/realtime/observability/candle-metrics.ts:26`, `apps/mist/src/realtime/observability/startup-compensation-metrics.ts:18` | 协议键/事件名 (*.constants.ts) |
-| 21 | `success` | 8 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:98`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:695`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:755` | 契约字面量 (*.constants.ts) |
-| 22 | `chan` | 8 次 | object-property, function-argument | `apps/chan/src/health/health.controller.ts:19`, `apps/chan/src/health/health.controller.ts:20`, `apps/mist/src/main.ts:47` | 契约字面量 (*.constants.ts) |
-| 23 | `, ` | 8 次 | function-argument | `apps/mist/src/collector/collector.controller.ts:50`, `apps/mist/src/sources/k-save.helper.ts:47`, `apps/schedule/src/pre-market-inspection.service.ts:272` | 契约字面量 (*.constants.ts) |
-| 24 | `decision_flow` | 7 次 | comparison, object-property | `apps/backtest/src/backtest-run.executor.ts:345`, `apps/backtest/src/backtest-run.executor.ts:446`, `apps/mist/src/strategy/services/strategy-definition.service.ts:258` | 契约字面量 (*.constants.ts) |
-| 25 | `ok` | 7 次 | object-property, comparison | `apps/backtest/src/health/health-state.service.ts:105`, `apps/chan/src/health/health.controller.ts:18`, `apps/mist/src/health/health.controller.ts:43` | 契约字面量 (*.constants.ts) |
-| 26 | `failed` | 7 次 | object-property, function-argument, comparison | `apps/backtest/src/observability/metrics.ts:77`, `apps/mist/src/collector/post-close-sync.service.ts:441`, `apps/notification/src/observability/oo-alert-metrics.ts:32` | 契约字面量 (*.constants.ts) |
-| 27 | `reset` | 7 次 | function-argument, comparison | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:165`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:214`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:219` | 契约字面量 (*.constants.ts) |
-| 28 | `text` | 7 次 | object-property | `apps/notification/src/channels/feishu.channel-adapter.ts:67`, `apps/notification/src/channels/qq.channel-adapter.ts:58`, `apps/notification/src/channels/wechat.channel-adapter.ts:52` | 契约字面量 (*.constants.ts) |
-| 29 | `GUARD` | 7 次 | switch-case, object-property, comparison | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:50`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:56`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:59` | 业务状态枚举 (Enums / *.constants.ts) |
-| 30 | `not_ready` | 6 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:93`, `apps/backtest/src/backtest-admission.service.ts:97`, `apps/backtest/src/health/health-state.service.ts:57` | 契约字面量 (*.constants.ts) |
+| 14 | `BUY` | 10 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:287`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:63`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:74` | 业务状态枚举 (Enums / *.constants.ts) |
+| 15 | `queue_full` | 8 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:125`, `apps/backtest/src/backtest-admission.service.ts:145`, `apps/backtest/src/backtest-startup.service.ts:77` | 契约字面量 (*.constants.ts) |
+| 16 | `0.1.0` | 8 次 | function-argument | `apps/backtest/src/observability/metrics.ts:16`, `apps/mist/src/realtime/observability/candle-metrics.ts:26`, `apps/mist/src/realtime/observability/startup-compensation-metrics.ts:18` | 协议键/事件名 (*.constants.ts) |
+| 17 | `success` | 8 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:98`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:695`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:755` | 契约字面量 (*.constants.ts) |
+| 18 | `chan` | 8 次 | object-property, function-argument | `apps/chan/src/health/health.controller.ts:19`, `apps/chan/src/health/health.controller.ts:20`, `apps/mist/src/main.ts:47` | 契约字面量 (*.constants.ts) |
+| 19 | `, ` | 8 次 | function-argument | `apps/mist/src/collector/collector.controller.ts:50`, `apps/mist/src/sources/k-save.helper.ts:47`, `apps/schedule/src/pre-market-inspection.service.ts:272` | 契约字面量 (*.constants.ts) |
+| 20 | `1m` | 8 次 | comparison, object-property | `apps/mist/src/collector/post-close-sync.service.ts:137`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:994`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:1010` | 契约字面量 (*.constants.ts) |
+| 21 | `text` | 8 次 | object-property | `apps/notification/src/channels/feishu.channel-adapter.ts:67`, `apps/notification/src/channels/qq.channel-adapter.ts:58`, `apps/notification/src/channels/wechat.channel-adapter.ts:52` | 契约字面量 (*.constants.ts) |
+| 22 | `TERMINAL` | 8 次 | switch-case, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:251`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:259`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:51` | 业务状态枚举 (Enums / *.constants.ts) |
+| 23 | `ok` | 7 次 | object-property, comparison | `apps/backtest/src/health/health-state.service.ts:105`, `apps/chan/src/health/health.controller.ts:18`, `apps/mist/src/health/health.controller.ts:43` | 契约字面量 (*.constants.ts) |
+| 24 | `failed` | 7 次 | object-property, function-argument, comparison | `apps/backtest/src/observability/metrics.ts:77`, `apps/mist/src/collector/post-close-sync.service.ts:441`, `apps/notification/src/observability/oo-alert-metrics.ts:32` | 契约字面量 (*.constants.ts) |
+| 25 | `reset` | 7 次 | function-argument, comparison | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:165`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:214`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:219` | 契约字面量 (*.constants.ts) |
+| 26 | `not_ready` | 6 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:93`, `apps/backtest/src/backtest-admission.service.ts:97`, `apps/backtest/src/health/health-state.service.ts:57` | 契约字面量 (*.constants.ts) |
+| 27 | `run_failed` | 6 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:108`, `apps/backtest/src/backtest-admission.service.ts:112`, `apps/backtest/src/health/health-state.service.ts:58` | 契约字面量 (*.constants.ts) |
+| 28 | `builtin` | 6 次 | comparison | `apps/mist/src/app.module.ts:90`, `apps/mist/src/app.module.ts:104`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:291` | 契约字面量 (*.constants.ts) |
+| 29 | `QMT_BASE_URL` | 6 次 | function-argument | `apps/mist/src/collector/history-download.client.ts:47`, `apps/mist/src/sources/qmt/qmt-source.service.ts:72`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:83` | 业务状态枚举 (Enums / *.constants.ts) |
+| 30 | `TDX_BASE_URL` | 6 次 | function-argument | `apps/mist/src/collector/history-download.client.ts:49`, `apps/mist/src/sources/tdx/realtime/realtime.client.ts:91`, `apps/mist/src/sources/tdx/tdx-source.service.ts:72` | 业务状态枚举 (Enums / *.constants.ts) |
 
 ## 三、硬编码重灾区文件列表（Top 20）
 
 | 排名 | 文件路径 | 硬编码总数 |
 | :--- | :--- | :--- |
 | 1 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts` | 119 处 |
-| 2 | `tools/strategy-dev/server.ts` | 82 处 |
+| 2 | `tools/strategy-dev/server.ts` | 88 处 |
 | 3 | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts` | 70 处 |
 | 4 | `apps/mist/src/sources/qmt/realtime/realtime.client.ts` | 67 处 |
 | 5 | `apps/mist/src/sources/tdx/realtime/realtime.client.ts` | 67 处 |
 | 6 | `apps/schedule/src/pre-market-inspection.service.ts` | 63 处 |
 | 7 | `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts` | 38 处 |
 | 8 | `libs/indicators/src/fibonacci/fibonacci.ts` | 36 处 |
-| 9 | `libs/strategy/src/simulation/standard-simulation-flows.ts` | 34 处 |
-| 10 | `libs/strategy/src/tactics/private/my-secret-tactics.ts` | 34 处 |
-| 11 | `libs/strategy/src/simulation/strategy-simulation.engine.ts` | 32 处 |
-| 12 | `apps/backtest/src/observability/metrics.ts` | 31 处 |
-| 13 | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts` | 31 处 |
-| 14 | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts` | 31 处 |
-| 15 | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle-observation.store.ts` | 30 处 |
-| 16 | `libs/chancore/src/internal/bi.ts` | 29 处 |
-| 17 | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts` | 28 处 |
-| 18 | `apps/backtest/src/backtest-run.executor.ts` | 27 处 |
-| 19 | `apps/mist/src/sources/qmt/qmt-source.service.ts` | 27 处 |
-| 20 | `apps/mist/src/strategy/services/backtest-run-command.service.ts` | 27 处 |
+| 9 | `apps/backtest/src/observability/metrics.ts` | 31 处 |
+| 10 | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts` | 31 处 |
+| 11 | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts` | 31 处 |
+| 12 | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle-observation.store.ts` | 30 处 |
+| 13 | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts` | 30 处 |
+| 14 | `libs/chancore/src/internal/bi.ts` | 29 处 |
+| 15 | `apps/mist/src/sources/qmt/qmt-source.service.ts` | 27 处 |
+| 16 | `libs/indicators/src/adx.ts` | 25 处 |
+| 17 | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts` | 24 处 |
+| 18 | `libs/strategy/src/evaluation/strategy-context.builder.ts` | 24 处 |
+| 19 | `libs/utils/src/services/k-boundary-calculator.ts` | 24 处 |
+| 20 | `apps/notification/src/observability/delivery-metrics.ts` | 23 处 |
 
 ## 四、完整明细清单
 
 <details>
-<summary>展开查看全部 2095 处详细命中文档</summary>
+<summary>展开查看全部 1994 处详细命中文档</summary>
 
 | 类型 | 数值/字符串 | 文件位置 | 上下文代码片段 |
 | :--- | :--- | :--- | :--- |
@@ -127,33 +127,15 @@
 | string | `k.timestamp <= :endAt` | `apps/backtest/src/backtest-market-data.adapter.ts:68:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
 | string | `k.timestamp > :afterTimestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:71:22` | `query.andWhere('k.timestamp > :afterTimestamp', { afterTimestamp: criteria.afterTimestamp, })` |
 | string | `k.timestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:76:19` | `query.orderBy('k.timestamp', 'ASC')` |
-| string | `BACKTEST_DATABASE_ERROR` | `apps/backtest/src/backtest-run.executor.ts:130:35` | `this.health.recordRunFailed('BACKTEST_DATABASE_ERROR', 0)` |
-| string | `rule_dsl` | `apps/backtest/src/backtest-run.executor.ts:206:21` | `kind: 'rule_dsl'` |
-| string | `BACKTEST_RUN_TIMEOUT_MS` | `apps/backtest/src/backtest-run.executor.ts:227:31` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS')` |
-| number | `1800000` | `apps/backtest/src/backtest-run.executor.ts:227:61` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS') ?? 1_800_000` |
-| string | `BACKTEST_MAX_BARS_PER_RUN` | `apps/backtest/src/backtest-run.executor.ts:229:31` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN')` |
-| number | `10000000` | `apps/backtest/src/backtest-run.executor.ts:229:63` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN') ?? 10_000_000` |
-| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:255:49` | `code: 'SECURITY_NOT_FOUND'` |
-| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:256:39` | `this.health.recordTargetIssue('SECURITY_NOT_FOUND')` |
-| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:294:49` | `code: 'NO_HISTORICAL_BARS'` |
-| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:295:39` | `this.health.recordTargetIssue('NO_HISTORICAL_BARS')` |
-| string | `decision_flow` | `apps/backtest/src/backtest-run.executor.ts:345:21` | `plan.kind === 'decision_flow'` |
-| string | `chan_bsp` | `apps/backtest/src/backtest-run.executor.ts:361:50` | `plan.kind === 'chan_bsp'` |
-| string | `chan_bsp` | `apps/backtest/src/backtest-run.executor.ts:395:29` | `plan.kind === 'chan_bsp'` |
-| string | `first_` | `apps/backtest/src/backtest-run.executor.ts:420:53` | `event.type.startsWith('first_')` |
-| number | `92` | `apps/backtest/src/backtest-run.executor.ts:421:23` | `event.type.startsWith('first_') ? 92.0 : event.type.startsWith('third_') ? 90.0 : 86.0` |
-| string | `third_` | `apps/backtest/src/backtest-run.executor.ts:422:45` | `event.type.startsWith('third_')` |
-| number | `90` | `apps/backtest/src/backtest-run.executor.ts:423:25` | `event.type.startsWith('third_') ? 90.0 : 86.0` |
-| number | `86` | `apps/backtest/src/backtest-run.executor.ts:424:25` | `event.type.startsWith('third_') ? 90.0 : 86.0` |
-| string | `HIGH` | `apps/backtest/src/backtest-run.executor.ts:425:36` | `confidenceLevel: 'HIGH'` |
-| string | `decision_flow` | `apps/backtest/src/backtest-run.executor.ts:446:36` | `plan.kind === 'decision_flow'` |
-| string | `SIGNAL_EMITTED` | `apps/backtest/src/backtest-run.executor.ts:459:36` | `outcome.status === 'SIGNAL_EMITTED'` |
-| string | `evaluated` | `apps/backtest/src/backtest-run.executor.ts:494:39` | `evaluation.status === 'evaluated'` |
-| number | `80` | `apps/backtest/src/backtest-run.executor.ts:502:31` | `confidence: 80.0` |
-| string | `HIGH` | `apps/backtest/src/backtest-run.executor.ts:503:36` | `confidenceLevel: 'HIGH'` |
-| string | `rule_dsl` | `apps/backtest/src/backtest-run.executor.ts:624:20` | `plan.kind === 'rule_dsl'` |
-| string | `k.volume` | `apps/backtest/src/backtest-run.executor.ts:626:30` | `field === 'k.volume'` |
-| string | `k.amount` | `apps/backtest/src/backtest-run.executor.ts:626:54` | `field === 'k.amount'` |
+| string | `BACKTEST_DATABASE_ERROR` | `apps/backtest/src/backtest-run.executor.ts:93:35` | `this.health.recordRunFailed('BACKTEST_DATABASE_ERROR', 0)` |
+| string | `BACKTEST_RUN_TIMEOUT_MS` | `apps/backtest/src/backtest-run.executor.ts:162:31` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS')` |
+| number | `1800000` | `apps/backtest/src/backtest-run.executor.ts:162:61` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS') ?? 1_800_000` |
+| string | `BACKTEST_MAX_BARS_PER_RUN` | `apps/backtest/src/backtest-run.executor.ts:164:31` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN')` |
+| number | `10000000` | `apps/backtest/src/backtest-run.executor.ts:164:63` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN') ?? 10_000_000` |
+| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:190:49` | `code: 'SECURITY_NOT_FOUND'` |
+| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:191:39` | `this.health.recordTargetIssue('SECURITY_NOT_FOUND')` |
+| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:229:49` | `code: 'NO_HISTORICAL_BARS'` |
+| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:230:39` | `this.health.recordTargetIssue('NO_HISTORICAL_BARS')` |
 | string | `BACKTEST_INTERRUPTED` | `apps/backtest/src/backtest-startup.service.ts:38:27` | `errorMessage: 'BACKTEST_INTERRUPTED'` |
 | string | `BACKTEST_CONCURRENCY` | `apps/backtest/src/backtest-startup.service.ts:46:49` | `this.config.get<number>('BACKTEST_CONCURRENCY')` |
 | string | `BACKTEST_QUEUE_CAPACITY` | `apps/backtest/src/backtest-startup.service.ts:47:46` | `this.config.get<number>('BACKTEST_QUEUE_CAPACITY')` |
@@ -323,7 +305,7 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `Local development` | `apps/mist/src/main.ts:53:41` | `new DocumentBuilder() .setTitle('Mist API') .setDescription( `Stock market analysis and alert system` |
 | string | `api-docs` | `apps/mist/src/main.ts:57:23` | `SwaggerModule.setup('api-docs', app, document)` |
 | number | `8001` | `apps/mist/src/main.ts:59:40` | `process.env.PORT ?? 8001` |
-| number | `4` | `apps/mist/src/realtime/candle/candle-bucket.util.ts:109:45` | `zoned.getFullYear().toString().padStart(4, '0')` |
+| number | `4` | `apps/mist/src/realtime/candle/candle-bucket.util.ts:107:45` | `zoned.getFullYear().toString().padStart(4, '0')` |
 | string | `valid` | `apps/mist/src/realtime/candle/candle-finalizer.ts:110:31` | `candle.validity === 'valid'` |
 | string | `sealed candle record` | `apps/mist/src/realtime/candle/candle-finalizer.ts:117:11` | `assertRealtimeRedisBytes( 'sealed candle record', compactRecord, REALTIME_REDIS_RECORD_LIMITS.sealed` |
 | string | `candle manifest record` | `apps/mist/src/realtime/candle/candle-finalizer.ts:127:9` | `assertRealtimeRedisBytes( 'candle manifest record', JSON.stringify(manifest), REALTIME_REDIS_RECORD_` |
@@ -343,17 +325,17 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `out_of_session` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:118:53` | `reason: 'out_of_session'` |
 | string | `late_after_grace` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:125:53` | `reason: 'late_after_grace'` |
 | string | `not_aggregation_eligible` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:161:11` | `this.recordSkip( snapshot.source, snapshot.securityId, 'not_aggregation_eligible', )` |
-| string | `not_aggregation_eligible` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:163:55` | `reason: 'not_aggregation_eligible'` |
-| string | `duplicate_or_late` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:182:53` | `reason: 'duplicate_or_late'` |
-| string | `candidate_capacity_exceeded` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:186:53` | `reason: 'candidate_capacity_exceeded'` |
-| string | `not_aggregation_eligible` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:190:53` | `reason: 'not_aggregation_eligible'` |
-| string | `late_after_grace` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:427:53` | `reason: 'late_after_grace'` |
-| string | `duplicate_or_late` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:432:53` | `reason: 'duplicate_or_late'` |
-| string | `invalid_price` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:442:17` | `reason: 'invalid_price'` |
-| string | `counter_reset` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:480:17` | `reason: 'counter_reset'` |
-| string | `current` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:524:33` | `position: 'current'` |
-| string | `prior` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:527:33` | `position: 'prior'` |
-| string | `provisional` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:657:14` | `quality: 'provisional'` |
+| string | `not_aggregation_eligible` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:165:19` | `reason: 'not_aggregation_eligible'` |
+| string | `duplicate_or_late` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:185:53` | `reason: 'duplicate_or_late'` |
+| string | `candidate_capacity_exceeded` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:191:17` | `reason: 'candidate_capacity_exceeded'` |
+| string | `not_aggregation_eligible` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:198:17` | `reason: 'not_aggregation_eligible'` |
+| string | `late_after_grace` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:434:53` | `reason: 'late_after_grace'` |
+| string | `duplicate_or_late` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:439:53` | `reason: 'duplicate_or_late'` |
+| string | `invalid_price` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:449:17` | `reason: 'invalid_price'` |
+| string | `counter_reset` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:487:17` | `reason: 'counter_reset'` |
+| string | `current` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:531:33` | `position: 'current'` |
+| string | `prior` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:534:33` | `position: 'prior'` |
+| string | `provisional` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:664:14` | `quality: 'provisional'` |
 | string | `off` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:209:40` | `this.mode === 'off'` |
 | string | `off` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:212:25` | `this.mode === 'off'` |
 | string | `ingest_gated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:215:39` | `trace.getActiveSpan()?.addEvent('ingest_gated', { reason })` |
@@ -808,73 +790,73 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `1000` | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:147:19` | `value * 1_000` |
 | number | `3` | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:163:92` | `fraction.padEnd(3, '0')` |
 | string | `QMT_REALTIME_ALLOWLIST` | `apps/mist/src/sources/qmt/realtime/realtime-allowlist.resolver.ts:16:50` | `this.shared.initialize(DataSource.QMT, 'QMT_REALTIME_ALLOWLIST')` |
-| string | `QMT_BASE_URL` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:84:26` | `config.get<string>('QMT_BASE_URL')` |
-| string | `QMT_WS_CLIENT_ID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:86:26` | `config.get<string>('QMT_WS_CLIENT_ID')` |
-| string | `ws` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:87:46` | `baseUrl.replace(/^http/, 'ws')` |
-| string | `QMT_WS_RECONNECT_DELAY_MS` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:89:7` | `config.get<number>( 'QMT_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )` |
-| string | `QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:93:7` | `config.get<number>( 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, ` |
-| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:122:36` | `localFailure(unauthorized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `sync_subscriptions` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:126:15` | `type: 'sync_subscriptions'` |
-| string | `subscriptions_synced` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:127:7` | `this.executeSubscriptionControl( { type: 'sync_subscriptions', symbols: normalized }, 'subscriptions` |
-| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:136:34` | `localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `subscribe` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:140:15` | `type: 'subscribe'` |
-| string | `subscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:141:7` | `this.executeSubscriptionControl( { type: 'subscribe', symbol: normalized }, 'subscribed', normalized` |
-| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:150:34` | `localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `unsubscribe` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:154:15` | `type: 'unsubscribe'` |
-| string | `unsubscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:155:7` | `this.executeSubscriptionControl( { type: 'unsubscribe', symbol: normalized }, 'unsubscribed', normal` |
-| string | `get_subscriptions` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:162:15` | `type: 'get_subscriptions'` |
-| string | `subscriptions` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:163:7` | `this.executeSubscriptionControl( { type: 'get_subscriptions' }, 'subscriptions', null, )` |
-| string | `QMT_SUBSCRIPTION_CONTROL_NOT_READY` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:175:30` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_NOT_READY')` |
-| string | `QMT_SUBSCRIPTION_CONTROL_BUSY` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:180:30` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_BUSY')` |
-| string | `QMT_SUBSCRIPTION_CONTROL_TIMEOUT` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:187:38` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT')` |
-| string | `QMT_SUBSCRIPTION_CONTROL_SEND_FAILED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:198:38` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_SEND_FAILED')` |
-| string | `ping` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:217:47` | `type: 'ping'` |
-| number | `30000` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:219:10` | `setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type` |
-| string | `QMT_REALTIME_WS_ERROR` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:229:27` | `this.store.setError('QMT_REALTIME_WS_ERROR', error.message)` |
-| string | `decodeError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:268:9` | `this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'QMT_REALTIME` |
-| string | `realtime.ready` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:274:29` | `message['type'] === 'realtime.ready'` |
-| string | `realtime.native_snapshot` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:282:29` | `message['type'] === 'realtime.native_snapshot'` |
-| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:290:31` | `message['provider'] !== 'qmt'` |
-| string | `builtin` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:292:24` | `data['mode'] !== 'builtin'` |
-| string | `QMT` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:294:26` | `data['source'] !== 'QMT'` |
-| string | `latest-state` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:295:27` | `data['quality'] !== 'latest-state'` |
-| string | `contractMismatch` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:302:9` | `this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )` |
-| string | `QMT_REALTIME_READY_CONTRACT_MISMATCH` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:304:9` | `this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )` |
-| string | `candle.snapshot.process` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:328:20` | `withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'qmt'); const reje` |
-| string | `source` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:329:25` | `span.setAttribute('source', 'qmt')` |
-| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:329:35` | `span.setAttribute('source', 'qmt')` |
-| string | `rejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:331:23` | `span.addEvent('rejected', { reason })` |
-| string | `transport_not_ready` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:338:16` | `reject('transport_not_ready', null)` |
-| string | `validationError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:340:11` | `this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )` |
-| string | `QMT_REALTIME_READY_REQUIRED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:342:11` | `this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )` |
-| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:348:59` | `decodeRealtimeNativeMapMessage(message, 'qmt')` |
-| string | `symbol` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:367:27` | `span.setAttribute('symbol', providerSymbol)` |
-| string | `capturedAt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:368:27` | `span.setAttribute('capturedAt', decoded.data.capturedAt)` |
-| string | `symbol_invalid` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:370:18` | `reject('symbol_invalid', providerSymbol)` |
-| string | `validationError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:372:13` | `this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )` |
-| string | `QMT_REALTIME_NATIVE_INVALID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:374:13` | `this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )` |
-| string | `not_authorized` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:380:18` | `reject('not_authorized', providerSymbol)` |
-| string | `symbolNotAuthorized` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:382:13` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
-| string | `QMT_REALTIME_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:384:13` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
-| number | `20` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:398:23` | `Object.keys(nativeRecord) .sort() .slice(0, 20)` |
-| string | `converter_error` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:409:18` | `reject('converter_error', providerSymbol)` |
-| string | `converterError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:411:13` | `this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )` |
-| string | `QMT_REALTIME_CONVERTER_FAILED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:413:13` | `this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )` |
-| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:427:31` | `message['provider'] !== 'qmt'` |
-| string | `controlResponseRejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:433:9` | `this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
-| string | `QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:435:9` | `this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
-| string | `controlResponseRejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:442:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON` |
-| string | `QMT_SUBSCRIPTION_CONTROL_RESPONSE_INVALID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:444:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON` |
-| string | `QMT_SUBSCRIPTION_CONTROL_DISCONNECTED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:459:36` | `localFailure(pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_DISCONNECTED')` |
-| string | `success` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:469:19` | `keys[0] === 'success'` |
-| string | `failure` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:470:19` | `keys[0] !== 'failure'` |
-| number | `3` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:474:57` | `failureKeys.length !== 3` |
-| number | `3` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:480:29` | `failureKeys.length === 3` |
-| string | `subscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:481:40` | `failure['subscriptionState'] !== 'subscribed'` |
-| string | `subscriptions_synced` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:491:15` | `value === 'subscriptions_synced'` |
-| string | `subscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:492:15` | `value === 'subscribed'` |
-| string | `unsubscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:493:15` | `value === 'unsubscribed'` |
-| string | `subscriptions` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:494:15` | `value === 'subscriptions'` |
+| string | `QMT_BASE_URL` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:83:40` | `config.get<string>('QMT_BASE_URL')` |
+| string | `QMT_WS_CLIENT_ID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:85:26` | `config.get<string>('QMT_WS_CLIENT_ID')` |
+| string | `ws` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:86:46` | `baseUrl.replace(/^http/, 'ws')` |
+| string | `QMT_WS_RECONNECT_DELAY_MS` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:88:7` | `config.get<number>( 'QMT_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )` |
+| string | `QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:92:7` | `config.get<number>( 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, ` |
+| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:121:36` | `localFailure(unauthorized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `sync_subscriptions` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:125:15` | `type: 'sync_subscriptions'` |
+| string | `subscriptions_synced` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:126:7` | `this.executeSubscriptionControl( { type: 'sync_subscriptions', symbols: normalized }, 'subscriptions` |
+| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:135:34` | `localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `subscribe` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:139:15` | `type: 'subscribe'` |
+| string | `subscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:140:7` | `this.executeSubscriptionControl( { type: 'subscribe', symbol: normalized }, 'subscribed', normalized` |
+| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:149:34` | `localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `unsubscribe` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:153:15` | `type: 'unsubscribe'` |
+| string | `unsubscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:154:7` | `this.executeSubscriptionControl( { type: 'unsubscribe', symbol: normalized }, 'unsubscribed', normal` |
+| string | `get_subscriptions` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:161:15` | `type: 'get_subscriptions'` |
+| string | `subscriptions` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:162:7` | `this.executeSubscriptionControl( { type: 'get_subscriptions' }, 'subscriptions', null, )` |
+| string | `QMT_SUBSCRIPTION_CONTROL_NOT_READY` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:174:30` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_NOT_READY')` |
+| string | `QMT_SUBSCRIPTION_CONTROL_BUSY` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:179:30` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_BUSY')` |
+| string | `QMT_SUBSCRIPTION_CONTROL_TIMEOUT` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:186:38` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT')` |
+| string | `QMT_SUBSCRIPTION_CONTROL_SEND_FAILED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:197:38` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_SEND_FAILED')` |
+| string | `ping` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:216:47` | `type: 'ping'` |
+| number | `30000` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:218:10` | `setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type` |
+| string | `QMT_REALTIME_WS_ERROR` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:228:27` | `this.store.setError('QMT_REALTIME_WS_ERROR', error.message)` |
+| string | `decodeError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:267:9` | `this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'QMT_REALTIME` |
+| string | `realtime.ready` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:273:29` | `message['type'] === 'realtime.ready'` |
+| string | `realtime.native_snapshot` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:281:29` | `message['type'] === 'realtime.native_snapshot'` |
+| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:289:31` | `message['provider'] !== 'qmt'` |
+| string | `builtin` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:291:24` | `data['mode'] !== 'builtin'` |
+| string | `QMT` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:293:26` | `data['source'] !== 'QMT'` |
+| string | `latest-state` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:294:27` | `data['quality'] !== 'latest-state'` |
+| string | `contractMismatch` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:301:9` | `this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )` |
+| string | `QMT_REALTIME_READY_CONTRACT_MISMATCH` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:303:9` | `this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )` |
+| string | `candle.snapshot.process` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:327:20` | `withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'qmt'); const reje` |
+| string | `source` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:328:25` | `span.setAttribute('source', 'qmt')` |
+| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:328:35` | `span.setAttribute('source', 'qmt')` |
+| string | `rejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:330:23` | `span.addEvent('rejected', { reason })` |
+| string | `transport_not_ready` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:337:16` | `reject('transport_not_ready', null)` |
+| string | `validationError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:339:11` | `this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )` |
+| string | `QMT_REALTIME_READY_REQUIRED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:341:11` | `this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )` |
+| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:347:59` | `decodeRealtimeNativeMapMessage(message, 'qmt')` |
+| string | `symbol` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:366:27` | `span.setAttribute('symbol', providerSymbol)` |
+| string | `capturedAt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:367:27` | `span.setAttribute('capturedAt', decoded.data.capturedAt)` |
+| string | `symbol_invalid` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:369:18` | `reject('symbol_invalid', providerSymbol)` |
+| string | `validationError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:371:13` | `this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )` |
+| string | `QMT_REALTIME_NATIVE_INVALID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:373:13` | `this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )` |
+| string | `not_authorized` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:379:18` | `reject('not_authorized', providerSymbol)` |
+| string | `symbolNotAuthorized` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:381:13` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
+| string | `QMT_REALTIME_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:383:13` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
+| number | `20` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:397:23` | `Object.keys(nativeRecord) .sort() .slice(0, 20)` |
+| string | `converter_error` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:408:18` | `reject('converter_error', providerSymbol)` |
+| string | `converterError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:410:13` | `this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )` |
+| string | `QMT_REALTIME_CONVERTER_FAILED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:412:13` | `this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )` |
+| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:426:31` | `message['provider'] !== 'qmt'` |
+| string | `controlResponseRejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:432:9` | `this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
+| string | `QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:434:9` | `this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
+| string | `controlResponseRejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:441:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON` |
+| string | `QMT_SUBSCRIPTION_CONTROL_RESPONSE_INVALID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:443:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON` |
+| string | `QMT_SUBSCRIPTION_CONTROL_DISCONNECTED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:458:36` | `localFailure(pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_DISCONNECTED')` |
+| string | `success` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:468:19` | `keys[0] === 'success'` |
+| string | `failure` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:469:19` | `keys[0] !== 'failure'` |
+| number | `3` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:473:57` | `failureKeys.length !== 3` |
+| number | `3` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:479:29` | `failureKeys.length === 3` |
+| string | `subscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:480:40` | `failure['subscriptionState'] !== 'subscribed'` |
+| string | `subscriptions_synced` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:490:15` | `value === 'subscriptions_synced'` |
+| string | `subscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:491:15` | `value === 'subscribed'` |
+| string | `unsubscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:492:15` | `value === 'unsubscribed'` |
+| string | `subscriptions` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:493:15` | `value === 'subscriptions'` |
 | string | `tdx` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:28:13` | `source: 'tdx'` |
 | string | `Volume` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:34:59` | `readTdxNativeQuantity(input.native, 'Volume', 100)` |
 | string | `Amount` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:35:59` | `readTdxNativeQuantity(input.native, 'Amount', 10_000)` |
@@ -887,73 +869,73 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `unexpected_key` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:103:7` | `quantityError( exactField, 'unexpected_key', `TDX native quantity must use exact key ${exactField}, ` |
 | string | `Volume` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:116:15` | `field === 'Volume'` |
 | string | `TDX_REALTIME_ALLOWLIST` | `apps/mist/src/sources/tdx/realtime/realtime-allowlist.resolver.ts:16:50` | `this.shared.initialize(DataSource.TDX, 'TDX_REALTIME_ALLOWLIST')` |
-| string | `TDX_BASE_URL` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:92:26` | `config.get<string>('TDX_BASE_URL')` |
-| string | `TDX_WS_CLIENT_ID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:94:26` | `config.get<string>('TDX_WS_CLIENT_ID')` |
-| string | `ws` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:95:46` | `baseUrl.replace(/^http/, 'ws')` |
-| string | `TDX_WS_RECONNECT_DELAY_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:97:7` | `config.get<number>( 'TDX_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )` |
-| string | `TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:101:7` | `config.get<number>( 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, ` |
-| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:130:36` | `localFailure(unauthorized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `sync_subscriptions` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:134:15` | `type: 'sync_subscriptions'` |
-| string | `subscriptions_synced` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:135:7` | `this.executeSubscriptionControl( { type: 'sync_subscriptions', symbols: normalized }, 'subscriptions` |
-| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:144:34` | `localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `subscribe` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:148:15` | `type: 'subscribe'` |
-| string | `subscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:149:7` | `this.executeSubscriptionControl( { type: 'subscribe', symbol: normalized }, 'subscribed', normalized` |
-| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:158:34` | `localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `unsubscribe` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:162:15` | `type: 'unsubscribe'` |
-| string | `unsubscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:163:7` | `this.executeSubscriptionControl( { type: 'unsubscribe', symbol: normalized }, 'unsubscribed', normal` |
-| string | `get_subscriptions` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:170:15` | `type: 'get_subscriptions'` |
-| string | `subscriptions` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:171:7` | `this.executeSubscriptionControl( { type: 'get_subscriptions' }, 'subscriptions', null, )` |
-| string | `TDX_SUBSCRIPTION_CONTROL_NOT_READY` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:183:30` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_NOT_READY')` |
-| string | `TDX_SUBSCRIPTION_CONTROL_BUSY` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:188:30` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_BUSY')` |
-| string | `TDX_SUBSCRIPTION_CONTROL_TIMEOUT` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:195:38` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT')` |
-| string | `TDX_SUBSCRIPTION_CONTROL_SEND_FAILED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:206:38` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_SEND_FAILED')` |
-| string | `ping` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:225:47` | `type: 'ping'` |
-| number | `30000` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:227:10` | `setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type` |
-| string | `TDX_REALTIME_WS_ERROR` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:237:27` | `this.store.setError('TDX_REALTIME_WS_ERROR', error.message)` |
-| string | `decodeError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:276:9` | `this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'TDX_REALTIME` |
-| string | `realtime.ready` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:282:29` | `message['type'] === 'realtime.ready'` |
-| string | `realtime.native_snapshot` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:290:29` | `message['type'] === 'realtime.native_snapshot'` |
-| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:298:31` | `message['provider'] !== 'tdx'` |
-| string | `builtin` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:300:24` | `data['mode'] !== 'builtin'` |
-| string | `TDX` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:302:26` | `data['source'] !== 'TDX'` |
-| string | `latest-state` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:303:27` | `data['quality'] !== 'latest-state'` |
-| string | `contractMismatch` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:310:9` | `this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )` |
-| string | `TDX_REALTIME_READY_CONTRACT_MISMATCH` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:312:9` | `this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )` |
-| string | `candle.snapshot.process` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:336:20` | `withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'tdx'); const reje` |
-| string | `source` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:337:25` | `span.setAttribute('source', 'tdx')` |
-| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:337:35` | `span.setAttribute('source', 'tdx')` |
-| string | `rejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:339:23` | `span.addEvent('rejected', { reason })` |
-| string | `transport_not_ready` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:346:16` | `reject('transport_not_ready', null)` |
-| string | `validationError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:348:11` | `this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )` |
-| string | `TDX_REALTIME_READY_REQUIRED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:350:11` | `this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )` |
-| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:356:59` | `decodeRealtimeNativeMapMessage(message, 'tdx')` |
-| string | `symbol` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:373:25` | `span.setAttribute('symbol', providerSymbol)` |
-| string | `capturedAt` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:374:25` | `span.setAttribute('capturedAt', decoded.data.capturedAt)` |
-| string | `symbol_invalid` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:376:16` | `reject('symbol_invalid', providerSymbol)` |
-| string | `validationError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:378:11` | `this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )` |
-| string | `TDX_REALTIME_NATIVE_INVALID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:380:11` | `this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )` |
-| string | `not_authorized` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:386:16` | `reject('not_authorized', providerSymbol)` |
-| string | `symbolNotAuthorized` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:388:11` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
-| string | `TDX_REALTIME_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:390:11` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
-| number | `20` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:404:21` | `Object.keys(nativeRecord) .sort() .slice(0, 20)` |
-| string | `converter_error` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:416:16` | `reject('converter_error', providerSymbol)` |
-| string | `converterError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:418:11` | `this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )` |
-| string | `TDX_REALTIME_CONVERTER_FAILED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:420:11` | `this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )` |
-| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:431:31` | `message['provider'] !== 'tdx'` |
-| string | `controlResponseRejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:437:9` | `this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
-| string | `TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:439:9` | `this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
-| string | `controlResponseRejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:446:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON` |
-| string | `TDX_SUBSCRIPTION_CONTROL_RESPONSE_INVALID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:448:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON` |
-| string | `TDX_SUBSCRIPTION_CONTROL_DISCONNECTED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:463:36` | `localFailure(pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_DISCONNECTED')` |
-| string | `success` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:473:19` | `keys[0] === 'success'` |
-| string | `failure` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:474:19` | `keys[0] !== 'failure'` |
-| number | `3` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:478:57` | `failureKeys.length !== 3` |
-| number | `3` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:484:29` | `failureKeys.length === 3` |
-| string | `subscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:485:40` | `failure['subscriptionState'] !== 'subscribed'` |
-| string | `subscriptions_synced` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:495:15` | `value === 'subscriptions_synced'` |
-| string | `subscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:496:15` | `value === 'subscribed'` |
-| string | `unsubscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:497:15` | `value === 'unsubscribed'` |
-| string | `subscriptions` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:498:15` | `value === 'subscriptions'` |
+| string | `TDX_BASE_URL` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:91:40` | `config.get<string>('TDX_BASE_URL')` |
+| string | `TDX_WS_CLIENT_ID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:93:26` | `config.get<string>('TDX_WS_CLIENT_ID')` |
+| string | `ws` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:94:46` | `baseUrl.replace(/^http/, 'ws')` |
+| string | `TDX_WS_RECONNECT_DELAY_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:96:7` | `config.get<number>( 'TDX_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )` |
+| string | `TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:100:7` | `config.get<number>( 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, ` |
+| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:129:36` | `localFailure(unauthorized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `sync_subscriptions` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:133:15` | `type: 'sync_subscriptions'` |
+| string | `subscriptions_synced` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:134:7` | `this.executeSubscriptionControl( { type: 'sync_subscriptions', symbols: normalized }, 'subscriptions` |
+| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:143:34` | `localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `subscribe` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:147:15` | `type: 'subscribe'` |
+| string | `subscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:148:7` | `this.executeSubscriptionControl( { type: 'subscribe', symbol: normalized }, 'subscribed', normalized` |
+| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:157:34` | `localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `unsubscribe` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:161:15` | `type: 'unsubscribe'` |
+| string | `unsubscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:162:7` | `this.executeSubscriptionControl( { type: 'unsubscribe', symbol: normalized }, 'unsubscribed', normal` |
+| string | `get_subscriptions` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:169:15` | `type: 'get_subscriptions'` |
+| string | `subscriptions` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:170:7` | `this.executeSubscriptionControl( { type: 'get_subscriptions' }, 'subscriptions', null, )` |
+| string | `TDX_SUBSCRIPTION_CONTROL_NOT_READY` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:182:30` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_NOT_READY')` |
+| string | `TDX_SUBSCRIPTION_CONTROL_BUSY` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:187:30` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_BUSY')` |
+| string | `TDX_SUBSCRIPTION_CONTROL_TIMEOUT` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:194:38` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT')` |
+| string | `TDX_SUBSCRIPTION_CONTROL_SEND_FAILED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:205:38` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_SEND_FAILED')` |
+| string | `ping` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:224:47` | `type: 'ping'` |
+| number | `30000` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:226:10` | `setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type` |
+| string | `TDX_REALTIME_WS_ERROR` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:236:27` | `this.store.setError('TDX_REALTIME_WS_ERROR', error.message)` |
+| string | `decodeError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:275:9` | `this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'TDX_REALTIME` |
+| string | `realtime.ready` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:281:29` | `message['type'] === 'realtime.ready'` |
+| string | `realtime.native_snapshot` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:289:29` | `message['type'] === 'realtime.native_snapshot'` |
+| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:297:31` | `message['provider'] !== 'tdx'` |
+| string | `builtin` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:299:24` | `data['mode'] !== 'builtin'` |
+| string | `TDX` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:301:26` | `data['source'] !== 'TDX'` |
+| string | `latest-state` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:302:27` | `data['quality'] !== 'latest-state'` |
+| string | `contractMismatch` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:309:9` | `this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )` |
+| string | `TDX_REALTIME_READY_CONTRACT_MISMATCH` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:311:9` | `this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )` |
+| string | `candle.snapshot.process` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:335:20` | `withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'tdx'); const reje` |
+| string | `source` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:336:25` | `span.setAttribute('source', 'tdx')` |
+| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:336:35` | `span.setAttribute('source', 'tdx')` |
+| string | `rejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:338:23` | `span.addEvent('rejected', { reason })` |
+| string | `transport_not_ready` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:345:16` | `reject('transport_not_ready', null)` |
+| string | `validationError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:347:11` | `this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )` |
+| string | `TDX_REALTIME_READY_REQUIRED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:349:11` | `this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )` |
+| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:355:59` | `decodeRealtimeNativeMapMessage(message, 'tdx')` |
+| string | `symbol` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:372:25` | `span.setAttribute('symbol', providerSymbol)` |
+| string | `capturedAt` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:373:25` | `span.setAttribute('capturedAt', decoded.data.capturedAt)` |
+| string | `symbol_invalid` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:375:16` | `reject('symbol_invalid', providerSymbol)` |
+| string | `validationError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:377:11` | `this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )` |
+| string | `TDX_REALTIME_NATIVE_INVALID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:379:11` | `this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )` |
+| string | `not_authorized` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:385:16` | `reject('not_authorized', providerSymbol)` |
+| string | `symbolNotAuthorized` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:387:11` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
+| string | `TDX_REALTIME_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:389:11` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
+| number | `20` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:403:21` | `Object.keys(nativeRecord) .sort() .slice(0, 20)` |
+| string | `converter_error` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:415:16` | `reject('converter_error', providerSymbol)` |
+| string | `converterError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:417:11` | `this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )` |
+| string | `TDX_REALTIME_CONVERTER_FAILED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:419:11` | `this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )` |
+| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:430:31` | `message['provider'] !== 'tdx'` |
+| string | `controlResponseRejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:436:9` | `this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
+| string | `TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:438:9` | `this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
+| string | `controlResponseRejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:445:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON` |
+| string | `TDX_SUBSCRIPTION_CONTROL_RESPONSE_INVALID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:447:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON` |
+| string | `TDX_SUBSCRIPTION_CONTROL_DISCONNECTED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:462:36` | `localFailure(pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_DISCONNECTED')` |
+| string | `success` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:472:19` | `keys[0] === 'success'` |
+| string | `failure` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:473:19` | `keys[0] !== 'failure'` |
+| number | `3` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:477:57` | `failureKeys.length !== 3` |
+| number | `3` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:483:29` | `failureKeys.length === 3` |
+| string | `subscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:484:40` | `failure['subscriptionState'] !== 'subscribed'` |
+| string | `subscriptions_synced` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:494:15` | `value === 'subscriptions_synced'` |
+| string | `subscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:495:15` | `value === 'subscribed'` |
+| string | `unsubscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:496:15` | `value === 'unsubscribed'` |
+| string | `subscriptions` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:497:15` | `value === 'subscriptions'` |
 | string | `TDX_BASE_URL` | `apps/mist/src/sources/tdx/tdx-source.service.ts:72:38` | `this.configService.get<string>('TDX_BASE_URL')` |
 | string | `/v1/bars/query` | `apps/mist/src/sources/tdx/tdx-source.service.ts:101:9` | `this.axios.post<TdxEnvelope<TdxBarsResponseData>>( '/v1/bars/query', { symbols: [formatCode], period` |
 | string | `front` | `apps/mist/src/sources/tdx/tdx-source.service.ts:108:25` | `dividendType: 'front'` |
@@ -1000,33 +982,28 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `512` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:27:20` | `value.length > 512` |
 | string | `=` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:28:20` | `value.includes('=')` |
 | string | `base64url` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:35:44` | `Buffer.from(value, 'base64url')` |
-| string | `VALIDATION_ERROR` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:79:15` | `code: 'VALIDATION_ERROR'` |
-| string | `startDate must not be after endDate` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:80:18` | `message: 'startDate must not be after endDate'` |
-| number | `5` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:116:24` | `dto.period !== 5` |
-| number | `15` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:117:24` | `dto.period !== 15` |
-| number | `30` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:118:24` | `dto.period !== 30` |
-| number | `60` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:119:24` | `dto.period !== 60` |
-| string | `CHAN_BSP_PERIOD_UNSUPPORTED` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:122:17` | `code: 'CHAN_BSP_PERIOD_UNSUPPORTED'` |
-| string | `chan_bsp replay period must be one of 1/5/15/30/60` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:123:20` | `message: 'chan_bsp replay period must be one of 1/5/15/30/60'` |
-| string | `run_failed` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:154:33` | `result.error.code === 'run_failed'` |
-| string | `missing` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:173:27` | `failed.status === 'missing'` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:177:11` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', run.id, )` |
-| string | `queue_full` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:183:33` | `result.error.code === 'queue_full'` |
-| number | `429` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:185:11` | `new BacktestCommandHttpException( 429, 'BACKTEST_QUEUE_FULL', 'Backtest queue is full', run.id, Back` |
-| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:193:9` | `new BacktestCommandHttpException( 503, 'BACKTEST_NOT_READY', 'Backtest service is not ready', run.id` |
-| string | `timeout` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:211:22` | `error.kind === 'timeout'` |
-| string | `unavailable` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:213:26` | `error.kind === 'unavailable'` |
-| string | `timeout` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:217:24` | `error.kind === 'timeout'` |
-| number | `504` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:220:11` | `new BacktestCommandHttpException( 504, 'BACKTEST_COMMAND_TIMEOUT', 'Backtest command timed out', run` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:235:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
-| string | `unavailable` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:241:24` | `error.kind === 'unavailable'` |
-| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:244:11` | `new BacktestCommandHttpException( 503, 'BACKTEST_UNAVAILABLE', 'Backtest service is unavailable', ru` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:259:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:268:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, BacktestRun` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:283:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, BacktestRun` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:291:7` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:323:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
-| string | `PENDING` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:333:34` | `initialStatus: 'PENDING'` |
+| string | `VALIDATION_ERROR` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:82:15` | `code: 'VALIDATION_ERROR'` |
+| string | `startDate must not be after endDate` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:83:18` | `message: 'startDate must not be after endDate'` |
+| string | `STRATEGY_CONFIG_INVALID` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:115:17` | `code: 'STRATEGY_CONFIG_INVALID'` |
+| string | `run_failed` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:143:33` | `result.error.code === 'run_failed'` |
+| string | `missing` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:162:27` | `failed.status === 'missing'` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:166:11` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', run.id, )` |
+| string | `queue_full` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:172:33` | `result.error.code === 'queue_full'` |
+| number | `429` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:174:11` | `new BacktestCommandHttpException( 429, 'BACKTEST_QUEUE_FULL', 'Backtest queue is full', run.id, Back` |
+| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:182:9` | `new BacktestCommandHttpException( 503, 'BACKTEST_NOT_READY', 'Backtest service is not ready', run.id` |
+| string | `timeout` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:200:22` | `error.kind === 'timeout'` |
+| string | `unavailable` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:202:26` | `error.kind === 'unavailable'` |
+| string | `timeout` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:206:24` | `error.kind === 'timeout'` |
+| number | `504` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:209:11` | `new BacktestCommandHttpException( 504, 'BACKTEST_COMMAND_TIMEOUT', 'Backtest command timed out', run` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:224:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
+| string | `unavailable` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:230:24` | `error.kind === 'unavailable'` |
+| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:233:11` | `new BacktestCommandHttpException( 503, 'BACKTEST_UNAVAILABLE', 'Backtest service is unavailable', ru` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:248:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:257:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, BacktestRun` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:272:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, BacktestRun` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:280:7` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:312:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
+| string | `PENDING` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:322:34` | `initialStatus: 'PENDING'` |
 | number | `50` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:62:53` | `query?.limit ?? 50` |
 | string | `run` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:64:27` | `this.runRepository .createQueryBuilder('run')` |
 | string | `run.id` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:65:16` | `this.runRepository .createQueryBuilder('run') .orderBy('run.id', 'DESC')` |
@@ -1035,12 +1012,16 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `Request validation failed` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:109:20` | `message: 'Request validation failed'` |
 | number | `50` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:114:34` | `query.limit ?? 50` |
 | string | `result` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:116:27` | `this.resultRepository .createQueryBuilder('result')` |
-| string | `result.backtestRunId = :runId` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:130:14` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
-| string | `result.signalTime` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:131:16` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
-| string | `result.id` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:132:19` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
-| string | `(result.signalTime > :signalTime OR (result.signalTime = :signalTime AND result.id > :id))` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:136:9` | `builder.andWhere( '(result.signalTime > :signalTime OR (result.signalTime = :signalTime AND result.i` |
-| string | `decision_flow` | `apps/mist/src/strategy/services/strategy-definition.service.ts:258:17` | `kind: 'decision_flow'` |
-| number | `50` | `apps/mist/src/strategy/services/strategy-definition.service.ts:260:64` | `(rule as any)?.requiredBarCount ?? 50` |
+| string | `result.backtestRunId = :runId` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:131:14` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
+| string | `result.signalTime` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:132:16` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
+| string | `result.id` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:133:19` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
+| string | `(result.signalTime > :signalTime OR (result.signalTime = :signalTime AND result.id > :id))` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:137:9` | `builder.andWhere( '(result.signalTime > :signalTime OR (result.signalTime = :signalTime AND result.i` |
+| string | `CHAN_BSP_KIND_RETIRED` | `apps/mist/src/strategy/services/strategy-definition.service.ts:42:15` | `code: 'CHAN_BSP_KIND_RETIRED'` |
+| string | `chan_bsp kind is retired; create a decision_flow definition instead` | `apps/mist/src/strategy/services/strategy-definition.service.ts:44:11` | `message: 'chan_bsp kind is retired; create a decision_flow definition instead'` |
+| string | `CHAN_BSP_KIND_RETIRED` | `apps/mist/src/strategy/services/strategy-definition.service.ts:123:19` | `code: 'CHAN_BSP_KIND_RETIRED'` |
+| string | `chan_bsp kind is retired; re-enabling requires converting to a decision_flow definition` | `apps/mist/src/strategy/services/strategy-definition.service.ts:125:15` | `message: 'chan_bsp kind is retired; re-enabling requires converting to a decision_flow definition'` |
+| string | `decision_flow` | `apps/mist/src/strategy/services/strategy-definition.service.ts:261:17` | `kind: 'decision_flow'` |
+| number | `50` | `apps/mist/src/strategy/services/strategy-definition.service.ts:263:64` | `(rule as any)?.requiredBarCount ?? 50` |
 | number | `50` | `apps/mist/src/strategy/services/strategy-signal.service.ts:24:52` | `query.limit ?? 50` |
 | number | `60` | `apps/mist/src/visual/visual.controller.ts:87:38` | `60 * 24` |
 | number | `24` | `apps/mist/src/visual/visual.controller.ts:87:43` | `60 * 24` |
@@ -1214,18 +1195,18 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `off` | `apps/signal/src/health/health-state.service.ts:26:34` | `this.realtimeMode === 'off'` |
 | string | `off` | `apps/signal/src/health/health-state.service.ts:35:34` | `this.realtimeMode === 'off'` |
 | string | `off` | `apps/signal/src/health/health-state.service.ts:46:34` | `this.realtimeMode === 'off'` |
-| string | `success` | `apps/signal/src/health/health-state.service.ts:66:27` | `lastRefreshOutcome: 'success'` |
-| string | `failed` | `apps/signal/src/health/health-state.service.ts:75:27` | `lastRefreshOutcome: 'failed'` |
-| string | `ready` | `apps/signal/src/health/health-state.service.ts:87:14` | `state: 'ready'` |
-| string | `running` | `apps/signal/src/health/health-state.service.ts:90:52` | `state: 'running'` |
-| string | `ready` | `apps/signal/src/health/health-state.service.ts:119:16` | `state: 'ready'` |
-| string | `idle` | `apps/signal/src/health/health-state.service.ts:130:14` | `state: 'idle'` |
-| string | `failed` | `apps/signal/src/health/health-state.service.ts:161:20` | `lastOutcome: 'failed'` |
-| string | `failed` | `apps/signal/src/health/health-state.service.ts:179:24` | `lastOutcome: 'failed'` |
-| string | `idle` | `apps/signal/src/health/health-state.service.ts:184:38` | `state: 'idle'` |
-| string | `ok` | `apps/signal/src/health/health-state.service.ts:189:15` | `status: 'ok'` |
-| string | `signal` | `apps/signal/src/health/health-state.service.ts:190:16` | `service: 'signal'` |
-| string | `signal` | `apps/signal/src/health/health-state.service.ts:191:17` | `instance: 'signal'` |
+| string | `success` | `apps/signal/src/health/health-state.service.ts:65:27` | `lastRefreshOutcome: 'success'` |
+| string | `failed` | `apps/signal/src/health/health-state.service.ts:74:27` | `lastRefreshOutcome: 'failed'` |
+| string | `ready` | `apps/signal/src/health/health-state.service.ts:86:14` | `state: 'ready'` |
+| string | `running` | `apps/signal/src/health/health-state.service.ts:89:52` | `state: 'running'` |
+| string | `ready` | `apps/signal/src/health/health-state.service.ts:117:16` | `state: 'ready'` |
+| string | `idle` | `apps/signal/src/health/health-state.service.ts:128:14` | `state: 'idle'` |
+| string | `failed` | `apps/signal/src/health/health-state.service.ts:157:20` | `lastOutcome: 'failed'` |
+| string | `failed` | `apps/signal/src/health/health-state.service.ts:175:24` | `lastOutcome: 'failed'` |
+| string | `idle` | `apps/signal/src/health/health-state.service.ts:179:38` | `state: 'idle'` |
+| string | `ok` | `apps/signal/src/health/health-state.service.ts:184:15` | `status: 'ok'` |
+| string | `signal` | `apps/signal/src/health/health-state.service.ts:185:16` | `service: 'signal'` |
+| string | `signal` | `apps/signal/src/health/health-state.service.ts:186:17` | `instance: 'signal'` |
 | string | `0.0.0.0` | `apps/signal/src/main.ts:17:15` | `host: '0.0.0.0'` |
 | number | `9010` | `apps/signal/src/main.ts:18:53` | `process.env.SIGNAL_RPC_PORT ?? 9010` |
 | number | `8010` | `apps/signal/src/main.ts:25:40` | `process.env.PORT ?? 8010` |
@@ -1243,26 +1224,25 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `mist_signal_queue_failed_total` | `apps/signal/src/observability/metrics.ts:48:30` | `meter .createObservableGauge('mist_signal_queue_failed_total', { description: 'Total jobs failed in ` |
 | string | `Total jobs failed in signal evaluation queue` | `apps/signal/src/observability/metrics.ts:49:22` | `description: 'Total jobs failed in signal evaluation queue'` |
 | number | `1000` | `apps/signal/src/observability/runtime-observability.service.ts:40:49` | `entry.duration / 1_000` |
-| string | `failed` | `apps/signal/src/realtime/candle-finalized-bullmq.worker.ts:81:46` | `diagnostics.lastPersistenceOutcome === 'failed'` |
-| string | `trading_day_validation:before` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:96:43` | `this.assertWithinDeadline(deadlineAt, 'trading_day_validation:before')` |
-| string | `expired_trading_day` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:100:24` | `completed('expired_trading_day')` |
-| string | `trading_day_validation:after` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:105:43` | `this.assertWithinDeadline(deadlineAt, 'trading_day_validation:after')` |
-| string | `out_of_order_trigger_discarded` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:124:24` | `completed('out_of_order_trigger_discarded')` |
-| string | `sealed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:128:27` | `payload.outcome === 'sealed'` |
-| string | `redis_observation` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:129:43` | `this.runStage(deadlineAt, 'redis_observation', () => this.resolveSealed(trigger, payload.triggerPric` |
-| string | `completed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:141:20` | `outcome: 'completed'` |
-| string | `analysis_evaluation` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:164:9` | `this.runStage( deadlineAt, 'analysis_evaluation', () => this.evaluation.evaluate(bar, executionPlans` |
-| string | `on` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:169:27` | `this.mode === 'on'` |
-| string | `persistence` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:176:15` | `this.runStage( deadlineAt, 'persistence', async (): Promise<LiveStrategyPersistenceOutcome> => { con` |
+| string | `failed` | `apps/signal/src/realtime/candle-finalized-bullmq.worker.ts:79:46` | `diagnostics.lastPersistenceOutcome === 'failed'` |
+| string | `trading_day_validation:before` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:97:43` | `this.assertWithinDeadline(deadlineAt, 'trading_day_validation:before')` |
+| string | `expired_trading_day` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:101:24` | `completed('expired_trading_day')` |
+| string | `trading_day_validation:after` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:106:43` | `this.assertWithinDeadline(deadlineAt, 'trading_day_validation:after')` |
+| string | `out_of_order_trigger_discarded` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:125:24` | `completed('out_of_order_trigger_discarded')` |
+| string | `sealed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:129:27` | `payload.outcome === 'sealed'` |
+| string | `redis_observation` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:130:43` | `this.runStage(deadlineAt, 'redis_observation', () => this.resolveSealed(trigger, payload.triggerPric` |
+| string | `completed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:142:20` | `outcome: 'completed'` |
+| string | `analysis_evaluation` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:165:9` | `this.runStage( deadlineAt, 'analysis_evaluation', () => this.evaluation.evaluate(bar, executionPlans` |
+| string | `on` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:170:27` | `this.mode === 'on'` |
+| string | `persistence` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:177:15` | `this.runStage( deadlineAt, 'persistence', async (): Promise<LiveStrategyPersistenceOutcome> => { con` |
 | string | `completed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:193:16` | `outcome: 'completed'` |
 | string | `sealed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:233:33` | `observation.outcome !== 'sealed'` |
-| string | `tdx` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:268:24` | `source !== 'tdx'` |
-| string | `qmt` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:268:44` | `source !== 'qmt'` |
-| number | `5` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:271:22` | `[1, 5, 15, 30, 60]` |
-| number | `15` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:271:25` | `[1, 5, 15, 30, 60]` |
-| number | `30` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:271:29` | `[1, 5, 15, 30, 60]` |
-| number | `60` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:271:33` | `[1, 5, 15, 30, 60]` |
-| string | `chan_bsp` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:281:51` | `definition.executionPlan.kind === 'chan_bsp'` |
+| string | `tdx` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:253:24` | `source !== 'tdx'` |
+| string | `qmt` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:253:44` | `source !== 'qmt'` |
+| number | `5` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256:22` | `[1, 5, 15, 30, 60]` |
+| number | `15` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256:25` | `[1, 5, 15, 30, 60]` |
+| number | `30` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256:29` | `[1, 5, 15, 30, 60]` |
+| number | `60` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256:33` | `[1, 5, 15, 30, 60]` |
 | string | `SET SESSION innodb_lock_wait_timeout = 3` | `apps/signal/src/realtime/live-strategy-persistence.service.ts:40:29` | `manager.query('SET SESSION innodb_lock_wait_timeout = 3')` |
 | string | `MIST_REALTIME_REDIS_URL` | `apps/signal/src/realtime/notification/bullmq-strategy-alert-delivery-handoff.service.ts:35:30` | `config.get<string>('MIST_REALTIME_REDIS_URL')` |
 | number | `5000` | `apps/signal/src/realtime/notification/bullmq-strategy-alert-delivery-handoff.service.ts:39:25` | `connectTimeout: 5_000` |
@@ -1280,26 +1260,23 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:186:61` | `Math.floor(position.minuteOffset / period) * period * 60_000` |
 | string | `volume` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:215:34` | `sumQuantity(ordered, 'volume')` |
 | string | `amount` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:216:34` | `sumQuantity(ordered, 'amount')` |
-| number | `4` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:261:28` | `tradingDay.slice(0, 4)` |
-| number | `4` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:261:51` | `tradingDay.slice(4, 6)` |
-| number | `6` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:261:54` | `tradingDay.slice(4, 6)` |
-| number | `6` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:261:77` | `tradingDay.slice(6, 8)` |
-| number | `8` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:261:80` | `tradingDay.slice(6, 8)` |
-| string | `h23` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:283:16` | `hourCycle: 'h23'` |
-| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:304:35` | `trigger.timestamp.getTime() % 60_000` |
-| number | `800` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:317:29` | `criteria.requiredBars > 800` |
-| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:318:35` | `criteria.anchorAt.getTime() % 60_000` |
-| string | `tdx` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:325:21` | `source === 'tdx'` |
+| number | `4` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:28` | `tradingDay.slice(0, 4)` |
+| number | `4` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:51` | `tradingDay.slice(4, 6)` |
+| number | `6` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:54` | `tradingDay.slice(4, 6)` |
+| number | `6` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:77` | `tradingDay.slice(6, 8)` |
+| number | `8` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:80` | `tradingDay.slice(6, 8)` |
+| string | `h23` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:282:16` | `hourCycle: 'h23'` |
+| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:303:35` | `trigger.timestamp.getTime() % 60_000` |
+| number | `800` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:316:29` | `criteria.requiredBars > 800` |
+| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:317:35` | `criteria.anchorAt.getTime() % 60_000` |
+| string | `tdx` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:324:21` | `source === 'tdx'` |
 | string | `off` | `apps/signal/src/signal-app.module.ts:100:16` | `mode === 'off'` |
-| string | `chan_bsp` | `apps/signal/src/signal-registry.service.ts:77:43` | `compiled.executionPlan.kind === 'chan_bsp'` |
-| number | `5` | `apps/signal/src/signal-registry.service.ts:144:26` | `period === 5` |
-| number | `15` | `apps/signal/src/signal-registry.service.ts:145:26` | `period === 15` |
-| number | `30` | `apps/signal/src/signal-registry.service.ts:146:26` | `period === 30` |
-| number | `60` | `apps/signal/src/signal-registry.service.ts:147:26` | `period === 60` |
-| string | `chan_bsp` | `apps/signal/src/signal-registry.service.ts:311:19` | `kind: 'chan_bsp'` |
-| string | `decision_flow` | `apps/signal/src/signal-registry.service.ts:319:21` | `kind: 'decision_flow'` |
-| number | `50` | `apps/signal/src/signal-registry.service.ts:325:21` | `typeof (version.rule as any)?.requiredBarCount === 'number' ? (version.rule as any).requiredBarCount` |
-| string | `rule_dsl` | `apps/signal/src/signal-registry.service.ts:336:23` | `kind: 'rule_dsl'` |
+| string | `chan_bsp` | `apps/signal/src/signal-registry.service.ts:74:49` | `compiled.executionPlan.sourceKind === 'chan_bsp'` |
+| number | `5` | `apps/signal/src/signal-registry.service.ts:142:26` | `period === 5` |
+| number | `15` | `apps/signal/src/signal-registry.service.ts:143:26` | `period === 15` |
+| number | `30` | `apps/signal/src/signal-registry.service.ts:144:26` | `period === 30` |
+| number | `60` | `apps/signal/src/signal-registry.service.ts:145:26` | `period === 60` |
+| string | `decision_flow` | `apps/signal/src/signal-registry.service.ts:309:11` | `kind: 'decision_flow'` |
 | string | `queue_full` | `libs/backtest/src/contracts/backtest-run-submit.contract.ts:37:15` | `value !== 'queue_full'` |
 | string | `not_ready` | `libs/backtest/src/contracts/backtest-run-submit.contract.ts:38:15` | `value !== 'not_ready'` |
 | string | `run_failed` | `libs/backtest/src/contracts/backtest-run-submit.contract.ts:39:15` | `value !== 'run_failed'` |
@@ -1324,57 +1301,57 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `time must be a valid Date` | `libs/chancore/src/internal/assert-chan-k-series.ts:31:31` | `inputError(index, 'time must be a valid Date')` |
 | string | `time must be strictly increasing` | `libs/chancore/src/internal/assert-chan-k-series.ts:35:31` | `inputError(index, 'time must be strictly increasing')` |
 | string | `high must be greater than or equal to low` | `libs/chancore/src/internal/assert-chan-k-series.ts:45:31` | `inputError(index, 'high must be greater than or equal to low')` |
-| string | `candidate` | `libs/chancore/src/internal/bi.ts:377:55` | `this.assertPhaseATimeStackCompleteBi(candidate, 'candidate')` |
-| string | `stack tail` | `libs/chancore/src/internal/bi.ts:381:56` | `this.assertPhaseATimeStackCompleteBi(previous, 'stack tail')` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:386:30` | `stack.length >= 3` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:387:44` | `stack.length - 3` |
-| string | `first` | `libs/chancore/src/internal/bi.ts:390:53` | `this.assertPhaseATimeStackCompleteBi(first, 'first')` |
-| string | `middle` | `libs/chancore/src/internal/bi.ts:391:54` | `this.assertPhaseATimeStackCompleteBi(middle, 'middle')` |
-| string | `third` | `libs/chancore/src/internal/bi.ts:392:53` | `this.assertPhaseATimeStackCompleteBi(third, 'third')` |
-| string | `merged Bi` | `libs/chancore/src/internal/bi.ts:404:54` | `this.assertPhaseATimeStackCompleteBi(merged, 'merged Bi')` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:412:37` | `stack.length - 3` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:412:40` | `stack.splice(stack.length - 3, 3, replacement)` |
-| string | `bi1` | `libs/chancore/src/internal/bi.ts:495:32` | `this.assertCompleteBi(bi1, 'bi1')` |
-| string | `bi2` | `libs/chancore/src/internal/bi.ts:496:32` | `this.assertCompleteBi(bi2, 'bi2')` |
-| string | `bi1` | `libs/chancore/src/internal/bi.ts:522:32` | `this.assertCompleteBi(bi1, 'bi1')` |
-| string | `bi2` | `libs/chancore/src/internal/bi.ts:523:32` | `this.assertCompleteBi(bi2, 'bi2')` |
-| string | `bi3` | `libs/chancore/src/internal/bi.ts:524:32` | `this.assertCompleteBi(bi3, 'bi3')` |
-| string | `up-down-up` | `libs/chancore/src/internal/bi.ts:531:12` | `case 'up-down-up': { return ( bi1.startFenxing.low <= bi2.endFenxing.low && bi2.startFenxing.high <=` |
-| string | `down-up-down` | `libs/chancore/src/internal/bi.ts:537:12` | `case 'down-up-down': return ( bi1.startFenxing.high >= bi2.endFenxing.high && bi2.startFenxing.low >` |
-| string | `bi1` | `libs/chancore/src/internal/bi.ts:551:32` | `this.assertCompleteBi(bi1, 'bi1')` |
-| string | `bi2` | `libs/chancore/src/internal/bi.ts:552:32` | `this.assertCompleteBi(bi2, 'bi2')` |
-| string | `bi1` | `libs/chancore/src/internal/bi.ts:583:32` | `this.assertCompleteBi(bi1, 'bi1')` |
-| string | `bi3` | `libs/chancore/src/internal/bi.ts:584:32` | `this.assertCompleteBi(bi3, 'bi3')` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:692:28` | `betweenCount >= 3` |
-| string | `none` | `libs/chancore/src/internal/bi.ts:808:45` | `type: 'none'` |
-| string | `none` | `libs/chancore/src/internal/bi.ts:812:45` | `type: 'none'` |
-| string | `a_contains_b` | `libs/chancore/src/internal/bi.ts:818:46` | `type: 'a_contains_b'` |
-| string | `b_contains_a` | `libs/chancore/src/internal/bi.ts:820:46` | `type: 'b_contains_a'` |
-| string | `a_contains_b` | `libs/chancore/src/internal/bi.ts:825:46` | `type: 'a_contains_b'` |
-| string | `b_contains_a` | `libs/chancore/src/internal/bi.ts:827:46` | `type: 'b_contains_a'` |
-| string | `none` | `libs/chancore/src/internal/bi.ts:831:43` | `type: 'none'` |
+| number | `3` | `libs/chancore/src/internal/bi-channel-policy.ts:266:31` | `internalBis.length >= 3` |
+| number | `5` | `libs/chancore/src/internal/bi-channel.ts:221:43` | `mergedBis.length >= 5` |
+| number | `3` | `libs/chancore/src/internal/bi-channel.ts:360:36` | `channel.bis.length >= 3` |
+| number | `4` | `libs/chancore/src/internal/bi-channel.ts:362:65` | `channel.type === ChannelType.UnComplete ? 4 : 5` |
+| number | `5` | `libs/chancore/src/internal/bi-channel.ts:362:69` | `channel.type === ChannelType.UnComplete ? 4 : 5` |
+| string | `candidate` | `libs/chancore/src/internal/bi.ts:371:55` | `this.assertPhaseATimeStackCompleteBi(candidate, 'candidate')` |
+| string | `stack tail` | `libs/chancore/src/internal/bi.ts:375:56` | `this.assertPhaseATimeStackCompleteBi(previous, 'stack tail')` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:380:30` | `stack.length >= 3` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:381:44` | `stack.length - 3` |
+| string | `first` | `libs/chancore/src/internal/bi.ts:384:53` | `this.assertPhaseATimeStackCompleteBi(first, 'first')` |
+| string | `middle` | `libs/chancore/src/internal/bi.ts:385:54` | `this.assertPhaseATimeStackCompleteBi(middle, 'middle')` |
+| string | `third` | `libs/chancore/src/internal/bi.ts:386:53` | `this.assertPhaseATimeStackCompleteBi(third, 'third')` |
+| string | `merged Bi` | `libs/chancore/src/internal/bi.ts:398:54` | `this.assertPhaseATimeStackCompleteBi(merged, 'merged Bi')` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:406:37` | `stack.length - 3` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:406:40` | `stack.splice(stack.length - 3, 3, replacement)` |
+| string | `bi1` | `libs/chancore/src/internal/bi.ts:489:32` | `this.assertCompleteBi(bi1, 'bi1')` |
+| string | `bi2` | `libs/chancore/src/internal/bi.ts:490:32` | `this.assertCompleteBi(bi2, 'bi2')` |
+| string | `bi1` | `libs/chancore/src/internal/bi.ts:516:32` | `this.assertCompleteBi(bi1, 'bi1')` |
+| string | `bi2` | `libs/chancore/src/internal/bi.ts:517:32` | `this.assertCompleteBi(bi2, 'bi2')` |
+| string | `bi3` | `libs/chancore/src/internal/bi.ts:518:32` | `this.assertCompleteBi(bi3, 'bi3')` |
+| string | `up-down-up` | `libs/chancore/src/internal/bi.ts:525:12` | `case 'up-down-up': { return ( bi1.startFenxing.low <= bi2.endFenxing.low && bi2.startFenxing.high <=` |
+| string | `down-up-down` | `libs/chancore/src/internal/bi.ts:531:12` | `case 'down-up-down': return ( bi1.startFenxing.high >= bi2.endFenxing.high && bi2.startFenxing.low >` |
+| string | `bi1` | `libs/chancore/src/internal/bi.ts:545:32` | `this.assertCompleteBi(bi1, 'bi1')` |
+| string | `bi2` | `libs/chancore/src/internal/bi.ts:546:32` | `this.assertCompleteBi(bi2, 'bi2')` |
+| string | `bi1` | `libs/chancore/src/internal/bi.ts:577:32` | `this.assertCompleteBi(bi1, 'bi1')` |
+| string | `bi3` | `libs/chancore/src/internal/bi.ts:578:32` | `this.assertCompleteBi(bi3, 'bi3')` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:686:28` | `betweenCount >= 3` |
+| string | `none` | `libs/chancore/src/internal/bi.ts:802:45` | `type: 'none'` |
+| string | `none` | `libs/chancore/src/internal/bi.ts:806:45` | `type: 'none'` |
+| string | `a_contains_b` | `libs/chancore/src/internal/bi.ts:812:46` | `type: 'a_contains_b'` |
+| string | `b_contains_a` | `libs/chancore/src/internal/bi.ts:814:46` | `type: 'b_contains_a'` |
+| string | `a_contains_b` | `libs/chancore/src/internal/bi.ts:819:46` | `type: 'a_contains_b'` |
+| string | `b_contains_a` | `libs/chancore/src/internal/bi.ts:821:46` | `type: 'b_contains_a'` |
+| string | `none` | `libs/chancore/src/internal/bi.ts:825:43` | `type: 'none'` |
 | number | `3` | `libs/chancore/src/internal/channel-lifecycle.ts:68:22` | `items.length < 3` |
-| number | `9` | `libs/chancore/src/internal/channel-lifecycle.ts:321:33` | `this.elements.length >= 9` |
-| number | `9` | `libs/chancore/src/internal/channel-lifecycle.ts:454:33` | `this.elements.length >= 9` |
-| number | `9` | `libs/chancore/src/internal/channel-lifecycle.ts:668:68` | `stateMachine.elements.length >= 9` |
-| number | `9` | `libs/chancore/src/internal/channel-lifecycle.ts:869:33` | `this.elements.length >= 9` |
-| number | `9` | `libs/chancore/src/internal/channel-lifecycle.ts:908:33` | `this.elements.length >= 9` |
-| number | `9` | `libs/chancore/src/internal/channel-lifecycle.ts:1011:51` | `stateMachine.elements.length >= 9` |
-| number | `3` | `libs/chancore/src/internal/channel-lifecycle.ts:1066:39` | `strategy.minSealedLength <= 3` |
-| number | `3` | `libs/chancore/src/internal/channel-lifecycle.ts:1067:43` | `stateMachine.elements.length >= 3` |
-| number | `9` | `libs/chancore/src/internal/channel-lifecycle.ts:1111:68` | `stateMachine.elements.length >= 9` |
-| number | `5` | `libs/chancore/src/internal/channel.ts:211:41` | `mergedBis.length >= 5` |
-| number | `5` | `libs/chancore/src/internal/channel.ts:322:44` | `elements.slice(0, 5)` |
-| number | `5` | `libs/chancore/src/internal/channel.ts:372:35` | `bis.length >= 5` |
-| number | `4` | `libs/chancore/src/internal/channel.ts:405:65` | `channel.type === ChannelType.UnComplete ? 4 : 5` |
-| number | `5` | `libs/chancore/src/internal/channel.ts:405:69` | `channel.type === ChannelType.UnComplete ? 4 : 5` |
-| number | `4` | `libs/chancore/src/internal/channel.ts:418:26` | `fourBis.length < 4` |
-| number | `3` | `libs/chancore/src/internal/duan-channel.ts:61:22` | `minCoreLength: 3` |
-| number | `3` | `libs/chancore/src/internal/duan-channel.ts:62:24` | `minSealedLength: 3` |
-| number | `3` | `libs/chancore/src/internal/duan-channel.ts:73:45` | `elements.slice(0, 3)` |
-| number | `3` | `libs/chancore/src/internal/duan-channel.ts:137:36` | `channel.duans.length >= 3` |
-| number | `3` | `libs/chancore/src/internal/duan.ts:43:22` | `bis.length < 3` |
-| number | `4` | `libs/chancore/src/internal/duan.ts:57:39` | `bis.length - 4` |
+| number | `9` | `libs/chancore/src/internal/duan-channel-policy.ts:393:49` | `internalDuans.length >= 9` |
+| number | `4` | `libs/chancore/src/internal/duan-channel-policy.ts:394:60` | `internalDuans.length >= 4` |
+| number | `9` | `libs/chancore/src/internal/duan-channel.ts:112:33` | `current.duans.length >= 9` |
+| number | `9` | `libs/chancore/src/internal/duan-channel.ts:117:77` | `next.duans.length >= 9` |
+| number | `9` | `libs/chancore/src/internal/duan-channel.ts:145:38` | `cand.duans.length >= 9` |
+| number | `9` | `libs/chancore/src/internal/duan-channel.ts:280:47` | `mergedDuans.length >= 9` |
+| number | `3` | `libs/chancore/src/internal/duan-channel.ts:335:32` | `channel.duans.length < 3` |
+| number | `5` | `libs/chancore/src/internal/duan.ts:50:24` | `reverseStart + 5` |
+| number | `3` | `libs/chancore/src/internal/duan.ts:52:37` | `reverseStart + 3` |
+| number | `5` | `libs/chancore/src/internal/duan.ts:53:37` | `reverseStart + 5` |
+| number | `5` | `libs/chancore/src/internal/duan.ts:69:24` | `reverseStart + 5` |
+| number | `3` | `libs/chancore/src/internal/duan.ts:71:37` | `reverseStart + 3` |
+| number | `5` | `libs/chancore/src/internal/duan.ts:72:37` | `reverseStart + 5` |
+| number | `3` | `libs/chancore/src/internal/duan.ts:96:22` | `bis.length < 3` |
+| number | `3` | `libs/chancore/src/internal/duan.ts:100:33` | `bis.length - 3` |
+| number | `3` | `libs/chancore/src/internal/duan.ts:115:39` | `bis.length - 3` |
 | number | `37` | `libs/decimal/src/decimal8.ts:19:22` | `value.length > 37` |
 | number | `28` | `libs/decimal/src/decimal8.ts:30:24` | `integer.length > 28` |
 | number | `37` | `libs/decimal/src/decimal8.ts:49:24` | `value.length > 37` |
@@ -1441,22 +1418,22 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:179:20` | `pl.Series('low', trailingLow as any)` |
 | string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:182:29` | `df.getColumn('high')` |
 | string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:183:28` | `df.getColumn('low')` |
-| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:254:21` | `direction !== 'up'` |
-| string | `down` | `libs/indicators/src/fibonacci/fibonacci.ts:254:43` | `direction !== 'down'` |
-| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:271:21` | `direction === 'up'` |
-| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:274:35` | `ratio.toFixed(3)` |
-| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:282:35` | `ratio.toFixed(3)` |
-| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:290:35` | `ratio.toFixed(3)` |
-| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:298:35` | `ratio.toFixed(3)` |
-| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:336:21` | `direction === 'up'` |
-| number | `4` | `libs/indicators/src/fibonacci/fibonacci.ts:342:43` | `options?.precision ?? 4` |
-| number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:344:27` | `10 ** precision` |
-| number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:344:46` | `10 ** precision` |
-| number | `0.008` | `libs/indicators/src/fibonacci/fibonacci.ts:346:48` | `options?.toleranceRatio ?? 0.008` |
-| number | `0.5` | `libs/indicators/src/fibonacci/fibonacci.ts:348:25` | `0.5 - tolerance` |
-| number | `0.618` | `libs/indicators/src/fibonacci/fibonacci.ts:349:25` | `0.618 + tolerance` |
-| number | `0.382` | `libs/indicators/src/fibonacci/fibonacci.ts:354:33` | `retracementRatio < 0.382` |
-| number | `0.5` | `libs/indicators/src/fibonacci/fibonacci.ts:356:33` | `0.5 - tolerance` |
+| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:253:21` | `direction !== 'up'` |
+| string | `down` | `libs/indicators/src/fibonacci/fibonacci.ts:253:43` | `direction !== 'down'` |
+| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:270:21` | `direction === 'up'` |
+| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:273:35` | `ratio.toFixed(3)` |
+| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:281:35` | `ratio.toFixed(3)` |
+| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:289:35` | `ratio.toFixed(3)` |
+| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:297:35` | `ratio.toFixed(3)` |
+| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:335:21` | `direction === 'up'` |
+| number | `4` | `libs/indicators/src/fibonacci/fibonacci.ts:341:43` | `options?.precision ?? 4` |
+| number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:343:27` | `10 ** precision` |
+| number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:343:46` | `10 ** precision` |
+| number | `0.008` | `libs/indicators/src/fibonacci/fibonacci.ts:345:48` | `options?.toleranceRatio ?? 0.008` |
+| number | `0.5` | `libs/indicators/src/fibonacci/fibonacci.ts:347:25` | `0.5 - tolerance` |
+| number | `0.618` | `libs/indicators/src/fibonacci/fibonacci.ts:348:25` | `0.618 + tolerance` |
+| number | `0.382` | `libs/indicators/src/fibonacci/fibonacci.ts:353:33` | `retracementRatio < 0.382` |
+| number | `0.5` | `libs/indicators/src/fibonacci/fibonacci.ts:355:33` | `0.5 - tolerance` |
 | string | `up` | `libs/indicators/src/force.ts:29:34` | `unit.trend.toLowerCase() === 'up'` |
 | string | `up` | `libs/indicators/src/force.ts:42:34` | `direction === 'up'` |
 | string | `up` | `libs/indicators/src/force.ts:95:44` | `directions[unitIndex] === 'up'` |
@@ -1568,20 +1545,8 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `qq` | `libs/signal/src/contracts/strategy-alert-delivery.contract.ts:112:23` | `input.channel !== 'qq'` |
 | string | `wechat` | `libs/signal/src/contracts/strategy-alert-delivery.contract.ts:113:23` | `input.channel !== 'wechat'` |
 | string | `feishu` | `libs/signal/src/contracts/strategy-alert-delivery.contract.ts:114:23` | `input.channel !== 'feishu'` |
-| string | `both` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:35:26` | `plan.direction === 'both'` |
-| string | `_buy` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:36:37` | `event.type.endsWith('_buy')` |
-| string | `buy` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:37:29` | `plan.direction === 'buy'` |
-| string | `first_buy` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:42:10` | `case 'first_buy':` |
-| string | `first_sell` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:43:10` | `case 'first_sell': return plan.points.first;` |
-| string | `second_buy` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:45:10` | `case 'second_buy':` |
-| string | `second_sell` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:46:10` | `case 'second_sell': return plan.points.second;` |
-| string | `third_buy` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:48:10` | `case 'third_buy':` |
-| string | `third_sell` | `libs/signal/src/runtime/chan-bsp/chan-bsp.detector.ts:49:10` | `case 'third_sell': return plan.points.third;` |
-| string | `duan` | `libs/signal/src/runtime/chan-bsp/chan-bsp.pipeline.ts:44:23` | `input.units === 'duan'` |
-| number | `4` | `libs/signal/src/runtime/chan-bsp/chan-bsp.pipeline.ts:129:41` | `units.length >= 4` |
-| number | `5` | `libs/signal/src/runtime/chan-bsp/chan-bsp.pipeline.ts:134:64` | `units.length >= 5` |
-| string | `unavailable` | `libs/signal/src/runtime/realtime-episode.store.ts:24:27` | `result.status === 'unavailable'` |
-| string | ` ` | `libs/signal/src/runtime/realtime-episode.store.ts:61:10` | `[ identity.definitionId, identity.versionId, identity.securityId, identity.source, identity.period, ` |
+| string | `tdx` | `libs/signal/src/runtime/realtime-kernel-pool.ts:197:18` | `source !== 'tdx'` |
+| string | `qmt` | `libs/signal/src/runtime/realtime-kernel-pool.ts:197:38` | `source !== 'qmt'` |
 | number | `60000` | `libs/signal/src/runtime/realtime-period.builder.ts:43:66` | `slotOffset * 60_000` |
 | string | ` ` | `libs/signal/src/runtime/realtime-period.builder.ts:89:34` | `key.split('\u0000')` |
 | number | `3` | `libs/signal/src/runtime/realtime-period.builder.ts:89:53` | `key.split('\u0000').slice(0, 3)` |
@@ -1592,31 +1557,7 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `h23` | `libs/signal/src/runtime/realtime-period.builder.ts:149:16` | `hourCycle: 'h23'` |
 | string | `discarded` | `libs/signal/src/runtime/realtime-period.builder.ts:188:27` | `trigger.outcome === 'discarded'` |
 | string | `complete` | `libs/signal/src/runtime/realtime-period.builder.ts:200:24` | `sealedBar.type !== 'complete'` |
-| string | `decision_flow` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:107:28` | `candidate.kind === 'decision_flow'` |
-| string | `duplicate` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:117:20` | `append === 'duplicate'` |
-| string | `chan_bsp` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:127:30` | `execution.kind === 'chan_bsp'` |
-| string | `decision_flow` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:131:30` | `execution.kind === 'decision_flow'` |
-| string | `unavailable` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:137:28` | `outcome.status === 'unavailable'` |
-| string | `emit` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:151:24` | `decision !== 'emit'` |
-| string | `evaluated` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:151:53` | `outcome.status !== 'evaluated'` |
-| number | `80` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:164:21` | `confidence: 80.0` |
-| string | `legacy_rule_dsl` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:167:19` | `flowId: 'legacy_rule_dsl'` |
-| string | `evaluated` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:213:19` | `status: 'evaluated'` |
-| string | `first_` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:221:43` | `event.type.startsWith('first_')` |
-| number | `92` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:222:13` | `event.type.startsWith('first_') ? 92.0 : event.type.startsWith('third_') ? 90.0 : 86.0` |
-| string | `third_` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:223:35` | `event.type.startsWith('third_')` |
-| number | `90` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:224:15` | `event.type.startsWith('third_') ? 90.0 : 86.0` |
-| number | `86` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:225:15` | `event.type.startsWith('third_') ? 90.0 : 86.0` |
-| string | `legacy_chan_bsp` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:228:19` | `flowId: 'legacy_chan_bsp'` |
-| string | `SELL` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:265:34` | `decisionResult.action === 'SELL'` |
-| string | `SIGNAL_EMITTED` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:279:49` | `decisionResult.status === 'SIGNAL_EMITTED'` |
-| string | `evaluated` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:284:15` | `status: 'evaluated'` |
-| string | `emit` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:298:22` | `decision !== 'emit'` |
-| string | `tdx` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:373:18` | `source !== 'tdx'` |
-| string | `qmt` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:373:38` | `source !== 'qmt'` |
-| string | `_buy` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:380:30` | `event.type.endsWith('_buy')` |
-| string | `tdx` | `libs/signal/src/runtime/shared-strategy-window.store.ts:162:18` | `source !== 'tdx'` |
-| string | `qmt` | `libs/signal/src/runtime/shared-strategy-window.store.ts:162:38` | `source !== 'qmt'` |
+| string | `exit` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:130:47` | `signal.signalKind === 'exit'` |
 | number | `3` | `libs/strategy/src/analysis/chan-fenxing-trigger.ts:30:38` | `orderedK.length < 3` |
 | string | `KDJ(9,3,3)` | `libs/strategy/src/analysis/strategy-kdj.ts:21:5` | `requireExactStrategyBars( bars, STRATEGY_KDJ_CALCULATION_BAR_COUNT, 'KDJ(9,3,3)', )` |
 | string | `MACD(12,26,9)` | `libs/strategy/src/analysis/strategy-macd.ts:21:5` | `requireExactStrategyBars( bars, STRATEGY_MACD_CALCULATION_BAR_COUNT, 'MACD(12,26,9)', )` |
@@ -1630,27 +1571,39 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `BRANCH` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:112:17` | `type: 'BRANCH'` |
 | string | `EXTRACTOR` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:129:12` | `case 'EXTRACTOR': { const plugin = this.getPlugin(node.pluginId); const opinion = await plugin.evalu` |
 | string | `EXTRACTOR` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:141:17` | `type: 'EXTRACTOR'` |
-| string | `CONSENSUS` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:156:12` | `case 'CONSENSUS': { let totalWeight = 0; let earnedScore = 0; let vetoTriggered = false; let vetoRea` |
-| string | `CONSENSUS` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:204:17` | `type: 'CONSENSUS'` |
-| string | `ABORTED` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:232:19` | `status: 'ABORTED'` |
-| string | `TERMINAL` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:242:12` | `case 'TERMINAL': { const finalAction = node.action === 'INHERIT' ? inheritedAction \|\| DECISION_ACTIO` |
-| string | `INHERIT` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:244:27` | `node.action === 'INHERIT'` |
-| string | `TERMINAL` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:250:17` | `type: 'TERMINAL'` |
-| string | `ABORT` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:256:61` | `finalAction === 'ABORT'` |
-| number | `85` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:256:75` | `finalAction === 'ABORT' ? 0 : 85` |
-| string | `ABORT` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:259:29` | `finalAction === 'ABORT'` |
-| string | `ABORTED` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:261:21` | `status: 'ABORTED'` |
-| string | `SIGNAL_EMITTED` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:271:19` | `status: 'SIGNAL_EMITTED'` |
-| string | `BUY` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:278:41` | `finalAction === 'BUY'` |
-| string | `eq` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:311:12` | `case 'eq': return actual === expected;` |
-| string | `ne` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:313:12` | `case 'ne': return actual !== expected;` |
-| string | `gt` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:315:12` | `case 'gt': return Number(actual) > Number(expected);` |
-| string | `gte` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:317:12` | `case 'gte': return Number(actual) >= Number(expected);` |
-| string | `lt` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:319:12` | `case 'lt': return Number(actual) < Number(expected);` |
-| string | `lte` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:321:12` | `case 'lte': return Number(actual) <= Number(expected);` |
-| string | `in` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:323:12` | `case 'in': if (Array.isArray(expected)) { return expected.includes(actual); } return false;` |
-| number | `80` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:334:18` | `score >= 80` |
-| number | `65` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:335:18` | `score >= 65` |
+| string | `CONSENSUS` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:156:12` | `case 'CONSENSUS': { const targetAction = node.targetAction ?? DECISION_ACTIONS.BUY; const vetoAction` |
+| string | `CONSENSUS` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:208:17` | `type: 'CONSENSUS'` |
+| string | `ABORTED` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:241:19` | `status: 'ABORTED'` |
+| string | `TERMINAL` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:251:12` | `case 'TERMINAL': { const finalAction = node.action === 'INHERIT' ? inheritedAction \|\| DECISION_ACTIO` |
+| string | `INHERIT` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:253:27` | `node.action === 'INHERIT'` |
+| string | `TERMINAL` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:259:17` | `type: 'TERMINAL'` |
+| string | `ABORT` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:265:61` | `finalAction === 'ABORT'` |
+| number | `85` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:265:75` | `finalAction === 'ABORT' ? 0 : 85` |
+| string | `ABORT` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:268:29` | `finalAction === 'ABORT'` |
+| string | `ABORTED` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:270:21` | `status: 'ABORTED'` |
+| string | `SIGNAL_EMITTED` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:280:19` | `status: 'SIGNAL_EMITTED'` |
+| string | `BUY` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:287:41` | `finalAction === 'BUY'` |
+| string | `eq` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:320:12` | `case 'eq': return actual === expected;` |
+| string | `ne` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:322:12` | `case 'ne': return actual !== expected;` |
+| string | `gt` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:324:12` | `case 'gt': return Number(actual) > Number(expected);` |
+| string | `gte` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:326:12` | `case 'gte': return Number(actual) >= Number(expected);` |
+| string | `lt` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:328:12` | `case 'lt': return Number(actual) < Number(expected);` |
+| string | `lte` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:330:12` | `case 'lte': return Number(actual) <= Number(expected);` |
+| string | `in` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:332:12` | `case 'in': if (Array.isArray(expected)) { return expected.includes(actual); } return false;` |
+| number | `80` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:343:18` | `score >= 80` |
+| number | `65` | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:344:18` | `score >= 65` |
+| string | `一买` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:46:23` | `reason.includes('一买')` |
+| string | `1买` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:47:23` | `reason.includes('1买')` |
+| string | `二买` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:48:23` | `reason.includes('二买')` |
+| string | `2买` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:49:23` | `reason.includes('2买')` |
+| string | `三买` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:50:23` | `reason.includes('三买')` |
+| string | `3买` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:51:23` | `reason.includes('3买')` |
+| string | `一卖` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:52:23` | `reason.includes('一卖')` |
+| string | `1卖` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:53:23` | `reason.includes('1卖')` |
+| string | `二卖` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:54:23` | `reason.includes('二卖')` |
+| string | `2卖` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:55:23` | `reason.includes('2卖')` |
+| string | `三卖` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:56:23` | `reason.includes('三卖')` |
+| string | `3卖` | `libs/strategy/src/decision-flow/decision-pivot-evidence.ts:57:23` | `reason.includes('3卖')` |
 | string | `ABORTED` | `libs/strategy/src/decision-flow/decision-trace-builder.ts:52:27` | `result.status === 'ABORTED'` |
 | string | `GUARD` | `libs/strategy/src/decision-flow/decision-trace-builder.ts:59:25` | `item.type === 'GUARD'` |
 | string | `CONSENSUS` | `libs/strategy/src/decision-flow/decision-trace-builder.ts:61:32` | `item.type === 'CONSENSUS'` |
@@ -1660,34 +1613,42 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | ` + ` | `libs/strategy/src/decision-flow/decision-trace-builder.ts:72:53` | `keyMilestones.join(' + ')` |
 | string | ` -> ` | `libs/strategy/src/decision-flow/decision-trace-builder.ts:72:62` | `keyMilestones.join(' + ') + ' -> '` |
 | string | `BUY` | `libs/strategy/src/decision-flow/decision-trace-builder.ts:74:25` | `result.action === 'BUY'` |
-| string | `entry` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:38:40` | `plan.signalKind === 'entry'` |
-| string | `guard_legacy_rule` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:41:11` | `id: 'guard_legacy_rule'` |
-| string | `GUARD` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:42:13` | `type: 'GUARD'` |
-| string | `存量规则DSL门禁` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:43:13` | `name: '存量规则DSL门禁'` |
-| string | `plugin.legacy.rule-dsl` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:44:17` | `pluginId: 'plugin.legacy.rule-dsl'` |
-| number | `0.5` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:47:22` | `minConfidence: 0.5` |
-| string | `term_legacy_matched` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:49:13` | `id: 'term_legacy_matched'` |
-| string | `TERMINAL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:50:15` | `type: 'TERMINAL'` |
-| string | `LEGACY_DSL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:52:20` | `signalTag: 'LEGACY_DSL'` |
-| string | `存量规则条件满足，触发信号` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:53:17` | `reason: '存量规则条件满足，触发信号'` |
-| string | `term_legacy_unmatched` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:56:13` | `id: 'term_legacy_unmatched'` |
-| string | `TERMINAL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:57:15` | `type: 'TERMINAL'` |
-| string | `ABORT` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:58:17` | `action: 'ABORT'` |
-| string | `存量规则条件未满足` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:59:17` | `reason: '存量规则条件未满足'` |
-| string | `sell` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:70:39` | `plan.direction === 'sell'` |
-| string | `guard_chan_bsp` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:73:11` | `id: 'guard_chan_bsp'` |
-| string | `GUARD` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:74:13` | `type: 'GUARD'` |
-| string | `缠论买卖点门禁` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:75:13` | `name: '缠论买卖点门禁'` |
-| string | `plugin.chan.bsp` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:76:17` | `pluginId: 'plugin.chan.bsp'` |
-| number | `0.7` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:85:22` | `minConfidence: 0.7` |
-| string | `term_chan_bsp_matched` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:87:13` | `id: 'term_chan_bsp_matched'` |
-| string | `TERMINAL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:88:15` | `type: 'TERMINAL'` |
-| string | `CHAN_BSP` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:90:20` | `signalTag: 'CHAN_BSP'` |
-| string | `缠论买卖点结构确立` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:91:17` | `reason: '缠论买卖点结构确立'` |
-| string | `term_chan_bsp_unmatched` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:94:13` | `id: 'term_chan_bsp_unmatched'` |
-| string | `TERMINAL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:95:15` | `type: 'TERMINAL'` |
-| string | `ABORT` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:96:17` | `action: 'ABORT'` |
-| string | `缠论形态未出现或未达买卖点确认门槛` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:97:17` | `reason: '缠论形态未出现或未达买卖点确认门槛'` |
+| string | `entry` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:39:40` | `plan.signalKind === 'entry'` |
+| string | `guard_legacy_rule` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:42:11` | `id: 'guard_legacy_rule'` |
+| string | `GUARD` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:43:13` | `type: 'GUARD'` |
+| string | `存量规则DSL门禁` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:44:13` | `name: '存量规则DSL门禁'` |
+| string | `plugin.legacy.rule-dsl` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:45:17` | `pluginId: 'plugin.legacy.rule-dsl'` |
+| number | `0.5` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:48:22` | `minConfidence: 0.5` |
+| string | `term_legacy_matched` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:50:13` | `id: 'term_legacy_matched'` |
+| string | `TERMINAL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:51:15` | `type: 'TERMINAL'` |
+| string | `LEGACY_DSL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:53:20` | `signalTag: 'LEGACY_DSL'` |
+| string | `存量规则条件满足，触发信号` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:54:17` | `reason: '存量规则条件满足，触发信号'` |
+| string | `term_legacy_unmatched` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:57:13` | `id: 'term_legacy_unmatched'` |
+| string | `TERMINAL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:58:15` | `type: 'TERMINAL'` |
+| string | `ABORT` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:59:17` | `action: 'ABORT'` |
+| string | `存量规则条件未满足` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:60:17` | `reason: '存量规则条件未满足'` |
+| string | `both` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:71:39` | `plan.direction === 'both'` |
+| string | `sell` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:74:28` | `plan.direction === 'sell'` |
+| string | `sell` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:79:28` | `plan.direction === 'sell'` |
+| string | `guard_chan_bsp` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:84:11` | `id: 'guard_chan_bsp'` |
+| string | `GUARD` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:85:13` | `type: 'GUARD'` |
+| string | `缠论买卖点门禁` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:86:13` | `name: '缠论买卖点门禁'` |
+| string | `plugin.chan.bsp` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:87:17` | `pluginId: 'plugin.chan.bsp'` |
+| number | `0.5` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:96:44` | `plan.minConfidence ?? 0.5` |
+| string | `term_chan_bsp_matched` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:98:13` | `id: 'term_chan_bsp_matched'` |
+| string | `TERMINAL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:99:15` | `type: 'TERMINAL'` |
+| string | `CHAN_BSP` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:101:20` | `signalTag: 'CHAN_BSP'` |
+| string | `缠论买卖点结构确立` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:102:17` | `reason: '缠论买卖点结构确立'` |
+| string | `term_chan_bsp_unmatched` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:105:13` | `id: 'term_chan_bsp_unmatched'` |
+| string | `TERMINAL` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:106:15` | `type: 'TERMINAL'` |
+| string | `ABORT` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:107:17` | `action: 'ABORT'` |
+| string | `缠论形态未出现或未达买卖点确认门槛` | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:108:17` | `reason: '缠论形态未出现或未达买卖点确认门槛'` |
+| string | `decision_flow` | `libs/strategy/src/decision-flow/stored-definition-compiler.ts:64:10` | `case 'decision_flow': { const flow = input.rule as unknown as DecisionFlowNode; if (!flow \|\| typeof ` |
+| string | `decision_flow` | `libs/strategy/src/decision-flow/stored-definition-compiler.ts:78:21` | `sourceKind: 'decision_flow'` |
+| string | `rule_dsl` | `libs/strategy/src/decision-flow/stored-definition-compiler.ts:82:10` | `case 'rule_dsl': { try { const compilation = compileStoredStrategyRuleWithNormalized( input.rule, in` |
+| string | `rule_dsl` | `libs/strategy/src/decision-flow/stored-definition-compiler.ts:95:23` | `sourceKind: 'rule_dsl'` |
+| string | `chan_bsp` | `libs/strategy/src/decision-flow/stored-definition-compiler.ts:107:10` | `case 'chan_bsp': { const chanPlan = validateChanBspRule(input.rule); const flow = LegacyStrategyComp` |
+| string | `chan_bsp` | `libs/strategy/src/decision-flow/stored-definition-compiler.ts:115:21` | `sourceKind: 'chan_bsp'` |
 | string | `unavailable` | `libs/strategy/src/evaluation/strategy-context.builder.ts:48:15` | `status: 'unavailable'` |
 | string | `insufficient_history` | `libs/strategy/src/evaluation/strategy-context.builder.ts:49:15` | `reason: 'insufficient_history'` |
 | string | `unavailable` | `libs/strategy/src/evaluation/strategy-context.builder.ts:66:17` | `status: 'unavailable'` |
@@ -1728,19 +1689,41 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `ne` | `libs/strategy/src/evaluation/strategy-rule.evaluator.ts:128:10` | `case 'ne': return current !== 0;` |
 | string | `crossesAbove` | `libs/strategy/src/evaluation/strategy-rule.evaluator.ts:130:10` | `case 'crossesAbove': if (previous === undefined) throw new Error('crossover has no prior value'); re` |
 | string | `crossesBelow` | `libs/strategy/src/evaluation/strategy-rule.evaluator.ts:134:10` | `case 'crossesBelow': if (previous === undefined) throw new Error('crossover has no prior value'); re` |
-| string | `有效行情数据为空，未形成缠论K线` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:130:17` | `reason: '有效行情数据为空，未形成缠论K线'` |
-| string | `未检测到满足条件的缠论买卖点` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:144:17` | `reason: '未检测到满足条件的缠论买卖点'` |
-| string | `缠论买卖点已在先前批次发射，无需重复触发` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:172:19` | `reason: '缠论买卖点已在先前批次发射，无需重复触发'` |
-| string | `_buy` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:179:45` | `latestEvent.type.endsWith('_buy')` |
-| string | `当前最新K线未确立有效分型扳机(笔内延伸或包含)` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:189:19` | `reason: '当前最新K线未确立有效分型扳机(笔内延伸或包含)'` |
-| string | `检测到买点结构，但最新确立分型为顶分型而非底分型` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:196:19` | `reason: '检测到买点结构，但最新确立分型为顶分型而非底分型'` |
-| string | `检测到卖点结构，但最新确立分型为底分型而非顶分型` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:203:19` | `reason: '检测到卖点结构，但最新确立分型为底分型而非顶分型'` |
-| string | `_buy` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:357:39` | `event.type.endsWith('_buy')` |
-| string | `first_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:362:31` | `event.type.startsWith('first_')` |
-| string | `second_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:363:31` | `event.type.startsWith('second_')` |
-| string | `third_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:365:31` | `event.type.startsWith('third_')` |
-| number | `4` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:432:41` | `units.length >= 4` |
-| number | `5` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:440:21` | `units.length >= 5` |
+| string | `..` | `libs/strategy/src/factor/external-plugin-loader.ts:121:53` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
+| string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:121:59` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
+| string | `../../../../..` | `libs/strategy/src/factor/external-plugin-loader.ts:126:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
+| string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:127:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
+| string | `src` | `libs/strategy/src/factor/external-plugin-loader.ts:153:31` | `path.join(basePath, 'src', 'index.ts')` |
+| string | `index.ts` | `libs/strategy/src/factor/external-plugin-loader.ts:153:38` | `path.join(basePath, 'src', 'index.ts')` |
+| string | `src` | `libs/strategy/src/factor/external-plugin-loader.ts:154:31` | `path.join(basePath, 'src', 'index.js')` |
+| string | `index.js` | `libs/strategy/src/factor/external-plugin-loader.ts:154:38` | `path.join(basePath, 'src', 'index.js')` |
+| string | `dist` | `libs/strategy/src/factor/external-plugin-loader.ts:155:31` | `path.join(basePath, 'dist', 'index.js')` |
+| string | `index.js` | `libs/strategy/src/factor/external-plugin-loader.ts:155:39` | `path.join(basePath, 'dist', 'index.js')` |
+| string | `index.ts` | `libs/strategy/src/factor/external-plugin-loader.ts:156:31` | `path.join(basePath, 'index.ts')` |
+| string | `index.js` | `libs/strategy/src/factor/external-plugin-loader.ts:157:31` | `path.join(basePath, 'index.js')` |
+| string | `src` | `libs/strategy/src/factor/external-plugin-loader.ts:169:31` | `path.join(basePath, 'src', 'plugins')` |
+| string | `plugins` | `libs/strategy/src/factor/external-plugin-loader.ts:169:38` | `path.join(basePath, 'src', 'plugins')` |
+| string | `plugins` | `libs/strategy/src/factor/external-plugin-loader.ts:170:31` | `path.join(basePath, 'plugins')` |
+| string | `.ts` | `libs/strategy/src/factor/external-plugin-loader.ts:178:29` | `f.endsWith('.ts')` |
+| string | `.js` | `libs/strategy/src/factor/external-plugin-loader.ts:178:50` | `f.endsWith('.js')` |
+| string | `.d.ts` | `libs/strategy/src/factor/external-plugin-loader.ts:179:29` | `f.endsWith('.d.ts')` |
+| string | `.spec.ts` | `libs/strategy/src/factor/external-plugin-loader.ts:180:29` | `f.endsWith('.spec.ts')` |
+| string | `.test.ts` | `libs/strategy/src/factor/external-plugin-loader.ts:181:29` | `f.endsWith('.test.ts')` |
+| string | `plugins` | `libs/strategy/src/factor/external-plugin-loader.ts:248:21` | `key !== 'plugins'` |
+| string | `getPlugins` | `libs/strategy/src/factor/external-plugin-loader.ts:248:63` | `key !== 'getPlugins'` |
+| string | `有效行情数据为空，未形成缠论K线` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:133:17` | `reason: '有效行情数据为空，未形成缠论K线'` |
+| string | `未检测到满足条件的缠论买卖点` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:147:17` | `reason: '未检测到满足条件的缠论买卖点'` |
+| string | `缠论买卖点已在先前批次发射，无需重复触发` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:191:19` | `reason: '缠论买卖点已在先前批次发射，无需重复触发'` |
+| string | `_buy` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:198:45` | `latestEvent.type.endsWith('_buy')` |
+| string | `_buy` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:202:31` | `e.type.endsWith('_buy')` |
+| string | `_buy` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:202:58` | `e.type.endsWith('_buy')` |
+| string | `当前最新K线未确立有效分型扳机(笔内延伸或包含)` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:213:19` | `reason: '当前最新K线未确立有效分型扳机(笔内延伸或包含)'` |
+| string | `检测到买点结构，但最新确立分型为顶分型而非底分型` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:220:19` | `reason: '检测到买点结构，但最新确立分型为顶分型而非底分型'` |
+| string | `检测到卖点结构，但最新确立分型为底分型而非顶分型` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:227:19` | `reason: '检测到卖点结构，但最新确立分型为底分型而非顶分型'` |
+| string | `_buy` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:414:39` | `event.type.endsWith('_buy')` |
+| string | `first_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:419:31` | `event.type.startsWith('first_')` |
+| string | `second_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:420:31` | `event.type.startsWith('second_')` |
+| string | `third_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:422:31` | `event.type.startsWith('third_')` |
 | number | `50` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:63:11` | `typeof rawParams?.period === 'number' && rawParams.period > 0 ? rawParams.period : 50` |
 | number | `0.008` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:67:11` | `typeof rawParams?.toleranceRatio === 'number' ? rawParams.toleranceRatio : 0.008` |
 | string | `pullback` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:102:23` | `direction === 'pullback'` |
@@ -1801,6 +1784,10 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `0.2` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:112:27` | `Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1)` |
 | number | `0.1` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:112:65` | `(volumeRatio - volumeMultiple) * 0.1` |
 | string | `NEUTRAL` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:129:15` | `action: 'NEUTRAL'` |
+| string | `SIGNAL_EMITTED` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:183:31` | `decision.status !== 'SIGNAL_EMITTED'` |
+| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:184:31` | `decision.action !== 'BUY'` |
+| string | `SELL` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:184:60` | `decision.action !== 'SELL'` |
+| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:195:39` | `decision.action === 'BUY'` |
 | string | `finiteNumber` | `libs/strategy/src/rules/strategy-field.catalog.ts:41:16` | `valueType: 'finiteNumber'` |
 | string | `decimal` | `libs/strategy/src/rules/strategy-field.catalog.ts:48:16` | `valueType: 'decimal'` |
 | string | `forwardFillWithinTradingDay` | `libs/strategy/src/rules/strategy-field.catalog.ts:51:20` | `missingPolicy: 'forwardFillWithinTradingDay'` |
@@ -1820,149 +1807,48 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `exit` | `libs/strategy/src/rules/strategy-rule.compiler.ts:232:38` | `value !== 'exit'` |
 | string | `crossesAbove` | `libs/strategy/src/rules/strategy-rule.compiler.ts:238:23` | `operator === 'crossesAbove'` |
 | string | `crossesBelow` | `libs/strategy/src/rules/strategy-rule.compiler.ts:238:54` | `operator === 'crossesBelow'` |
-| number | `60` | `libs/strategy/src/simulation/standard-simulation-flows.ts:31:57` | `options?.requiredBarCount ?? 60` |
+| string | `first_buy` | `libs/strategy/src/simulation/kernel-signal-mapper.ts:9:10` | `case 'first_buy': return '1买';` |
+| string | `second_buy` | `libs/strategy/src/simulation/kernel-signal-mapper.ts:11:10` | `case 'second_buy': return '2买';` |
+| string | `third_buy` | `libs/strategy/src/simulation/kernel-signal-mapper.ts:13:10` | `case 'third_buy': return '3买';` |
+| string | `first_sell` | `libs/strategy/src/simulation/kernel-signal-mapper.ts:15:10` | `case 'first_sell': return '1卖';` |
+| string | `second_sell` | `libs/strategy/src/simulation/kernel-signal-mapper.ts:17:10` | `case 'second_sell': return '2卖';` |
+| string | `third_sell` | `libs/strategy/src/simulation/kernel-signal-mapper.ts:19:10` | `case 'third_sell': return '3卖';` |
+| string | `entry` | `libs/strategy/src/simulation/kernel-signal-mapper.ts:35:39` | `signal.signalKind === 'entry'` |
+| number | `60` | `libs/strategy/src/simulation/standard-simulation-flows.ts:29:57` | `options?.requiredBarCount ?? 60` |
+| string | `both` | `libs/strategy/src/simulation/standard-simulation-flows.ts:33:19` | `direction === 'both'` |
+| string | `sell` | `libs/strategy/src/simulation/standard-simulation-flows.ts:33:51` | `direction === 'sell'` |
 | string | `both` | `libs/strategy/src/simulation/standard-simulation-flows.ts:35:19` | `direction === 'both'` |
-| string | `sell` | `libs/strategy/src/simulation/standard-simulation-flows.ts:35:51` | `direction === 'sell'` |
-| string | `both` | `libs/strategy/src/simulation/standard-simulation-flows.ts:37:19` | `direction === 'both'` |
-| string | `sell` | `libs/strategy/src/simulation/standard-simulation-flows.ts:37:54` | `direction === 'sell'` |
-| string | `guard_chan_bsp` | `libs/strategy/src/simulation/standard-simulation-flows.ts:40:9` | `id: 'guard_chan_bsp'` |
-| string | `GUARD` | `libs/strategy/src/simulation/standard-simulation-flows.ts:41:11` | `type: 'GUARD'` |
-| string | `缠论形态买卖点标准门禁` | `libs/strategy/src/simulation/standard-simulation-flows.ts:42:11` | `name: '缠论形态买卖点标准门禁'` |
-| string | `plugin.chan.bsp` | `libs/strategy/src/simulation/standard-simulation-flows.ts:43:15` | `pluginId: 'plugin.chan.bsp'` |
-| number | `0.6` | `libs/strategy/src/simulation/standard-simulation-flows.ts:52:20` | `minConfidence: 0.6` |
-| string | `term_chan_bsp_passed` | `libs/strategy/src/simulation/standard-simulation-flows.ts:54:11` | `id: 'term_chan_bsp_passed'` |
-| string | `TERMINAL` | `libs/strategy/src/simulation/standard-simulation-flows.ts:55:13` | `type: 'TERMINAL'` |
-| string | `CHAN_BSP` | `libs/strategy/src/simulation/standard-simulation-flows.ts:57:18` | `signalTag: 'CHAN_BSP'` |
-| string | `缠论结构确立，触发买卖点信号` | `libs/strategy/src/simulation/standard-simulation-flows.ts:58:15` | `reason: '缠论结构确立，触发买卖点信号'` |
-| string | `term_chan_bsp_rejected` | `libs/strategy/src/simulation/standard-simulation-flows.ts:61:11` | `id: 'term_chan_bsp_rejected'` |
-| string | `TERMINAL` | `libs/strategy/src/simulation/standard-simulation-flows.ts:62:13` | `type: 'TERMINAL'` |
-| string | `ABORT` | `libs/strategy/src/simulation/standard-simulation-flows.ts:63:15` | `action: 'ABORT'` |
-| string | `未满足缠论买卖点形态确认条件` | `libs/strategy/src/simulation/standard-simulation-flows.ts:64:15` | `reason: '未满足缠论买卖点形态确认条件'` |
-| string | `guard_tactics_chan_bsp` | `libs/strategy/src/simulation/standard-simulation-flows.ts:77:9` | `id: 'guard_tactics_chan_bsp'` |
-| string | `GUARD` | `libs/strategy/src/simulation/standard-simulation-flows.ts:78:11` | `type: 'GUARD'` |
-| string | `plugin.chan.bsp` | `libs/strategy/src/simulation/standard-simulation-flows.ts:80:15` | `pluginId: 'plugin.chan.bsp'` |
-| string | `bi` | `libs/strategy/src/simulation/standard-simulation-flows.ts:82:14` | `units: 'bi'` |
-| string | `both` | `libs/strategy/src/simulation/standard-simulation-flows.ts:83:18` | `direction: 'both'` |
-| number | `60` | `libs/strategy/src/simulation/standard-simulation-flows.ts:85:25` | `requiredBarCount: 60` |
-| string | `BOTH` | `libs/strategy/src/simulation/standard-simulation-flows.ts:88:21` | `requiredAction: 'BOTH'` |
-| number | `0.5` | `libs/strategy/src/simulation/standard-simulation-flows.ts:89:20` | `minConfidence: 0.5` |
-| string | `term_tactics_signal` | `libs/strategy/src/simulation/standard-simulation-flows.ts:91:11` | `id: 'term_tactics_signal'` |
-| string | `TERMINAL` | `libs/strategy/src/simulation/standard-simulation-flows.ts:92:13` | `type: 'TERMINAL'` |
-| string | `INHERIT` | `libs/strategy/src/simulation/standard-simulation-flows.ts:93:15` | `action: 'INHERIT'` |
-| string | `TACTICS_SIGNAL` | `libs/strategy/src/simulation/standard-simulation-flows.ts:94:18` | `signalTag: 'TACTICS_SIGNAL'` |
-| string | `term_tactics_abort` | `libs/strategy/src/simulation/standard-simulation-flows.ts:98:11` | `id: 'term_tactics_abort'` |
-| string | `TERMINAL` | `libs/strategy/src/simulation/standard-simulation-flows.ts:99:13` | `type: 'TERMINAL'` |
-| string | `ABORT` | `libs/strategy/src/simulation/standard-simulation-flows.ts:100:15` | `action: 'ABORT'` |
-| string | `未达四象限战术触发标准` | `libs/strategy/src/simulation/standard-simulation-flows.ts:101:15` | `reason: '未达四象限战术触发标准'` |
-| number | `36` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:38:51` | `Math.random().toString(36)` |
-| number | `8` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:38:64` | `Math.random().toString(36).slice(2, 8)` |
-| number | `600` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:41:48` | `config.windowBudget ?? 600` |
-| string | `BUY` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:170:29` | `decision.action === 'BUY'` |
-| string | `SELL` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:170:58` | `decision.action === 'SELL'` |
-| string | `BUY` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:171:41` | `decision.action === 'BUY'` |
-| string | `_buy` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:189:45` | `candType.endsWith('_buy')` |
-| number | `20` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:267:25` | `this.cursor % 20` |
-| string | `一买` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:313:34` | `item.reason.includes('一买')` |
-| string | `1买` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:313:64` | `item.reason.includes('1买')` |
-| string | `first_buy` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:314:26` | `type: 'first_buy'` |
-| string | `二买` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:316:34` | `item.reason.includes('二买')` |
-| string | `2买` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:316:64` | `item.reason.includes('2买')` |
-| string | `second_buy` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:317:26` | `type: 'second_buy'` |
-| string | `三买` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:319:34` | `item.reason.includes('三买')` |
-| string | `3买` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:319:64` | `item.reason.includes('3买')` |
-| string | `third_buy` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:320:26` | `type: 'third_buy'` |
-| string | `一卖` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:322:34` | `item.reason.includes('一卖')` |
-| string | `1卖` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:322:64` | `item.reason.includes('1卖')` |
-| string | `first_sell` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:323:26` | `type: 'first_sell'` |
-| string | `二卖` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:325:34` | `item.reason.includes('二卖')` |
-| string | `2卖` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:325:64` | `item.reason.includes('2卖')` |
-| string | `second_sell` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:326:26` | `type: 'second_sell'` |
-| string | `三卖` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:328:34` | `item.reason.includes('三卖')` |
-| string | `3卖` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:328:64` | `item.reason.includes('3卖')` |
-| string | `third_sell` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:329:26` | `type: 'third_sell'` |
-| string | `first_buy` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:338:12` | `case 'first_buy': return '1买';` |
-| string | `second_buy` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:340:12` | `case 'second_buy': return '2买';` |
-| string | `third_buy` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:342:12` | `case 'third_buy': return '3买';` |
-| string | `first_sell` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:344:12` | `case 'first_sell': return '1卖';` |
-| string | `second_sell` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:346:12` | `case 'second_sell': return '2卖';` |
-| string | `third_sell` | `libs/strategy/src/simulation/strategy-simulation.engine.ts:348:12` | `case 'third_sell': return '3卖';` |
-| number | `500` | `libs/strategy/src/simulation/strategy-simulation.session.ts:20:21` | `private speedMs = 500;` |
-| string | `play` | `libs/strategy/src/simulation/strategy-simulation.session.ts:75:12` | `case 'play': this.play(); return this.engine.getCurrentFrame();` |
-| string | `step_next` | `libs/strategy/src/simulation/strategy-simulation.session.ts:81:12` | `case 'step_next': this.pause(); return this.stepNext();` |
-| string | `step_prev` | `libs/strategy/src/simulation/strategy-simulation.session.ts:84:12` | `case 'step_prev': this.pause(); return this.stepPrev();` |
-| string | `seek` | `libs/strategy/src/simulation/strategy-simulation.session.ts:87:12` | `case 'seek': this.pause(); return this.seek(command.param ?? 0);` |
-| string | `set_speed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:90:12` | `case 'set_speed': if ( typeof command.param === 'number' && command.param >= 20 && command.param <= ` |
-| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:93:28` | `command.param >= 20` |
-| number | `5000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:94:28` | `command.param <= 5000` |
-| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:97:31` | `this.status === 'playing'` |
-| string | `paused` | `libs/strategy/src/simulation/strategy-simulation.session.ts:121:20` | `this.setStatus('paused')` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:131:22` | `this.setStatus('completed')` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:150:22` | `this.setStatus('completed')` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:158:20` | `this.setStatus('completed')` |
-| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:163:20` | `this.setStatus('playing')` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:175:26` | `this.setStatus('completed')` |
-| string | `1m` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:40:13` | `p === '1m'` |
-| string | `5m` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:41:13` | `p === '5m'` |
-| string | `5` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:41:27` | `p === '5'` |
-| string | `15m` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:42:13` | `p === '15m'` |
-| string | `15` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:42:28` | `p === '15'` |
-| string | `30m` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:43:13` | `p === '30m'` |
-| string | `30` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:43:28` | `p === '30'` |
-| string | `60m` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:44:13` | `p === '60m'` |
-| string | `60` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:44:28` | `p === '60'` |
-| string | `1h` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:44:42` | `p === '1h'` |
-| string | `1d` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:45:13` | `p === '1d'` |
-| string | `daily` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:45:42` | `p === 'daily'` |
-| number | `3` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:168:36` | `klines.length < 3` |
-| string | `K线数量不足` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:169:64` | `this.emptyDecision(TacticalQuadrant.LeftBuy, ctx, 'K线数量不足')` |
-| string | `未形成有效底分型` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:202:11` | `this.emptyDecision( TacticalQuadrant.LeftBuy, ctx, '未形成有效底分型', )` |
-| number | `3` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:268:30` | `bis.length >= 3` |
-| number | `3` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:269:35` | `bis.length - 3` |
-| string | `二买形态观察中，等待底分型扳机确立` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:285:13` | `this.emptyDecision( TacticalQuadrant.RightBuy, ctx, '二买形态观察中，等待底分型扳机确立', )` |
-| number | `3` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:313:36` | `klines.length < 3` |
-| string | `K线数量不足` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:314:65` | `this.emptyDecision(TacticalQuadrant.LeftSell, ctx, 'K线数量不足')` |
-| string | `未形成有效顶分型` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:344:11` | `this.emptyDecision( TacticalQuadrant.LeftSell, ctx, '未形成有效顶分型', )` |
-| number | `3` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:406:30` | `bis.length >= 3` |
-| number | `3` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:407:35` | `bis.length - 3` |
-| string | `二卖形态观察中，等待顶分型扳机确立` | `libs/strategy/src/tactics/default/standard-chan-tactics.ts:423:13` | `this.emptyDecision( TacticalQuadrant.RightSell, ctx, '二卖形态观察中，等待顶分型扳机确立', )` |
-| string | `private` | `libs/strategy/src/tactics/dynamic-tactics-loader.ts:143:28` | `path.join(__dirname, 'private', 'my-secret-tactics')` |
-| string | `my-secret-tactics` | `libs/strategy/src/tactics/dynamic-tactics-loader.ts:143:39` | `path.join(__dirname, 'private', 'my-secret-tactics')` |
-| string | `private` | `libs/strategy/src/tactics/dynamic-tactics-loader.ts:144:28` | `path.join(__dirname, 'private', 'index')` |
-| string | `index` | `libs/strategy/src/tactics/dynamic-tactics-loader.ts:144:39` | `path.join(__dirname, 'private', 'index')` |
-| number | `3` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:35:25` | `klines.length < 3` |
-| string | `DOWN` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:52:24` | `macroTrend === 'DOWN'` |
-| string | `UP` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:63:22` | `macroTrend === 'UP'` |
-| string | `DOWN` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:65:26` | `macroTrend === 'DOWN'` |
-| number | `35` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:69:50` | `ctx.subKlines.length >= 35` |
-| number | `-0.01` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:77:48` | `lastDif > -0.01` |
-| number | `3` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:78:49` | `lastDif.toFixed(3)` |
-| string | `UP` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:90:34` | `macroTrend === 'UP'` |
-| number | `95` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:90:41` | `macroTrend === 'UP' ? 95 : 88` |
-| number | `88` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:90:46` | `macroTrend === 'UP' ? 95 : 88` |
-| number | `3` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:103:22` | `bis.length < 3` |
-| number | `3` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:108:33` | `bis.length - 3` |
-| string | `down` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:112:22` | `b0.trend === 'down'` |
-| string | `up` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:112:45` | `b1.trend === 'up'` |
-| string | `down` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:112:66` | `b2.trend === 'down'` |
-| string | `处于二买形态观察区，但当根K线未确立底分型扳机` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:130:13` | `this.emptyDecision( TacticalQuadrant.RightBuy, ctx, '处于二买形态观察区，但当根K线未确立底分型扳机', )` |
-| number | `92` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:139:23` | `confidence: 92` |
-| number | `3` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:156:25` | `klines.length < 3` |
-| number | `85` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:170:19` | `confidence: 85` |
-| string | `本级别顶分型确立，高位冲高滞涨，建议分批止盈` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:172:15` | `reason: '本级别顶分型确立，高位冲高滞涨，建议分批止盈'` |
-| number | `3` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:183:22` | `bis.length < 3` |
-| number | `3` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:187:33` | `bis.length - 3` |
-| string | `up` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:192:22` | `b0.trend === 'up'` |
-| string | `down` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:192:43` | `b1.trend === 'down'` |
-| string | `up` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:192:66` | `b2.trend === 'up'` |
-| string | `处于二卖形态观察区，但当根K线未确立顶分型扳机` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:200:13` | `this.emptyDecision( TacticalQuadrant.RightSell, ctx, '处于二卖形态观察区，但当根K线未确立顶分型扳机', )` |
-| number | `90` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:209:23` | `confidence: 90` |
-| string | `up` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:226:30` | `lastDuan.trend === 'up'` |
-| string | `down` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:227:30` | `lastDuan.trend === 'down'` |
-| number | `30` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:230:30` | `ctx.klines.length >= 30` |
-| number | `-30` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:232:33` | `closes.slice(-30)` |
-| number | `30` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:232:71` | `closes.slice(-30).reduce((acc, c) => acc + c, 0) / 30` |
-| number | `1.015` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:234:32` | `ma30 * 1.015` |
-| number | `0.985` | `libs/strategy/src/tactics/private/my-secret-tactics.ts:235:32` | `ma30 * 0.985` |
+| string | `sell` | `libs/strategy/src/simulation/standard-simulation-flows.ts:35:54` | `direction === 'sell'` |
+| string | `guard_chan_bsp` | `libs/strategy/src/simulation/standard-simulation-flows.ts:38:9` | `id: 'guard_chan_bsp'` |
+| string | `GUARD` | `libs/strategy/src/simulation/standard-simulation-flows.ts:39:11` | `type: 'GUARD'` |
+| string | `缠论形态买卖点标准门禁` | `libs/strategy/src/simulation/standard-simulation-flows.ts:40:11` | `name: '缠论形态买卖点标准门禁'` |
+| string | `plugin.chan.bsp` | `libs/strategy/src/simulation/standard-simulation-flows.ts:41:15` | `pluginId: 'plugin.chan.bsp'` |
+| number | `0.6` | `libs/strategy/src/simulation/standard-simulation-flows.ts:50:20` | `minConfidence: 0.6` |
+| string | `term_chan_bsp_passed` | `libs/strategy/src/simulation/standard-simulation-flows.ts:52:11` | `id: 'term_chan_bsp_passed'` |
+| string | `TERMINAL` | `libs/strategy/src/simulation/standard-simulation-flows.ts:53:13` | `type: 'TERMINAL'` |
+| string | `CHAN_BSP` | `libs/strategy/src/simulation/standard-simulation-flows.ts:55:18` | `signalTag: 'CHAN_BSP'` |
+| string | `缠论结构确立，触发买卖点信号` | `libs/strategy/src/simulation/standard-simulation-flows.ts:56:15` | `reason: '缠论结构确立，触发买卖点信号'` |
+| string | `term_chan_bsp_rejected` | `libs/strategy/src/simulation/standard-simulation-flows.ts:59:11` | `id: 'term_chan_bsp_rejected'` |
+| string | `TERMINAL` | `libs/strategy/src/simulation/standard-simulation-flows.ts:60:13` | `type: 'TERMINAL'` |
+| string | `ABORT` | `libs/strategy/src/simulation/standard-simulation-flows.ts:61:15` | `action: 'ABORT'` |
+| string | `未满足缠论买卖点形态确认条件` | `libs/strategy/src/simulation/standard-simulation-flows.ts:62:15` | `reason: '未满足缠论买卖点形态确认条件'` |
+| number | `250` | `libs/strategy/src/simulation/strategy-simulation.session.ts:37:21` | `private speedMs = 250;` |
+| number | `-8640000000000000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:55:18` | `new Date(-8640000000000000)` |
+| number | `600` | `libs/strategy/src/simulation/strategy-simulation.session.ts:77:52` | `config.windowBudget ?? 600` |
+| string | `play` | `libs/strategy/src/simulation/strategy-simulation.session.ts:133:12` | `case 'play': this.play(); return this.getCurrentFrame();` |
+| string | `step_next` | `libs/strategy/src/simulation/strategy-simulation.session.ts:139:12` | `case 'step_next': this.pause(); return this.stepNext();` |
+| string | `step_prev` | `libs/strategy/src/simulation/strategy-simulation.session.ts:142:12` | `case 'step_prev': this.pause(); return this.stepPrev();` |
+| string | `seek` | `libs/strategy/src/simulation/strategy-simulation.session.ts:145:12` | `case 'seek': this.pause(); return this.seek(command.param ?? 0);` |
+| string | `set_speed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:148:12` | `case 'set_speed': if ( typeof command.param === 'number' && command.param >= 20 && command.param <= ` |
+| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:151:28` | `command.param >= 20` |
+| number | `5000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:152:28` | `command.param <= 5000` |
+| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:155:31` | `this.status === 'playing'` |
+| string | `paused` | `libs/strategy/src/simulation/strategy-simulation.session.ts:179:20` | `this.setStatus('paused')` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:222:22` | `this.setStatus('completed')` |
+| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:257:25` | `this.cursor % 20` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:311:20` | `this.setStatus('completed')` |
+| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:325:20` | `this.setStatus('playing')` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:334:26` | `this.setStatus('completed')` |
 | number | `10000` | `libs/timezone/src/timezone.service.ts:62:16` | `timeout: 10000` |
 | string | `T` | `libs/timezone/src/timezone.service.ts:88:47` | `normalized.replace(' ', 'T')` |
 | string | `+08:00` | `libs/timezone/src/timezone.service.ts:88:54` | `normalized.replace(' ', 'T') + '+08:00'` |
@@ -2051,20 +1937,23 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:229:36` | `totalMinutes % 60` |
 | number | `4` | `libs/utils/src/services/k-boundary-calculator.ts:231:47` | `normalizedDate.year.toString().padStart(4, '0')` |
 | number | `10000` | `libs/utils/src/utils.service.ts:15:34` | `config.timeout \|\| 10000` |
-| number | `3` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:42:36` | `klines.length < 3` |
-| string | `line` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:99:17` | `type: 'line'` |
-| string | `chan_bi` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:100:18` | `layer: 'chan_bi'` |
-| string | `solid` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:109:18` | `style: 'solid'` |
-| string | `band` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:150:17` | `type: 'band'` |
-| string | `chan_zs_bi` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:151:18` | `layer: 'chan_zs_bi'` |
-| string | `line` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:210:17` | `type: 'line'` |
-| string | `chan_duan` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:211:18` | `layer: 'chan_duan'` |
-| string | `solid` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:220:18` | `style: 'solid'` |
-| string | `band` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:253:17` | `type: 'band'` |
-| string | `chan_zs_duan` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:254:18` | `layer: 'chan_zs_duan'` |
-| number | `3` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:279:37` | `bis.length >= 3` |
-| string | `text` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:311:17` | `type: 'text'` |
-| string | `chan_bsp` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:312:18` | `layer: 'chan_bsp'` |
+| number | `3` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:46:36` | `klines.length < 3` |
+| string | `line` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:103:17` | `type: 'line'` |
+| string | `chan_bi` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:104:18` | `layer: 'chan_bi'` |
+| string | `solid` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:113:18` | `style: 'solid'` |
+| string | `band` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:153:17` | `type: 'band'` |
+| string | `chan_zs_bi` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:154:18` | `layer: 'chan_zs_bi'` |
+| string | `line` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:215:17` | `type: 'line'` |
+| string | `chan_duan` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:216:18` | `layer: 'chan_duan'` |
+| string | `solid` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:225:18` | `style: 'solid'` |
+| string | `band` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:270:17` | `type: 'band'` |
+| string | `chan_zs_duan` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:271:18` | `layer: 'chan_zs_duan'` |
+| number | `3` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:298:37` | `bis.length >= 3` |
+| string | `text` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:324:17` | `type: 'text'` |
+| string | `chan_bsp_bi` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:325:18` | `layer: 'chan_bsp_bi'` |
+| number | `3` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:337:27` | `duans.length >= 3` |
+| string | `text` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:364:19` | `type: 'text'` |
+| string | `chan_bsp_duan` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:365:20` | `layer: 'chan_bsp_duan'` |
 | number | `50` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:37:38` | `options.period ?? 50` |
 | string | `0.236` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:80:18` | `upper: '0.236'` |
 | string | `0.382` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:80:34` | `lower: '0.382'` |
@@ -2086,18 +1975,19 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `chan_zs` | `libs/visual-command/src/visual-command.service.ts:46:20` | `layerSet.has('chan_zs')` |
 | string | `chan_zs_bi` | `libs/visual-command/src/visual-command.service.ts:47:20` | `layerSet.has('chan_zs_bi')` |
 | string | `chan_zs_duan` | `libs/visual-command/src/visual-command.service.ts:48:20` | `layerSet.has('chan_zs_duan')` |
-| string | `chan` | `libs/visual-command/src/visual-command.service.ts:52:20` | `layerSet.has('chan')` |
-| string | `chan_bi` | `libs/visual-command/src/visual-command.service.ts:53:20` | `layerSet.has('chan_bi')` |
-| string | `chan_duan` | `libs/visual-command/src/visual-command.service.ts:54:20` | `layerSet.has('chan_duan')` |
-| string | `chan_bsp` | `libs/visual-command/src/visual-command.service.ts:56:20` | `layerSet.has('chan_bsp')` |
-| string | `chan` | `libs/visual-command/src/visual-command.service.ts:60:34` | `layerSet.has('chan')` |
-| string | `chan_bi` | `libs/visual-command/src/visual-command.service.ts:60:57` | `layerSet.has('chan_bi')` |
-| string | `chan` | `libs/visual-command/src/visual-command.service.ts:61:36` | `layerSet.has('chan')` |
-| string | `chan_duan` | `libs/visual-command/src/visual-command.service.ts:61:59` | `layerSet.has('chan_duan')` |
-| string | `chan` | `libs/visual-command/src/visual-command.service.ts:62:40` | `layerSet.has('chan')` |
-| string | `chan` | `libs/visual-command/src/visual-command.service.ts:63:35` | `layerSet.has('chan')` |
-| string | `chan_bsp` | `libs/visual-command/src/visual-command.service.ts:63:58` | `layerSet.has('chan_bsp')` |
-| string | `fibonacci` | `libs/visual-command/src/visual-command.service.ts:69:22` | `layerSet.has('fibonacci')` |
+| string | `chan_bsp` | `libs/visual-command/src/visual-command.service.ts:51:20` | `layerSet.has('chan_bsp')` |
+| string | `chan_bsp_bi` | `libs/visual-command/src/visual-command.service.ts:52:20` | `layerSet.has('chan_bsp_bi')` |
+| string | `chan_bsp_duan` | `libs/visual-command/src/visual-command.service.ts:53:20` | `layerSet.has('chan_bsp_duan')` |
+| string | `chan` | `libs/visual-command/src/visual-command.service.ts:57:20` | `layerSet.has('chan')` |
+| string | `chan_bi` | `libs/visual-command/src/visual-command.service.ts:58:20` | `layerSet.has('chan_bi')` |
+| string | `chan_duan` | `libs/visual-command/src/visual-command.service.ts:59:20` | `layerSet.has('chan_duan')` |
+| string | `chan` | `libs/visual-command/src/visual-command.service.ts:65:34` | `layerSet.has('chan')` |
+| string | `chan_bi` | `libs/visual-command/src/visual-command.service.ts:65:57` | `layerSet.has('chan_bi')` |
+| string | `chan` | `libs/visual-command/src/visual-command.service.ts:66:36` | `layerSet.has('chan')` |
+| string | `chan_duan` | `libs/visual-command/src/visual-command.service.ts:66:59` | `layerSet.has('chan_duan')` |
+| string | `chan` | `libs/visual-command/src/visual-command.service.ts:67:40` | `layerSet.has('chan')` |
+| string | `chan` | `libs/visual-command/src/visual-command.service.ts:68:35` | `layerSet.has('chan')` |
+| string | `fibonacci` | `libs/visual-command/src/visual-command.service.ts:74:22` | `layerSet.has('fibonacci')` |
 | string | `k.json` | `tools/strategy-dev/provider.ts:67:61` | `path.join(baseDir, options.caseKey, 'k.json')` |
 | string | `, ` | `tools/strategy-dev/provider.ts:75:66` | `FIXTURE_DIRS.join(', ')` |
 | string | `, ` | `tools/strategy-dev/provider.ts:114:19` | `listAvailableDatasets() .map((d) => d.key) .join(', ')` |
@@ -2110,124 +2000,133 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `.json` | `tools/strategy-dev/provider.ts:198:28` | `f.replace('.json', '')` |
 | string | `meta.json` | `tools/strategy-dev/provider.ts:220:53` | `path.join(baseDir, ent.name, 'meta.json')` |
 | string | `k.json` | `tools/strategy-dev/provider.ts:228:49` | `path.join(baseDir, ent.name, 'k.json')` |
-| number | `4` | `tools/strategy-dev/runner.ts:34:33` | `units.length >= 4` |
-| number | `5` | `tools/strategy-dev/runner.ts:38:21` | `units.length >= 5` |
-| string | `case` | `tools/strategy-dev/runner.ts:70:26` | `getArg('case')` |
-| string | `caseKey` | `tools/strategy-dev/runner.ts:70:44` | `getArg('caseKey')` |
-| string | `code` | `tools/strategy-dev/runner.ts:71:23` | `getArg('code')` |
-| string | `period` | `tools/strategy-dev/runner.ts:72:25` | `getArg('period')` |
-| string | `subPeriod` | `tools/strategy-dev/runner.ts:73:28` | `getArg('subPeriod')` |
-| string | `sub` | `tools/strategy-dev/runner.ts:73:51` | `getArg('sub')` |
-| string | `parentPeriod` | `tools/strategy-dev/runner.ts:74:31` | `getArg('parentPeriod')` |
-| string | `parent` | `tools/strategy-dev/runner.ts:74:57` | `getArg('parent')` |
-| string | `capital` | `tools/strategy-dev/runner.ts:75:36` | `getArg('capital')` |
-| number | `100000` | `tools/strategy-dev/runner.ts:83:50` | `Number(initialCapitalStr) \|\| 100000` |
-| number | `10` | `tools/strategy-dev/runner.ts:130:58` | `klines[0]?.time.toISOString().substring(0, 10)` |
-| number | `10` | `tools/strategy-dev/runner.ts:130:126` | `klines[klines.length - 1]?.time.toISOString().substring(0, 10)` |
-| number | `30` | `tools/strategy-dev/runner.ts:178:21` | `minWindow = 30` |
-| number | `19` | `tools/strategy-dev/runner.ts:225:74` | `s.decision.time.toISOString().replace('T', ' ').substring(0, 19)` |
-| number | `99.9` | `tools/strategy-dev/runner.ts:316:65` | `grossProfit > 0 ? 99.9 : 0` |
-| string | `Forbidden: Strategy simulation suite is strictly restricted to local development environment and disabled in production.` | `tools/strategy-dev/server.ts:71:11` | `error: 'Forbidden: Strategy simulation suite is strictly restricted to local development environment` |
-| string | `complete` | `tools/strategy-dev/server.ts:194:11` | `type: 'complete'` |
-| string | `上证指数 30m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:284:19` | `strategyName: '上证指数 30m 缠论策略树决策流回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:286:13` | `status: 'completed'` |
-| string | `qmt` | `tools/strategy-dev/server.ts:287:13` | `source: 'qmt'` |
-| number | `30` | `tools/strategy-dev/server.ts:289:13` | `period: 30` |
-| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:290:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
-| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:291:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
-| number | `51` | `tools/strategy-dev/server.ts:292:18` | `signalCount: 51` |
-| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:294:16` | `startedAt: '2026-09-25T05:00:00.000Z'` |
-| string | `2026-09-25T05:00:02.000Z` | `tools/strategy-dev/server.ts:295:18` | `completedAt: '2026-09-25T05:00:02.000Z'` |
-| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:296:16` | `createdAt: '2026-09-25T05:00:00.000Z'` |
-| string | `上证指数 日线 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:301:19` | `strategyName: '上证指数 日线 缠论策略树决策流回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:303:13` | `status: 'completed'` |
-| string | `qmt` | `tools/strategy-dev/server.ts:304:13` | `source: 'qmt'` |
-| number | `1440` | `tools/strategy-dev/server.ts:306:13` | `period: 1440` |
-| string | `2024-01-01T16:00:00.000Z` | `tools/strategy-dev/server.ts:307:16` | `startDate: '2024-01-01T16:00:00.000Z'` |
-| string | `2026-09-23T16:00:00.000Z` | `tools/strategy-dev/server.ts:308:14` | `endDate: '2026-09-23T16:00:00.000Z'` |
-| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:311:16` | `startedAt: '2026-09-25T04:50:00.000Z'` |
-| string | `2026-09-25T04:50:01.000Z` | `tools/strategy-dev/server.ts:312:18` | `completedAt: '2026-09-25T04:50:01.000Z'` |
-| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:313:16` | `createdAt: '2026-09-25T04:50:00.000Z'` |
-| number | `3` | `tools/strategy-dev/server.ts:316:9` | `id: 3` |
-| string | `贵州茅台 日线 历史基准回测` | `tools/strategy-dev/server.ts:318:19` | `strategyName: '贵州茅台 日线 历史基准回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:320:13` | `status: 'completed'` |
-| string | `tdx` | `tools/strategy-dev/server.ts:321:13` | `source: 'tdx'` |
-| number | `1440` | `tools/strategy-dev/server.ts:323:13` | `period: 1440` |
-| string | `2024-01-01T00:00:00.000Z` | `tools/strategy-dev/server.ts:324:16` | `startDate: '2024-01-01T00:00:00.000Z'` |
-| string | `2026-08-21T00:00:00.000Z` | `tools/strategy-dev/server.ts:325:14` | `endDate: '2026-08-21T00:00:00.000Z'` |
-| number | `18` | `tools/strategy-dev/server.ts:326:18` | `signalCount: 18` |
-| string | `2026-09-25T04:40:00.000Z` | `tools/strategy-dev/server.ts:328:16` | `startedAt: '2026-09-25T04:40:00.000Z'` |
-| string | `2026-09-25T04:40:01.000Z` | `tools/strategy-dev/server.ts:329:18` | `completedAt: '2026-09-25T04:40:01.000Z'` |
-| string | `2026-09-25T04:40:00.000Z` | `tools/strategy-dev/server.ts:330:16` | `createdAt: '2026-09-25T04:40:00.000Z'` |
-| string | `/v1/indicators/k` | `tools/strategy-dev/server.ts:421:24` | `pathname.endsWith('/v1/indicators/k')` |
-| string | `/indicators/k` | `tools/strategy-dev/server.ts:422:25` | `pathname.endsWith('/indicators/k')` |
-| string | `/v1/chan/merge-k` | `tools/strategy-dev/server.ts:484:25` | `pathname.endsWith('/v1/chan/merge-k')` |
-| number | `200` | `tools/strategy-dev/server.ts:512:25` | `sendJson(res, [], 200)` |
-| string | `/v1/visual/commands` | `tools/strategy-dev/server.ts:518:25` | `pathname.endsWith('/v1/visual/commands')` |
-| string | `/v1/simulation/` | `tools/strategy-dev/server.ts:574:25` | `pathname.includes('/v1/simulation/')` |
-| string | `/v1/simulation/start` | `tools/strategy-dev/server.ts:581:25` | `pathname.endsWith('/v1/simulation/start')` |
-| string | `/v1/simulation/stream` | `tools/strategy-dev/server.ts:655:25` | `pathname.endsWith('/v1/simulation/stream')` |
-| number | `404` | `tools/strategy-dev/server.ts:660:21` | `res.writeHead(404, { 'Content-Type': 'text/plain' })` |
-| number | `200` | `tools/strategy-dev/server.ts:665:19` | `res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform',` |
-| string | `no-cache, no-transform` | `tools/strategy-dev/server.ts:667:24` | `'Cache-Control': 'no-cache, no-transform'` |
-| string | `no` | `tools/strategy-dev/server.ts:670:28` | `'X-Accel-Buffering': 'no'` |
+| string | `case` | `tools/strategy-dev/runner.ts:57:26` | `getArg('case')` |
+| string | `caseKey` | `tools/strategy-dev/runner.ts:57:44` | `getArg('caseKey')` |
+| string | `code` | `tools/strategy-dev/runner.ts:58:23` | `getArg('code')` |
+| string | `period` | `tools/strategy-dev/runner.ts:59:25` | `getArg('period')` |
+| string | `subPeriod` | `tools/strategy-dev/runner.ts:60:28` | `getArg('subPeriod')` |
+| string | `sub` | `tools/strategy-dev/runner.ts:60:51` | `getArg('sub')` |
+| string | `parentPeriod` | `tools/strategy-dev/runner.ts:61:31` | `getArg('parentPeriod')` |
+| string | `parent` | `tools/strategy-dev/runner.ts:61:57` | `getArg('parent')` |
+| string | `capital` | `tools/strategy-dev/runner.ts:62:36` | `getArg('capital')` |
+| number | `100000` | `tools/strategy-dev/runner.ts:70:50` | `Number(initialCapitalStr) \|\| 100000` |
+| number | `30` | `tools/strategy-dev/runner.ts:74:51` | `fallback = 30` |
+| string | `complete` | `tools/strategy-dev/runner.ts:110:11` | `type: 'complete'` |
+| number | `30` | `tools/strategy-dev/runner.ts:136:51` | `resolvePeriod(options.period, 30)` |
+| number | `10` | `tools/strategy-dev/runner.ts:156:58` | `klines[0]?.time.toISOString().substring(0, 10)` |
+| number | `10` | `tools/strategy-dev/runner.ts:156:126` | `klines[klines.length - 1]?.time.toISOString().substring(0, 10)` |
+| number | `-8640000000000000` | `tools/strategy-dev/runner.ts:170:26` | `new Date(-8640000000000000)` |
+| number | `60` | `tools/strategy-dev/runner.ts:177:27` | `requiredBarCount: 60` |
+| number | `19` | `tools/strategy-dev/runner.ts:214:61` | `s.signalTime.replace('T', ' ').substring(0, 19)` |
+| number | `19` | `tools/strategy-dev/runner.ts:215:60` | `s.pivotTime.replace('T', ' ').substring(0, 19)` |
+| number | `99.9` | `tools/strategy-dev/runner.ts:286:65` | `grossProfit > 0 ? 99.9 : 0` |
+| string | `Forbidden: Strategy simulation suite is strictly restricted to local development environment and disabled in production.` | `tools/strategy-dev/server.ts:74:11` | `error: 'Forbidden: Strategy simulation suite is strictly restricted to local development environment` |
+| string | `complete` | `tools/strategy-dev/server.ts:197:11` | `type: 'complete'` |
+| string | `上证指数 30m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:289:19` | `strategyName: '上证指数 30m 缠论策略树决策流回测'` |
+| string | `completed` | `tools/strategy-dev/server.ts:291:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:292:13` | `source: 'qmt'` |
+| number | `30` | `tools/strategy-dev/server.ts:294:13` | `period: 30` |
+| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:295:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
+| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:296:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
+| number | `51` | `tools/strategy-dev/server.ts:297:18` | `signalCount: 51` |
+| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:299:16` | `startedAt: '2026-09-25T05:00:00.000Z'` |
+| string | `2026-09-25T05:00:02.000Z` | `tools/strategy-dev/server.ts:300:18` | `completedAt: '2026-09-25T05:00:02.000Z'` |
+| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:301:16` | `createdAt: '2026-09-25T05:00:00.000Z'` |
+| string | `上证指数 日线 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:306:19` | `strategyName: '上证指数 日线 缠论策略树决策流回测'` |
+| string | `completed` | `tools/strategy-dev/server.ts:308:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:309:13` | `source: 'qmt'` |
+| number | `1440` | `tools/strategy-dev/server.ts:311:13` | `period: 1440` |
+| string | `2024-01-01T16:00:00.000Z` | `tools/strategy-dev/server.ts:312:16` | `startDate: '2024-01-01T16:00:00.000Z'` |
+| string | `2026-09-23T16:00:00.000Z` | `tools/strategy-dev/server.ts:313:14` | `endDate: '2026-09-23T16:00:00.000Z'` |
+| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:316:16` | `startedAt: '2026-09-25T04:50:00.000Z'` |
+| string | `2026-09-25T04:50:01.000Z` | `tools/strategy-dev/server.ts:317:18` | `completedAt: '2026-09-25T04:50:01.000Z'` |
+| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:318:16` | `createdAt: '2026-09-25T04:50:00.000Z'` |
+| number | `3` | `tools/strategy-dev/server.ts:321:9` | `id: 3` |
+| string | `上证指数 5m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:323:19` | `strategyName: '上证指数 5m 缠论策略树决策流回测'` |
+| string | `completed` | `tools/strategy-dev/server.ts:325:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:326:13` | `source: 'qmt'` |
+| number | `5` | `tools/strategy-dev/server.ts:328:13` | `period: 5` |
+| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:329:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
+| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:330:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
+| number | `4` | `tools/strategy-dev/server.ts:331:18` | `signalCount: 4` |
+| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:333:16` | `startedAt: '2026-09-25T04:45:00.000Z'` |
+| string | `2026-09-25T04:45:01.000Z` | `tools/strategy-dev/server.ts:334:18` | `completedAt: '2026-09-25T04:45:01.000Z'` |
+| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:335:16` | `createdAt: '2026-09-25T04:45:00.000Z'` |
+| number | `200` | `tools/strategy-dev/server.ts:430:51` | `startIndex - 200` |
+| number | `-8640000000000000` | `tools/strategy-dev/server.ts:437:16` | `new Date(-8640000000000000)` |
+| number | `60` | `tools/strategy-dev/server.ts:450:27` | `requiredBarCount: 60` |
+| string | `/v1/indicators/k` | `tools/strategy-dev/server.ts:488:24` | `pathname.endsWith('/v1/indicators/k')` |
+| string | `/indicators/k` | `tools/strategy-dev/server.ts:489:25` | `pathname.endsWith('/indicators/k')` |
+| string | `/v1/chan/merge-k` | `tools/strategy-dev/server.ts:551:25` | `pathname.endsWith('/v1/chan/merge-k')` |
+| number | `200` | `tools/strategy-dev/server.ts:579:25` | `sendJson(res, [], 200)` |
+| string | `/v1/visual/commands` | `tools/strategy-dev/server.ts:585:25` | `pathname.endsWith('/v1/visual/commands')` |
+| string | `/v1/simulation/` | `tools/strategy-dev/server.ts:645:25` | `pathname.includes('/v1/simulation/')` |
+| string | `/v1/simulation/start` | `tools/strategy-dev/server.ts:652:25` | `pathname.endsWith('/v1/simulation/start')` |
+| string | `/v1/simulation/stream` | `tools/strategy-dev/server.ts:737:25` | `pathname.endsWith('/v1/simulation/stream')` |
+| number | `404` | `tools/strategy-dev/server.ts:742:21` | `res.writeHead(404, { 'Content-Type': 'text/plain' })` |
+| number | `200` | `tools/strategy-dev/server.ts:747:19` | `res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform',` |
+| string | `no-cache, no-transform` | `tools/strategy-dev/server.ts:749:24` | `'Cache-Control': 'no-cache, no-transform'` |
+| string | `no` | `tools/strategy-dev/server.ts:752:28` | `'X-Accel-Buffering': 'no'` |
 | string | `: stream-connected
 
-` | `tools/strategy-dev/server.ts:672:15` | `res.write(': stream-connected\n\n')` |
+` | `tools/strategy-dev/server.ts:754:15` | `res.write(': stream-connected\n\n')` |
 | string | `: ping
 
-` | `tools/strategy-dev/server.ts:704:19` | `res.write(': ping\n\n')` |
-| string | `/v1/simulation/control` | `tools/strategy-dev/server.ts:723:25` | `pathname.endsWith('/v1/simulation/control')` |
-| string | `/v1/simulation/stop` | `tools/strategy-dev/server.ts:756:25` | `pathname.endsWith('/v1/simulation/stop')` |
-| string | `completed` | `tools/strategy-dev/server.ts:768:64` | `status: 'completed'` |
-| string | `/v1/simulation/dump` | `tools/strategy-dev/server.ts:782:25` | `pathname.endsWith('/v1/simulation/dump')` |
-| string | `No active simulation session found` | `tools/strategy-dev/server.ts:792:30` | `error: 'No active simulation session found'` |
-| number | `404` | `tools/strategy-dev/server.ts:792:70` | `sendJson(res, { error: 'No active simulation session found' }, 404)` |
-| string | `../../.data/simulation-dumps` | `tools/strategy-dev/server.ts:837:49` | `path.resolve(__dirname, '../../.data/simulation-dumps')` |
-| string | `latest-dump.json` | `tools/strategy-dev/server.ts:842:30` | `path.join(dumpDir, 'latest-dump.json')` |
-| number | `500` | `tools/strategy-dev/server.ts:858:45` | `sendJson(res, { error: err.message }, 500)` |
-| string | `/v1/strategies` | `tools/strategy-dev/server.ts:864:25` | `pathname.endsWith('/v1/strategies')` |
-| string | `decision_flow` | `tools/strategy-dev/server.ts:872:15` | `kind: 'decision_flow'` |
-| string | `active` | `tools/strategy-dev/server.ts:873:17` | `status: 'active'` |
-| number | `5` | `tools/strategy-dev/server.ts:876:22` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `15` | `tools/strategy-dev/server.ts:876:25` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `30` | `tools/strategy-dev/server.ts:876:29` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `60` | `tools/strategy-dev/server.ts:876:33` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `1440` | `tools/strategy-dev/server.ts:876:37` | `[1, 5, 15, 30, 60, 1440]` |
-| string | `entry` | `tools/strategy-dev/server.ts:894:21` | `signalKind: 'entry'` |
-| string | `active` | `tools/strategy-dev/server.ts:895:17` | `status: 'active'` |
-| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:915:25` | `pathname.endsWith('/v1/strategy-backtests')` |
-| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:920:25` | `pathname.endsWith('/v1/strategy-backtests')` |
-| string | `000001` | `tools/strategy-dev/server.ts:942:37` | `symbol === '000001'` |
-| number | `1440` | `tools/strategy-dev/server.ts:942:78` | `period === 1440` |
-| string | `m` | `tools/strategy-dev/server.ts:942:101` | `period + 'm'` |
-| string | `completed` | `tools/strategy-dev/server.ts:944:17` | `status: 'completed'` |
-| number | `1000` | `tools/strategy-dev/server.ts:952:42` | `Date.now() - 1000` |
-| string | `completed` | `tools/strategy-dev/server.ts:964:19` | `status: 'completed'` |
-| string | `回测任务执行完成` | `tools/strategy-dev/server.ts:965:20` | `message: '回测任务执行完成'` |
-| number | `202` | `tools/strategy-dev/server.ts:969:9` | `sendJson( res, { runId: newRun.id, status: 'completed', message: '回测任务执行完成', pollUrl: `/v1/strategy-` |
-| number | `500` | `tools/strategy-dev/server.ts:973:45` | `sendJson(res, { error: err.message }, 500)` |
-| number | `30` | `tools/strategy-dev/server.ts:996:31` | `matchedRun?.period \|\| 30` |
-| string | `HIGH` | `tools/strategy-dev/server.ts:1025:26` | `confidenceLevel: 'HIGH'` |
-| string | `Not Found` | `tools/strategy-dev/server.ts:1076:26` | `error: 'Not Found'` |
-| number | `404` | `tools/strategy-dev/server.ts:1076:57` | `sendJson(res, { error: 'Not Found', path: pathname }, 404)` |
-| string | `0.0.0.0` | `tools/strategy-dev/server.ts:1079:21` | `server.listen(PORT, '0.0.0.0', () => { console.log( `\n🚀 [Mist Dev Server] 本地开发服务已就绪: http://localh` |
-| number | `1440` | `tools/strategy-dev/server.ts:1110:46` | `run.period === 1440` |
-| string | `code` | `tools/strategy-dev/sync.ts:35:23` | `getArg('code')` |
-| string | `periods` | `tools/strategy-dev/sync.ts:36:28` | `getArg('periods')` |
-| string | `period` | `tools/strategy-dev/sync.ts:36:49` | `getArg('period')` |
-| string | `limit` | `tools/strategy-dev/sync.ts:37:27` | `getArg('limit')` |
-| string | `all` | `tools/strategy-dev/sync.ts:40:36` | `limitStr.toLowerCase() === 'all'` |
-| string | `max` | `tools/strategy-dev/sync.ts:40:72` | `limitStr.toLowerCase() === 'max'` |
-| string | `source` | `tools/strategy-dev/sync.ts:46:25` | `getArg('source')` |
-| string | `box` | `tools/strategy-dev/sync.ts:47:26` | `getArg('box')` |
-| string | `password` | `tools/strategy-dev/sync.ts:49:12` | `getArg('password')` |
-| string | `'\''` | `tools/strategy-dev/sync.ts:112:5` | `(options.password \|\| 'change-me-root').replace( /'/g, "'\\''", )` |
-| number | `1024` | `tools/strategy-dev/sync.ts:119:26` | `100 * 1024` |
-| number | `1024` | `tools/strategy-dev/sync.ts:119:33` | `100 * 1024 * 1024` |
-| number | `120000` | `tools/strategy-dev/sync.ts:121:18` | `timeout: 120000` |
-| string | `NULL` | `tools/strategy-dev/sync.ts:152:36` | `volume !== 'NULL'` |
-| string | `NULL` | `tools/strategy-dev/sync.ts:153:36` | `amount !== 'NULL'` |
-| string | `data/kline` | `tools/strategy-dev/sync.ts:177:42` | `path.resolve(__dirname, 'data/kline')` |
+` | `tools/strategy-dev/server.ts:785:19` | `res.write(': ping\n\n')` |
+| string | `/v1/simulation/control` | `tools/strategy-dev/server.ts:804:25` | `pathname.endsWith('/v1/simulation/control')` |
+| string | `/v1/simulation/stop` | `tools/strategy-dev/server.ts:840:25` | `pathname.endsWith('/v1/simulation/stop')` |
+| string | `completed` | `tools/strategy-dev/server.ts:853:64` | `status: 'completed'` |
+| string | `/v1/simulation/dump` | `tools/strategy-dev/server.ts:867:25` | `pathname.endsWith('/v1/simulation/dump')` |
+| string | `No active simulation session found` | `tools/strategy-dev/server.ts:877:30` | `error: 'No active simulation session found'` |
+| number | `404` | `tools/strategy-dev/server.ts:877:70` | `sendJson(res, { error: 'No active simulation session found' }, 404)` |
+| string | `../../.data/simulation-dumps` | `tools/strategy-dev/server.ts:922:49` | `path.resolve(__dirname, '../../.data/simulation-dumps')` |
+| string | `latest-dump.json` | `tools/strategy-dev/server.ts:927:30` | `path.join(dumpDir, 'latest-dump.json')` |
+| number | `500` | `tools/strategy-dev/server.ts:943:45` | `sendJson(res, { error: err.message }, 500)` |
+| string | `/v1/strategies` | `tools/strategy-dev/server.ts:949:25` | `pathname.endsWith('/v1/strategies')` |
+| string | `缠论标准策略树` | `tools/strategy-dev/server.ts:953:15` | `name: '缠论标准策略树'` |
+| string | `基于策略树决策流与标准缠论买卖点` | `tools/strategy-dev/server.ts:954:22` | `description: '基于策略树决策流与标准缠论买卖点'` |
+| string | `decision_flow` | `tools/strategy-dev/server.ts:955:15` | `kind: 'decision_flow'` |
+| string | `active` | `tools/strategy-dev/server.ts:956:17` | `status: 'active'` |
+| number | `5` | `tools/strategy-dev/server.ts:958:22` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `15` | `tools/strategy-dev/server.ts:958:25` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `30` | `tools/strategy-dev/server.ts:958:29` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `60` | `tools/strategy-dev/server.ts:958:33` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `1440` | `tools/strategy-dev/server.ts:958:37` | `[1, 5, 15, 30, 60, 1440]` |
+| string | `entry` | `tools/strategy-dev/server.ts:975:21` | `signalKind: 'entry'` |
+| string | `active` | `tools/strategy-dev/server.ts:976:17` | `status: 'active'` |
+| string | `标准决策流版本 (集成标准缠论)` | `tools/strategy-dev/server.ts:977:22` | `description: '标准决策流版本 (集成标准缠论)'` |
+| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:996:25` | `pathname.endsWith('/v1/strategy-backtests')` |
+| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:1001:25` | `pathname.endsWith('/v1/strategy-backtests')` |
+| string | `000001` | `tools/strategy-dev/server.ts:1023:37` | `symbol === '000001'` |
+| number | `1440` | `tools/strategy-dev/server.ts:1023:78` | `period === 1440` |
+| string | `m` | `tools/strategy-dev/server.ts:1023:101` | `period + 'm'` |
+| string | `completed` | `tools/strategy-dev/server.ts:1025:17` | `status: 'completed'` |
+| number | `1000` | `tools/strategy-dev/server.ts:1033:42` | `Date.now() - 1000` |
+| string | `completed` | `tools/strategy-dev/server.ts:1045:19` | `status: 'completed'` |
+| string | `回测任务执行完成` | `tools/strategy-dev/server.ts:1046:20` | `message: '回测任务执行完成'` |
+| number | `202` | `tools/strategy-dev/server.ts:1050:9` | `sendJson( res, { runId: newRun.id, status: 'completed', message: '回测任务执行完成', pollUrl: `/v1/strategy-` |
+| number | `500` | `tools/strategy-dev/server.ts:1054:45` | `sendJson(res, { error: err.message }, 500)` |
+| number | `30` | `tools/strategy-dev/server.ts:1077:31` | `matchedRun?.period \|\| 30` |
+| string | `HIGH` | `tools/strategy-dev/server.ts:1108:26` | `confidenceLevel: 'HIGH'` |
+| string | `Not Found` | `tools/strategy-dev/server.ts:1163:26` | `error: 'Not Found'` |
+| number | `404` | `tools/strategy-dev/server.ts:1163:57` | `sendJson(res, { error: 'Not Found', path: pathname }, 404)` |
+| string | `0.0.0.0` | `tools/strategy-dev/server.ts:1166:21` | `server.listen(PORT, '0.0.0.0', () => { console.log( `\n🚀 [Mist Dev Server] 本地开发服务已就绪: http://localh` |
+| number | `1440` | `tools/strategy-dev/server.ts:1197:46` | `run.period === 1440` |
+| string | `code` | `tools/strategy-dev/sync.ts:35:26` | `getArg('code')` |
+| string | `periods` | `tools/strategy-dev/sync.ts:37:28` | `getArg('periods')` |
+| string | `period` | `tools/strategy-dev/sync.ts:37:49` | `getArg('period')` |
+| string | `limit` | `tools/strategy-dev/sync.ts:38:27` | `getArg('limit')` |
+| string | `all` | `tools/strategy-dev/sync.ts:41:36` | `limitStr.toLowerCase() === 'all'` |
+| string | `max` | `tools/strategy-dev/sync.ts:41:72` | `limitStr.toLowerCase() === 'max'` |
+| string | `source` | `tools/strategy-dev/sync.ts:47:25` | `getArg('source')` |
+| string | `box` | `tools/strategy-dev/sync.ts:48:26` | `getArg('box')` |
+| string | `password` | `tools/strategy-dev/sync.ts:50:12` | `getArg('password')` |
+| string | `'\''` | `tools/strategy-dev/sync.ts:113:5` | `(options.password \|\| 'change-me-root').replace( /'/g, "'\\''", )` |
+| number | `1024` | `tools/strategy-dev/sync.ts:120:26` | `100 * 1024` |
+| number | `1024` | `tools/strategy-dev/sync.ts:120:33` | `100 * 1024 * 1024` |
+| number | `120000` | `tools/strategy-dev/sync.ts:122:18` | `timeout: 120000` |
+| string | `NULL` | `tools/strategy-dev/sync.ts:153:36` | `volume !== 'NULL'` |
+| string | `NULL` | `tools/strategy-dev/sync.ts:154:36` | `amount !== 'NULL'` |
+| string | `data/kline` | `tools/strategy-dev/sync.ts:178:42` | `path.resolve(__dirname, 'data/kline')` |
 
 </details>
