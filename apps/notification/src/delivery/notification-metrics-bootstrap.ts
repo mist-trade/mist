@@ -42,6 +42,7 @@ export class NotificationMetricsBootstrap
       () => void this.sampleQueueDepth(),
       QUEUE_SAMPLE_INTERVAL_MS,
     );
+    this.timer?.unref?.();
   }
 
   onModuleDestroy(): void {

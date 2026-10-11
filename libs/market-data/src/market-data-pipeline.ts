@@ -282,14 +282,3 @@ export function prepareMarketData(
     }),
   });
 }
-
-/**
- * Helper: count bars that would be dropped due to precision gate without running full pipeline
- */
-export function countPrecisionDropped(bars: readonly K[]): number {
-  let dropped = 0;
-  for (const k of bars) {
-    if (mapKToStrategyBarInternal(k) === null) dropped += 1;
-  }
-  return dropped;
-}

@@ -40,7 +40,7 @@ interface SegmentEnd {
  * @param reverseStart 反向起始笔下标
  * @param originalDir 原线段趋势方向
  */
-export function hasExpandingCounterStructure(
+function hasExpandingCounterStructure(
   bis: readonly ChanBi[],
   reverseStart: number,
   originalDir: TrendDirection,

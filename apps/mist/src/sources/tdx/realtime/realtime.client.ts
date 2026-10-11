@@ -32,18 +32,20 @@ import {
   DEFAULT_TDX_WS_CLIENT_ID,
   DEFAULT_WS_RECONNECT_DELAY_MS,
   DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS,
+  CONTROL_REQUEST_TYPES,
+  CONTROL_RESPONSE_TYPES,
 } from '../../constants';
 
 type ControlRequest =
-  | { type: 'sync_subscriptions'; symbols: string[] }
-  | { type: 'subscribe'; symbol: string }
-  | { type: 'unsubscribe'; symbol: string }
-  | { type: 'get_subscriptions' };
+  | {
+      type: typeof CONTROL_REQUEST_TYPES.SYNC_SUBSCRIPTIONS;
+      symbols: string[];
+    }
+  | { type: typeof CONTROL_REQUEST_TYPES.SUBSCRIBE; symbol: string }
+  | { type: typeof CONTROL_REQUEST_TYPES.UNSUBSCRIBE; symbol: string }
+  | { type: typeof CONTROL_REQUEST_TYPES.GET_SUBSCRIPTIONS };
 type ControlResponseType =
-  | 'subscriptions_synced'
-  | 'subscribed'
-  | 'unsubscribed'
-  | 'subscriptions';
+  (typeof CONTROL_RESPONSE_TYPES)[keyof typeof CONTROL_RESPONSE_TYPES];
 
 interface PendingControl {
   expectedType: ControlResponseType;
@@ -130,8 +132,11 @@ export class TdxRealtimeClient
       );
     }
     return this.executeSubscriptionControl(
-      { type: 'sync_subscriptions', symbols: normalized },
-      'subscriptions_synced',
+      {
+        type: CONTROL_REQUEST_TYPES.SYNC_SUBSCRIPTIONS,
+        symbols: normalized,
+      },
+      CONTROL_RESPONSE_TYPES.SUBSCRIPTIONS_SYNCED,
       null,
     );
   }
@@ -144,8 +149,8 @@ export class TdxRealtimeClient
       );
     }
     return this.executeSubscriptionControl(
-      { type: 'subscribe', symbol: normalized },
-      'subscribed',
+      { type: CONTROL_REQUEST_TYPES.SUBSCRIBE, symbol: normalized },
+      CONTROL_RESPONSE_TYPES.SUBSCRIBED,
       normalized,
     );
   }
@@ -158,16 +163,16 @@ export class TdxRealtimeClient
       );
     }
     return this.executeSubscriptionControl(
-      { type: 'unsubscribe', symbol: normalized },
-      'unsubscribed',
+      { type: CONTROL_REQUEST_TYPES.UNSUBSCRIBE, symbol: normalized },
+      CONTROL_RESPONSE_TYPES.UNSUBSCRIBED,
       normalized,
     );
   }
 
   getSubscriptions(): Promise<SubscriptionControlResult> {
     return this.executeSubscriptionControl(
-      { type: 'get_subscriptions' },
-      'subscriptions',
+      { type: CONTROL_REQUEST_TYPES.GET_SUBSCRIPTIONS },
+      CONTROL_RESPONSE_TYPES.SUBSCRIPTIONS,
       null,
     );
   }
@@ -491,10 +496,8 @@ function decodeControlResult(
 
 function isControlResponseType(value: unknown): value is ControlResponseType {
   return (
-    value === 'subscriptions_synced' ||
-    value === 'subscribed' ||
-    value === 'unsubscribed' ||
-    value === 'subscriptions'
+    typeof value === 'string' &&
+    Object.values(CONTROL_RESPONSE_TYPES).includes(value as ControlResponseType)
   );
 }
 

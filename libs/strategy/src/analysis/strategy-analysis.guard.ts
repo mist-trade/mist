@@ -33,13 +33,3 @@ export function requireExactStrategyBars(
     }
   }
 }
-
-export function requireFiniteAnalysisValue(
-  value: unknown,
-  analysisName: string,
-): number {
-  if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new TypeError(`${analysisName} did not produce a finite observation`);
-  }
-  return value;
-}

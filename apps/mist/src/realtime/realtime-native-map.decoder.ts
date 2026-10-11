@@ -1,9 +1,8 @@
 import { RealtimeNativeMapFrame, RealtimeSource } from './realtime.types';
+import { isRecord, hasExactKeys, isRfc3339 } from '@app/utils';
 
 const OUTER_KEYS = ['type', 'provider', 'data', 'timestamp'] as const;
 const DATA_KEYS = ['schemaVersion', 'capturedAt', 'native'] as const;
-const RFC3339_PATTERN =
-  /^\d{4}-\d{2}-\d{2}T(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|[+-](?:[01]\d|2[0-3]):[0-5]\d)$/;
 const MAX_NATIVE_ENTRIES = 256;
 const MAX_FRAME_BYTES = 1_048_576;
 
@@ -76,25 +75,4 @@ export function decodeRealtimeNativeMapMessage(
   };
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hasExactKeys(
-  value: Record<string, unknown>,
-  expected: readonly string[],
-): boolean {
-  const keys = Object.keys(value);
-  return (
-    keys.length === expected.length &&
-    keys.every((key) => expected.includes(key))
-  );
-}
-
-function isRfc3339(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    RFC3339_PATTERN.test(value) &&
-    Number.isFinite(Date.parse(value))
-  );
-}
+export { isRecord };

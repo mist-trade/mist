@@ -9,24 +9,6 @@ export const DECISION_ACTIONS = Object.freeze({
   TERMINAL: 'TERMINAL',
 } as const);
 
-export type DecisionActionType =
-  (typeof DECISION_ACTIONS)[keyof typeof DECISION_ACTIONS];
-
-export const STRATEGY_KINDS = Object.freeze({
-  DECISION_FLOW: 'decision_flow',
-  CHAN_BSP: 'chan_bsp',
-} as const);
-
-export type StrategyKindType =
-  (typeof STRATEGY_KINDS)[keyof typeof STRATEGY_KINDS];
-
-export const STRATEGY_STATUS = Object.freeze({
-  ACTIVE: 'active',
-  COMPLETED: 'completed',
-  PAUSED: 'paused',
-  STOPPED: 'stopped',
-} as const);
-
 export const SIGNAL_KINDS = Object.freeze({
   ENTRY: 'entry',
   EXIT: 'exit',

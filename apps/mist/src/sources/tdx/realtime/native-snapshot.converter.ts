@@ -119,7 +119,7 @@ function quantityError(
   );
 }
 
-export function readTdxNativeNumber(
+function readTdxNativeNumber(
   native: Record<string, unknown>,
   aliases: readonly string[],
 ): number | null {

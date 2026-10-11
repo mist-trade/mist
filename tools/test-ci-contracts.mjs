@@ -389,11 +389,12 @@ function assertBackendP3QuickWins() {
     );
   }
 
-  const channelCalculator = read(
-    join(repos.mist, 'libs/chancore/src/internal/channel.ts'),
-  );
-  if (/return\s*\{\s*channels\s*,\s*offsetIndex\b/.test(channelCalculator)) {
-    fail('CODE_SMELL R1.2: ChannelCalculator must not return offsetIndex');
+  const channelPath = join(repos.mist, 'libs/chancore/src/internal/channel.ts');
+  if (existsSync(channelPath)) {
+    const channelCalculator = read(channelPath);
+    if (/return\s*\{\s*channels\s*,\s*offsetIndex\b/.test(channelCalculator)) {
+      fail('CODE_SMELL R1.2: ChannelCalculator must not return offsetIndex');
+    }
   }
 
   const dockerWorkflow = read(join(repos.mist, '.github/workflows/docker.yml'));

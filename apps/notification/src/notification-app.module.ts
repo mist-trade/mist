@@ -8,6 +8,7 @@ import { notificationEnvSchema } from '@app/config';
 import { NOTIFICATION_ENTITIES } from './notification-entities';
 import { NotificationDeliveryModule } from './delivery/notification-delivery.module';
 import { OoAlertModule } from './oo-alert/oo-alert.module';
+import { HttpTransportModule } from '@app/transport/http';
 import { AppController } from './app.controller';
 import { HealthController } from './health/health.controller';
 import { NotificationAdminController } from './notification-admin.controller';
@@ -55,6 +56,7 @@ import { NotificationAdminController } from './notification-admin.controller';
     }),
     NotificationDeliveryModule,
     OoAlertModule,
+    HttpTransportModule,
   ],
   controllers: [AppController, HealthController, NotificationAdminController],
 })

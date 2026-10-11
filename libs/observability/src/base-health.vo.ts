@@ -7,16 +7,3 @@ export interface BaseHealthVo {
   readonly timestamp: string;
   readonly version?: string;
 }
-
-export function createBaseHealthSnapshot(
-  service: string,
-  status: HealthStatus = 'ok',
-  instance?: string,
-): BaseHealthVo {
-  return {
-    status,
-    service,
-    instance: instance ?? service,
-    timestamp: new Date().toISOString(),
-  };
-}

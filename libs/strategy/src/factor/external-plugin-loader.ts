@@ -3,6 +3,29 @@ import * as path from 'node:path';
 import type { FactorPlugin } from './factor.types';
 import type { FactorPluginRegistry } from './factor-plugin-registry';
 
+const CANDIDATE_INDEX_FILES: readonly string[] = Object.freeze([
+  'index.ts',
+  'index.js',
+]);
+
+const CANDIDATE_SUBDIRS: readonly string[] = Object.freeze(['src', 'dist']);
+
+const CANDIDATE_PLUGIN_DIRS: readonly string[] = Object.freeze(['plugins']);
+
+const CODE_EXTENSIONS: readonly string[] = Object.freeze(['.ts', '.js']);
+
+const IGNORED_EXTENSIONS: readonly string[] = Object.freeze([
+  '.d.ts',
+  '.spec.ts',
+  '.test.ts',
+]);
+
+const EXCLUDED_EXPORT_KEYS: readonly string[] = Object.freeze([
+  'plugins',
+  'default',
+  'getPlugins',
+]);
+
 /**
  * 校验对象是否满足 FactorPlugin 契约
  */
@@ -149,13 +172,16 @@ export class ExternalFactorPluginLoader {
 
       if (stat.isDirectory()) {
         const results: string[] = [];
-        const indexCandidates = [
-          path.join(basePath, 'src', 'index.ts'),
-          path.join(basePath, 'dist', 'index.js'),
-          path.join(basePath, 'src', 'index.js'),
-          path.join(basePath, 'index.ts'),
-          path.join(basePath, 'index.js'),
-        ];
+        const indexCandidates: string[] = [];
+
+        for (const dir of CANDIDATE_SUBDIRS) {
+          for (const idxFile of CANDIDATE_INDEX_FILES) {
+            indexCandidates.push(path.join(basePath, dir, idxFile));
+          }
+        }
+        for (const idxFile of CANDIDATE_INDEX_FILES) {
+          indexCandidates.push(path.join(basePath, idxFile));
+        }
 
         for (const candidate of indexCandidates) {
           if (
@@ -168,22 +194,25 @@ export class ExternalFactorPluginLoader {
         }
 
         // 进一步扫描 plugins/ 目录中的独立插件文件
-        const pluginsDirs = [
-          path.join(basePath, 'src', 'plugins'),
-          path.join(basePath, 'dist', 'plugins'),
-          path.join(basePath, 'plugins'),
-        ];
+        const pluginsDirs: string[] = [];
+        for (const dir of CANDIDATE_SUBDIRS) {
+          for (const pDir of CANDIDATE_PLUGIN_DIRS) {
+            pluginsDirs.push(path.join(basePath, dir, pDir));
+          }
+        }
+        for (const pDir of CANDIDATE_PLUGIN_DIRS) {
+          pluginsDirs.push(path.join(basePath, pDir));
+        }
 
         for (const pDir of pluginsDirs) {
           if (fs.existsSync(pDir) && fs.statSync(pDir).isDirectory()) {
             const files = fs.readdirSync(pDir);
             for (const f of files) {
-              if (
-                (f.endsWith('.ts') || f.endsWith('.js')) &&
-                !f.endsWith('.d.ts') &&
-                !f.endsWith('.spec.ts') &&
-                !f.endsWith('.test.ts')
-              ) {
+              const isCode = CODE_EXTENSIONS.some((ext) => f.endsWith(ext));
+              const isIgnored = IGNORED_EXTENSIONS.some((ext) =>
+                f.endsWith(ext),
+              );
+              if (isCode && !isIgnored) {
                 const fullP = path.join(pDir, f);
                 if (fs.statSync(fullP).isFile() && !results.includes(fullP)) {
                   results.push(fullP);
@@ -249,7 +278,7 @@ export class ExternalFactorPluginLoader {
 
       // 4. 检查其他具名导出
       for (const [key, value] of Object.entries(mod)) {
-        if (key !== 'plugins' && key !== 'default' && key !== 'getPlugins') {
+        if (!EXCLUDED_EXPORT_KEYS.includes(key)) {
           this.collectPluginCandidate(value, plugins);
         }
       }

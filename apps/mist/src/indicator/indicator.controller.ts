@@ -208,17 +208,23 @@ export class IndicatorController {
     });
 
     // 用 pipeline.projected 的 effective 视图回填 KVo，保证与 visual/策略同一序列
-    return pipeline.projected
-      .filter((bar) => bar.ohlc.effective !== null)
-      .map((bar) => ({
+    const result: KVo[] = [];
+    for (const bar of pipeline.projected) {
+      const effective = bar.ohlc.effective;
+      if (!effective) {
+        continue;
+      }
+      result.push({
         id: bar.rawBar.securityId,
-        high: bar.ohlc.effective!.high,
-        low: bar.ohlc.effective!.low,
-        open: bar.ohlc.effective!.open,
-        close: bar.ohlc.effective!.close,
+        high: effective.high,
+        low: effective.low,
+        open: effective.open,
+        close: effective.close,
         symbol: queryDto.code,
         time: bar.rawBar.timestamp,
         amount: bar.amount.effective,
-      }));
+      });
+    }
+    return result;
   }
 }

@@ -334,12 +334,15 @@ export class StrategySimulationSession {
           this.setStatus('completed');
         }
         void frame;
-      } catch (err: any) {
-        this.listeners.onError?.(err);
+      } catch (err: unknown) {
+        this.listeners.onError?.(
+          err instanceof Error ? err : new Error(String(err)),
+        );
       } finally {
         this.isProcessing = false;
       }
     }, this.speedMs);
+    this.timer?.unref?.();
   }
 
   private clearTimer(): void {

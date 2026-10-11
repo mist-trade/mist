@@ -5,6 +5,7 @@ import { TimezoneService } from '@app/timezone';
 import { VisualCommandService } from '@app/visual-command';
 import { prepareMarketData } from '@app/market-data';
 import { type ChanK } from '@app/chancore';
+import { K } from '@app/shared-data';
 import { IndicatorService } from '../indicator/indicator.service';
 import { QueryVisualCommandsDto } from './dto/query-visual-commands.dto';
 import { VisualCommandPayloadVo } from './vo/visual-command.vo';
@@ -21,7 +22,7 @@ export class VisualController {
   ) {}
 
   private toChanKlines(
-    kEntities: any[],
+    kEntities: K[],
     period: number,
     startDate: Date,
     endDate: Date,
@@ -49,19 +50,25 @@ export class VisualController {
       );
     }
 
-    return pipeline.projected
-      .filter((bar) => bar.ohlc.effective !== null)
-      .map((bar, idx) => ({
-        id: idx + 1,
+    const result: ChanK[] = [];
+    for (const bar of pipeline.projected) {
+      const effective = bar.ohlc.effective;
+      if (!effective) {
+        continue;
+      }
+      result.push({
+        id: result.length + 1,
         symbol: code,
         time: bar.rawBar.timestamp,
-        open: bar.ohlc.effective!.open,
-        high: bar.ohlc.effective!.high,
-        low: bar.ohlc.effective!.low,
-        close: bar.ohlc.effective!.close,
+        open: effective.open,
+        high: effective.high,
+        low: effective.low,
+        close: effective.close,
         volume: bar.volume.effective,
         amount: bar.amount.effective,
-      }));
+      });
+    }
+    return result;
   }
 
   @Get('commands')

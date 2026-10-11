@@ -17,7 +17,7 @@ export interface ChannelSpan {
 }
 
 /** 按 startTime 精确匹配单元下标；找不到返回 -1。 */
-export function indexOfUnitStart(
+function indexOfUnitStart(
   units: readonly { readonly startTime: Date }[],
   target: Date,
 ): number {
@@ -30,7 +30,7 @@ export function indexOfUnitStart(
 }
 
 /** 按 endTime 精确匹配单元下标；找不到返回 -1。 */
-export function indexOfUnitEnd(
+function indexOfUnitEnd(
   units: readonly { readonly endTime: Date }[],
   target: Date,
 ): number {

@@ -19,6 +19,7 @@ import {
   CRON_SUBSCRIPTION_RESET_0915,
   isIntradayAddWindow,
 } from '@app/timezone';
+import { isRecord, hasExactKeys } from '@app/utils';
 import { Clock } from '../realtime/clock.service';
 import { RealtimeSecurityAllowlistService } from '../realtime/realtime-security-allowlist.service';
 import { RealtimeSnapshotIngressService } from '../realtime/realtime-snapshot-ingress.service';
@@ -479,21 +480,6 @@ function isProviderSymbol(value: unknown): value is string {
   return (
     typeof value === 'string' &&
     /^(?:\d{6}\.(?:SH|SZ|BJ)|\d{5,6}\.HK)$/.test(value)
-  );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function hasExactKeys(
-  value: Record<string, unknown>,
-  expected: readonly string[],
-): boolean {
-  const keys = Object.keys(value);
-  return (
-    keys.length === expected.length &&
-    keys.every((key) => expected.includes(key))
   );
 }
 
