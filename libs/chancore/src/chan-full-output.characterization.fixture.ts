@@ -21,7 +21,7 @@ type FixtureRow = readonly [
   amount: string,
 ];
 
-// Project-owned 600519 daily OHLC fixture. IDs and volume are deliberately
+// Project-owned 000001 daily OHLC fixture. IDs and volume are deliberately
 // deterministic, non-contiguous and occasionally non-monotonic so algorithm
 // characterization cannot accidentally rely on database identity distance.
 const ROWS: readonly FixtureRow[] = [
@@ -75,7 +75,7 @@ const ROWS: readonly FixtureRow[] = [
 export function createChanFullOutputFixture(): ChanCharacterizationK[] {
   return ROWS.map(([time, open, high, low, close, amount], index) => ({
     id: 10_001 + index * 37 + (index % 5) * 11,
-    symbol: '600519',
+    symbol: '000001',
     time: new Date(time),
     open,
     high,

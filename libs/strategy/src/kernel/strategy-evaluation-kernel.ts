@@ -200,6 +200,8 @@ export class StrategyEvaluationKernel {
     const pivot =
       extractPivotEvidence(decision) ??
       extractPivotEvidenceFromReason(decision);
+    const badgeText =
+      decision.badgeText ?? this.findBadgeTextFromTrace(decision.trace);
     return {
       definitionId: plan.definitionId,
       versionId: plan.versionId,
@@ -212,12 +214,16 @@ export class StrategyEvaluationKernel {
       signalType: decision.signalTag ?? decision.action ?? 'decision_flow',
       confidence: decision.confidence,
       confidenceLevel: decision.confidenceLevel as ConfidenceLevel,
+      badgeText,
+      displayTag: decision.displayTag,
+      styleMeta: decision.styleMeta,
       decisionTrace: {
         status: decision.status,
         action: decision.action,
         confidence: decision.confidence,
         confidenceLevel: decision.confidenceLevel,
         signalTag: decision.signalTag,
+        badgeText,
         reason: decision.reason,
         trace: decision.trace,
       },
@@ -226,9 +232,25 @@ export class StrategyEvaluationKernel {
         confidence: decision.confidence,
         confidenceLevel: decision.confidenceLevel,
         signalTag: decision.signalTag,
+        badgeText,
         reason: decision.reason,
       },
       ruleSnapshot: plan.ruleSnapshot,
     };
+  }
+
+  private findBadgeTextFromTrace(trace?: readonly any[]): string | undefined {
+    if (!Array.isArray(trace)) return undefined;
+    for (let i = trace.length - 1; i >= 0; i--) {
+      const item = trace[i];
+      if (item?.badgeText && typeof item.badgeText === 'string') {
+        return item.badgeText;
+      }
+      const ev = item?.evidence as Record<string, unknown> | undefined;
+      if (ev?.badgeText && typeof ev.badgeText === 'string') {
+        return ev.badgeText;
+      }
+    }
+    return undefined;
   }
 }

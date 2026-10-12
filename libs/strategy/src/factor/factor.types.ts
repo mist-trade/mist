@@ -27,6 +27,18 @@ export interface FactorOpinion {
   /** 人类可读的原因说明，用于白盒归因和前端展示 */
   readonly reason: string;
 
+  /** 插件自主生成的展示徽标（如 "左侧1买", "三卖", "爆量突破"） */
+  readonly badgeText?: string;
+
+  /** 插件自主分类标签 */
+  readonly displayTag?: string;
+
+  /** 插件自主指定的渲染建议（可选） */
+  readonly styleMeta?: Readonly<{
+    color?: string;
+    position?: 'above' | 'below';
+  }>;
+
   /**
    * 结构化特征快照（可选），用于复盘调试与原生终端绘图回写
    * 例如：缠论中枢可附带 { zd: 15.2, zg: 16.8 }；资金流可附带 { netInflow: 50000000 }

@@ -4,10 +4,10 @@
  *
  * 用法:
  *   # 直接跑存量黄金快照 (无需任何网络)
- *   pnpm dev:strategy --case maotai-2024-2026
+ *   pnpm dev:strategy --case shanghai-index-2024-2025
  *
  *   # 跑本地同步的股票缓存
- *   pnpm dev:strategy --code 600519 --period 30m
+ *   pnpm dev:strategy --code 000001 --period 30m
  *
  * 架构契约:
  *   严格遵循统一求值内核 (StrategyEvaluationKernel) push 驱动管线，
@@ -55,7 +55,7 @@ function parseCliArgs(): RunnerCliOptions {
   };
 
   const caseKey = getArg('case') || getArg('caseKey');
-  const code = getArg('code') || (!caseKey ? '600519' : undefined);
+  const code = getArg('code') || (!caseKey ? '000001' : undefined);
   const period = getArg('period') || (!caseKey ? '30m' : undefined);
   const subPeriod = getArg('subPeriod') || getArg('sub');
   const parentPeriod = getArg('parentPeriod') || getArg('parent');
@@ -135,7 +135,7 @@ async function runStrategyDev(): Promise<void> {
 
   const periodNum = resolvePeriod(options.period, 30);
   const securityCode = String(
-    klines[0]?.symbol || options.code || options.caseKey || '600519',
+    klines[0]?.symbol || options.code || options.caseKey || '000001',
   );
 
   // 1. 初始化标准决策流树

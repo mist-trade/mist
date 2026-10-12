@@ -48,6 +48,12 @@ export interface KernelSignal {
   readonly signalType: string;
   readonly confidence: number;
   readonly confidenceLevel: ConfidenceLevel;
+  readonly badgeText?: string;
+  readonly displayTag?: string;
+  readonly styleMeta?: Readonly<{
+    color?: string;
+    position?: 'above' | 'below';
+  }>;
   readonly decisionTrace: Record<string, unknown>;
   readonly contextSnapshot: Record<string, unknown>;
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;

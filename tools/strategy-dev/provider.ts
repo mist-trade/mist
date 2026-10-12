@@ -3,9 +3,9 @@ import * as path from 'path';
 import type { ChanK } from '@app/chancore';
 
 export interface KLineLoadOptions {
-  /** 指定已有快照用例名，如 'maotai-2024-2026', 'shanghai-index-2024-2025' */
+  /** 指定已有快照用例名，如 'shanghai-index-2024-2025' */
   caseKey?: string;
-  /** 股票或指数代码，如 '600519', '000001' */
+  /** 股票或指数代码，如 '000001' */
   code?: string;
   /** 周期，如 '1d', '30m', '5m', '1m' 或数字 (1440, 30, 5, 1) */
   period?: string | number;

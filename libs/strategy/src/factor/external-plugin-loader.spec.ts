@@ -212,10 +212,11 @@ describe('ExternalFactorPluginLoader', () => {
     it('automatically discovers peer workspace mist-alpha-private plugins when present', () => {
       // 不设置 customPaths，测试默认探测逻辑
       const plugins = ExternalFactorPluginLoader.loadPlugins();
-      expect(plugins.length).toBeGreaterThanOrEqual(2);
+      expect(plugins.length).toBeGreaterThanOrEqual(3);
       const ids = plugins.map((p) => p.id);
       expect(ids).toContain('plugin.private.chan-custom-enhancer');
       expect(ids).toContain('plugin.private.alpha-momentum');
+      expect(ids).toContain('plugin.regime.shanghai-index');
     });
   });
 });

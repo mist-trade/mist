@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-10-11T11:11:34.350Z",
+  "generatedAt": "2026-10-12T16:09:18.145Z",
   "summary": {
-    "totalFiles": 411,
-    "totalFindings": 1994,
+    "totalFiles": 410,
+    "totalFindings": 1934,
     "numberFindings": 390,
-    "stringFindings": 1604
+    "stringFindings": 1544
   },
   "topNumbers": [
     {
@@ -34,7 +34,7 @@
           "value": 3,
           "raw": "3",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 473,
+          "line": 478,
           "column": 57,
           "context": "failureKeys.length !== 3"
         },
@@ -43,7 +43,7 @@
           "value": 3,
           "raw": "3",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 479,
+          "line": 484,
           "column": 29,
           "context": "failureKeys.length === 3"
         },
@@ -52,7 +52,7 @@
           "value": 3,
           "raw": "3",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 477,
+          "line": 482,
           "column": 57,
           "context": "failureKeys.length !== 3"
         },
@@ -61,7 +61,7 @@
           "value": 3,
           "raw": "3",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 483,
+          "line": 488,
           "column": 29,
           "context": "failureKeys.length === 3"
         },
@@ -364,7 +364,7 @@
           "value": 60,
           "raw": "60",
           "file": "apps/mist/src/visual/visual.controller.ts",
-          "line": 87,
+          "line": 94,
           "column": 38,
           "context": "60 * 24"
         },
@@ -808,7 +808,7 @@
           "value": 1000,
           "raw": "1000",
           "file": "apps/mist/src/visual/visual.controller.ts",
-          "line": 87,
+          "line": 94,
           "column": 55,
           "context": "60 * 24 * 3600 * 1000"
         },
@@ -2299,7 +2299,7 @@
           "value": 20,
           "raw": "20",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 397,
+          "line": 402,
           "column": 23,
           "context": "Object.keys(nativeRecord) .sort() .slice(0, 20)"
         },
@@ -2308,7 +2308,7 @@
           "value": 20,
           "raw": "20",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 403,
+          "line": 408,
           "column": 21,
           "context": "Object.keys(nativeRecord) .sort() .slice(0, 20)"
         },
@@ -2581,7 +2581,7 @@
           "value": 30000,
           "raw": "30_000",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 218,
+          "line": 223,
           "column": 10,
           "context": "setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type"
         },
@@ -2590,7 +2590,7 @@
           "value": 30000,
           "raw": "30_000",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 226,
+          "line": 231,
           "column": 10,
           "context": "setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type"
         }
@@ -3115,7 +3115,7 @@
           "value": 24,
           "raw": "24",
           "file": "apps/mist/src/visual/visual.controller.ts",
-          "line": 87,
+          "line": 94,
           "column": 43,
           "context": "60 * 24"
         },
@@ -3496,7 +3496,7 @@
           "raw": "'qmt'",
           "category": "comparison",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 289,
+          "line": 294,
           "column": 31,
           "context": "message['provider'] !== 'qmt'"
         },
@@ -3506,7 +3506,7 @@
           "raw": "'qmt'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 328,
+          "line": 333,
           "column": 35,
           "context": "span.setAttribute('source', 'qmt')"
         },
@@ -3516,7 +3516,7 @@
           "raw": "'qmt'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 347,
+          "line": 352,
           "column": 59,
           "context": "decodeRealtimeNativeMapMessage(message, 'qmt')"
         },
@@ -3526,7 +3526,7 @@
           "raw": "'qmt'",
           "category": "comparison",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 426,
+          "line": 431,
           "column": 31,
           "context": "message['provider'] !== 'qmt'"
         },
@@ -3682,7 +3682,7 @@
           "raw": "'tdx'",
           "category": "comparison",
           "file": "apps/mist/src/realtime/realtime-native-map.decoder.ts",
-          "line": 66,
+          "line": 65,
           "column": 27,
           "context": "expectedProvider === 'tdx'"
         },
@@ -3702,7 +3702,7 @@
           "raw": "'tdx'",
           "category": "comparison",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 297,
+          "line": 302,
           "column": 31,
           "context": "message['provider'] !== 'tdx'"
         },
@@ -3712,7 +3712,7 @@
           "raw": "'tdx'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 336,
+          "line": 341,
           "column": 35,
           "context": "span.setAttribute('source', 'tdx')"
         },
@@ -3722,7 +3722,7 @@
           "raw": "'tdx'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 355,
+          "line": 360,
           "column": 59,
           "context": "decodeRealtimeNativeMapMessage(message, 'tdx')"
         },
@@ -3732,7 +3732,7 @@
           "raw": "'tdx'",
           "category": "comparison",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 430,
+          "line": 435,
           "column": 31,
           "context": "message['provider'] !== 'tdx'"
         },
@@ -4724,7 +4724,7 @@
           "raw": "'failure'",
           "category": "comparison",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 469,
+          "line": 474,
           "column": 19,
           "context": "keys[0] !== 'failure'"
         },
@@ -4734,7 +4734,7 @@
           "raw": "'failure'",
           "category": "comparison",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 473,
+          "line": 478,
           "column": 19,
           "context": "keys[0] !== 'failure'"
         }
@@ -5204,7 +5204,7 @@
           "raw": "'BUY'",
           "category": "comparison",
           "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-          "line": 287,
+          "line": 324,
           "column": 41,
           "context": "finalAction === 'BUY'"
         },
@@ -5532,7 +5532,7 @@
           "raw": "'success'",
           "category": "comparison",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 468,
+          "line": 473,
           "column": 19,
           "context": "keys[0] === 'success'"
         },
@@ -5542,7 +5542,7 @@
           "raw": "'success'",
           "category": "comparison",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 472,
+          "line": 477,
           "column": 19,
           "context": "keys[0] === 'success'"
         },
@@ -5912,7 +5912,7 @@
           "raw": "'TERMINAL'",
           "category": "switch-case",
           "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-          "line": 251,
+          "line": 283,
           "column": 12,
           "context": "case 'TERMINAL': { const finalAction = node.action === 'INHERIT' ? inheritedAction || DECISION_ACTIO"
         },
@@ -5922,7 +5922,7 @@
           "raw": "'TERMINAL'",
           "category": "object-property",
           "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-          "line": 259,
+          "line": 291,
           "column": 17,
           "context": "type: 'TERMINAL'"
         },
@@ -6150,7 +6150,7 @@
           "raw": "'reset'",
           "category": "function-argument",
           "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-          "line": 165,
+          "line": 166,
           "column": 28,
           "context": "this.enqueue(source, 'reset', 'weekday_0915')"
         },
@@ -6160,7 +6160,7 @@
           "raw": "'reset'",
           "category": "function-argument",
           "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-          "line": 214,
+          "line": 215,
           "column": 30,
           "context": "this.enqueue(source, 'reset', 'auto_reconcile_enabled')"
         },
@@ -6170,7 +6170,7 @@
           "raw": "'reset'",
           "category": "function-argument",
           "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-          "line": 219,
+          "line": 220,
           "column": 28,
           "context": "this.enqueue(source, 'reset', 'scheduled_reconcile')"
         },
@@ -6180,7 +6180,7 @@
           "raw": "'reset'",
           "category": "function-argument",
           "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-          "line": 234,
+          "line": 235,
           "column": 38,
           "context": "this.enqueue(observation.source, 'reset', 'accepted_ready')"
         },
@@ -6190,7 +6190,7 @@
           "raw": "'reset'",
           "category": "comparison",
           "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-          "line": 326,
+          "line": 327,
           "column": 20,
           "context": "policy === 'reset'"
         },
@@ -6200,7 +6200,7 @@
           "raw": "'reset'",
           "category": "comparison",
           "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-          "line": 435,
+          "line": 436,
           "column": 22,
           "context": "current === 'reset'"
         },
@@ -6210,7 +6210,7 @@
           "raw": "'reset'",
           "category": "comparison",
           "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-          "line": 435,
+          "line": 436,
           "column": 46,
           "context": "incoming === 'reset'"
         }
@@ -6378,7 +6378,7 @@
           "raw": "'builtin'",
           "category": "comparison",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 291,
+          "line": 296,
           "column": 24,
           "context": "data['mode'] !== 'builtin'"
         },
@@ -6388,7 +6388,7 @@
           "raw": "'builtin'",
           "category": "comparison",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 299,
+          "line": 304,
           "column": 24,
           "context": "data['mode'] !== 'builtin'"
         },
@@ -6444,7 +6444,7 @@
           "raw": "'QMT_BASE_URL'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 83,
+          "line": 85,
           "column": 40,
           "context": "config.get<string>('QMT_BASE_URL')"
         },
@@ -6500,7 +6500,7 @@
           "raw": "'TDX_BASE_URL'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 91,
+          "line": 93,
           "column": 40,
           "context": "config.get<string>('TDX_BASE_URL')"
         },
@@ -6764,7 +6764,7 @@
           "raw": "'source_config'",
           "category": "function-argument",
           "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-          "line": 390,
+          "line": 391,
           "column": 45,
           "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
         },
@@ -6873,72 +6873,6 @@
           "line": 354,
           "column": 23,
           "context": "mode: 'pessimistic_write'"
-        }
-      ]
-    },
-    {
-      "value": "subscribed",
-      "count": 6,
-      "occurrences": [
-        {
-          "type": "string",
-          "value": "subscribed",
-          "raw": "'subscribed'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 140,
-          "column": 7,
-          "context": "this.executeSubscriptionControl( { type: 'subscribe', symbol: normalized }, 'subscribed', normalized"
-        },
-        {
-          "type": "string",
-          "value": "subscribed",
-          "raw": "'subscribed'",
-          "category": "comparison",
-          "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 480,
-          "column": 40,
-          "context": "failure['subscriptionState'] !== 'subscribed'"
-        },
-        {
-          "type": "string",
-          "value": "subscribed",
-          "raw": "'subscribed'",
-          "category": "comparison",
-          "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 491,
-          "column": 15,
-          "context": "value === 'subscribed'"
-        },
-        {
-          "type": "string",
-          "value": "subscribed",
-          "raw": "'subscribed'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 148,
-          "column": 7,
-          "context": "this.executeSubscriptionControl( { type: 'subscribe', symbol: normalized }, 'subscribed', normalized"
-        },
-        {
-          "type": "string",
-          "value": "subscribed",
-          "raw": "'subscribed'",
-          "category": "comparison",
-          "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 484,
-          "column": 40,
-          "context": "failure['subscriptionState'] !== 'subscribed'"
-        },
-        {
-          "type": "string",
-          "value": "subscribed",
-          "raw": "'subscribed'",
-          "category": "comparison",
-          "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 495,
-          "column": 15,
-          "context": "value === 'subscribed'"
         }
       ]
     },
@@ -7216,7 +7150,7 @@
           "raw": "'GUARD'",
           "category": "switch-case",
           "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-          "line": 50,
+          "line": 58,
           "column": 12,
           "context": "case 'GUARD': { const plugin = this.getPlugin(node.pluginId); const opinion = await plugin.evaluate("
         },
@@ -7226,7 +7160,7 @@
           "raw": "'GUARD'",
           "category": "object-property",
           "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-          "line": 56,
+          "line": 64,
           "column": 17,
           "context": "type: 'GUARD'"
         },
@@ -7480,7 +7414,7 @@
           "raw": "'rejected'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 330,
+          "line": 335,
           "column": 23,
           "context": "span.addEvent('rejected', { reason })"
         },
@@ -7490,7 +7424,7 @@
           "raw": "'rejected'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 338,
+          "line": 343,
           "column": 23,
           "context": "span.addEvent('rejected', { reason })"
         }
@@ -7638,7 +7572,7 @@
           "raw": "'source'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 328,
+          "line": 333,
           "column": 25,
           "context": "span.setAttribute('source', 'qmt')"
         },
@@ -7648,7 +7582,7 @@
           "raw": "'source'",
           "category": "function-argument",
           "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 336,
+          "line": 341,
           "column": 25,
           "context": "span.setAttribute('source', 'tdx')"
         },
@@ -7775,6 +7709,62 @@
           "context": "type: 'none'"
         }
       ]
+    },
+    {
+      "value": "MIST_REALTIME_REDIS_URL",
+      "count": 5,
+      "occurrences": [
+        {
+          "type": "string",
+          "value": "MIST_REALTIME_REDIS_URL",
+          "raw": "'MIST_REALTIME_REDIS_URL'",
+          "category": "function-argument",
+          "file": "apps/mist/src/realtime/realtime-redis.service.ts",
+          "line": 50,
+          "column": 40,
+          "context": "this.config.get<string>('MIST_REALTIME_REDIS_URL')"
+        },
+        {
+          "type": "string",
+          "value": "MIST_REALTIME_REDIS_URL",
+          "raw": "'MIST_REALTIME_REDIS_URL'",
+          "category": "function-argument",
+          "file": "apps/notification/src/delivery/alert-delivery-queue.service.ts",
+          "line": 34,
+          "column": 30,
+          "context": "config.get<string>('MIST_REALTIME_REDIS_URL')"
+        },
+        {
+          "type": "string",
+          "value": "MIST_REALTIME_REDIS_URL",
+          "raw": "'MIST_REALTIME_REDIS_URL'",
+          "category": "function-argument",
+          "file": "apps/notification/src/oo-alert/oo-alert-queue.service.ts",
+          "line": 27,
+          "column": 30,
+          "context": "config.get<string>('MIST_REALTIME_REDIS_URL')"
+        },
+        {
+          "type": "string",
+          "value": "MIST_REALTIME_REDIS_URL",
+          "raw": "'MIST_REALTIME_REDIS_URL'",
+          "category": "function-argument",
+          "file": "apps/signal/src/realtime/notification/bullmq-strategy-alert-delivery-handoff.service.ts",
+          "line": 35,
+          "column": 30,
+          "context": "config.get<string>('MIST_REALTIME_REDIS_URL')"
+        },
+        {
+          "type": "string",
+          "value": "MIST_REALTIME_REDIS_URL",
+          "raw": "'MIST_REALTIME_REDIS_URL'",
+          "category": "function-argument",
+          "file": "apps/signal/src/realtime/signal-realtime-redis.service.ts",
+          "line": 28,
+          "column": 41,
+          "context": "this.config.get<string>('MIST_REALTIME_REDIS_URL')"
+        }
+      ]
     }
   ],
   "topFiles": [
@@ -7791,16 +7781,16 @@
       70
     ],
     [
+      "apps/schedule/src/pre-market-inspection.service.ts",
+      63
+    ],
+    [
       "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      67
+      55
     ],
     [
       "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      67
-    ],
-    [
-      "apps/schedule/src/pre-market-inspection.service.ts",
-      63
+      55
     ],
     [
       "apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts",
@@ -7868,10 +7858,6 @@
     ],
     [
       "apps/mist/src/strategy/services/backtest-run-command.service.ts",
-      22
-    ],
-    [
-      "libs/strategy/src/factor/external-plugin-loader.ts",
       22
     ],
     [
@@ -7976,6 +7962,10 @@
     ],
     [
       "libs/indicators/src/rsi.ts",
+      13
+    ],
+    [
+      "libs/strategy/src/factor/plugins/chan-bsp.plugin.ts",
       13
     ]
   ],
@@ -12416,7 +12406,7 @@
       "raw": "'realtime.native_snapshot'",
       "category": "comparison",
       "file": "apps/mist/src/realtime/realtime-native-map.decoder.ts",
-      "line": 46,
+      "line": 45,
       "column": 24,
       "context": "parsed['type'] !== 'realtime.native_snapshot'"
     },
@@ -12426,7 +12416,7 @@
       "raw": "'tdx'",
       "category": "comparison",
       "file": "apps/mist/src/realtime/realtime-native-map.decoder.ts",
-      "line": 66,
+      "line": 65,
       "column": 27,
       "context": "expectedProvider === 'tdx'"
     },
@@ -13078,7 +13068,7 @@
       "raw": "'REALTIME_RECONCILE_INTERVAL_MS'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 128,
+      "line": 129,
       "column": 23,
       "context": "this.config.get('REALTIME_RECONCILE_INTERVAL_MS')"
     },
@@ -13088,7 +13078,7 @@
       "raw": "'realtime-subscription-reconcile'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 135,
+      "line": 136,
       "column": 32,
       "context": "this.scheduler.addInterval('realtime-subscription-reconcile', interval)"
     },
@@ -13098,7 +13088,7 @@
       "raw": "'incremental'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 143,
+      "line": 144,
       "column": 26,
       "context": "this.enqueue(source, 'incremental', 'intraday_activation')"
     },
@@ -13108,7 +13098,7 @@
       "raw": "'intraday_activation'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 143,
+      "line": 144,
       "column": 41,
       "context": "this.enqueue(source, 'incremental', 'intraday_activation')"
     },
@@ -13118,7 +13108,7 @@
       "raw": "'reset'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 165,
+      "line": 166,
       "column": 28,
       "context": "this.enqueue(source, 'reset', 'weekday_0915')"
     },
@@ -13128,7 +13118,7 @@
       "raw": "'weekday_0915'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 165,
+      "line": 166,
       "column": 37,
       "context": "this.enqueue(source, 'reset', 'weekday_0915')"
     },
@@ -13138,7 +13128,7 @@
       "raw": "'realtime-subscription-reconcile'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 172,
+      "line": 173,
       "column": 37,
       "context": "this.scheduler.deleteInterval('realtime-subscription-reconcile')"
     },
@@ -13148,7 +13138,7 @@
       "raw": "'reset'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 214,
+      "line": 215,
       "column": 30,
       "context": "this.enqueue(source, 'reset', 'auto_reconcile_enabled')"
     },
@@ -13158,7 +13148,7 @@
       "raw": "'auto_reconcile_enabled'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 214,
+      "line": 215,
       "column": 39,
       "context": "this.enqueue(source, 'reset', 'auto_reconcile_enabled')"
     },
@@ -13168,7 +13158,7 @@
       "raw": "'reset'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 219,
+      "line": 220,
       "column": 28,
       "context": "this.enqueue(source, 'reset', 'scheduled_reconcile')"
     },
@@ -13178,7 +13168,7 @@
       "raw": "'scheduled_reconcile'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 219,
+      "line": 220,
       "column": 37,
       "context": "this.enqueue(source, 'reset', 'scheduled_reconcile')"
     },
@@ -13188,7 +13178,7 @@
       "raw": "'reset'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 234,
+      "line": 235,
       "column": 38,
       "context": "this.enqueue(observation.source, 'reset', 'accepted_ready')"
     },
@@ -13198,7 +13188,7 @@
       "raw": "'accepted_ready'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 234,
+      "line": 235,
       "column": 47,
       "context": "this.enqueue(observation.source, 'reset', 'accepted_ready')"
     },
@@ -13208,7 +13198,7 @@
       "raw": "'reset'",
       "category": "comparison",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 326,
+      "line": 327,
       "column": 20,
       "context": "policy === 'reset'"
     },
@@ -13218,7 +13208,7 @@
       "raw": "'assignment'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 385,
+      "line": 386,
       "column": 27,
       "context": "this.assignmentRepository .createQueryBuilder('assignment')"
     },
@@ -13228,7 +13218,7 @@
       "raw": "'source_config.formatCode'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 386,
+      "line": 387,
       "column": 15,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13238,7 +13228,7 @@
       "raw": "'providerSymbol'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 386,
+      "line": 387,
       "column": 43,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13248,7 +13238,7 @@
       "raw": "'security.id'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 387,
+      "line": 388,
       "column": 18,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13258,7 +13248,7 @@
       "raw": "'securityId'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 387,
+      "line": 388,
       "column": 33,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13268,7 +13258,7 @@
       "raw": "'security.status'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 388,
+      "line": 389,
       "column": 18,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13278,7 +13268,7 @@
       "raw": "'securityStatus'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 388,
+      "line": 389,
       "column": 37,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13288,7 +13278,7 @@
       "raw": "'assignment.security'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 389,
+      "line": 390,
       "column": 18,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13298,7 +13288,7 @@
       "raw": "'security'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 389,
+      "line": 390,
       "column": 41,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13308,7 +13298,7 @@
       "raw": "'assignment.sourceConfig'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 390,
+      "line": 391,
       "column": 18,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13318,7 +13308,7 @@
       "raw": "'source_config'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 390,
+      "line": 391,
       "column": 45,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13328,7 +13318,7 @@
       "raw": "'security.type IN (:...types)'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 391,
+      "line": 392,
       "column": 14,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13338,7 +13328,7 @@
       "raw": "'source_config.source = :source'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 394,
+      "line": 395,
       "column": 17,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13348,7 +13338,7 @@
       "raw": "'source_config.enabled = :enabled'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 395,
+      "line": 396,
       "column": 17,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13358,7 +13348,7 @@
       "raw": "'source_config.formatCode'",
       "category": "function-argument",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 396,
+      "line": 397,
       "column": 16,
       "context": "this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro"
     },
@@ -13368,7 +13358,7 @@
       "raw": "'reset'",
       "category": "comparison",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 435,
+      "line": 436,
       "column": 22,
       "context": "current === 'reset'"
     },
@@ -13378,7 +13368,7 @@
       "raw": "'reset'",
       "category": "comparison",
       "file": "apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts",
-      "line": 435,
+      "line": 436,
       "column": 46,
       "context": "incoming === 'reset'"
     },
@@ -14534,7 +14524,7 @@
       "raw": "'QMT_BASE_URL'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 83,
+      "line": 85,
       "column": 40,
       "context": "config.get<string>('QMT_BASE_URL')"
     },
@@ -14544,7 +14534,7 @@
       "raw": "'QMT_WS_CLIENT_ID'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 85,
+      "line": 87,
       "column": 26,
       "context": "config.get<string>('QMT_WS_CLIENT_ID')"
     },
@@ -14554,7 +14544,7 @@
       "raw": "'ws'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 86,
+      "line": 88,
       "column": 46,
       "context": "baseUrl.replace(/^http/, 'ws')"
     },
@@ -14564,7 +14554,7 @@
       "raw": "'QMT_WS_RECONNECT_DELAY_MS'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 88,
+      "line": 90,
       "column": 7,
       "context": "config.get<number>( 'QMT_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )"
     },
@@ -14574,7 +14564,7 @@
       "raw": "'QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 92,
+      "line": 94,
       "column": 7,
       "context": "config.get<number>( 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, "
     },
@@ -14584,59 +14574,19 @@
       "raw": "'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 121,
+      "line": 123,
       "column": 36,
       "context": "localFailure(unauthorized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')"
     },
     {
       "type": "string",
-      "value": "sync_subscriptions",
-      "raw": "'sync_subscriptions'",
-      "category": "object-property",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 125,
-      "column": 15,
-      "context": "type: 'sync_subscriptions'"
-    },
-    {
-      "type": "string",
-      "value": "subscriptions_synced",
-      "raw": "'subscriptions_synced'",
-      "category": "function-argument",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 126,
-      "column": 7,
-      "context": "this.executeSubscriptionControl( { type: 'sync_subscriptions', symbols: normalized }, 'subscriptions"
-    },
-    {
-      "type": "string",
       "value": "QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED",
       "raw": "'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED'",
-      "category": "function-argument",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 135,
-      "column": 34,
-      "context": "localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')"
-    },
-    {
-      "type": "string",
-      "value": "subscribe",
-      "raw": "'subscribe'",
-      "category": "object-property",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 139,
-      "column": 15,
-      "context": "type: 'subscribe'"
-    },
-    {
-      "type": "string",
-      "value": "subscribed",
-      "raw": "'subscribed'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
       "line": 140,
-      "column": 7,
-      "context": "this.executeSubscriptionControl( { type: 'subscribe', symbol: normalized }, 'subscribed', normalized"
+      "column": 34,
+      "context": "localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')"
     },
     {
       "type": "string",
@@ -14644,49 +14594,9 @@
       "raw": "'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 149,
+      "line": 154,
       "column": 34,
       "context": "localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')"
-    },
-    {
-      "type": "string",
-      "value": "unsubscribe",
-      "raw": "'unsubscribe'",
-      "category": "object-property",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 153,
-      "column": 15,
-      "context": "type: 'unsubscribe'"
-    },
-    {
-      "type": "string",
-      "value": "unsubscribed",
-      "raw": "'unsubscribed'",
-      "category": "function-argument",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 154,
-      "column": 7,
-      "context": "this.executeSubscriptionControl( { type: 'unsubscribe', symbol: normalized }, 'unsubscribed', normal"
-    },
-    {
-      "type": "string",
-      "value": "get_subscriptions",
-      "raw": "'get_subscriptions'",
-      "category": "object-property",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 161,
-      "column": 15,
-      "context": "type: 'get_subscriptions'"
-    },
-    {
-      "type": "string",
-      "value": "subscriptions",
-      "raw": "'subscriptions'",
-      "category": "function-argument",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 162,
-      "column": 7,
-      "context": "this.executeSubscriptionControl( { type: 'get_subscriptions' }, 'subscriptions', null, )"
     },
     {
       "type": "string",
@@ -14694,7 +14604,7 @@
       "raw": "'QMT_SUBSCRIPTION_CONTROL_NOT_READY'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 174,
+      "line": 179,
       "column": 30,
       "context": "localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_NOT_READY')"
     },
@@ -14704,7 +14614,7 @@
       "raw": "'QMT_SUBSCRIPTION_CONTROL_BUSY'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 179,
+      "line": 184,
       "column": 30,
       "context": "localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_BUSY')"
     },
@@ -14714,7 +14624,7 @@
       "raw": "'QMT_SUBSCRIPTION_CONTROL_TIMEOUT'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 186,
+      "line": 191,
       "column": 38,
       "context": "localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT')"
     },
@@ -14724,7 +14634,7 @@
       "raw": "'QMT_SUBSCRIPTION_CONTROL_SEND_FAILED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 197,
+      "line": 202,
       "column": 38,
       "context": "localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_SEND_FAILED')"
     },
@@ -14734,7 +14644,7 @@
       "raw": "'ping'",
       "category": "object-property",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 216,
+      "line": 221,
       "column": 47,
       "context": "type: 'ping'"
     },
@@ -14743,7 +14653,7 @@
       "value": 30000,
       "raw": "30_000",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 218,
+      "line": 223,
       "column": 10,
       "context": "setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type"
     },
@@ -14753,7 +14663,7 @@
       "raw": "'QMT_REALTIME_WS_ERROR'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 228,
+      "line": 233,
       "column": 27,
       "context": "this.store.setError('QMT_REALTIME_WS_ERROR', error.message)"
     },
@@ -14763,7 +14673,7 @@
       "raw": "'decodeError'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 267,
+      "line": 272,
       "column": 9,
       "context": "this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'QMT_REALTIME"
     },
@@ -14773,7 +14683,7 @@
       "raw": "'realtime.ready'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 273,
+      "line": 278,
       "column": 29,
       "context": "message['type'] === 'realtime.ready'"
     },
@@ -14783,7 +14693,7 @@
       "raw": "'realtime.native_snapshot'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 281,
+      "line": 286,
       "column": 29,
       "context": "message['type'] === 'realtime.native_snapshot'"
     },
@@ -14793,7 +14703,7 @@
       "raw": "'qmt'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 289,
+      "line": 294,
       "column": 31,
       "context": "message['provider'] !== 'qmt'"
     },
@@ -14803,7 +14713,7 @@
       "raw": "'builtin'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 291,
+      "line": 296,
       "column": 24,
       "context": "data['mode'] !== 'builtin'"
     },
@@ -14813,7 +14723,7 @@
       "raw": "'QMT'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 293,
+      "line": 298,
       "column": 26,
       "context": "data['source'] !== 'QMT'"
     },
@@ -14823,7 +14733,7 @@
       "raw": "'latest-state'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 294,
+      "line": 299,
       "column": 27,
       "context": "data['quality'] !== 'latest-state'"
     },
@@ -14833,7 +14743,7 @@
       "raw": "'contractMismatch'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 301,
+      "line": 306,
       "column": 9,
       "context": "this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )"
     },
@@ -14843,7 +14753,7 @@
       "raw": "'QMT_REALTIME_READY_CONTRACT_MISMATCH'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 303,
+      "line": 308,
       "column": 9,
       "context": "this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )"
     },
@@ -14853,7 +14763,7 @@
       "raw": "'candle.snapshot.process'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 327,
+      "line": 332,
       "column": 20,
       "context": "withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'qmt'); const reje"
     },
@@ -14863,7 +14773,7 @@
       "raw": "'source'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 328,
+      "line": 333,
       "column": 25,
       "context": "span.setAttribute('source', 'qmt')"
     },
@@ -14873,7 +14783,7 @@
       "raw": "'qmt'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 328,
+      "line": 333,
       "column": 35,
       "context": "span.setAttribute('source', 'qmt')"
     },
@@ -14883,7 +14793,7 @@
       "raw": "'rejected'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 330,
+      "line": 335,
       "column": 23,
       "context": "span.addEvent('rejected', { reason })"
     },
@@ -14893,7 +14803,7 @@
       "raw": "'transport_not_ready'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 337,
+      "line": 342,
       "column": 16,
       "context": "reject('transport_not_ready', null)"
     },
@@ -14903,7 +14813,7 @@
       "raw": "'validationError'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 339,
+      "line": 344,
       "column": 11,
       "context": "this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )"
     },
@@ -14913,7 +14823,7 @@
       "raw": "'QMT_REALTIME_READY_REQUIRED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 341,
+      "line": 346,
       "column": 11,
       "context": "this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )"
     },
@@ -14923,7 +14833,7 @@
       "raw": "'qmt'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 347,
+      "line": 352,
       "column": 59,
       "context": "decodeRealtimeNativeMapMessage(message, 'qmt')"
     },
@@ -14933,7 +14843,7 @@
       "raw": "'symbol'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 366,
+      "line": 371,
       "column": 27,
       "context": "span.setAttribute('symbol', providerSymbol)"
     },
@@ -14943,7 +14853,7 @@
       "raw": "'capturedAt'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 367,
+      "line": 372,
       "column": 27,
       "context": "span.setAttribute('capturedAt', decoded.data.capturedAt)"
     },
@@ -14953,7 +14863,7 @@
       "raw": "'symbol_invalid'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 369,
+      "line": 374,
       "column": 18,
       "context": "reject('symbol_invalid', providerSymbol)"
     },
@@ -14963,7 +14873,7 @@
       "raw": "'validationError'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 371,
+      "line": 376,
       "column": 13,
       "context": "this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )"
     },
@@ -14973,7 +14883,7 @@
       "raw": "'QMT_REALTIME_NATIVE_INVALID'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 373,
+      "line": 378,
       "column": 13,
       "context": "this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )"
     },
@@ -14983,7 +14893,7 @@
       "raw": "'not_authorized'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 379,
+      "line": 384,
       "column": 18,
       "context": "reject('not_authorized', providerSymbol)"
     },
@@ -14993,7 +14903,7 @@
       "raw": "'symbolNotAuthorized'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 381,
+      "line": 386,
       "column": 13,
       "context": "this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'"
     },
@@ -15003,7 +14913,7 @@
       "raw": "'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 383,
+      "line": 388,
       "column": 13,
       "context": "this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'"
     },
@@ -15012,7 +14922,7 @@
       "value": 20,
       "raw": "20",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 397,
+      "line": 402,
       "column": 23,
       "context": "Object.keys(nativeRecord) .sort() .slice(0, 20)"
     },
@@ -15022,7 +14932,7 @@
       "raw": "'converter_error'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 408,
+      "line": 413,
       "column": 18,
       "context": "reject('converter_error', providerSymbol)"
     },
@@ -15032,7 +14942,7 @@
       "raw": "'converterError'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 410,
+      "line": 415,
       "column": 13,
       "context": "this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )"
     },
@@ -15042,7 +14952,7 @@
       "raw": "'QMT_REALTIME_CONVERTER_FAILED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 412,
+      "line": 417,
       "column": 13,
       "context": "this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )"
     },
@@ -15052,7 +14962,7 @@
       "raw": "'qmt'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 426,
+      "line": 431,
       "column": 31,
       "context": "message['provider'] !== 'qmt'"
     },
@@ -15062,7 +14972,7 @@
       "raw": "'controlResponseRejected'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 432,
+      "line": 437,
       "column": 9,
       "context": "this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE"
     },
@@ -15072,7 +14982,7 @@
       "raw": "'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 434,
+      "line": 439,
       "column": 9,
       "context": "this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE"
     },
@@ -15082,7 +14992,7 @@
       "raw": "'controlResponseRejected'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 441,
+      "line": 446,
       "column": 9,
       "context": "this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON"
     },
@@ -15092,7 +15002,7 @@
       "raw": "'QMT_SUBSCRIPTION_CONTROL_RESPONSE_INVALID'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 443,
+      "line": 448,
       "column": 9,
       "context": "this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON"
     },
@@ -15102,7 +15012,7 @@
       "raw": "'QMT_SUBSCRIPTION_CONTROL_DISCONNECTED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 458,
+      "line": 463,
       "column": 36,
       "context": "localFailure(pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_DISCONNECTED')"
     },
@@ -15112,7 +15022,7 @@
       "raw": "'success'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 468,
+      "line": 473,
       "column": 19,
       "context": "keys[0] === 'success'"
     },
@@ -15122,7 +15032,7 @@
       "raw": "'failure'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 469,
+      "line": 474,
       "column": 19,
       "context": "keys[0] !== 'failure'"
     },
@@ -15131,7 +15041,7 @@
       "value": 3,
       "raw": "3",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 473,
+      "line": 478,
       "column": 57,
       "context": "failureKeys.length !== 3"
     },
@@ -15140,7 +15050,7 @@
       "value": 3,
       "raw": "3",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 479,
+      "line": 484,
       "column": 29,
       "context": "failureKeys.length === 3"
     },
@@ -15150,49 +15060,9 @@
       "raw": "'subscribed'",
       "category": "comparison",
       "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 480,
+      "line": 485,
       "column": 40,
       "context": "failure['subscriptionState'] !== 'subscribed'"
-    },
-    {
-      "type": "string",
-      "value": "subscriptions_synced",
-      "raw": "'subscriptions_synced'",
-      "category": "comparison",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 490,
-      "column": 15,
-      "context": "value === 'subscriptions_synced'"
-    },
-    {
-      "type": "string",
-      "value": "subscribed",
-      "raw": "'subscribed'",
-      "category": "comparison",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 491,
-      "column": 15,
-      "context": "value === 'subscribed'"
-    },
-    {
-      "type": "string",
-      "value": "unsubscribed",
-      "raw": "'unsubscribed'",
-      "category": "comparison",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 492,
-      "column": 15,
-      "context": "value === 'unsubscribed'"
-    },
-    {
-      "type": "string",
-      "value": "subscriptions",
-      "raw": "'subscriptions'",
-      "category": "comparison",
-      "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-      "line": 493,
-      "column": 15,
-      "context": "value === 'subscriptions'"
     },
     {
       "type": "string",
@@ -15318,7 +15188,7 @@
       "raw": "'TDX_BASE_URL'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 91,
+      "line": 93,
       "column": 40,
       "context": "config.get<string>('TDX_BASE_URL')"
     },
@@ -15328,7 +15198,7 @@
       "raw": "'TDX_WS_CLIENT_ID'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 93,
+      "line": 95,
       "column": 26,
       "context": "config.get<string>('TDX_WS_CLIENT_ID')"
     },
@@ -15338,7 +15208,7 @@
       "raw": "'ws'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 94,
+      "line": 96,
       "column": 46,
       "context": "baseUrl.replace(/^http/, 'ws')"
     },
@@ -15348,7 +15218,7 @@
       "raw": "'TDX_WS_RECONNECT_DELAY_MS'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 96,
+      "line": 98,
       "column": 7,
       "context": "config.get<number>( 'TDX_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )"
     },
@@ -15358,7 +15228,7 @@
       "raw": "'TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 100,
+      "line": 102,
       "column": 7,
       "context": "config.get<number>( 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, "
     },
@@ -15368,59 +15238,19 @@
       "raw": "'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 129,
+      "line": 131,
       "column": 36,
       "context": "localFailure(unauthorized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')"
     },
     {
       "type": "string",
-      "value": "sync_subscriptions",
-      "raw": "'sync_subscriptions'",
-      "category": "object-property",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 133,
-      "column": 15,
-      "context": "type: 'sync_subscriptions'"
-    },
-    {
-      "type": "string",
-      "value": "subscriptions_synced",
-      "raw": "'subscriptions_synced'",
-      "category": "function-argument",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 134,
-      "column": 7,
-      "context": "this.executeSubscriptionControl( { type: 'sync_subscriptions', symbols: normalized }, 'subscriptions"
-    },
-    {
-      "type": "string",
       "value": "TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED",
       "raw": "'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED'",
-      "category": "function-argument",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 143,
-      "column": 34,
-      "context": "localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')"
-    },
-    {
-      "type": "string",
-      "value": "subscribe",
-      "raw": "'subscribe'",
-      "category": "object-property",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 147,
-      "column": 15,
-      "context": "type: 'subscribe'"
-    },
-    {
-      "type": "string",
-      "value": "subscribed",
-      "raw": "'subscribed'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
       "line": 148,
-      "column": 7,
-      "context": "this.executeSubscriptionControl( { type: 'subscribe', symbol: normalized }, 'subscribed', normalized"
+      "column": 34,
+      "context": "localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')"
     },
     {
       "type": "string",
@@ -15428,49 +15258,9 @@
       "raw": "'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 157,
+      "line": 162,
       "column": 34,
       "context": "localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')"
-    },
-    {
-      "type": "string",
-      "value": "unsubscribe",
-      "raw": "'unsubscribe'",
-      "category": "object-property",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 161,
-      "column": 15,
-      "context": "type: 'unsubscribe'"
-    },
-    {
-      "type": "string",
-      "value": "unsubscribed",
-      "raw": "'unsubscribed'",
-      "category": "function-argument",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 162,
-      "column": 7,
-      "context": "this.executeSubscriptionControl( { type: 'unsubscribe', symbol: normalized }, 'unsubscribed', normal"
-    },
-    {
-      "type": "string",
-      "value": "get_subscriptions",
-      "raw": "'get_subscriptions'",
-      "category": "object-property",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 169,
-      "column": 15,
-      "context": "type: 'get_subscriptions'"
-    },
-    {
-      "type": "string",
-      "value": "subscriptions",
-      "raw": "'subscriptions'",
-      "category": "function-argument",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 170,
-      "column": 7,
-      "context": "this.executeSubscriptionControl( { type: 'get_subscriptions' }, 'subscriptions', null, )"
     },
     {
       "type": "string",
@@ -15478,7 +15268,7 @@
       "raw": "'TDX_SUBSCRIPTION_CONTROL_NOT_READY'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 182,
+      "line": 187,
       "column": 30,
       "context": "localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_NOT_READY')"
     },
@@ -15488,7 +15278,7 @@
       "raw": "'TDX_SUBSCRIPTION_CONTROL_BUSY'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 187,
+      "line": 192,
       "column": 30,
       "context": "localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_BUSY')"
     },
@@ -15498,7 +15288,7 @@
       "raw": "'TDX_SUBSCRIPTION_CONTROL_TIMEOUT'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 194,
+      "line": 199,
       "column": 38,
       "context": "localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT')"
     },
@@ -15508,7 +15298,7 @@
       "raw": "'TDX_SUBSCRIPTION_CONTROL_SEND_FAILED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 205,
+      "line": 210,
       "column": 38,
       "context": "localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_SEND_FAILED')"
     },
@@ -15518,7 +15308,7 @@
       "raw": "'ping'",
       "category": "object-property",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 224,
+      "line": 229,
       "column": 47,
       "context": "type: 'ping'"
     },
@@ -15527,7 +15317,7 @@
       "value": 30000,
       "raw": "30_000",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 226,
+      "line": 231,
       "column": 10,
       "context": "setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type"
     },
@@ -15537,7 +15327,7 @@
       "raw": "'TDX_REALTIME_WS_ERROR'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 236,
+      "line": 241,
       "column": 27,
       "context": "this.store.setError('TDX_REALTIME_WS_ERROR', error.message)"
     },
@@ -15547,7 +15337,7 @@
       "raw": "'decodeError'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 275,
+      "line": 280,
       "column": 9,
       "context": "this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'TDX_REALTIME"
     },
@@ -15557,7 +15347,7 @@
       "raw": "'realtime.ready'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 281,
+      "line": 286,
       "column": 29,
       "context": "message['type'] === 'realtime.ready'"
     },
@@ -15567,7 +15357,7 @@
       "raw": "'realtime.native_snapshot'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 289,
+      "line": 294,
       "column": 29,
       "context": "message['type'] === 'realtime.native_snapshot'"
     },
@@ -15577,7 +15367,7 @@
       "raw": "'tdx'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 297,
+      "line": 302,
       "column": 31,
       "context": "message['provider'] !== 'tdx'"
     },
@@ -15587,7 +15377,7 @@
       "raw": "'builtin'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 299,
+      "line": 304,
       "column": 24,
       "context": "data['mode'] !== 'builtin'"
     },
@@ -15597,7 +15387,7 @@
       "raw": "'TDX'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 301,
+      "line": 306,
       "column": 26,
       "context": "data['source'] !== 'TDX'"
     },
@@ -15607,7 +15397,7 @@
       "raw": "'latest-state'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 302,
+      "line": 307,
       "column": 27,
       "context": "data['quality'] !== 'latest-state'"
     },
@@ -15617,7 +15407,7 @@
       "raw": "'contractMismatch'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 309,
+      "line": 314,
       "column": 9,
       "context": "this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )"
     },
@@ -15627,7 +15417,7 @@
       "raw": "'TDX_REALTIME_READY_CONTRACT_MISMATCH'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 311,
+      "line": 316,
       "column": 9,
       "context": "this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )"
     },
@@ -15637,7 +15427,7 @@
       "raw": "'candle.snapshot.process'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 335,
+      "line": 340,
       "column": 20,
       "context": "withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'tdx'); const reje"
     },
@@ -15647,7 +15437,7 @@
       "raw": "'source'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 336,
+      "line": 341,
       "column": 25,
       "context": "span.setAttribute('source', 'tdx')"
     },
@@ -15657,7 +15447,7 @@
       "raw": "'tdx'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 336,
+      "line": 341,
       "column": 35,
       "context": "span.setAttribute('source', 'tdx')"
     },
@@ -15667,7 +15457,7 @@
       "raw": "'rejected'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 338,
+      "line": 343,
       "column": 23,
       "context": "span.addEvent('rejected', { reason })"
     },
@@ -15677,7 +15467,7 @@
       "raw": "'transport_not_ready'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 345,
+      "line": 350,
       "column": 16,
       "context": "reject('transport_not_ready', null)"
     },
@@ -15687,7 +15477,7 @@
       "raw": "'validationError'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 347,
+      "line": 352,
       "column": 11,
       "context": "this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )"
     },
@@ -15697,7 +15487,7 @@
       "raw": "'TDX_REALTIME_READY_REQUIRED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 349,
+      "line": 354,
       "column": 11,
       "context": "this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )"
     },
@@ -15707,7 +15497,7 @@
       "raw": "'tdx'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 355,
+      "line": 360,
       "column": 59,
       "context": "decodeRealtimeNativeMapMessage(message, 'tdx')"
     },
@@ -15717,7 +15507,7 @@
       "raw": "'symbol'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 372,
+      "line": 377,
       "column": 25,
       "context": "span.setAttribute('symbol', providerSymbol)"
     },
@@ -15727,7 +15517,7 @@
       "raw": "'capturedAt'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 373,
+      "line": 378,
       "column": 25,
       "context": "span.setAttribute('capturedAt', decoded.data.capturedAt)"
     },
@@ -15737,7 +15527,7 @@
       "raw": "'symbol_invalid'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 375,
+      "line": 380,
       "column": 16,
       "context": "reject('symbol_invalid', providerSymbol)"
     },
@@ -15747,7 +15537,7 @@
       "raw": "'validationError'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 377,
+      "line": 382,
       "column": 11,
       "context": "this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )"
     },
@@ -15757,7 +15547,7 @@
       "raw": "'TDX_REALTIME_NATIVE_INVALID'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 379,
+      "line": 384,
       "column": 11,
       "context": "this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )"
     },
@@ -15767,7 +15557,7 @@
       "raw": "'not_authorized'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 385,
+      "line": 390,
       "column": 16,
       "context": "reject('not_authorized', providerSymbol)"
     },
@@ -15777,7 +15567,7 @@
       "raw": "'symbolNotAuthorized'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 387,
+      "line": 392,
       "column": 11,
       "context": "this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'"
     },
@@ -15787,7 +15577,7 @@
       "raw": "'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 389,
+      "line": 394,
       "column": 11,
       "context": "this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'"
     },
@@ -15796,7 +15586,7 @@
       "value": 20,
       "raw": "20",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 403,
+      "line": 408,
       "column": 21,
       "context": "Object.keys(nativeRecord) .sort() .slice(0, 20)"
     },
@@ -15806,7 +15596,7 @@
       "raw": "'converter_error'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 415,
+      "line": 420,
       "column": 16,
       "context": "reject('converter_error', providerSymbol)"
     },
@@ -15816,7 +15606,7 @@
       "raw": "'converterError'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 417,
+      "line": 422,
       "column": 11,
       "context": "this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )"
     },
@@ -15826,7 +15616,7 @@
       "raw": "'TDX_REALTIME_CONVERTER_FAILED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 419,
+      "line": 424,
       "column": 11,
       "context": "this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )"
     },
@@ -15836,7 +15626,7 @@
       "raw": "'tdx'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 430,
+      "line": 435,
       "column": 31,
       "context": "message['provider'] !== 'tdx'"
     },
@@ -15846,7 +15636,7 @@
       "raw": "'controlResponseRejected'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 436,
+      "line": 441,
       "column": 9,
       "context": "this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE"
     },
@@ -15856,7 +15646,7 @@
       "raw": "'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 438,
+      "line": 443,
       "column": 9,
       "context": "this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE"
     },
@@ -15866,7 +15656,7 @@
       "raw": "'controlResponseRejected'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 445,
+      "line": 450,
       "column": 9,
       "context": "this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON"
     },
@@ -15876,7 +15666,7 @@
       "raw": "'TDX_SUBSCRIPTION_CONTROL_RESPONSE_INVALID'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 447,
+      "line": 452,
       "column": 9,
       "context": "this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON"
     },
@@ -15886,7 +15676,7 @@
       "raw": "'TDX_SUBSCRIPTION_CONTROL_DISCONNECTED'",
       "category": "function-argument",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 462,
+      "line": 467,
       "column": 36,
       "context": "localFailure(pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_DISCONNECTED')"
     },
@@ -15896,7 +15686,7 @@
       "raw": "'success'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 472,
+      "line": 477,
       "column": 19,
       "context": "keys[0] === 'success'"
     },
@@ -15906,7 +15696,7 @@
       "raw": "'failure'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 473,
+      "line": 478,
       "column": 19,
       "context": "keys[0] !== 'failure'"
     },
@@ -15915,7 +15705,7 @@
       "value": 3,
       "raw": "3",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 477,
+      "line": 482,
       "column": 57,
       "context": "failureKeys.length !== 3"
     },
@@ -15924,7 +15714,7 @@
       "value": 3,
       "raw": "3",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 483,
+      "line": 488,
       "column": 29,
       "context": "failureKeys.length === 3"
     },
@@ -15934,49 +15724,9 @@
       "raw": "'subscribed'",
       "category": "comparison",
       "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 484,
+      "line": 489,
       "column": 40,
       "context": "failure['subscriptionState'] !== 'subscribed'"
-    },
-    {
-      "type": "string",
-      "value": "subscriptions_synced",
-      "raw": "'subscriptions_synced'",
-      "category": "comparison",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 494,
-      "column": 15,
-      "context": "value === 'subscriptions_synced'"
-    },
-    {
-      "type": "string",
-      "value": "subscribed",
-      "raw": "'subscribed'",
-      "category": "comparison",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 495,
-      "column": 15,
-      "context": "value === 'subscribed'"
-    },
-    {
-      "type": "string",
-      "value": "unsubscribed",
-      "raw": "'unsubscribed'",
-      "category": "comparison",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 496,
-      "column": 15,
-      "context": "value === 'unsubscribed'"
-    },
-    {
-      "type": "string",
-      "value": "subscriptions",
-      "raw": "'subscriptions'",
-      "category": "comparison",
-      "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-      "line": 497,
-      "column": 15,
-      "context": "value === 'subscriptions'"
     },
     {
       "type": "string",
@@ -16828,7 +16578,7 @@
       "value": 60,
       "raw": "60",
       "file": "apps/mist/src/visual/visual.controller.ts",
-      "line": 87,
+      "line": 94,
       "column": 38,
       "context": "60 * 24"
     },
@@ -16837,7 +16587,7 @@
       "value": 24,
       "raw": "24",
       "file": "apps/mist/src/visual/visual.controller.ts",
-      "line": 87,
+      "line": 94,
       "column": 43,
       "context": "60 * 24"
     },
@@ -16846,7 +16596,7 @@
       "value": 3600,
       "raw": "3600",
       "file": "apps/mist/src/visual/visual.controller.ts",
-      "line": 87,
+      "line": 94,
       "column": 48,
       "context": "60 * 24 * 3600"
     },
@@ -16855,7 +16605,7 @@
       "value": 1000,
       "raw": "1000",
       "file": "apps/mist/src/visual/visual.controller.ts",
-      "line": 87,
+      "line": 94,
       "column": 55,
       "context": "60 * 24 * 3600 * 1000"
     },
@@ -19452,13 +19202,13 @@
     },
     {
       "type": "string",
-      "value": "600519",
-      "raw": "'600519'",
+      "value": "000001",
+      "raw": "'000001'",
       "category": "object-property",
       "file": "libs/chancore/src/chan-full-output.characterization.fixture.ts",
       "line": 78,
       "column": 13,
-      "context": "symbol: '600519'"
+      "context": "symbol: '000001'"
     },
     {
       "type": "number",
@@ -22057,7 +21807,7 @@
       "raw": "'GUARD'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 50,
+      "line": 58,
       "column": 12,
       "context": "case 'GUARD': { const plugin = this.getPlugin(node.pluginId); const opinion = await plugin.evaluate("
     },
@@ -22067,7 +21817,7 @@
       "raw": "'GUARD'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 56,
+      "line": 64,
       "column": 17,
       "context": "type: 'GUARD'"
     },
@@ -22077,7 +21827,7 @@
       "raw": "'BOTH'",
       "category": "comparison",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 66,
+      "line": 77,
       "column": 35,
       "context": "node.requiredAction === 'BOTH'"
     },
@@ -22087,7 +21837,7 @@
       "raw": "'ANY'",
       "category": "comparison",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 66,
+      "line": 77,
       "column": 69,
       "context": "node.requiredAction === 'ANY'"
     },
@@ -22097,7 +21847,7 @@
       "raw": "'ABORTED'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 100,
+      "line": 119,
       "column": 19,
       "context": "status: 'ABORTED'"
     },
@@ -22107,7 +21857,7 @@
       "raw": "'LOW'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 102,
+      "line": 121,
       "column": 28,
       "context": "confidenceLevel: 'LOW'"
     },
@@ -22117,7 +21867,7 @@
       "raw": "'BRANCH'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 108,
+      "line": 127,
       "column": 12,
       "context": "case 'BRANCH': { const conditionResult = this.resolveCondition(node.condition, context); trace.push("
     },
@@ -22127,7 +21877,7 @@
       "raw": "'BRANCH'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 112,
+      "line": 131,
       "column": 17,
       "context": "type: 'BRANCH'"
     },
@@ -22137,7 +21887,7 @@
       "raw": "'EXTRACTOR'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 129,
+      "line": 149,
       "column": 12,
       "context": "case 'EXTRACTOR': { const plugin = this.getPlugin(node.pluginId); const opinion = await plugin.evalu"
     },
@@ -22147,7 +21897,7 @@
       "raw": "'EXTRACTOR'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 141,
+      "line": 161,
       "column": 17,
       "context": "type: 'EXTRACTOR'"
     },
@@ -22157,7 +21907,7 @@
       "raw": "'CONSENSUS'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 156,
+      "line": 186,
       "column": 12,
       "context": "case 'CONSENSUS': { const targetAction = node.targetAction ?? DECISION_ACTIONS.BUY; const vetoAction"
     },
@@ -22167,7 +21917,7 @@
       "raw": "'CONSENSUS'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 208,
+      "line": 238,
       "column": 17,
       "context": "type: 'CONSENSUS'"
     },
@@ -22177,7 +21927,7 @@
       "raw": "'ABORTED'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 241,
+      "line": 273,
       "column": 19,
       "context": "status: 'ABORTED'"
     },
@@ -22187,7 +21937,7 @@
       "raw": "'TERMINAL'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 251,
+      "line": 283,
       "column": 12,
       "context": "case 'TERMINAL': { const finalAction = node.action === 'INHERIT' ? inheritedAction || DECISION_ACTIO"
     },
@@ -22197,7 +21947,7 @@
       "raw": "'INHERIT'",
       "category": "comparison",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 253,
+      "line": 285,
       "column": 27,
       "context": "node.action === 'INHERIT'"
     },
@@ -22207,7 +21957,7 @@
       "raw": "'TERMINAL'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 259,
+      "line": 291,
       "column": 17,
       "context": "type: 'TERMINAL'"
     },
@@ -22217,7 +21967,7 @@
       "raw": "'ABORT'",
       "category": "comparison",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 265,
+      "line": 297,
       "column": 61,
       "context": "finalAction === 'ABORT'"
     },
@@ -22226,7 +21976,7 @@
       "value": 85,
       "raw": "85",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 265,
+      "line": 297,
       "column": 75,
       "context": "finalAction === 'ABORT' ? 0 : 85"
     },
@@ -22236,7 +21986,7 @@
       "raw": "'ABORT'",
       "category": "comparison",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 268,
+      "line": 300,
       "column": 29,
       "context": "finalAction === 'ABORT'"
     },
@@ -22246,7 +21996,7 @@
       "raw": "'ABORTED'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 270,
+      "line": 302,
       "column": 21,
       "context": "status: 'ABORTED'"
     },
@@ -22256,7 +22006,7 @@
       "raw": "'SIGNAL_EMITTED'",
       "category": "object-property",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 280,
+      "line": 317,
       "column": 19,
       "context": "status: 'SIGNAL_EMITTED'"
     },
@@ -22266,7 +22016,7 @@
       "raw": "'BUY'",
       "category": "comparison",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 287,
+      "line": 324,
       "column": 41,
       "context": "finalAction === 'BUY'"
     },
@@ -22276,7 +22026,7 @@
       "raw": "'eq'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 320,
+      "line": 374,
       "column": 12,
       "context": "case 'eq': return actual === expected;"
     },
@@ -22286,7 +22036,7 @@
       "raw": "'ne'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 322,
+      "line": 376,
       "column": 12,
       "context": "case 'ne': return actual !== expected;"
     },
@@ -22296,7 +22046,7 @@
       "raw": "'gt'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 324,
+      "line": 378,
       "column": 12,
       "context": "case 'gt': return Number(actual) > Number(expected);"
     },
@@ -22306,7 +22056,7 @@
       "raw": "'gte'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 326,
+      "line": 380,
       "column": 12,
       "context": "case 'gte': return Number(actual) >= Number(expected);"
     },
@@ -22316,7 +22066,7 @@
       "raw": "'lt'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 328,
+      "line": 382,
       "column": 12,
       "context": "case 'lt': return Number(actual) < Number(expected);"
     },
@@ -22326,7 +22076,7 @@
       "raw": "'lte'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 330,
+      "line": 384,
       "column": 12,
       "context": "case 'lte': return Number(actual) <= Number(expected);"
     },
@@ -22336,7 +22086,7 @@
       "raw": "'in'",
       "category": "switch-case",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 332,
+      "line": 386,
       "column": 12,
       "context": "case 'in': if (Array.isArray(expected)) { return expected.includes(actual); } return false;"
     },
@@ -22345,7 +22095,7 @@
       "value": 80,
       "raw": "80",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 343,
+      "line": 397,
       "column": 18,
       "context": "score >= 80"
     },
@@ -22354,129 +22104,9 @@
       "value": 65,
       "raw": "65",
       "file": "libs/strategy/src/decision-flow/decision-flow-evaluator.ts",
-      "line": 344,
+      "line": 398,
       "column": 18,
       "context": "score >= 65"
-    },
-    {
-      "type": "string",
-      "value": "一买",
-      "raw": "'一买'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 46,
-      "column": 23,
-      "context": "reason.includes('一买')"
-    },
-    {
-      "type": "string",
-      "value": "1买",
-      "raw": "'1买'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 47,
-      "column": 23,
-      "context": "reason.includes('1买')"
-    },
-    {
-      "type": "string",
-      "value": "二买",
-      "raw": "'二买'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 48,
-      "column": 23,
-      "context": "reason.includes('二买')"
-    },
-    {
-      "type": "string",
-      "value": "2买",
-      "raw": "'2买'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 49,
-      "column": 23,
-      "context": "reason.includes('2买')"
-    },
-    {
-      "type": "string",
-      "value": "三买",
-      "raw": "'三买'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 50,
-      "column": 23,
-      "context": "reason.includes('三买')"
-    },
-    {
-      "type": "string",
-      "value": "3买",
-      "raw": "'3买'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 51,
-      "column": 23,
-      "context": "reason.includes('3买')"
-    },
-    {
-      "type": "string",
-      "value": "一卖",
-      "raw": "'一卖'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 52,
-      "column": 23,
-      "context": "reason.includes('一卖')"
-    },
-    {
-      "type": "string",
-      "value": "1卖",
-      "raw": "'1卖'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 53,
-      "column": 23,
-      "context": "reason.includes('1卖')"
-    },
-    {
-      "type": "string",
-      "value": "二卖",
-      "raw": "'二卖'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 54,
-      "column": 23,
-      "context": "reason.includes('二卖')"
-    },
-    {
-      "type": "string",
-      "value": "2卖",
-      "raw": "'2卖'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 55,
-      "column": 23,
-      "context": "reason.includes('2卖')"
-    },
-    {
-      "type": "string",
-      "value": "三卖",
-      "raw": "'三卖'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 56,
-      "column": 23,
-      "context": "reason.includes('三卖')"
-    },
-    {
-      "type": "string",
-      "value": "3卖",
-      "raw": "'3卖'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/decision-flow/decision-pivot-evidence.ts",
-      "line": 57,
-      "column": 23,
-      "context": "reason.includes('3卖')"
     },
     {
       "type": "string",
@@ -23332,7 +22962,7 @@
       "raw": "'..'",
       "category": "function-argument",
       "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 121,
+      "line": 144,
       "column": 53,
       "context": "path.resolve(process.cwd(), '..', 'mist-alpha-private')"
     },
@@ -23342,7 +22972,7 @@
       "raw": "'mist-alpha-private'",
       "category": "function-argument",
       "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 121,
+      "line": 144,
       "column": 59,
       "context": "path.resolve(process.cwd(), '..', 'mist-alpha-private')"
     },
@@ -23352,7 +22982,7 @@
       "raw": "'../../../../..'",
       "category": "function-argument",
       "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 126,
+      "line": 149,
       "column": 7,
       "context": "path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )"
     },
@@ -23362,189 +22992,9 @@
       "raw": "'mist-alpha-private'",
       "category": "function-argument",
       "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 127,
+      "line": 150,
       "column": 7,
       "context": "path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )"
-    },
-    {
-      "type": "string",
-      "value": "src",
-      "raw": "'src'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 153,
-      "column": 31,
-      "context": "path.join(basePath, 'src', 'index.ts')"
-    },
-    {
-      "type": "string",
-      "value": "index.ts",
-      "raw": "'index.ts'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 153,
-      "column": 38,
-      "context": "path.join(basePath, 'src', 'index.ts')"
-    },
-    {
-      "type": "string",
-      "value": "src",
-      "raw": "'src'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 154,
-      "column": 31,
-      "context": "path.join(basePath, 'src', 'index.js')"
-    },
-    {
-      "type": "string",
-      "value": "index.js",
-      "raw": "'index.js'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 154,
-      "column": 38,
-      "context": "path.join(basePath, 'src', 'index.js')"
-    },
-    {
-      "type": "string",
-      "value": "dist",
-      "raw": "'dist'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 155,
-      "column": 31,
-      "context": "path.join(basePath, 'dist', 'index.js')"
-    },
-    {
-      "type": "string",
-      "value": "index.js",
-      "raw": "'index.js'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 155,
-      "column": 39,
-      "context": "path.join(basePath, 'dist', 'index.js')"
-    },
-    {
-      "type": "string",
-      "value": "index.ts",
-      "raw": "'index.ts'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 156,
-      "column": 31,
-      "context": "path.join(basePath, 'index.ts')"
-    },
-    {
-      "type": "string",
-      "value": "index.js",
-      "raw": "'index.js'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 157,
-      "column": 31,
-      "context": "path.join(basePath, 'index.js')"
-    },
-    {
-      "type": "string",
-      "value": "src",
-      "raw": "'src'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 169,
-      "column": 31,
-      "context": "path.join(basePath, 'src', 'plugins')"
-    },
-    {
-      "type": "string",
-      "value": "plugins",
-      "raw": "'plugins'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 169,
-      "column": 38,
-      "context": "path.join(basePath, 'src', 'plugins')"
-    },
-    {
-      "type": "string",
-      "value": "plugins",
-      "raw": "'plugins'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 170,
-      "column": 31,
-      "context": "path.join(basePath, 'plugins')"
-    },
-    {
-      "type": "string",
-      "value": ".ts",
-      "raw": "'.ts'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 178,
-      "column": 29,
-      "context": "f.endsWith('.ts')"
-    },
-    {
-      "type": "string",
-      "value": ".js",
-      "raw": "'.js'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 178,
-      "column": 50,
-      "context": "f.endsWith('.js')"
-    },
-    {
-      "type": "string",
-      "value": ".d.ts",
-      "raw": "'.d.ts'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 179,
-      "column": 29,
-      "context": "f.endsWith('.d.ts')"
-    },
-    {
-      "type": "string",
-      "value": ".spec.ts",
-      "raw": "'.spec.ts'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 180,
-      "column": 29,
-      "context": "f.endsWith('.spec.ts')"
-    },
-    {
-      "type": "string",
-      "value": ".test.ts",
-      "raw": "'.test.ts'",
-      "category": "function-argument",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 181,
-      "column": 29,
-      "context": "f.endsWith('.test.ts')"
-    },
-    {
-      "type": "string",
-      "value": "plugins",
-      "raw": "'plugins'",
-      "category": "comparison",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 248,
-      "column": 21,
-      "context": "key !== 'plugins'"
-    },
-    {
-      "type": "string",
-      "value": "getPlugins",
-      "raw": "'getPlugins'",
-      "category": "comparison",
-      "file": "libs/strategy/src/factor/external-plugin-loader.ts",
-      "line": 248,
-      "column": 63,
-      "context": "key !== 'getPlugins'"
     },
     {
       "type": "string",
@@ -23642,7 +23092,7 @@
       "raw": "'_buy'",
       "category": "function-argument",
       "file": "libs/strategy/src/factor/plugins/chan-bsp.plugin.ts",
-      "line": 414,
+      "line": 417,
       "column": 39,
       "context": "event.type.endsWith('_buy')"
     },
@@ -23652,7 +23102,7 @@
       "raw": "'first_'",
       "category": "function-argument",
       "file": "libs/strategy/src/factor/plugins/chan-bsp.plugin.ts",
-      "line": 419,
+      "line": 422,
       "column": 31,
       "context": "event.type.startsWith('first_')"
     },
@@ -23662,7 +23112,7 @@
       "raw": "'second_'",
       "category": "function-argument",
       "file": "libs/strategy/src/factor/plugins/chan-bsp.plugin.ts",
-      "line": 420,
+      "line": 423,
       "column": 31,
       "context": "event.type.startsWith('second_')"
     },
@@ -23672,7 +23122,7 @@
       "raw": "'third_'",
       "category": "function-argument",
       "file": "libs/strategy/src/factor/plugins/chan-bsp.plugin.ts",
-      "line": 422,
+      "line": 425,
       "column": 31,
       "context": "event.type.startsWith('third_')"
     },
@@ -24485,71 +23935,11 @@
     },
     {
       "type": "string",
-      "value": "first_buy",
-      "raw": "'first_buy'",
-      "category": "switch-case",
-      "file": "libs/strategy/src/simulation/kernel-signal-mapper.ts",
-      "line": 9,
-      "column": 10,
-      "context": "case 'first_buy': return '1买';"
-    },
-    {
-      "type": "string",
-      "value": "second_buy",
-      "raw": "'second_buy'",
-      "category": "switch-case",
-      "file": "libs/strategy/src/simulation/kernel-signal-mapper.ts",
-      "line": 11,
-      "column": 10,
-      "context": "case 'second_buy': return '2买';"
-    },
-    {
-      "type": "string",
-      "value": "third_buy",
-      "raw": "'third_buy'",
-      "category": "switch-case",
-      "file": "libs/strategy/src/simulation/kernel-signal-mapper.ts",
-      "line": 13,
-      "column": 10,
-      "context": "case 'third_buy': return '3买';"
-    },
-    {
-      "type": "string",
-      "value": "first_sell",
-      "raw": "'first_sell'",
-      "category": "switch-case",
-      "file": "libs/strategy/src/simulation/kernel-signal-mapper.ts",
-      "line": 15,
-      "column": 10,
-      "context": "case 'first_sell': return '1卖';"
-    },
-    {
-      "type": "string",
-      "value": "second_sell",
-      "raw": "'second_sell'",
-      "category": "switch-case",
-      "file": "libs/strategy/src/simulation/kernel-signal-mapper.ts",
-      "line": 17,
-      "column": 10,
-      "context": "case 'second_sell': return '2卖';"
-    },
-    {
-      "type": "string",
-      "value": "third_sell",
-      "raw": "'third_sell'",
-      "category": "switch-case",
-      "file": "libs/strategy/src/simulation/kernel-signal-mapper.ts",
-      "line": 19,
-      "column": 10,
-      "context": "case 'third_sell': return '3卖';"
-    },
-    {
-      "type": "string",
       "value": "entry",
       "raw": "'entry'",
       "category": "comparison",
       "file": "libs/strategy/src/simulation/kernel-signal-mapper.ts",
-      "line": 35,
+      "line": 14,
       "column": 39,
       "context": "signal.signalKind === 'entry'"
     },

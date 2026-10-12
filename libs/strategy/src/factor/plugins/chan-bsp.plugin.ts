@@ -258,6 +258,7 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     const confidence = this.computeConfidence(latestEvent.type);
     const unitLabel = params.units === CHAN_BSP_UNITS.DUAN ? '线段' : '笔';
     const pointLabel = this.formatPointName(latestEvent.type);
+    const badgeText = this.formatBadgeText(latestEvent.type);
 
     const lastBar =
       context.bars.length > 0 ? context.bars[context.bars.length - 1] : null;
@@ -270,8 +271,10 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       action,
       confidence,
       reason: `缠论${unitLabel}级${pointLabel}确认 (价格: ${latestEvent.price.toFixed(2)})`,
+      badgeText,
       evidence: {
         eventType: latestEvent.type,
+        badgeText,
         units: latestEvent.units,
         price: latestEvent.price,
         time: latestEvent.time.toISOString(),
@@ -454,6 +457,25 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         return '三买';
       case CANDIDATE_BSP_TYPES.THIRD_SELL:
         return '三卖';
+      default:
+        return type;
+    }
+  }
+
+  private formatBadgeText(type: ChanBspType): string {
+    switch (type) {
+      case CANDIDATE_BSP_TYPES.FIRST_BUY:
+        return '1买';
+      case CANDIDATE_BSP_TYPES.FIRST_SELL:
+        return '1卖';
+      case CANDIDATE_BSP_TYPES.SECOND_BUY:
+        return '2买';
+      case CANDIDATE_BSP_TYPES.SECOND_SELL:
+        return '2卖';
+      case CANDIDATE_BSP_TYPES.THIRD_BUY:
+        return '3买';
+      case CANDIDATE_BSP_TYPES.THIRD_SELL:
+        return '3卖';
       default:
         return type;
     }

@@ -140,6 +140,12 @@ export interface DecisionExecutionTraceItem {
   readonly conditionResult?: boolean;
   readonly breakdown?: readonly ConsensusVoteBreakdown[];
   readonly evidence?: Readonly<Record<string, unknown>>;
+  readonly badgeText?: string;
+  readonly displayTag?: string;
+  readonly styleMeta?: Readonly<{
+    color?: string;
+    position?: 'above' | 'below';
+  }>;
 }
 
 export type DecisionStatus = 'SIGNAL_EMITTED' | 'ABORTED';
@@ -160,6 +166,13 @@ export interface DecisionResult {
   readonly signalTag?: string;
   /** 人类可读说明 */
   readonly reason: string;
+  /** 插件自主生成的展示徽标（如 "左侧1买", "三卖", "爆量突破"） */
+  readonly badgeText?: string;
+  readonly displayTag?: string;
+  readonly styleMeta?: Readonly<{
+    color?: string;
+    position?: 'above' | 'below';
+  }>;
   /** 白盒执行轨迹 */
   readonly trace: readonly DecisionExecutionTraceItem[];
 }

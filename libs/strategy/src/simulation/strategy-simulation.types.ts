@@ -4,6 +4,7 @@ import type {
   StrategyMarketSource,
 } from '@app/market-data';
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
+import type { FactorPluginRegistry } from '../factor/factor-plugin-registry';
 
 export type SimulationSessionStatus =
   | 'idle'
@@ -55,6 +56,7 @@ export interface SimulationSessionConfig {
   readonly filterFenxingContainment?: boolean;
   readonly flow: DecisionFlowNode;
   readonly windowBudget?: number;
+  readonly registry?: FactorPluginRegistry;
 }
 
 export type SimulationControlAction =

@@ -2,31 +2,10 @@ import type { KernelSignal } from '../kernel/kernel.types';
 import type { SimulationSignal } from './strategy-simulation.types';
 
 /**
- * 缠论买卖点类型 → 前端徽标文案。旧 StrategySimulationEngine 的展示映射整体迁移。
- */
-export function formatBadgeText(signalType: string, isBuy: boolean): string {
-  switch (signalType) {
-    case 'first_buy':
-      return '1买';
-    case 'second_buy':
-      return '2买';
-    case 'third_buy':
-      return '3买';
-    case 'first_sell':
-      return '1卖';
-    case 'second_sell':
-      return '2卖';
-    case 'third_sell':
-      return '3卖';
-    default:
-      return isBuy ? '买点' : '卖点';
-  }
-}
-
-/**
  * 内核信号 → 推演会话展示信号（SimulationSignal）。
  * signalType 以决策流 trace 证据中的 eventType 优先（一买/二买/三买等结构类型），
  * 缺省回退 signalTag/action。
+ * badgeText 遵循纯透传原则：优先取内核/上下文/轨迹中的 badgeText，兜底为“买点”/“卖点”。
  */
 export function mapKernelSignalToSimulationSignal(
   signal: KernelSignal,
@@ -35,7 +14,11 @@ export function mapKernelSignalToSimulationSignal(
   const isBuy = signal.signalKind === 'entry';
   const evidenceType = readEvidenceEventType(signal);
   const signalType = evidenceType ?? signal.signalType;
-  const badgeText = formatBadgeText(signalType, isBuy);
+  const badgeText =
+    signal.badgeText ??
+    (signal.contextSnapshot as any)?.badgeText ??
+    (signal.decisionTrace as any)?.badgeText ??
+    (isBuy ? '买点' : '卖点');
   return {
     signalTime: signal.signalTime.toISOString(),
     triggerTime: signal.triggerTime,

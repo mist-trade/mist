@@ -49,7 +49,7 @@ export function buildNotificationEnvelope(
   const securityCode =
     security?.code ?? String(signal?.securityId ?? alertEvent.strategySignalId);
   const securityName = security?.name ?? '';
-  const direction = directionLabel(signal?.signalKind, ctx);
+  const direction = directionLabel(signal?.signalKind, ctx, signal);
   const strategyName = strategyDefinition?.name ?? '';
   const periodLabel = signal ? formatPeriod(signal.period) : '';
   const signalTime = signal ? formatShanghaiTime(signal.signalTime) : '';
@@ -116,21 +116,26 @@ function buildSummary(parts: {
   }`;
 }
 
-const CHAN_BSP_TYPE_NAMES: Record<string, string> = {
-  first_buy: '一买',
-  second_buy: '二买',
-  third_buy: '三买',
-  first_sell: '一卖',
-  second_sell: '二卖',
-  third_sell: '三卖',
-};
-
-function directionLabel(kind: unknown, ctx?: Record<string, unknown>): string {
+function directionLabel(
+  kind: unknown,
+  ctx?: Record<string, unknown>,
+  signal?: StrategySignal | null,
+): string {
+  const badgeText =
+    (typeof ctx?.badgeText === 'string' && ctx.badgeText.length > 0
+      ? ctx.badgeText
+      : undefined) ??
+    (typeof (signal as any)?.badgeText === 'string' &&
+    (signal as any).badgeText.length > 0
+      ? (signal as any).badgeText
+      : undefined);
+  if (badgeText) {
+    return badgeText;
+  }
   const chanBsp = ctx?.chanBsp as Record<string, unknown> | undefined;
   if (chanBsp && typeof chanBsp.type === 'string') {
-    const typeName = CHAN_BSP_TYPE_NAMES[chanBsp.type] ?? chanBsp.type;
     const unitLabel = chanBsp.units === CHAN_BSP_UNITS.DUAN ? '段级' : '笔级';
-    return `${typeName} (${unitLabel})`;
+    return `${chanBsp.type} (${unitLabel})`;
   }
   if (kind === SIGNAL_KINDS.ENTRY) return '买入';
   if (kind === SIGNAL_KINDS.EXIT) return '卖出';

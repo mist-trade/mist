@@ -48,14 +48,14 @@ describe('ChannelLifecycle Verification', () => {
     });
   });
 
-  it('runs Bi channels and Duan channels separately on 600519 daily fixture', () => {
+  it('runs Bi channels and Duan channels separately on 000001 daily fixture', () => {
     const k = createChanFullOutputFixture();
 
     const biResult = ChanCore.createBi(k);
     const biChannels = ChanCore.createBiChannels(k);
 
     console.log(
-      '\n=================== [数据集 2: 贵州茅台 (600519) 日线行情] ===================',
+      '\n=================== [数据集 2: 上证指数 (000001) 日线行情] ===================',
     );
     console.log('\n--- 1. 笔与笔中枢 (Bi-Level) ---');
     console.log(`有效笔总数 (Valid Bis): ${biResult.phaseB.length}`);

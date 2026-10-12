@@ -77,6 +77,7 @@ export class StrategySimulationSession {
           requiredBarCount: config.windowBudget ?? 600,
         },
       ],
+      registry: config.registry,
     });
   }
 

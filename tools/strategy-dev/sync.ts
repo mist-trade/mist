@@ -3,7 +3,7 @@
  * 远程行情数据同步工具 (通过 SSH 从 mist-box 拉取并本地持久化)
  *
  * 用法:
- *   pnpm dev:sync --code 600519 --periods 1d,30m,5m
+ *   pnpm dev:sync --code 000001 --periods 1d,30m,5m
  *   pnpm dev:sync --code 000001 --periods 30m --limit 3000
  */
 
@@ -32,7 +32,7 @@ function parseCliArgs(): SyncCliOptions {
     return undefined;
   };
 
-  const rawCode = getArg('code') || '600519';
+  const rawCode = getArg('code') || '000001';
   const code = rawCode.replace(/\.(SH|SZ|BJ|sh|sz|bj)$/, '');
   const periodStr = getArg('periods') || getArg('period') || '1d,30m';
   const limitStr = getArg('limit');

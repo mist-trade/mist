@@ -45,6 +45,14 @@ export class DecisionFlowEvaluator {
     trace: DecisionExecutionTraceItem[],
     currentScore?: number,
     inheritedAction?: 'BUY' | 'SELL',
+    inheritedMeta?: {
+      readonly badgeText?: string;
+      readonly displayTag?: string;
+      readonly styleMeta?: Readonly<{
+        color?: string;
+        position?: 'above' | 'below';
+      }>;
+    },
   ): Promise<DecisionResult> {
     switch (node.type) {
       case 'GUARD': {
@@ -59,6 +67,9 @@ export class DecisionFlowEvaluator {
           confidence: opinion.confidence,
           reason: opinion.reason,
           evidence: opinion.evidence,
+          badgeText: opinion.badgeText,
+          displayTag: opinion.displayTag,
+          styleMeta: opinion.styleMeta,
         });
 
         const minConf = node.minConfidence ?? 0.0;
@@ -78,6 +89,12 @@ export class DecisionFlowEvaluator {
             ? opinion.action
             : inheritedAction;
 
+        const nextInheritedMeta = {
+          badgeText: opinion.badgeText ?? inheritedMeta?.badgeText,
+          displayTag: opinion.displayTag ?? inheritedMeta?.displayTag,
+          styleMeta: opinion.styleMeta ?? inheritedMeta?.styleMeta,
+        };
+
         if (passed) {
           return this.evaluateNode(
             node.onPass,
@@ -85,6 +102,7 @@ export class DecisionFlowEvaluator {
             trace,
             nextScore,
             nextInheritedAction,
+            nextInheritedMeta,
           );
         } else if (node.onFail) {
           return this.evaluateNode(
@@ -93,6 +111,7 @@ export class DecisionFlowEvaluator {
             trace,
             nextScore,
             inheritedAction,
+            nextInheritedMeta,
           );
         }
 
@@ -123,6 +142,7 @@ export class DecisionFlowEvaluator {
           trace,
           currentScore,
           inheritedAction,
+          inheritedMeta,
         );
       }
 
@@ -142,7 +162,16 @@ export class DecisionFlowEvaluator {
           name: node.name,
           exportedKey: node.exportAttributeKey,
           evidence: opinion.evidence,
+          badgeText: opinion.badgeText,
+          displayTag: opinion.displayTag,
+          styleMeta: opinion.styleMeta,
         });
+
+        const nextInheritedMeta = {
+          badgeText: opinion.badgeText ?? inheritedMeta?.badgeText,
+          displayTag: opinion.displayTag ?? inheritedMeta?.displayTag,
+          styleMeta: opinion.styleMeta ?? inheritedMeta?.styleMeta,
+        };
 
         return this.evaluateNode(
           node.next,
@@ -150,6 +179,7 @@ export class DecisionFlowEvaluator {
           trace,
           currentScore,
           inheritedAction,
+          nextInheritedMeta,
         );
       }
 
@@ -226,6 +256,7 @@ export class DecisionFlowEvaluator {
             trace,
             calculatedScore,
             nextInheritedAction,
+            inheritedMeta,
           );
         } else if (node.onFailure) {
           return this.evaluateNode(
@@ -234,6 +265,7 @@ export class DecisionFlowEvaluator {
             trace,
             calculatedScore,
             nextInheritedAction,
+            inheritedMeta,
           );
         }
 
@@ -276,6 +308,11 @@ export class DecisionFlowEvaluator {
           };
         }
 
+        const badgeText =
+          inheritedMeta?.badgeText ?? this.findBadgeTextFromTrace(trace);
+        const displayTag = inheritedMeta?.displayTag;
+        const styleMeta = inheritedMeta?.styleMeta;
+
         return {
           status: 'SIGNAL_EMITTED',
           action: finalAction,
@@ -285,10 +322,27 @@ export class DecisionFlowEvaluator {
           reason:
             node.reason ??
             `决策流信号发射 (${finalAction === 'BUY' ? '买入/开仓' : '卖出/平仓'})`,
+          badgeText,
+          displayTag,
+          styleMeta,
           trace,
         };
       }
     }
+  }
+
+  private findBadgeTextFromTrace(
+    trace: readonly DecisionExecutionTraceItem[],
+  ): string | undefined {
+    for (let i = trace.length - 1; i >= 0; i--) {
+      const item = trace[i];
+      if (item.badgeText) return item.badgeText;
+      const ev = item.evidence as Record<string, unknown> | undefined;
+      if (ev?.badgeText && typeof ev.badgeText === 'string') {
+        return ev.badgeText;
+      }
+    }
+    return undefined;
   }
 
   private getPlugin(pluginId: string): FactorPlugin {

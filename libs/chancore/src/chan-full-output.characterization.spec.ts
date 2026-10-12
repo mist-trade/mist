@@ -18,9 +18,9 @@ import { DuanStatus, DuanType, TrendDirection } from './contracts';
 import type { ChanBiOptions } from './contracts';
 
 const EXPECTED_FULL_OUTPUT_SHA256 =
-  '53796f7a15bf4b59bacded76d59ca7248a6a08055bf6e16564f008922bbe8b79';
+  '900306a1f49e33ac2741f305df261281212002450430dc7653d926fca6fac372';
 const EXPECTED_FILTERED_CONTAINMENT_SHA256 =
-  '352c7c5b5c3fddfb7eb60913e17ebea8f5cee0a652ea061efda54665ce69b811';
+  '73ffd59b08954d83919c91d2e87a7995a1917ed5a75b995450935db1dfdffeae';
 
 function toContractK(source: ChanK): ChanCharacterizationK {
   return {

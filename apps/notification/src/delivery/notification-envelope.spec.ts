@@ -116,6 +116,7 @@ describe('buildNotificationEnvelope', () => {
       signalTime: new Date('2026-08-26T01:35:00.000Z'), // 09:35 in UTC+8
       contextSnapshot: {
         triggerPrice: 3050.25,
+        badgeText: '一买 (笔级)',
         chanBsp: {
           type: 'first_buy',
           units: 'bi',
@@ -157,6 +158,7 @@ describe('buildNotificationEnvelope', () => {
       signalTime: new Date('2026-08-26T06:00:00.000Z'), // 14:00 in UTC+8
       contextSnapshot: {
         triggerPrice: 1620.1,
+        badgeText: '三卖 (段级)',
         chanBsp: {
           type: 'third_sell',
           units: 'duan',
@@ -182,5 +184,27 @@ describe('buildNotificationEnvelope', () => {
     expect(env.message.summary).toBe(
       '[Mist] 399006 创业板指 三卖 (段级) @ 1620.1 | 创业板指 30m 段级缠论买卖点 | 30m | 2026-08-26 14:00',
     );
+  });
+
+  it('prioritizes transparent badgeText from signal over default direction', () => {
+    const signal = {
+      securityId: 3,
+      strategyDefinitionId: 12,
+      signalKind: 'entry',
+      period: 15,
+      signalTime: new Date('2026-08-26T02:00:00.000Z'),
+      badgeText: '左侧1买',
+      contextSnapshot: {},
+    } as unknown as StrategySignal;
+
+    const env = buildNotificationEnvelope(
+      alertEvent,
+      signal,
+      null,
+      null,
+      NotificationChannel.WECHAT,
+    );
+
+    expect(env.message.direction).toBe('左侧1买');
   });
 });
