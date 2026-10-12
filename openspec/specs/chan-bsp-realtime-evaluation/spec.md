@@ -1,6 +1,9 @@
 # chan-bsp-realtime-evaluation Specification
 
 ## Purpose
+> [!NOTE] RETIRED / DEPRECATED (2026-09-27 unify-strategy-evaluation-pipeline)
+> The standalone `chan_bsp` strategy kind and independent detector dispatch branches have been retired. All Chan BSP evaluations are unified into the decision flow tree via `plugin.chan.bsp` and the unified push kernel. See `strategy-evaluation-pipeline`.
+
 Define chan_bsp as a distinct strategy kind with a declarative `{units, points, direction}` rule, evaluated by a stateless window-to-events detector over realtime StrategyBars with bounded confirmation semantics.
 ## Requirements
 ### Requirement: Chan Bsp Strategies Shall Be A Distinct Strategy Kind With A Declarative Configuration

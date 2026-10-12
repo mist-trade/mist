@@ -31,10 +31,18 @@ The semantic change SHALL be released with `ChanCore.algorithmVersion` increment
 - **AND** the current Channel MUST be finalized and sealed up to the last unit before departure
 - **AND** subsequent units MUST be processed as independent new trend / channel candidates
 
-#### Scenario: Channel level enlargement via 9-wave accumulation
-- **WHEN** a Channel extends continuously without departure for 9 constituent units (3+3+3)
-- **THEN** the Channel MUST be marked with `expanded: true`
+#### Scenario: Channel level enlargement via 9-wave accumulation applies only to Duan-level and sets upgradedLevel
+- **WHEN** a Duan-level Channel extends continuously without departure for 9 constituent units (3+3+3)
+- **THEN** the Channel MUST be marked with `extended: true` AND `upgradedLevel: ChannelLevel.Macro`
+- **AND** the Channel MUST NOT be marked with `expanded: true` (it is an extension upgrade of a single central, not an expansion of multiple centrals)
+- **AND** Bi-level Channels SHALL NOT trigger 9-unit level enlargement (retaining Bi-level micro purity)
 - **AND** it MUST be closed as a completed higher-level Central
+
+#### Scenario: The merged expansion Central carries explicit expanded geometry and preserves absorbed components
+- **WHEN** two adjacent same-level Channels are merged as an expansion
+- **THEN** the outer bounding Central MUST carry `expanded: true` AND `upgradedLevel: ChannelLevel.Macro` AND `absorbed: false`
+- **AND** the constituent participant Channels MUST be preserved in the output with `absorbed: true` AND `expanded: false`
+- **AND** absorbed participant Channels MUST NOT generate buy/sell points in downstream spans
 
 #### Scenario: Pairwise central expansion is strictly bounded
 - **WHEN** two adjacent independent completed same-level Channels are evaluated for expansion

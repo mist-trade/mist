@@ -1,6 +1,9 @@
 # chan-bsp-backtest-evaluation Specification
 
 ## Purpose
+> [!NOTE] RETIRED / DEPRECATED (2026-09-27 unify-strategy-evaluation-pipeline)
+> The standalone `chan_bsp` strategy kind and independent detector dispatch branches have been retired. All Chan BSP evaluations are unified into the decision flow tree via `plugin.chan.bsp` and the unified push kernel. See `strategy-evaluation-pipeline`.
+
 Define how the backtest engine evaluates chan_bsp (缠论买卖点) strategy versions:
 dispatch by the run's kind snapshot, evaluation over the correction layer with
 complete signal flow, structural context persistence, period restrictions and
