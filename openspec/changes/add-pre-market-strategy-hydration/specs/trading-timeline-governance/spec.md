@@ -15,7 +15,7 @@ The shared `timezone` library (`@app/timezone`) SHALL serve as the single source
 - **AND** it MUST NOT maintain local duplicate window implementations
 
 #### Scenario: Signal runtime consumes centralized 09:20 pre-market warmup cron constant
-- **WHEN** `apps/signal` registers the pre-market strategy window hydration cron job
+- **WHEN** `apps/signal` registers the pre-market strategy kernel pool warmup cron job
 - **THEN** it MUST reference `CRON_PRE_MARKET_STRATEGY_WARMUP_0920` exported by `@app/timezone`
 - **AND** it MUST explicitly specify `timeZone: 'Asia/Shanghai'`
 

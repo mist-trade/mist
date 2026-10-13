@@ -1,43 +1,47 @@
 ## ADDED Requirements
 
-### Requirement: Signal Runtime Shall Support Pre-Market Strategy Window Hydration
+### Requirement: Signal Runtime Shall Support Pre-Market Strategy Kernel Pool Warmup
 
-The Signal runtime (`apps/signal`) SHALL support proactive pre-market strategy window hydration for active strategy targets before continuous trading begins, eliminating cold-start database I/O latency and full-history indicator recalculation overhead when the first real-time candle of the day arrives.
+The Signal runtime (`apps/signal`) SHALL proactively warm up pre-market strategy kernel pool groups for active strategy targets before continuous trading begins, eliminating cold-start historical-window loading I/O and pre-warm phase push overhead when the first real-time candle of the day arrives. Warmup SHALL pre-build `RealtimeKernelPool` group kernels using the same `loadRealtimeWindow` + `StrategyEvaluationKernel` push pipeline as the lazy path, with no separate evaluation code path.
 
-#### Scenario: Pre-market strategy hydration triggers at 09:20 on exchange trading days
+#### Scenario: Pre-market kernel pool warmup triggers at 09:20 on exchange trading days
 - **WHEN** the `09:20` pre-market warmup schedule (`CRON_PRE_MARKET_STRATEGY_WARMUP_0920`) fires on an A-share trading day
 - **THEN** `apps/signal` MUST identify all active `(securityId, source, period)` target groups across the current strategy registry
-- **AND** it MUST load the required historical K-line windows up to each target's maximum `requiredBarCount` using yesterday's close as the anchor
-- **AND** it MUST validate bar series integrity and pre-warm in-memory structures in `SharedStrategyWindowStore`
+- **AND** it MUST load the required historical K-line windows up to each target's maximum `requiredBarCount` using the 09:20 anchor
+- **AND** it MUST pre-build group kernels in `RealtimeKernelPool` whose `publicFrom` is the day's first expected public bar instant, pushing the historical segment through the pre-warm phase silently
 
-#### Scenario: Strategy hydration triggers on startup and registry reconciliation
+#### Scenario: Pre-market warmup is skipped on non-trading days and is idempotent
+- **WHEN** the warmup schedule fires on a non-trading day
+- **THEN** the warmup MUST be skipped without loading any historical window
+- **AND** when a target group already exists with a matching plan signature and sufficient capacity, it MUST be skipped idempotently and reported as skipped
+
+#### Scenario: Warmup triggers on startup and registry reconciliation
 - **WHEN** `SignalRealtimeStartupService` bootstraps or reconciles its strategy registry
-- **THEN** it MUST trigger proactive window hydration for newly registered or expanded targets
-- **AND** target groups already hydrated with sufficient capacity MUST be skipped idempotently
+- **THEN** it MUST trigger proactive warmup for newly registered or expanded targets through the same warmup entry point
+- **AND** the warmup MUST NOT block registry reconciliation or service startup
 
 #### Scenario: Vectorized data integrity inspection via Polars detects anomalies before market open
-- **WHEN** historical K-line bars are loaded during pre-market hydration
-- **THEN** the store MUST execute vectorized validation using Polars to verify that:
-  - timestamps are strictly monotonically increasing (`timestamp.diff() > 0`);
+- **WHEN** historical K-line bars are loaded during pre-market warmup
+- **THEN** the pool MUST execute vectorized validation using Polars to verify that:
+  - timestamps are strictly monotonically increasing;
   - prices are non-negative (`open, high, low, close >= 0`);
   - high prices are greater than or equal to low prices (`high >= low`);
-  - no null or NaN values exist in the bar series;
-- **AND** if validation fails, the target MUST be marked as failed with a structured failure reason (`timestamp_reversed`, `invalid_price`, `price_boundary_violation`, or `contains_null_or_nan`) and isolated without blocking remaining targets
+  - no null or NaN values exist in the OHLC series;
+- **AND** if validation fails, the target MUST be marked as failed with a structured bounded failure reason (`insufficient_bars`, `timestamp_reversed`, `invalid_price`, `price_boundary_violation`, or `contains_null_or_nan`) and isolated without blocking remaining targets
 
-#### Scenario: Static indicators are proactively pre-computed and cached during pre-market hydration
-- **WHEN** historical bars pass data integrity inspection during pre-market hydration
-- **THEN** the system MUST pre-compute static indicator observations for the historical window using vectorized Polars indicators
-- **AND** it MUST attach the pre-warmed analysis cache to the window group
+#### Scenario: First real-time candle arrives with zero historical database I/O
+- **WHEN** the first `candle_finalized` trigger of a trading day arrives for a pre-warmed target
+- **THEN** `RealtimeKernelPool` MUST reuse the pre-built group kernel without executing historical K-line database queries
+- **AND** the first public bar MUST be evaluated through the canonical push pipeline with signal emission semantics identical to the lazy-hydration path
+- **AND** the trading-day rollover at the first trigger MUST NOT discard groups warmed for that same trading day
 
-#### Scenario: First real-time candle arrives with zero database I/O and zero full-history indicator recalculation
-- **WHEN** the first `candle_finalized` trigger of a trading day arrives for a pre-hydrated target
-- **THEN** `SharedStrategyWindowStore.prepare` MUST find the in-memory window already initialized
-- **AND** it MUST append the new bar directly in memory without executing historical K-line database queries
-- **AND** strategy evaluation MUST reuse pre-warmed indicator observations without recomputing the full historical series
-
-#### Scenario: Single security hydration failure is isolated
-- **WHEN** historical K-line loading or Polars validation fails for a specific target during pre-market hydration
+#### Scenario: Single security warmup failure is isolated
+- **WHEN** historical K-line loading or Polars validation fails for a specific target during pre-market warmup
 - **THEN** `apps/signal` MUST record a bounded warning log with structured target details and failure reason
-- **AND** the failure MUST NOT interrupt hydration for other targets
+- **AND** the failure MUST NOT interrupt warmup for other targets
 - **AND** the failure MUST NOT cause the Signal service to crash or become unready
 - **AND** subsequent real-time triggers for that target MUST fall back to on-demand hydration
+
+#### Scenario: Pre-market warmup state is observable
+- **WHEN** the Signal health endpoint is queried after a pre-market warmup attempt
+- **THEN** it MUST expose the warmup state (`off` / `ready` / `partial` / `error`), the last warmed-at timestamp, the anchor trading day, success/skip/failure counts, and a bounded last failure code
