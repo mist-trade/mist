@@ -51,8 +51,52 @@
 
 - **依赖的现有模块**：
   - `libs/strategy`: `DecisionFlowEngine`、`FactorPlugin` 纯函数计算接口、滑动窗口 `StrategySeriesImputer`；
-  - `libs/signal`: 实时策略执行、`ChanBspDetector`、`ChanBspEpisodeCursor`；
+  - `libs/signal`: 实时链路内核池（`RealtimeKernelPool`）与统一求值服务（原
+    `ChanBspDetector`/`ChanBspEpisodeCursor` 已随统一内核退役删除）；
   - `apps/backtest`: 回测执行器与历史数据回放适配器；
   - `apps/signal`: 实时策略信号运行时；
   - `docs/factor-framework-and-alpha-architecture.md`: 聚焦 ETF 市场的系统化 CTA 决策流与 Exit Trinity 设计蓝图；
   - `openspec/changes/integrate-native-terminal-visualization`: 通用绘图指令与 TDX/QMT 回写管道。
+
+---
+
+## 4. 断点修补（2026-10-13 修订：三链路对账基础）
+
+本 change 的核心承诺是「实时 vs 回测 100% 逐条对齐」（§2.1-4 与
+`backtest-trade-decision` 的 Dual-track Parity 场景）。2026-10-13 对
+回测 / 信号 / 决策树三模块做了接缝审计，发现四处会使「逐条对齐」在
+持久化与身份层无法落地的断点；不修则 Parity 断言没有可比对的坐标系。
+本节将四处修补纳入本 change 范围（**仅纳入必要断点修补，不含撮合/持仓本体**）：
+
+1. **信号身份与落盘字段双轨不对齐（②）**：
+   - 实时 `strategy_signals` 具备 `security_id`(FK) / `signal_kind` /
+     `signal_source` / `period` / `source` / `strategy_version_id` 全身份列；
+     回测 `backtest_signal_results` 在 migration 009 移除
+     definition/version/period/source 后仅剩 `security_code` 字符串，
+     migration 014 给实时补的 `security_id`/`signal_kind` 也未同步回测。
+   - 后果：parity 对账只能把回测侧 `signal_kind` 硬编码为 `'entry'`
+     （`tools/parity-reconcile/run.mjs:119`），方向互斥信号无法区分；
+     回测信号行无版本归属，无法按 `strategy_version_id` 与实时做
+     「同版本同信号」对账。
+2. **单步推演的身份空心化（③）**：
+   - `StrategySimulationSession` 内核计划硬编码 `definitionId: 0,
+     versionId: 0`；本地网关自造 `createTacticsDecisionFlow()`，不经
+     存量定义编译边界。推演信号无法归属到任何策略版本，无法与
+     回测/实时信号对账。
+3. **预热状态与预热结果无消费面（④，半成品字段）**：
+   - `prewarmStatus / prewarmActual / prewarmExpected` 由内核诊断产出、
+     `HistoricalBarSource.PreparedReplay` 透出，但**全仓无下游消费**：
+     回测执行器只读 `publicBarCount`、不落盘；实时健康不暴露。
+     「预热不足」这一关键数据质量信号在两条链路上同时不可见。
+4. **推演计划来源与编译边界不一致（⑥）**：
+   - 回测/实时的计划统一来自 `compileStoredDefinitionVersion`（DB 定义
+     → 决策树，带版本与窗口预算）；推演直接用预编译 flow，无编译边界、
+     无版本约束。三链路同构门禁只保证「同一 flow 执行一致」，不保证
+     「同一来源语义」。
+
+**修订边界**：只补身份/落盘/可见性，不动撮合与持仓本体（Phases 1-2 原范围
+不变）；对应 spec 新增「Cross-Lane Signal Identity and Persistence Parity」
+「Simulation Plan Identity and Compilation Boundary」「Warmup Status
+Propagation」三条 Requirement；Migration 编号按 forward-only 原则使用
+**027**（原任务书 §2.3 写「Migration 022」有误：022 已被
+`022_qmt_volume_to_shares` 占用，当前最新为 026）。

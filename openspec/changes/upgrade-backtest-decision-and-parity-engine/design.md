@@ -190,67 +190,121 @@ CREATE TABLE `backtest_trade_results` (
 
 ---
 
-## 4. 三维防未来函数质检与对账机制
+## 7. 信号身份与落盘字段一致性（对账坐标系）
 
-```mermaid
-graph TD
-    subgraph V1["1. 因果不变性断言 (Causality Assertions)"]
-        A1["所有指标输入时间戳 ≤ 决策时间戳"]
-        A2["成交时间戳 > 信号确认时间戳"]
-        A3["缠论买点确认时延校验 (t_confirm ≥ t_extrema)"]
-    end
+### 7.1 两表身份列现状（2026-10-13 核对）
 
-    subgraph V2["2. 双轨对账单元测试 (Live-Backtest Parity Suite)"]
-        B1["录制历史行情切片"]
-        B2["实时推流引擎运行 (Signal App)"]
-        B3["离线回测引擎运行 (Backtest App)"]
-        B4["断言: Signal 产生时间/内容/持仓动作 100% 逐字对齐"]
-    end
+| 身份列 | 实时 `strategy_signals` | 回测 `backtest_signal_results` |
+| :--- | :--- | :--- |
+| security 身份 | `security_id` INT + FK→securities（migration 014） | `security_code` VARCHAR(20)（migration 009 移除 definition/version/period/source 后遗留） |
+| `signal_kind` (entry/exit) | ✅ enum（migration 014） | ❌ |
+| `signal_source` (live/backtest) | ✅ enum | ❌ |
+| `strategy_version_id` | ✅ INT + FK（migration 006 原建） | ❌（migration 009 已 DROP） |
+| `period` / `source` | ✅ | ❌（migration 009 已 DROP） |
+| `decision_trace` / `context_snapshot` / `rule_snapshot` | ✅ | ✅ |
 
-    subgraph V3["3. 未来数据扰动与泄漏测试 (Lookahead Leakage Injection)"]
-        C1["在时间点 t 截断或注入未来随机噪声"]
-        C2["重新计算 t 时刻的决策输出"]
-        C3["断言: t 时刻的信号与持仓决策严格保持不变"]
-    end
-```
+### 7.2 决定：回测侧补列（migration 027，forward-only）
 
----
-
-## 5. 实体与数据库设计（Schema Migrations）
-
-### 5.1 `backtest_trade_results` 表（替代/升级现有仅信号表）
+原则：**只补对账必需的身份列，不回收定义/版本再声明为「业务不可变」的列**。
+回测的版本归属本就由 `backtest_runs.strategy_definition_id/strategy_version_id`
+承载，信号行冗余一份是为了 parity 逐行对账与按版本聚合查询，不做跨表 JOIN 兜底。
 
 ```sql
-CREATE TABLE `backtest_trade_results` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `backtest_run_id` INT NOT NULL,
-  `security_code` VARCHAR(20) NOT NULL,
-  `entry_signal_time` DATETIME(3) NOT NULL,
-  `entry_time` DATETIME(3) NOT NULL,
-  `entry_price` DECIMAL(12, 4) NOT NULL,
-  `exit_signal_time` DATETIME(3) NOT NULL,
-  `exit_time` DATETIME(3) NOT NULL,
-  `exit_price` DECIMAL(12, 4) NOT NULL,
-  `exit_reason` VARCHAR(60) NOT NULL, -- 'STRUCTURAL_CHAN_STOP' | 'TRAILING_STOP' | 'BREAK_EVEN' | 'HARD_STOP_LOSS' | 'OPPOSITE_SIGNAL' | 'TIMEOUT'
-  `holding_bars` INT NOT NULL,
-  `pnl_amount` DECIMAL(14, 4) NOT NULL,
-  `pnl_ratio` DECIMAL(8, 4) NOT NULL,
-  `total_fee` DECIMAL(10, 4) NOT NULL,
-  `context_snapshot` JSON NOT NULL,
-  `created_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
-  INDEX `idx_run_id` (`backtest_run_id`),
-  INDEX `idx_security` (`security_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+-- Migration 027: backtest signal result identity parity with realtime strategy_signals
+ALTER TABLE `backtest_signal_results`
+  ADD COLUMN `security_id` int NULL AFTER `backtest_run_id`,
+  ADD COLUMN `strategy_version_id` int NULL AFTER `security_id`,
+  ADD COLUMN `signal_kind` enum('entry','exit') NOT NULL DEFAULT 'entry' AFTER `signal_type`,
+  ADD COLUMN `signal_source` enum('live','backtest') NOT NULL DEFAULT 'backtest' AFTER `signal_kind`;
+
+-- 1) security_code → security_id 回填（code 在 securities 中唯一）
+UPDATE `backtest_signal_results` r
+  JOIN `securities` s ON s.`code` = r.`security_code`
+  SET r.`security_id` = s.`id`
+  WHERE r.`security_id` IS NULL;
+
+-- 2) 存量行 signal_kind 以 entry 位保留（原 dedupe/parity 工具即按 entry 处理）
+-- 3) security_id 回填失败的存量行保留 NULL（不阻断迁移；新写入必填）
 ```
+
+- 新增列先 NULL 容忍（存量回填），代码层收口为写入必填；`security_code`
+  列保留为展示/兼容列（前端与旧查询依赖），不作为对账主键。
+- 不回填 `period`/`source`：回测 run 级已有 `period`/`source`，信号行不重复；
+  对账时从 `backtest_runs` 取，避免第二个写入点。
+- Entity 同步：`BacktestSignalResult` 实体补映射 `securityId /
+  strategyVersionId / signalKind / signalSource`；executor 写入时从
+  `run.securityId` / `run.strategyVersionId` / `signal.signalKind` 取值。
+
+### 7.3 唯一性与多信号语义
+
+migration 025 已 drop 业务唯一键（保留主键 id 身份），同一 Bar 多信号
+（entry+exit 或复合信号）不折叠，与实时一致。本 change **不**重建业务唯一键；
+对账按 `(run_id, security_id, signal_time, signal_kind, strategy_version_id,
+signal_type)` 六元组做集合比对。
 
 ---
 
-## 6. 与原生终端可视化（QMT / TDX）与 Web 控制台分工
+## 8. 推演计划身份注入与编译边界对齐（③⑥）
 
-1. **Web 端 (`mist-fe`)**：
-   - 任务控制与状态轮询；
-   - 量化绩效卡片：总收益率、年化收益率、夏普比率、最大回撤、胜率、盈亏比、交易总次数；
-   - 逐笔 Trade 流水表格（包含入场时间/价格、出场时间/价格、持仓时长、出场归因）；
-   - 因果质检报告（时序断言与双轨对账状态）。
-2. **桌面端 (`TDX / QMT`)**：
-   - 通过 `openspec/changes/integrate-native-terminal-visualization` 提供的绘图指令接口，将回测生成的 Trade 序列自动转为买入 Pin 标、卖出 Pin 标、持仓连接线与动态止损警戒线，在桌面专业终端极速复盘。
+### 8.1 版本身份注入
+
+```typescript
+// strategy-simulation.types.ts 扩展
+export interface SimulationPlanIdentity {
+  readonly definitionId: number;
+  readonly versionId: number;
+}
+
+export interface SimulationSessionConfig {
+  // ...existing fields
+  /** 计划身份；缺省时为本地演示注入显式哨兵身份，禁止隐式 0 */
+  readonly planIdentity?: SimulationPlanIdentity;
+}
+```
+
+- 会话内存具名常量 `SIMULATION_LOCAL_FIXTURE_IDENTITY = { definitionId: -1,
+  versionId: -1 }` 作为「本地演示夹具」显式哨兵（负值，绝不可能与 DB
+  自增主键碰撞）；构造入参给出的真实身份优先。
+- `SimulationSignal` 映射补 `definitionId/versionId` 透出，便于推演帧与
+  回测信号逐条对账。
+
+### 8.2 编译边界对齐（⑥）
+
+- 推演计划的 `flow` 来源唯一化：`tools/strategy-dev/server.ts` 的
+  `createTacticsDecisionFlow()` 本地工厂属于 dev fixture，必须显式声明
+  fixture 身份（哨兵），不得伪装成 DB 定义；若以后端点为「加载存量定义推演」，
+  必须走 `compileStoredDefinitionVersion`（现有编译边界），不得再抄一条流。
+- 门禁断言（静态 + 单测双守）：`StrategySimulationSession` 构造中不得出现
+  字面量 `definitionId: 0` / `versionId: 0`；计划身份必须来自 config 或
+  显式哨兵常量。
+
+---
+
+## 9. 预热状态贯通（④）
+
+### 9.1 现状与决定
+
+`prewarmStatus / prewarmActual / prewarmExpected` 已由内核诊断产出、
+`HistoricalBarSource.PreparedReplay` 透出，但无下游消费（回测不落盘、
+实时不暴露）。决定：**贯通而非删除**——预热不足（`partial`）本身就是策略
+有效性与对账可信度的关键输入（窗口不足期间内核不判定不发射）。
+
+### 9.2 传播路径
+
+1. **回测侧**：
+   - `replaySecurity` 从 replay outcome 取 `prewarmStatus/prewarmActual/
+     prewarmExpected`，聚合到 run 级（多标的多窗口时取最保守值：任一
+     `empty` → `empty`，任一 `partial` → `partial`，全部 `full` → `full`）。
+   - 落 `backtest_runs` 新列（migration 027 一并加）：
+     `prewarm_status enum('full','partial','empty') NULL`、
+     `prewarm_min_actual INT NULL`、`prewarm_min_expected INT NULL`。
+   - Web 控制台绩效卡片与因果质检报告展示预热覆盖度（Phase 4 一并做）。
+2. **实时侧**：
+   - `RealtimeKernelPool.diagnostics()` 聚合各组内核诊断：
+     `prewarmStatusCounts: { full, partial, empty }`（组级计数）+
+     `minPrewarmActual/minPrewarmExpected`（最保守组）；
+   - `SignalHealthVo.marketData` 区块补预热覆盖字段
+     （盘前预热 change `add-pre-market-strategy-hydration` 已预构建组后，
+     该字段在 09:30 前即为 `full`，两 change 字段命名对齐）；
+   - 「窗口不足不判定不发射」的现有语义（`insufficient_history`）不变，
+     预热覆盖度只是使其可观测。

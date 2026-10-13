@@ -28,7 +28,10 @@
   - 重构 `replaySecurity`，将仅信号输出升级为 `DecisionFlowEngine + PositionStateMachine + SimulatedBroker` 闭环执行；
   - 计算每笔交易与分批平仓的 `BacktestTradeResult`（包含出场原因 `exitReason`、持仓天数、净收益率、R 倍数、手续费）；
   - 汇总统计量化绩效指标（总收益率、最大回撤、夏普比率、胜率、盈亏比、交易次数、平均持仓周期）。
-- [ ] **2.3 数据库 Migration 022**
+- [ ] **2.3 数据库 Migration（编号顺延 027 之后，见 Phase 0 修订）**
+  - ⚠️ 原稿写「Migration 022」有误：022 已被 `022_qmt_volume_to_shares`
+    占用（forward-only 不复用）；Phase 0 的 migration 027 为本 change 首个。
+    本项实际编号在实施时按届时最新号顺延；
   - 新增 `backtest_trade_results` 表（支持 `is_partial` 半仓标记与 `pnl_r_multiple`）；
   - 在 `backtest_runs` 表中增加绩效统计指标字段（`total_return`, `max_drawdown`, `sharpe_ratio`, `win_rate`, `profit_loss_ratio`, `trade_count`）。
 
@@ -41,7 +44,7 @@
 - [ ] **3.2 未来数据扰动/注入防泄漏测试（Lookahead Leakage Test）**
   - 编写自动化测试：在任意时间点 $t$ 截断/扰动未来数据，断言在 $t$ 的信号与持仓决策 100% 不变。
 - [ ] **3.3 实时 vs 回测双轨 Parity 测试套件（Parity Replay Suite）**
-  - 选取黄金历史样本（如茅台、300ETF 等多周期数据）；
+  - 选取黄金历史样本（上证指数 000001 等，茅台夹具已随 2026-10-13 全仓清理退役；多周期数据）；
   - 同时运行 `Signal App`（在线 BullMQ 推流）与 `Backtest App`（离线 K 线批处理）；
   - 断言产生的所有 Signal 与 Trade 决策 100% 逐字逐时间戳对齐。
 
@@ -55,3 +58,47 @@
 - [ ] **4.2 原生终端绘图指令适配（`integrate-native-terminal-visualization`）**
   - 将回测生成的 Trade 序列映射为通用绘图指令（买入 Pin 标、卖出 Pin 标、持仓连接线、动态止损警戒线与分批止盈标记）；
   - 验证 QMT / TDX 客户端一键加载并极速复盘回测交易轨迹。
+
+---
+
+## Phase 0: 三链路对账基础（2026-10-13 修订新增，先于 Phase 1 执行）
+
+> 依据 proposal §4 断点审计：不修身份/落盘/可见性，Phase 3 的双轨 Parity
+> 断言没有可比对的坐标系。本 Phase 只补对账地基，不动撮合/持仓本体。
+
+- [ ] **0.1 回测信号落盘身份补列（migration 027 + 实体 + 执行器）**
+  - 新增 `deploy/database/migrations/027_backtest_signal_identity_parity.sql`：
+    `backtest_signal_results` 增 `security_id`（FK→securities，存量按
+    `security_code` 回填）、`strategy_version_id`、`signal_kind`
+    enum('entry','exit')、`signal_source` enum('live','backtest')；
+    一并增 `backtest_runs` 预热列（见 0.4）；
+  - `BacktestSignalResult` 实体补映射；`replaySecurity`/`flushResults`
+    写入 `security_id = security.id`、`strategy_version_id =
+    run.strategyVersionId`、`signal_kind = signal.signalKind ?? 'entry'`、
+    `signal_source = 'backtest'`；
+  - `tools/parity-reconcile/run.mjs` 移除 `'entry'` 硬编码兜底，改读双端
+    持久化 `signal_kind`，比对元组扩为六元组。
+- [ ] **0.2 推演计划身份注入与编译边界对齐（③⑥）**
+  - `SimulationSessionConfig` 增 `planIdentity`；`StrategySimulationSession`
+    消除字面量 `definitionId: 0 / versionId: 0`，缺省注入显式哨兵
+    `SIMULATION_LOCAL_FIXTURE_IDENTITY`（负值）；
+  - `SimulationSignal` 透出 `definitionId/versionId`；
+  - `tools/strategy-dev/server.ts`：存量定义推演必须走
+    `compileStoredDefinitionVersion`；本地夹具流显式标记 fixture 身份；
+  - 门禁：单测断言会话构造不出现隐式 0 身份 + 静态扫描（必要时入
+    dev-server-boundary.guard.spec.ts）。
+- [ ] **0.3 预热状态实时侧贯通（④）**
+  - `RealtimeKernelPool.diagnostics()` 增组级预热聚合
+    （`prewarmStatusCounts` + 最保守 actual/expected）；
+  - `SignalHealthVo.marketData` 补预热覆盖字段（与
+    `add-pre-market-strategy-hydration` 的 `preMarketWarmup` 命名对齐）；
+  - 断言：`insufficient_history` 不发射语义不变（回归）。
+- [ ] **0.4 预热状态回测侧落盘（④）**
+  - `replaySecurity` 聚合各标的 replay outcome 的预热状态（最保守：任一
+    empty→empty、任一 partial→partial、全 full→full）；
+  - 落 `backtest_runs.prewarm_status / prewarm_min_actual /
+    prewarm_min_expected`（随 0.1 的 migration 027 一并建）；
+  - 单元测试覆盖聚合规则与 NULL 语义（无信号标的的容错）。
+- [ ] **0.5 Phase 0 验证**
+  - `pnpm -C mist typecheck` + `pnpm -C mist test:ci` 全绿；
+  - `openspec validate upgrade-backtest-decision-and-parity-engine --strict` 通过。

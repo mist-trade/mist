@@ -94,3 +94,73 @@ The backtest engine SHALL persist detailed trade records into the `backtest_trad
 - **WHEN** a trade or partial close completes
 - **THEN** a record MUST be written to `backtest_trade_results` capturing `exit_reason`, `is_partial`, `pnl_amount`, `pnl_ratio`, and `context_snapshot`
 - **AND** summary metrics (total return, max drawdown, Sharpe ratio, win rate, profit-loss ratio) MUST be aggregated into `backtest_runs`
+
+### Requirement: Cross-Lane Signal Identity and Persistence Parity
+
+Backtest and realtime signal persistence SHALL expose the same identity columns so
+that parity reconciliation can compare signals per security, strategy version, direction
+and signal type without lossy defaults. The `backtest_signal_results` table SHALL carry
+`security_id`, `strategy_version_id`, `signal_kind` and `signal_source` mirroring
+`strategy_signals` identity semantics.
+
+#### Scenario: Backtest signal rows persist full identity
+- **WHEN** the backtest executor persists a signal produced by the unified kernel
+- **THEN** the row MUST record `security_id` (FK to securities), `strategy_version_id`
+  (from the run), `signal_kind` (`entry` or `exit` from the kernel signal) and
+  `signal_source = 'backtest'`
+- **AND** existing rows SHALL be backfilled by migration (security_id resolved from
+  `security_code`; legacy rows default signal_kind to `entry`)
+
+#### Scenario: Multiple signals on the same bar are not collapsed
+- **WHEN** entry and exit (or composite) signals share the same security and signal time
+- **THEN** each signal MUST be stored as a distinct row
+- **AND** parity reconciliation MUST compare signals by the identity tuple
+  `(run_id, security_id, signal_time, signal_kind, strategy_version_id, signal_type)`
+  rather than a single prior dedupe key
+
+#### Scenario: Parity reconciliation consumes real signal kind
+- **WHEN** the parity replay tool compares live and backtest outputs
+- **THEN** it MUST use the persisted `signal_kind` from both lanes
+- **AND** it MUST NOT default the backtest side to `entry`
+
+### Requirement: Simulation Plan Identity and Compilation Boundary
+
+The single-step simulation lane SHALL attribute every simulated signal to an explicit
+plan identity and SHALL derive strategy flows through the canonical stored-definition
+compiler boundary. Implicit zero-valued definition/version identities are prohibited.
+
+#### Scenario: Simulation session carries explicit plan identity
+- **WHEN** a simulation session is constructed with a stored definition plan
+- **THEN** the kernel plan and emitted simulation signals MUST carry that
+  `definitionId` and `versionId`
+- **AND** when no real identity is supplied (local fixture), the session MUST use an
+  explicit negative sentinel identity that cannot collide with database primary keys
+
+#### Scenario: Simulation flow derives from the canonical compiler
+- **WHEN** the dev-server serves simulation for a stored strategy definition
+- **THEN** the strategy flow MUST be produced by `compileStoredDefinitionVersion`
+- **AND** locally authored fixture flows MUST be explicitly marked as fixtures and MUST NOT
+  masquerade as stored definitions
+
+### Requirement: Warmup Status Shall Propagate to Persistence and Health
+
+Kernel pre-warm diagnostics (`prewarmStatus`, `prewarmActual`, `prewarmExpected`) SHALL
+propagate to observable surfaces in both execution lanes instead of being dropped.
+
+#### Scenario: Backtest run records warmup coverage
+- **WHEN** a backtest run completes
+- **THEN** `backtest_runs` MUST record the aggregated `prewarm_status`
+  (`full` / `partial` / `empty`, most conservative across target securities) plus the
+  minimum actual/expected pre-warm bar counts
+- **AND** the web console quality report MUST expose warmup coverage
+
+#### Scenario: Realtime health exposes warmup coverage
+- **WHEN** the Signal health endpoint is queried
+- **THEN** the market-data block MUST expose per-status warmup group counts and the most
+  conservative actual/expected bar counts
+
+#### Scenario: Insufficient prewarm keeps existing non-emission semantics
+- **WHEN** a window is not fully pre-warmed
+- **THEN** the kernel MUST continue to withhold evaluation until the window budget is
+  satisfied (unchanged `insufficient_history` semantics)
+- **AND** the warmup status MUST be reported without altering signal emission behavior
