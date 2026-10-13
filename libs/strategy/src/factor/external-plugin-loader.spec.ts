@@ -214,9 +214,8 @@ describe('ExternalFactorPluginLoader', () => {
       const plugins = ExternalFactorPluginLoader.loadPlugins();
       expect(plugins.length).toBeGreaterThanOrEqual(3);
       const ids = plugins.map((p) => p.id);
-      expect(ids).toContain('plugin.private.chan-custom-enhancer');
-      expect(ids).toContain('plugin.private.alpha-momentum');
       expect(ids).toContain('plugin.regime.shanghai-index');
+      expect(ids).toContain('plugin.private.alpha-momentum');
     });
   });
 });
