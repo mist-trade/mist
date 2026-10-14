@@ -18,6 +18,9 @@ const IGNORED_EXTENSIONS: readonly string[] = Object.freeze([
   '.d.ts',
   '.spec.ts',
   '.test.ts',
+  '.spec.js',
+  '.test.js',
+  '.map',
 ]);
 
 const EXCLUDED_EXPORT_KEYS: readonly string[] = Object.freeze([
@@ -238,8 +241,12 @@ export class ExternalFactorPluginLoader {
     const plugins: FactorPlugin[] = [];
 
     try {
-      // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-var-requires
-      const mod = require(filePath);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dynamicRequire =
+        typeof (globalThis as any).__non_webpack_require__ === 'function'
+          ? (globalThis as any).__non_webpack_require__
+          : eval('require');
+      const mod = dynamicRequire(filePath);
       if (!mod || (typeof mod !== 'object' && typeof mod !== 'function')) {
         return [];
       }
