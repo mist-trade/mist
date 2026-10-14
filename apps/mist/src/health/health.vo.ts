@@ -1,4 +1,8 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type {
+  RealtimeProductizationMode,
+  RealtimeStrategyMode,
+} from '@app/config';
 import type { BaseHealthVo, HealthStatus } from '@app/observability';
 
 export class BackendHealthVo implements BaseHealthVo {
@@ -15,10 +19,10 @@ export class BackendHealthVo implements BaseHealthVo {
   timestamp!: string;
 
   @ApiProperty({ enum: ['off', 'shadow', 'on'], example: 'on' })
-  productizationMode!: 'off' | 'shadow' | 'on';
+  productizationMode!: RealtimeProductizationMode;
 
   @ApiProperty({ enum: ['off', 'shadow', 'on'], example: 'on' })
-  strategyMode!: 'off' | 'shadow' | 'on';
+  strategyMode!: RealtimeStrategyMode;
 
   @ApiProperty({ example: true })
   redisAvailable!: boolean;

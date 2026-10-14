@@ -4,6 +4,7 @@ import {
   REALTIME_CANDLE_GRACE_LIMITS,
   REALTIME_CANDLE_QUEUE_LIMITS,
   REALTIME_CANDLE_TERMINAL_GRACE_LIMITS,
+  type RealtimeProductizationMode,
 } from './realtime-candle.config';
 
 /**
@@ -26,17 +27,6 @@ export const commonEnvSchema = Joi.object({
   // AKTools
   AKTOOLS_BASE_URL: Joi.string().uri().default('http://localhost:8080'),
 });
-
-/**
- * App-specific environment variable validation
- */
-export const appEnvSchema = Joi.object({
-  // Add app-specific variables (ports, API keys, etc.)
-  nest_server_port: Joi.number().port().default(3000),
-  redis_server_host: Joi.string().hostname().default('localhost'),
-  redis_server_port: Joi.number().port().default(6379),
-  redis_server_db: Joi.number().default(0),
-}).concat(commonEnvSchema);
 
 /**
  * Mist app-specific environment variable validation
@@ -71,9 +61,6 @@ export const mistEnvSchema = commonEnvSchema
       then: Joi.optional(),
       otherwise: Joi.required(),
     }),
-    redis_server_host: Joi.string().hostname().default('localhost'),
-    redis_server_port: Joi.number().port().default(6379),
-    redis_server_db: Joi.number().default(0),
 
     // Data source configuration
     // Accepts enum values ('ef', 'tdx', 'qmt') or enum keys ('EAST_MONEY', 'TDX', 'QMT')
@@ -328,7 +315,7 @@ export const backtestEnvSchema = commonEnvSchema
     return value;
   }, 'backtest listener port relationship');
 
-export type RealtimeStrategyMode = 'off' | 'shadow' | 'on';
+export type RealtimeStrategyMode = RealtimeProductizationMode;
 
 /**
  * Mock mode reads the same env the schema validates; single source of truth.

@@ -17,7 +17,6 @@ export type RealtimeLastOutcome =
 interface KernelGroup {
   readonly kernel: StrategyEvaluationKernel;
   readonly planSignature: string;
-  readonly capacity: number;
   lastPushedMs: number | null;
 }
 
@@ -136,7 +135,6 @@ export class RealtimeKernelPool {
     const group: KernelGroup = {
       kernel,
       planSignature,
-      capacity: requiredBars,
       lastPushedMs: null,
     };
     const ordered = dedupeHydration(hydrated.bars, bar);

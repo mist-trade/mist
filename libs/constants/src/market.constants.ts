@@ -8,9 +8,6 @@ export const MARKET_SOURCES = Object.freeze({
   EASTMONEY: 'eastmoney',
 } as const);
 
-export type MarketSourceType =
-  (typeof MARKET_SOURCES)[keyof typeof MARKET_SOURCES];
-
 export const PERIOD_MINUTES = Object.freeze({
   '1m': 1,
   '5m': 5,
@@ -24,9 +21,6 @@ export const CANDLE_SESSIONS = Object.freeze({
   MORNING: 'morning',
   AFTERNOON: 'afternoon',
 } as const);
-
-export type CandleSessionType =
-  (typeof CANDLE_SESSIONS)[keyof typeof CANDLE_SESSIONS];
 
 export const CANDLE_FIELDS = Object.freeze({
   OPEN: 'open',

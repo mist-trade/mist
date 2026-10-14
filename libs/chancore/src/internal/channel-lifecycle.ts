@@ -940,5 +940,3 @@ export type BiChannelLifecycleStrategy<
   T extends ChannelElement,
   R,
 > = ChannelLifecycleStrategy<T, R>;
-export const BI_CENTRAL_CORE_LENGTH = CHANNEL_CORE_LENGTH;
-export const BI_CENTRAL_MIN_SEALED_LENGTH = CHANNEL_MIN_SEALED_LENGTH;

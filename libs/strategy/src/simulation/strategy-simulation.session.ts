@@ -268,16 +268,6 @@ export class StrategySimulationSession {
     return this.frames[this.cursor] ?? null;
   }
 
-  public getAllSignals(): readonly SimulationSignal[] {
-    return this.accumulatedSignals;
-  }
-
-  public getGeneratedFrames(): readonly SimulationFrame[] {
-    return this.frames
-      .slice(0, this.cursor + 1)
-      .filter((frame): frame is SimulationFrame => frame !== undefined);
-  }
-
   /**
    * 导出当前推演会话的完整调试快照（含滑动窗口队列数据、当前 Bar 与全部信号）。
    */

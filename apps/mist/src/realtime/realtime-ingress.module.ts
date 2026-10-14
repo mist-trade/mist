@@ -12,7 +12,11 @@ import { RealtimeRedisService } from './realtime-redis.service';
 import { OpenCandleAggregator } from './candle/open-candle-aggregator';
 import { CandleFinalizer } from './candle/candle-finalizer';
 import { RealtimeMarketDataProductService } from './candle/realtime-market-data-product.service';
-import { isMockMode, resolveRealtimeStrategyMode } from '@app/config';
+import {
+  isMockMode,
+  resolveRealtimeStrategyMode,
+  type RealtimeStrategyMode,
+} from '@app/config';
 import { RealtimeStrategyHandoffModule } from './strategy-trigger/realtime-strategy-handoff.module';
 import { RealtimeStrategyStartupCompensationService } from './strategy-trigger/realtime-strategy-startup-compensation.service';
 import { RealtimeStrategyHandoffObservabilityService } from './strategy-trigger/realtime-strategy-handoff-observability.service';
@@ -102,7 +106,7 @@ export class RealtimeIngressModule implements OnModuleInit {
 }
 
 export function realtimeStrategyHandoffModulesForMode(
-  mode: 'off' | 'shadow' | 'on',
+  mode: RealtimeStrategyMode,
 ) {
   return mode === 'off' ? [] : [RealtimeStrategyHandoffModule];
 }

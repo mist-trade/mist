@@ -50,4 +50,3 @@ export type {
 } from './runtime/realtime-strategy-evaluation.service';
 export { RealtimeKernelPool } from './runtime/realtime-kernel-pool';
 export type { RealtimeLastOutcome } from './runtime/realtime-kernel-pool';
-export { toZhongshu } from './runtime/chan-bsp-pipeline';

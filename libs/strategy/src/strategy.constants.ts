@@ -14,12 +14,6 @@ export const SIGNAL_KINDS = Object.freeze({
   EXIT: 'exit',
 } as const);
 
-export const MACRO_TREND_DIRECTIONS = Object.freeze({
-  UP: 'UP',
-  DOWN: 'DOWN',
-  RANGE: 'RANGE',
-} as const);
-
 export const CANDIDATE_BSP_TYPES = Object.freeze({
   FIRST_BUY: 'first_buy',
   FIRST_SELL: 'first_sell',
@@ -39,17 +33,6 @@ export const CHAN_BSP_DIRECTIONS = Object.freeze({
   SELL: 'sell',
 } as const);
 
-export const HIGHER_PERIOD_RATIOS = Object.freeze({
-  DEFAULT: 4,
-  ONE_MIN: 5,
-  FIVE_MIN: 6,
-  FIFTEEN_MIN: 4,
-  THIRTY_MIN: 4,
-  SIXTY_MIN: 4,
-  DAILY: 5,
-} as const);
-
-export const MACD_MIN_CALCULATION_BARS = 34;
 export const DEFAULT_REQUIRED_BARS_DUAN = 200;
 export const DEFAULT_REQUIRED_BARS_BI = 50;
 
@@ -61,7 +44,3 @@ export const BSP_CONFIDENCE = Object.freeze({
 } as const);
 
 export const DEFAULT_TECHNICAL_FACTOR_CONFIDENCE = 0.75;
-
-export const STRATEGY_DEFAULT_PERIODS = Object.freeze([1, 5, 15, 30, 60, 1440]);
-export const DEFAULT_PREWARM_BARS = 200;
-export const DEFAULT_SIMULATION_SPEED = 1;

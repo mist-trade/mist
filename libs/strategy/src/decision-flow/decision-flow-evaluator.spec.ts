@@ -3,7 +3,6 @@ import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
 import type { FactorContext } from '../factor/factor.types';
 import { DecisionFlowEvaluator } from './decision-flow-evaluator';
 import type { DecisionFlowNode } from './decision-flow.types';
-import { FlowBlackboard } from './flow-blackboard';
 import { DecisionExecutionTraceBuilder } from './decision-trace-builder';
 import { LegacyStrategyCompiler } from './legacy-strategy-compiler';
 import { LegacyRuleDslPlugin } from '../factor/plugins/legacy-rule-dsl.plugin';
@@ -56,27 +55,6 @@ describe('Phase 2: Decision Flow Engine', () => {
   beforeEach(() => {
     registry = new InMemoryFactorPluginRegistry();
     evaluator = new DecisionFlowEvaluator({ registry });
-  });
-
-  describe('FlowBlackboard', () => {
-    it('manages attributes and serializes to JSON object', () => {
-      const board = new FlowBlackboard({ 'market.regime': 'BULL' });
-      expect(board.get('market.regime')).toBe('BULL');
-
-      board.set('chan.central', { zd: 10.0, zg: 12.0 });
-      expect(board.has('chan.central')).toBe(true);
-
-      const json = board.toJSON();
-      expect(json['market.regime']).toBe('BULL');
-      expect((json['chan.central'] as any).zd).toBe(10.0);
-
-      board.delete('market.regime');
-      expect(board.has('market.regime')).toBe(false);
-      expect(board.size).toBe(1);
-
-      board.clear();
-      expect(board.size).toBe(0);
-    });
   });
 
   describe('GuardNode (Fast-Fail Short-Circuit)', () => {

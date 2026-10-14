@@ -1,3 +1,4 @@
+import type { RealtimeProductizationMode } from '@app/config';
 import type { CandleFinalizerDiagnostics } from './candle-finalizer';
 import type {
   RealtimeQuantityField,
@@ -14,7 +15,7 @@ export interface RealtimeQuantityRejectionObservation {
   lastFailureAtMs: number;
 }
 
-export type RealtimeCandleProductMode = 'off' | 'shadow' | 'on';
+export type RealtimeCandleProductMode = RealtimeProductizationMode;
 
 export type RealtimeCandleDegradedReason =
   | 'redis_unavailable'
