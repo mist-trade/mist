@@ -114,7 +114,7 @@ async function syncSinglePeriod(
   );
   try {
     rawOutput = execSync(
-      `ssh ${options.boxHost} "docker exec -i -e MYSQL_PWD='${escapedPassword}' mist-mysql mysql -uroot mist --batch --raw"`,
+      `ssh ${options.boxHost} "docker exec -i mist-mysql mysql -uroot -p${escapedPassword} mist --batch --raw"`,
       {
         input: sql,
         maxBuffer: 100 * 1024 * 1024,
