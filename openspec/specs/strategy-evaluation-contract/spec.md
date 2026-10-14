@@ -454,9 +454,13 @@ classification, or per-kind display mappings of its own.
 - **AND** any valid `FactorPlugin` instance exported by the external module MUST be registered into `FactorPluginRegistry`
 
 #### Scenario: Engine degrades gracefully when external plugins are absent
-- **WHEN** no external plugin directory is configured or present
+- **WHEN** no external plugin directory is configured or present (including a single-repository CI
+  checkout without the peer private workspace)
 - **THEN** the engine MUST continue execution with built-in standard plugins
-- **AND** the public test suites and builds MUST pass cleanly without external dependencies
+- **AND** plugin discovery MUST return an empty result without throwing
+- **AND** the public test suites and builds MUST pass cleanly without external dependencies; discovery
+  assertions that require the peer private workspace SHALL be guarded by its presence and MUST NOT
+  hardcode a private plugin inventory
 
 #### Scenario: Private plugin display metadata is passed through verbatim
 - **WHEN** a private `FactorPlugin` returns an opinion carrying `badgeText`, `displayTag`, or `styleMeta`
