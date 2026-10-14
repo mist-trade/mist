@@ -29,7 +29,6 @@ export interface CandleFinalizerDiagnostics {
     total: number;
   }>;
   finalizationFailureTotal: number;
-  finalizationLastFailureAtMs: number | null;
   recordLimitBreachTotal: number;
   maxSealedRecordBytes: number;
   maxManifestBytes: number;
@@ -66,7 +65,6 @@ export class CandleFinalizer {
     Map<InvalidReason, number>
   >();
   private finalizationFailureTotal = 0;
-  private finalizationLastFailureAtMs: number | null = null;
   private recordLimitBreachTotal = 0;
   private maxSealedRecordBytes = 0;
   private maxManifestBytes = 0;
@@ -129,7 +127,7 @@ export class CandleFinalizer {
         REALTIME_REDIS_RECORD_LIMITS.manifest,
       );
     } catch (error) {
-      this.recordFinalizationFailure(true, true);
+      this.recordFinalizationFailure(true);
       this.logger.error(
         `Candle seal bounds failed for securityId=${candle.securityId} source=${candle.source} bucket ${candle.bucketStartMs}: ${
           error instanceof Error ? error.message : String(error)
@@ -140,7 +138,7 @@ export class CandleFinalizer {
 
     const expiresAt = marketDayExpiryEpochSeconds(tradingDay);
     if (Math.floor(nowMs / 1_000) >= expiresAt) {
-      this.recordFinalizationFailure(false, true);
+      this.recordFinalizationFailure(false);
       this.logger.error(
         `Candle seal rejected expired tradingDay=${tradingDay} securityId=${candle.securityId} source=${candle.source}`,
       );
@@ -189,7 +187,7 @@ export class CandleFinalizer {
       // multi.exec returns null if the transaction was discarded (e.g.
       // WATCH conflict — we don't use WATCH, but guard anyway).
       if (results === null) {
-        this.recordFinalizationFailure(false, false, nowMs);
+        this.recordFinalizationFailure(false);
         this.logger.error(
           `Candle seal transaction discarded for ${candle.providerSymbol} bucket ${candle.bucketStartMs}`,
         );
@@ -206,7 +204,7 @@ export class CandleFinalizer {
       }
       return true;
     } catch (error) {
-      this.recordFinalizationFailure(false, false, nowMs);
+      this.recordFinalizationFailure(false);
       this.logger.error(
         `Candle seal failed for ${candle.providerSymbol} bucket ${candle.bucketStartMs}: ${
           error instanceof Error ? error.message : String(error)
@@ -257,7 +255,7 @@ export class CandleFinalizer {
         REALTIME_REDIS_RECORD_LIMITS.manifest,
       );
     } catch (error) {
-      this.recordFinalizationFailure(true, true);
+      this.recordFinalizationFailure(true);
       this.logger.error(
         `discardDue bounds failed for securityId=${decoded.securityId} source=${decoded.source} bucket ${decoded.bucketStartMs}: ${
           error instanceof Error ? error.message : String(error)
@@ -267,7 +265,7 @@ export class CandleFinalizer {
     }
     const expiresAt = marketDayExpiryEpochSeconds(tradingDay);
     if (Math.floor(nowMs / 1_000) >= expiresAt) {
-      this.recordFinalizationFailure(false, true);
+      this.recordFinalizationFailure(false);
       return false;
     }
 
@@ -288,11 +286,11 @@ export class CandleFinalizer {
       if (committed) {
         this.recordDiscard(decoded.source, decoded.securityId, reason);
       } else {
-        this.recordFinalizationFailure(false, false, nowMs);
+        this.recordFinalizationFailure(false);
       }
       return committed;
     } catch (error) {
-      this.recordFinalizationFailure(false, false, nowMs);
+      this.recordFinalizationFailure(false);
       this.logger.error(
         `discardDue failed for securityId=${decoded.securityId} source=${decoded.source} bucket ${decoded.bucketStartMs}: ${
           error instanceof Error ? error.message : String(error)
@@ -321,7 +319,6 @@ export class CandleFinalizer {
           ),
         ),
       finalizationFailureTotal: this.finalizationFailureTotal,
-      finalizationLastFailureAtMs: this.finalizationLastFailureAtMs,
       recordLimitBreachTotal: this.recordLimitBreachTotal,
       maxSealedRecordBytes: this.maxSealedRecordBytes,
       maxManifestBytes: this.maxManifestBytes,
@@ -346,26 +343,14 @@ export class CandleFinalizer {
   }
 
   /**
-   * Records a finalization failure. Deterministic rejections (expired trading
-   * day, record byte limit) only accumulate counters; transient runtime errors
-   * (MULTI/EXEC null or throw) additionally refresh the last-failure timestamp
-   * that drives the windowed degraded verdict.
+   * Records a finalization failure.
    *
    * @param recordLimitBreach Whether this failure is a record byte-limit breach
    *                          (increments recordLimitBreachTotal as well).
-   * @param deterministic     True for expected lifecycle rejections that must
-   *                          not influence the degraded verdict.
-   * @param nowMs             Current time from the caller's Clock; ignored when
-   *                          deterministic.
    */
-  private recordFinalizationFailure(
-    recordLimitBreach = false,
-    deterministic = false,
-    nowMs = 0,
-  ): void {
+  private recordFinalizationFailure(recordLimitBreach = false): void {
     this.finalizationFailureTotal++;
     if (recordLimitBreach) this.recordLimitBreachTotal++;
-    if (!deterministic) this.finalizationLastFailureAtMs = nowMs;
   }
 
   private recordDiscard(

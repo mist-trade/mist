@@ -43,10 +43,3 @@ export const REALTIME_CANDLE_QUEUE_LIMITS = Object.freeze({
   perSeries: Object.freeze({ default: 8, min: 1, max: 256 }),
   global: Object.freeze({ default: 256, min: 16, max: 4_096 }),
 });
-
-/** Recovery window for event-based candle degraded verdicts (candle-degraded-event-recovery). */
-export const REALTIME_CANDLE_DEGRADED_RECOVERY_WINDOW_LIMITS = Object.freeze({
-  default: 300_000,
-  min: 60_000,
-  max: 900_000,
-});

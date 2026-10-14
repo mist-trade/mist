@@ -1,37 +1,8 @@
 import type { RealtimeProductizationMode } from '@app/config';
 import type { CandleFinalizerDiagnostics } from './candle-finalizer';
-import type {
-  RealtimeQuantityField,
-  RealtimeQuantityRejectReason,
-} from '../realtime-quantity-validation.error';
 import type { RealtimeSource } from '../realtime.types';
-import type { RealtimeStrategyHandoffObservation } from '../strategy-trigger/realtime-strategy-handoff-observability.service';
-
-export interface RealtimeQuantityRejectionObservation {
-  source: RealtimeSource;
-  field: RealtimeQuantityField;
-  reason: RealtimeQuantityRejectReason;
-  total: number;
-  lastFailureAtMs: number;
-}
 
 export type RealtimeCandleProductMode = RealtimeProductizationMode;
-
-export type RealtimeCandleDegradedReason =
-  | 'redis_unavailable'
-  | 'redis_observation_failed'
-  | 'redis_aof_disabled'
-  | 'redis_aof_error'
-  | 'redis_eviction_policy'
-  | 'redis_retention'
-  | 'due_scan_failed'
-  | 'due_registration_failed'
-  | 'finalization_failed'
-  | 'finalization_horizon_exceeded'
-  | 'record_limit_breach'
-  | 'queue_overflow'
-  | 'recovery_gap'
-  | 'quantity_profile_rejected';
 
 export interface RealtimeCandleRuntimeObservation {
   mode: RealtimeCandleProductMode;
@@ -40,9 +11,7 @@ export interface RealtimeCandleRuntimeObservation {
     pendingGlobal: number;
     maximumPendingPerSeries: number;
     snapshotOverflowTotal: number;
-    snapshotOverflowLastFailureAtMs: number | null;
     dueAdmissionOverflowTotal: number;
-    dueAdmissionOverflowLastFailureAtMs: number | null;
   };
   candle: {
     seriesCount: number;
@@ -76,42 +45,14 @@ export interface RealtimeCandleRuntimeObservation {
     /** Frames accepted as price-only (either cumulative quantity absent). */
     quantityMissingFrameTotal: number;
     finalizationFailureTotal: number;
-    finalizationLastFailureAtMs: number | null;
     finalizationHorizonExceededTotal: number;
-    finalizationHorizonExceededLastFailureAtMs: number | null;
     recordLimitBreachTotal: number;
     recoveryGapTotal: number;
-    recoveryGapLastFailureAtMs: number | null;
     maxSealedRecordBytes: number;
     maxManifestBytes: number;
   };
   due: {
     scanFailureTotal: number;
-    scanLastFailureAtMs: number | null;
     registrationFailureTotal: number;
-    registrationLastFailureAtMs: number | null;
   };
-}
-
-export interface RealtimeCandleHealthObservation
-  extends RealtimeCandleRuntimeObservation {
-  status: 'disabled' | 'ok' | 'degraded';
-  degradedReasons: RealtimeCandleDegradedReason[];
-  due: RealtimeCandleRuntimeObservation['due'] & {
-    pendingCount: number | null;
-    oldestLagMs: number | null;
-  };
-  redis: {
-    available: boolean;
-    usedMemoryBytes: number | null;
-    aofSizeBytes: number | null;
-    aofEnabled: boolean | null;
-    aofLastWriteStatus: string | null;
-    maxmemoryPolicy: string | null;
-    currentDayMarketKeyCount: number | null;
-    expiredMarketKeyCount: number | null;
-    observationFailureTotal: number;
-  };
-  quantityProfileRejections: RealtimeQuantityRejectionObservation[];
-  strategyHandoff: RealtimeStrategyHandoffObservation;
 }

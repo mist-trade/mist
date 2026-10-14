@@ -102,11 +102,8 @@ export class RealtimeMarketDataProductService
   private startupReplayPending = true;
   private startupEligibleBucketStartMs: number | null = null;
   private recoveryGapCount = 0;
-  private recoveryGapLastFailureAtMs: number | null = null;
   private snapshotOverflowCount = 0;
-  private snapshotOverflowLastFailureAtMs: number | null = null;
   private dueAdmissionOverflowCount = 0;
-  private dueAdmissionOverflowLastFailureAtMs: number | null = null;
   private readonly lateAfterGraceCounts = new Map<string, number>();
   private readonly candidateCapacityExceededCounts = new Map<string, number>();
 
@@ -120,11 +117,8 @@ export class RealtimeMarketDataProductService
   }
   private quantityMissingFrameCount = 0;
   private dueScanFailureCount = 0;
-  private dueScanLastFailureAtMs: number | null = null;
   private dueRegistrationFailureCount = 0;
-  private dueRegistrationLastFailureAtMs: number | null = null;
   private finalizationHorizonExceededCount = 0;
-  private finalizationHorizonExceededLastFailureAtMs: number | null = null;
 
   constructor(
     private readonly config: ConfigService,
@@ -228,7 +222,6 @@ export class RealtimeMarketDataProductService
     );
     if (!accepted) {
       this.snapshotOverflowCount++;
-      this.snapshotOverflowLastFailureAtMs = acceptedAt;
       trace.getActiveSpan()?.addEvent('queue_overflow', {
         securityId: snapshot.securityId,
       });
@@ -539,16 +532,6 @@ export class RealtimeMarketDataProductService
       this.logger.warn(
         `candle due_registration_failed securityId=${identity.securityId} bucket=${bucket.bucketStartMs}`,
       );
-      // Deterministic rejections (record byte limit, expired trading day) only
-      // accumulate; transient runtime errors (MULTI/EXEC null or throw) also
-      // refresh the timestamp that drives the windowed degraded verdict.
-      const deterministic =
-        error instanceof RangeError ||
-        (error instanceof Error &&
-          error.message.includes('is already expired'));
-      if (!deterministic) {
-        this.dueRegistrationLastFailureAtMs = acceptedAt;
-      }
       // A6 (design 303-304): mark candle redis_due_registration_failed.
       this.logger.error(
         `Due registration failed for securityId=${identity.securityId} source=${identity.source} bucket ${bucket.bucketStartMs}: ${
@@ -599,7 +582,6 @@ export class RealtimeMarketDataProductService
       );
     } catch (error) {
       this.dueScanFailureCount++;
-      this.dueScanLastFailureAtMs = now;
       this.logger.error(
         `Due scan failed for ${tradingDay}: ${
           error instanceof Error ? error.message : String(error)
@@ -635,7 +617,6 @@ export class RealtimeMarketDataProductService
       });
       if (!accepted) {
         this.dueAdmissionOverflowCount++;
-        this.dueAdmissionOverflowLastFailureAtMs = now;
         this.dueInFlight.delete(member);
         trace.getActiveSpan()?.addEvent('due_admission_overflow', {
           securityId: decoded.securityId,
@@ -711,7 +692,6 @@ export class RealtimeMarketDataProductService
     const current = resolveCandleBucket(new Date(now).toISOString());
     if (current && now > current.bucketStartMs) {
       this.recoveryGapCount++;
-      this.recoveryGapLastFailureAtMs = now;
       this.logger.warn(
         `recovery_gap startup_mid_bucket bucket=${current.bucketStartMs}; valid aggregation resumes at ${this.startupEligibleBucketStartMs ?? 'unknown'}`,
       );
@@ -792,10 +772,7 @@ export class RealtimeMarketDataProductService
           ...Object.values(queue.pendingByKey),
         ),
         snapshotOverflowTotal: this.snapshotOverflowCount,
-        snapshotOverflowLastFailureAtMs: this.snapshotOverflowLastFailureAtMs,
         dueAdmissionOverflowTotal: this.dueAdmissionOverflowCount,
-        dueAdmissionOverflowLastFailureAtMs:
-          this.dueAdmissionOverflowLastFailureAtMs,
       },
       candle: {
         ...aggregator,
@@ -824,21 +801,15 @@ export class RealtimeMarketDataProductService
         }),
         quantityMissingFrameTotal: this.quantityMissingFrameCount,
         finalizationFailureTotal: finalizer.finalizationFailureTotal,
-        finalizationLastFailureAtMs: finalizer.finalizationLastFailureAtMs,
         finalizationHorizonExceededTotal: this.finalizationHorizonExceededCount,
-        finalizationHorizonExceededLastFailureAtMs:
-          this.finalizationHorizonExceededLastFailureAtMs,
         recordLimitBreachTotal: finalizer.recordLimitBreachTotal,
         recoveryGapTotal: this.recoveryGapCount,
-        recoveryGapLastFailureAtMs: this.recoveryGapLastFailureAtMs,
         maxSealedRecordBytes: finalizer.maxSealedRecordBytes,
         maxManifestBytes: finalizer.maxManifestBytes,
       },
       due: {
         scanFailureTotal: this.dueScanFailureCount,
-        scanLastFailureAtMs: this.dueScanLastFailureAtMs,
         registrationFailureTotal: this.dueRegistrationFailureCount,
-        registrationLastFailureAtMs: this.dueRegistrationLastFailureAtMs,
       },
     };
   }
@@ -1055,7 +1026,6 @@ export class RealtimeMarketDataProductService
       `finalization_horizon_exceeded securityId=${decoded.securityId} source=${decoded.source} bucket=${decoded.bucketStartMs}`,
     );
     this.finalizationHorizonExceededCount++;
-    this.finalizationHorizonExceededLastFailureAtMs = this.clock.now();
   }
 
   private clearDueTracking(member: string): void {

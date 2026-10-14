@@ -796,11 +796,6 @@ describe('RealtimeMarketDataProductService', () => {
     expect(finalizer.seal).not.toHaveBeenCalled();
     expect(finalizer.discardDue).not.toHaveBeenCalled();
     expect(aggregator.peekCandidate(1, 'tdx', bucketStartMs)).toBeNull();
-    // The horizon timestamp MUST come from the injected Clock (not Date.now()),
-    // so the recovery-window verdict stays deterministic under test.
-    expect((service as any).finalizationHorizonExceededLastFailureAtMs).toBe(
-      bucketStartMs + 120_000,
-    );
   });
 
   it('stops admission, drains admitted work, then disconnects owned Redis without finalizing', async () => {
