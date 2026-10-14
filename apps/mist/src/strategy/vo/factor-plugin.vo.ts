@@ -2,7 +2,7 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class FactorPluginVo {
   @ApiProperty({
-    description: '因子插件唯一标识，如 plugin.technical.volume-breakout',
+    description: '因子插件唯一标识，如 plugin.technical.fibonacci',
   })
   id!: string;
 

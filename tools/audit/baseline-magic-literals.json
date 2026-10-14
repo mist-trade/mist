@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-10-12T16:09:18.145Z",
+  "generatedAt": "2026-10-14T08:14:42.150Z",
   "summary": {
-    "totalFiles": 410,
-    "totalFindings": 1934,
-    "numberFindings": 390,
-    "stringFindings": 1544
+    "totalFiles": 417,
+    "totalFindings": 2020,
+    "numberFindings": 397,
+    "stringFindings": 1623
   },
   "topNumbers": [
     {
@@ -710,6 +710,183 @@
       ]
     },
     {
+      "value": 5,
+      "count": 19,
+      "occurrences": [
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "apps/mist/src/collector/post-close-sync.service.ts",
+          "line": 274,
+          "column": 71,
+          "context": "criteria.concurrencyLimit ?? 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "apps/mist/src/realtime/realtime-security-allowlist.service.ts",
+          "line": 165,
+          "column": 28,
+          "context": "requested.length > 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "apps/schedule/src/data-collection.controller.ts",
+          "line": 105,
+          "column": 26,
+          "context": "now.getDay() === 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "apps/schedule/src/data-collection.controller.ts",
+          "line": 160,
+          "column": 41,
+          "context": "previousTradingDay.getDay() === 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "apps/signal/src/realtime/candle-finalized-job.processor.ts",
+          "line": 256,
+          "column": 22,
+          "context": "[1, 5, 15, 30, 60]"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "apps/signal/src/signal-registry.service.ts",
+          "line": 142,
+          "column": 26,
+          "context": "period === 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/chancore/src/chan-duan-anchor.characterization.fixture.ts",
+          "line": 465,
+          "column": 40,
+          "context": "index % 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/chancore/src/chan-full-output.characterization.fixture.ts",
+          "line": 77,
+          "column": 40,
+          "context": "index % 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/chancore/src/internal/bi-channel.ts",
+          "line": 221,
+          "column": 43,
+          "context": "mergedBis.length >= 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/chancore/src/internal/bi-channel.ts",
+          "line": 362,
+          "column": 69,
+          "context": "channel.type === ChannelType.UnComplete ? 4 : 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/chancore/src/internal/duan.ts",
+          "line": 50,
+          "column": 24,
+          "context": "reverseStart + 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/chancore/src/internal/duan.ts",
+          "line": 53,
+          "column": 37,
+          "context": "reverseStart + 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/chancore/src/internal/duan.ts",
+          "line": 69,
+          "column": 24,
+          "context": "reverseStart + 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/chancore/src/internal/duan.ts",
+          "line": 72,
+          "column": 37,
+          "context": "reverseStart + 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 33,
+          "column": 45,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 96,
+          "column": 45,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "libs/strategy/src/factor/helpers/volume-features.extractor.ts",
+          "line": 184,
+          "column": 64,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "tools/strategy-dev/server.ts",
+          "line": 328,
+          "column": 13,
+          "context": "period: 5"
+        },
+        {
+          "type": "number",
+          "value": 5,
+          "raw": "5",
+          "file": "tools/strategy-dev/server.ts",
+          "line": 958,
+          "column": 22,
+          "context": "[1, 5, 15, 30, 60, 1440]"
+        }
+      ]
+    },
+    {
       "value": 1000,
       "count": 18,
       "occurrences": [
@@ -878,6 +1055,174 @@
       ]
     },
     {
+      "value": 10,
+      "count": 18,
+      "occurrences": [
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/mist/src/app.module.ts",
+          "line": 158,
+          "column": 25,
+          "context": "poolSize: 10"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/mist/src/collector/helpers/data-freshness.validator.ts",
+          "line": 133,
+          "column": 40,
+          "context": "String(bar.date).slice(0, 10)"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/mist/src/collector/helpers/data-freshness.validator.ts",
+          "line": 141,
+          "column": 38,
+          "context": "d.toISOString().slice(0, 10)"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/mist/src/collector/helpers/data-freshness.validator.ts",
+          "line": 145,
+          "column": 40,
+          "context": "String(bar.time).slice(0, 10)"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/mist/src/realtime/realtime-redis.service.ts",
+          "line": 91,
+          "column": 17,
+          "context": "times > 10"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/mist/src/sources/qmt/qmt-source.service.ts",
+          "line": 382,
+          "column": 86,
+          "context": "text.slice(8, 10)"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/mist/src/sources/qmt/qmt-source.service.ts",
+          "line": 382,
+          "column": 104,
+          "context": "text.slice(10, 12)"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/schedule/src/pre-market-inspection.service.ts",
+          "line": 270,
+          "column": 40,
+          "context": "missingItems.slice(0, 10)"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "apps/signal/src/realtime/signal-realtime-redis.service.ts",
+          "line": 40,
+          "column": 17,
+          "context": "times > 10"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "libs/indicators/src/fibonacci/fibonacci.ts",
+          "line": 23,
+          "column": 20,
+          "context": "10 ** precision"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "libs/indicators/src/fibonacci/fibonacci.ts",
+          "line": 343,
+          "column": 27,
+          "context": "10 ** precision"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "libs/indicators/src/fibonacci/fibonacci.ts",
+          "line": 343,
+          "column": 46,
+          "context": "10 ** precision"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 33,
+          "column": 48,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 96,
+          "column": 48,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "libs/strategy/src/factor/helpers/volume-features.extractor.ts",
+          "line": 184,
+          "column": 67,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "libs/timezone/src/timezone.service.ts",
+          "line": 136,
+          "column": 23,
+          "context": "maxLookbackDays = 10"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "tools/strategy-dev/runner.ts",
+          "line": 156,
+          "column": 58,
+          "context": "klines[0]?.time.toISOString().substring(0, 10)"
+        },
+        {
+          "type": "number",
+          "value": 10,
+          "raw": "10",
+          "file": "tools/strategy-dev/runner.ts",
+          "line": 156,
+          "column": 126,
+          "context": "klines[klines.length - 1]?.time.toISOString().substring(0, 10)"
+        }
+      ]
+    },
+    {
       "value": 4,
       "count": 17,
       "occurrences": [
@@ -1033,156 +1378,6 @@
           "line": 331,
           "column": 18,
           "context": "signalCount: 4"
-        }
-      ]
-    },
-    {
-      "value": 5,
-      "count": 16,
-      "occurrences": [
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "apps/mist/src/collector/post-close-sync.service.ts",
-          "line": 274,
-          "column": 71,
-          "context": "criteria.concurrencyLimit ?? 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "apps/mist/src/realtime/realtime-security-allowlist.service.ts",
-          "line": 165,
-          "column": 28,
-          "context": "requested.length > 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "apps/schedule/src/data-collection.controller.ts",
-          "line": 105,
-          "column": 26,
-          "context": "now.getDay() === 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "apps/schedule/src/data-collection.controller.ts",
-          "line": 160,
-          "column": 41,
-          "context": "previousTradingDay.getDay() === 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "apps/signal/src/realtime/candle-finalized-job.processor.ts",
-          "line": 256,
-          "column": 22,
-          "context": "[1, 5, 15, 30, 60]"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "apps/signal/src/signal-registry.service.ts",
-          "line": 142,
-          "column": 26,
-          "context": "period === 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "libs/chancore/src/chan-duan-anchor.characterization.fixture.ts",
-          "line": 465,
-          "column": 40,
-          "context": "index % 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "libs/chancore/src/chan-full-output.characterization.fixture.ts",
-          "line": 77,
-          "column": 40,
-          "context": "index % 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "libs/chancore/src/internal/bi-channel.ts",
-          "line": 221,
-          "column": 43,
-          "context": "mergedBis.length >= 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "libs/chancore/src/internal/bi-channel.ts",
-          "line": 362,
-          "column": 69,
-          "context": "channel.type === ChannelType.UnComplete ? 4 : 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "libs/chancore/src/internal/duan.ts",
-          "line": 50,
-          "column": 24,
-          "context": "reverseStart + 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "libs/chancore/src/internal/duan.ts",
-          "line": 53,
-          "column": 37,
-          "context": "reverseStart + 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "libs/chancore/src/internal/duan.ts",
-          "line": 69,
-          "column": 24,
-          "context": "reverseStart + 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "libs/chancore/src/internal/duan.ts",
-          "line": 72,
-          "column": 37,
-          "context": "reverseStart + 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "tools/strategy-dev/server.ts",
-          "line": 328,
-          "column": 13,
-          "context": "period: 5"
-        },
-        {
-          "type": "number",
-          "value": 5,
-          "raw": "5",
-          "file": "tools/strategy-dev/server.ts",
-          "line": 958,
-          "column": 22,
-          "context": "[1, 5, 15, 30, 60, 1440]"
         }
       ]
     },
@@ -1487,147 +1682,6 @@
       ]
     },
     {
-      "value": 10,
-      "count": 15,
-      "occurrences": [
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/mist/src/app.module.ts",
-          "line": 158,
-          "column": 25,
-          "context": "poolSize: 10"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/mist/src/collector/helpers/data-freshness.validator.ts",
-          "line": 133,
-          "column": 40,
-          "context": "String(bar.date).slice(0, 10)"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/mist/src/collector/helpers/data-freshness.validator.ts",
-          "line": 141,
-          "column": 38,
-          "context": "d.toISOString().slice(0, 10)"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/mist/src/collector/helpers/data-freshness.validator.ts",
-          "line": 145,
-          "column": 40,
-          "context": "String(bar.time).slice(0, 10)"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/mist/src/realtime/realtime-redis.service.ts",
-          "line": 91,
-          "column": 17,
-          "context": "times > 10"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/mist/src/sources/qmt/qmt-source.service.ts",
-          "line": 382,
-          "column": 86,
-          "context": "text.slice(8, 10)"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/mist/src/sources/qmt/qmt-source.service.ts",
-          "line": 382,
-          "column": 104,
-          "context": "text.slice(10, 12)"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/schedule/src/pre-market-inspection.service.ts",
-          "line": 270,
-          "column": 40,
-          "context": "missingItems.slice(0, 10)"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "apps/signal/src/realtime/signal-realtime-redis.service.ts",
-          "line": 40,
-          "column": 17,
-          "context": "times > 10"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "libs/indicators/src/fibonacci/fibonacci.ts",
-          "line": 23,
-          "column": 20,
-          "context": "10 ** precision"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "libs/indicators/src/fibonacci/fibonacci.ts",
-          "line": 343,
-          "column": 27,
-          "context": "10 ** precision"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "libs/indicators/src/fibonacci/fibonacci.ts",
-          "line": 343,
-          "column": 46,
-          "context": "10 ** precision"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "libs/timezone/src/timezone.service.ts",
-          "line": 136,
-          "column": 23,
-          "context": "maxLookbackDays = 10"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "tools/strategy-dev/runner.ts",
-          "line": 156,
-          "column": 58,
-          "context": "klines[0]?.time.toISOString().substring(0, 10)"
-        },
-        {
-          "type": "number",
-          "value": 10,
-          "raw": "10",
-          "file": "tools/strategy-dev/runner.ts",
-          "line": 156,
-          "column": 126,
-          "context": "klines[klines.length - 1]?.time.toISOString().substring(0, 10)"
-        }
-      ]
-    },
-    {
       "value": 5000,
       "count": 15,
       "occurrences": [
@@ -1762,9 +1816,114 @@
           "value": 5000,
           "raw": "5000",
           "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-          "line": 152,
+          "line": 153,
           "column": 28,
           "context": "command.param <= 5000"
+        }
+      ]
+    },
+    {
+      "value": 20,
+      "count": 11,
+      "occurrences": [
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts",
+          "line": 19,
+          "column": 19,
+          "context": "@ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 }) @IsOptional() @Type(() => Number) @I"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts",
+          "line": 89,
+          "column": 34,
+          "context": "query.limit ?? 20"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
+          "line": 402,
+          "column": 23,
+          "context": "Object.keys(nativeRecord) .sort() .slice(0, 20)"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
+          "line": 408,
+          "column": 21,
+          "context": "Object.keys(nativeRecord) .sort() .slice(0, 20)"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "libs/indicators/src/rpp.ts",
+          "line": 22,
+          "column": 20,
+          "context": "window: number = 20"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "libs/indicators/src/rpp.ts",
+          "line": 76,
+          "column": 20,
+          "context": "window: number = 20"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 33,
+          "column": 52,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 96,
+          "column": 52,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "libs/strategy/src/factor/helpers/volume-features.extractor.ts",
+          "line": 184,
+          "column": 71,
+          "context": "[5, 10, 20]"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
+          "line": 152,
+          "column": 28,
+          "context": "command.param >= 20"
+        },
+        {
+          "type": "number",
+          "value": 20,
+          "raw": "20",
+          "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
+          "line": 258,
+          "column": 25,
+          "context": "this.cursor % 20"
         }
       ]
     },
@@ -1962,7 +2121,7 @@
     },
     {
       "value": 0.5,
-      "count": 9,
+      "count": 10,
       "occurrences": [
         {
           "type": "number",
@@ -1986,9 +2145,18 @@
           "type": "number",
           "value": 0.5,
           "raw": "0.5",
+          "file": "libs/indicators/src/rpp.ts",
+          "line": 57,
+          "column": 23,
+          "context": "pl.lit(0.5)"
+        },
+        {
+          "type": "number",
+          "value": 0.5,
+          "raw": "0.5",
           "file": "libs/indicators/src/time-series/ts-rank.ts",
-          "line": 60,
-          "column": 31,
+          "line": 36,
+          "column": 60,
           "context": "normalize ? 0.5 : 1"
         },
         {
@@ -1996,7 +2164,7 @@
           "value": 0.5,
           "raw": "0.5",
           "file": "libs/indicators/src/time-series/ts-rank.ts",
-          "line": 100,
+          "line": 99,
           "column": 24,
           "context": "normalize ? 0.5 : 1"
         },
@@ -2273,71 +2441,62 @@
       ]
     },
     {
-      "value": 20,
-      "count": 7,
+      "value": 14,
+      "count": 6,
       "occurrences": [
         {
           "type": "number",
-          "value": 20,
-          "raw": "20",
-          "file": "apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts",
-          "line": 19,
-          "column": 19,
-          "context": "@ApiPropertyOptional({ minimum: 1, maximum: 100, default: 20 }) @IsOptional() @Type(() => Number) @I"
+          "value": 14,
+          "raw": "14",
+          "file": "apps/mist/src/indicator/indicator.service.ts",
+          "line": 79,
+          "column": 22,
+          "context": "period: number = 14"
         },
         {
           "type": "number",
-          "value": 20,
-          "raw": "20",
-          "file": "apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts",
-          "line": 89,
-          "column": 34,
-          "context": "query.limit ?? 20"
+          "value": 14,
+          "raw": "14",
+          "file": "apps/mist/src/sources/qmt/qmt-source.service.ts",
+          "line": 382,
+          "column": 130,
+          "context": "text.slice(12, 14)"
         },
         {
           "type": "number",
-          "value": 20,
-          "raw": "20",
-          "file": "apps/mist/src/sources/qmt/realtime/realtime.client.ts",
-          "line": 402,
-          "column": 23,
-          "context": "Object.keys(nativeRecord) .sort() .slice(0, 20)"
+          "value": 14,
+          "raw": "14",
+          "file": "libs/indicators/src/adx.ts",
+          "line": 22,
+          "column": 20,
+          "context": "period: number = 14"
         },
         {
           "type": "number",
-          "value": 20,
-          "raw": "20",
-          "file": "apps/mist/src/sources/tdx/realtime/realtime.client.ts",
-          "line": 408,
-          "column": 21,
-          "context": "Object.keys(nativeRecord) .sort() .slice(0, 20)"
+          "value": 14,
+          "raw": "14",
+          "file": "libs/indicators/src/atr.ts",
+          "line": 27,
+          "column": 20,
+          "context": "period: number = 14"
         },
         {
           "type": "number",
-          "value": 20,
-          "raw": "20",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 38,
-          "column": 70,
-          "context": "typeof rawParams?.lookback === 'number' ? rawParams.lookback : 20"
+          "value": 14,
+          "raw": "14",
+          "file": "libs/indicators/src/atr.ts",
+          "line": 80,
+          "column": 20,
+          "context": "period: number = 14"
         },
         {
           "type": "number",
-          "value": 20,
-          "raw": "20",
-          "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-          "line": 151,
-          "column": 28,
-          "context": "command.param >= 20"
-        },
-        {
-          "type": "number",
-          "value": 20,
-          "raw": "20",
-          "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-          "line": 257,
-          "column": 25,
-          "context": "this.cursor % 20"
+          "value": 14,
+          "raw": "14",
+          "file": "libs/indicators/src/rsi.ts",
+          "line": 20,
+          "column": 20,
+          "context": "period: number = 14"
         }
       ]
     },
@@ -2398,57 +2557,6 @@
           "line": 38,
           "column": 23,
           "context": "commandTimeout: 3_000"
-        }
-      ]
-    },
-    {
-      "value": 14,
-      "count": 5,
-      "occurrences": [
-        {
-          "type": "number",
-          "value": 14,
-          "raw": "14",
-          "file": "apps/mist/src/indicator/indicator.service.ts",
-          "line": 79,
-          "column": 22,
-          "context": "period: number = 14"
-        },
-        {
-          "type": "number",
-          "value": 14,
-          "raw": "14",
-          "file": "apps/mist/src/sources/qmt/qmt-source.service.ts",
-          "line": 382,
-          "column": 130,
-          "context": "text.slice(12, 14)"
-        },
-        {
-          "type": "number",
-          "value": 14,
-          "raw": "14",
-          "file": "libs/indicators/src/adx.ts",
-          "line": 22,
-          "column": 20,
-          "context": "period: number = 14"
-        },
-        {
-          "type": "number",
-          "value": 14,
-          "raw": "14",
-          "file": "libs/indicators/src/atr.ts",
-          "line": 22,
-          "column": 20,
-          "context": "period: number = 14"
-        },
-        {
-          "type": "number",
-          "value": 14,
-          "raw": "14",
-          "file": "libs/indicators/src/rsi.ts",
-          "line": 20,
-          "column": 20,
-          "context": "period: number = 14"
         }
       ]
     },
@@ -2794,39 +2902,6 @@
           "line": 70,
           "column": 50,
           "context": "Number(initialCapitalStr) || 100000"
-        }
-      ]
-    },
-    {
-      "value": 0.95,
-      "count": 3,
-      "occurrences": [
-        {
-          "type": "number",
-          "value": 0.95,
-          "raw": "0.95",
-          "file": "libs/strategy/src/factor/plugins/financial-guard.plugin.ts",
-          "line": 121,
-          "column": 19,
-          "context": "confidence: 0.95"
-        },
-        {
-          "type": "number",
-          "value": 0.95,
-          "raw": "0.95",
-          "file": "libs/strategy/src/factor/plugins/northbound-capital.plugin.ts",
-          "line": 70,
-          "column": 35,
-          "context": "Math.min(0.95, 0.75 + excess * 0.2)"
-        },
-        {
-          "type": "number",
-          "value": 0.95,
-          "raw": "0.95",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 111,
-          "column": 11,
-          "context": "Math.min( 0.95, 0.75 + Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1), )"
         }
       ]
     },
@@ -3299,50 +3374,26 @@
       ]
     },
     {
-      "value": 0.75,
+      "value": 0.95,
       "count": 2,
       "occurrences": [
         {
           "type": "number",
-          "value": 0.75,
-          "raw": "0.75",
-          "file": "libs/strategy/src/factor/plugins/northbound-capital.plugin.ts",
-          "line": 70,
-          "column": 41,
-          "context": "0.75 + excess * 0.2"
+          "value": 0.95,
+          "raw": "0.95",
+          "file": "libs/strategy/src/factor/plugins/financial-guard.plugin.ts",
+          "line": 121,
+          "column": 19,
+          "context": "confidence: 0.95"
         },
         {
           "type": "number",
-          "value": 0.75,
-          "raw": "0.75",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 112,
-          "column": 11,
-          "context": "0.75 + Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1)"
-        }
-      ]
-    },
-    {
-      "value": 0.2,
-      "count": 2,
-      "occurrences": [
-        {
-          "type": "number",
-          "value": 0.2,
-          "raw": "0.2",
+          "value": 0.95,
+          "raw": "0.95",
           "file": "libs/strategy/src/factor/plugins/northbound-capital.plugin.ts",
           "line": 70,
-          "column": 57,
-          "context": "excess * 0.2"
-        },
-        {
-          "type": "number",
-          "value": 0.2,
-          "raw": "0.2",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 112,
-          "column": 27,
-          "context": "Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1)"
+          "column": 35,
+          "context": "Math.min(0.95, 0.75 + excess * 0.2)"
         }
       ]
     },
@@ -3393,9 +3444,323 @@
           "context": "this.addMarketDays(startDate, 7)"
         }
       ]
+    },
+    {
+      "value": 19,
+      "count": 2,
+      "occurrences": [
+        {
+          "type": "number",
+          "value": 19,
+          "raw": "19",
+          "file": "tools/strategy-dev/runner.ts",
+          "line": 214,
+          "column": 61,
+          "context": "s.signalTime.replace('T', ' ').substring(0, 19)"
+        },
+        {
+          "type": "number",
+          "value": 19,
+          "raw": "19",
+          "file": "tools/strategy-dev/runner.ts",
+          "line": 215,
+          "column": 60,
+          "context": "s.pivotTime.replace('T', ' ').substring(0, 19)"
+        }
+      ]
+    },
+    {
+      "value": 1024,
+      "count": 2,
+      "occurrences": [
+        {
+          "type": "number",
+          "value": 1024,
+          "raw": "1024",
+          "file": "tools/strategy-dev/sync.ts",
+          "line": 120,
+          "column": 26,
+          "context": "100 * 1024"
+        },
+        {
+          "type": "number",
+          "value": 1024,
+          "raw": "1024",
+          "file": "tools/strategy-dev/sync.ts",
+          "line": 120,
+          "column": 33,
+          "context": "100 * 1024 * 1024"
+        }
+      ]
     }
   ],
   "topStrings": [
+    {
+      "value": "volume",
+      "count": 26,
+      "occurrences": [
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "apps/mist/src/sources/east-money/east-money-source.service.ts",
+          "line": 120,
+          "column": 62,
+          "context": "normalizeEastMoneyQuantity(item['成交量'], 'volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "apps/mist/src/sources/east-money/east-money-source.service.ts",
+          "line": 195,
+          "column": 57,
+          "context": "normalizeEastMoneyQuantity(item.volume, 'volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "apps/mist/src/sources/qmt/qmt-source.service.ts",
+          "line": 214,
+          "column": 56,
+          "context": "this.readDecimal(symbolData, ['volume'], rowKey, 'volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts",
+          "line": 47,
+          "column": 25,
+          "context": "quantityError('volume', 'invalid_type')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts",
+          "line": 50,
+          "column": 25,
+          "context": "quantityError('volume', 'negative_value')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts",
+          "line": 53,
+          "column": 25,
+          "context": "quantityError('volume', 'unsafe_integer')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "apps/mist/src/sources/tdx/tdx-source.service.ts",
+          "line": 132,
+          "column": 55,
+          "context": "normalizeTdxBarQuantity(bar.volume, 'volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "apps/signal/src/realtime/signal-strategy-market-data.adapter.ts",
+          "line": 215,
+          "column": 34,
+          "context": "sumQuantity(ordered, 'volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/obv.ts",
+          "line": 43,
+          "column": 23,
+          "context": "pl.Series('volume', volumes as any)"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/obv.ts",
+          "line": 54,
+          "column": 32,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 47,
+          "column": 23,
+          "context": "pl.Series('volume', volumes as any)"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 61,
+          "column": 18,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 65,
+          "column": 12,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/volume.ts",
+          "line": 73,
+          "column": 39,
+          "context": "calculated.getColumn('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vpci.ts",
+          "line": 72,
+          "column": 29,
+          "context": "pl.Series('volume', volumes as any)"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vpci.ts",
+          "line": 79,
+          "column": 45,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vpci.ts",
+          "line": 84,
+          "column": 28,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vpci.ts",
+          "line": 93,
+          "column": 27,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vpci.ts",
+          "line": 121,
+          "column": 27,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vpci.ts",
+          "line": 122,
+          "column": 26,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vwap.ts",
+          "line": 57,
+          "column": 23,
+          "context": "pl.Series('volume', volumes as any)"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vwap.ts",
+          "line": 60,
+          "column": 45,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vwap.ts",
+          "line": 65,
+          "column": 16,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/vwap.ts",
+          "line": 66,
+          "column": 16,
+          "context": "pl.col('volume')"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/market-data/src/projection/strategy-series-imputer.ts",
+          "line": 208,
+          "column": 11,
+          "context": "imputeQuantity( bars, start, 'volume', bar.volume, volumeAnchors, offset, )"
+        },
+        {
+          "type": "string",
+          "value": "volume",
+          "raw": "'volume'",
+          "category": "function-argument",
+          "file": "libs/signal/src/runtime/realtime-period.builder.ts",
+          "line": 118,
+          "column": 31,
+          "context": "sumQuantity(bars, 'volume')"
+        }
+      ]
+    },
     {
       "value": "qmt",
       "count": 21,
@@ -3800,7 +4165,7 @@
     },
     {
       "value": "high",
-      "count": 14,
+      "count": 16,
       "occurrences": [
         {
           "type": "string",
@@ -3858,7 +4223,7 @@
           "raw": "'high'",
           "category": "function-argument",
           "file": "libs/indicators/src/atr.ts",
-          "line": 32,
+          "line": 49,
           "column": 21,
           "context": "pl.Series('high', high as any)"
         },
@@ -3868,7 +4233,7 @@
           "raw": "'high'",
           "category": "function-argument",
           "file": "libs/indicators/src/atr.ts",
-          "line": 37,
+          "line": 54,
           "column": 22,
           "context": "pl.col('high')"
         },
@@ -3878,7 +4243,7 @@
           "raw": "'high'",
           "category": "function-argument",
           "file": "libs/indicators/src/atr.ts",
-          "line": 38,
+          "line": 55,
           "column": 22,
           "context": "pl.col('high')"
         },
@@ -3941,12 +4306,32 @@
           "line": 56,
           "column": 24,
           "context": "pl.col('high')"
+        },
+        {
+          "type": "string",
+          "value": "high",
+          "raw": "'high'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/rpp.ts",
+          "line": 45,
+          "column": 21,
+          "context": "pl.Series('high', highs as any)"
+        },
+        {
+          "type": "string",
+          "value": "high",
+          "raw": "'high'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/rpp.ts",
+          "line": 51,
+          "column": 26,
+          "context": "pl.col('high')"
         }
       ]
     },
     {
       "value": "low",
-      "count": 14,
+      "count": 16,
       "occurrences": [
         {
           "type": "string",
@@ -4004,7 +4389,7 @@
           "raw": "'low'",
           "category": "function-argument",
           "file": "libs/indicators/src/atr.ts",
-          "line": 33,
+          "line": 50,
           "column": 20,
           "context": "pl.Series('low', low as any)"
         },
@@ -4014,7 +4399,7 @@
           "raw": "'low'",
           "category": "function-argument",
           "file": "libs/indicators/src/atr.ts",
-          "line": 37,
+          "line": 54,
           "column": 41,
           "context": "pl.col('low')"
         },
@@ -4024,7 +4409,7 @@
           "raw": "'low'",
           "category": "function-argument",
           "file": "libs/indicators/src/atr.ts",
-          "line": 39,
+          "line": 56,
           "column": 22,
           "context": "pl.col('low')"
         },
@@ -4086,6 +4471,26 @@
           "file": "libs/indicators/src/kdj.ts",
           "line": 55,
           "column": 23,
+          "context": "pl.col('low')"
+        },
+        {
+          "type": "string",
+          "value": "low",
+          "raw": "'low'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/rpp.ts",
+          "line": 46,
+          "column": 20,
+          "context": "pl.Series('low', lows as any)"
+        },
+        {
+          "type": "string",
+          "value": "low",
+          "raw": "'low'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/rpp.ts",
+          "line": 50,
+          "column": 25,
           "context": "pl.col('low')"
         }
       ]
@@ -4528,7 +4933,7 @@
           "raw": "'completed'",
           "category": "function-argument",
           "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-          "line": 222,
+          "line": 223,
           "column": 22,
           "context": "this.setStatus('completed')"
         },
@@ -4538,7 +4943,7 @@
           "raw": "'completed'",
           "category": "function-argument",
           "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-          "line": 311,
+          "line": 312,
           "column": 20,
           "context": "this.setStatus('completed')"
         },
@@ -4548,7 +4953,7 @@
           "raw": "'completed'",
           "category": "function-argument",
           "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-          "line": 334,
+          "line": 335,
           "column": 26,
           "context": "this.setStatus('completed')"
         },
@@ -4737,132 +5142,6 @@
           "line": 478,
           "column": 19,
           "context": "keys[0] !== 'failure'"
-        }
-      ]
-    },
-    {
-      "value": "NEUTRAL",
-      "count": 12,
-      "occurrences": [
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/http-proxy.plugin.ts",
-          "line": 77,
-          "column": 19,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/http-proxy.plugin.ts",
-          "line": 87,
-          "column": 19,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/http-proxy.plugin.ts",
-          "line": 115,
-          "column": 17,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts",
-          "line": 55,
-          "column": 17,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts",
-          "line": 65,
-          "column": 17,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts",
-          "line": 73,
-          "column": 17,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/northbound-capital.plugin.ts",
-          "line": 59,
-          "column": 17,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/northbound-capital.plugin.ts",
-          "line": 96,
-          "column": 15,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 47,
-          "column": 17,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 68,
-          "column": 17,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 96,
-          "column": 17,
-          "context": "action: 'NEUTRAL'"
-        },
-        {
-          "type": "string",
-          "value": "NEUTRAL",
-          "raw": "'NEUTRAL'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 129,
-          "column": 15,
-          "context": "action: 'NEUTRAL'"
         }
       ]
     },
@@ -5089,114 +5368,8 @@
       ]
     },
     {
-      "value": "volume",
-      "count": 10,
-      "occurrences": [
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/east-money/east-money-source.service.ts",
-          "line": 120,
-          "column": 62,
-          "context": "normalizeEastMoneyQuantity(item['成交量'], 'volume')"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/east-money/east-money-source.service.ts",
-          "line": 195,
-          "column": 57,
-          "context": "normalizeEastMoneyQuantity(item.volume, 'volume')"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/qmt/qmt-source.service.ts",
-          "line": 214,
-          "column": 56,
-          "context": "this.readDecimal(symbolData, ['volume'], rowKey, 'volume')"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts",
-          "line": 47,
-          "column": 25,
-          "context": "quantityError('volume', 'invalid_type')"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts",
-          "line": 50,
-          "column": 25,
-          "context": "quantityError('volume', 'negative_value')"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts",
-          "line": 53,
-          "column": 25,
-          "context": "quantityError('volume', 'unsafe_integer')"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "apps/mist/src/sources/tdx/tdx-source.service.ts",
-          "line": 132,
-          "column": 55,
-          "context": "normalizeTdxBarQuantity(bar.volume, 'volume')"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "apps/signal/src/realtime/signal-strategy-market-data.adapter.ts",
-          "line": 215,
-          "column": 34,
-          "context": "sumQuantity(ordered, 'volume')"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "libs/market-data/src/projection/strategy-series-imputer.ts",
-          "line": 208,
-          "column": 11,
-          "context": "imputeQuantity( bars, start, 'volume', bar.volume, volumeAnchors, offset, )"
-        },
-        {
-          "type": "string",
-          "value": "volume",
-          "raw": "'volume'",
-          "category": "function-argument",
-          "file": "libs/signal/src/runtime/realtime-period.builder.ts",
-          "line": 118,
-          "column": 31,
-          "context": "sumQuantity(bars, 'volume')"
-        }
-      ]
-    },
-    {
       "value": "BUY",
-      "count": 10,
+      "count": 9,
       "occurrences": [
         {
           "type": "string",
@@ -5272,19 +5445,9 @@
           "type": "string",
           "value": "BUY",
           "raw": "'BUY'",
-          "category": "object-property",
-          "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-          "line": 109,
-          "column": 17,
-          "context": "action: 'BUY'"
-        },
-        {
-          "type": "string",
-          "value": "BUY",
-          "raw": "'BUY'",
           "category": "comparison",
           "file": "libs/strategy/src/kernel/strategy-evaluation-kernel.ts",
-          "line": 184,
+          "line": 191,
           "column": 31,
           "context": "decision.action !== 'BUY'"
         },
@@ -5294,7 +5457,7 @@
           "raw": "'BUY'",
           "category": "comparison",
           "file": "libs/strategy/src/kernel/strategy-evaluation-kernel.ts",
-          "line": 195,
+          "line": 202,
           "column": 39,
           "context": "decision.action === 'BUY'"
         }
@@ -5985,6 +6148,92 @@
           "line": 60,
           "column": 13,
           "context": "type: 'TERMINAL'"
+        }
+      ]
+    },
+    {
+      "value": "NEUTRAL",
+      "count": 8,
+      "occurrences": [
+        {
+          "type": "string",
+          "value": "NEUTRAL",
+          "raw": "'NEUTRAL'",
+          "category": "object-property",
+          "file": "libs/strategy/src/factor/plugins/http-proxy.plugin.ts",
+          "line": 77,
+          "column": 19,
+          "context": "action: 'NEUTRAL'"
+        },
+        {
+          "type": "string",
+          "value": "NEUTRAL",
+          "raw": "'NEUTRAL'",
+          "category": "object-property",
+          "file": "libs/strategy/src/factor/plugins/http-proxy.plugin.ts",
+          "line": 87,
+          "column": 19,
+          "context": "action: 'NEUTRAL'"
+        },
+        {
+          "type": "string",
+          "value": "NEUTRAL",
+          "raw": "'NEUTRAL'",
+          "category": "object-property",
+          "file": "libs/strategy/src/factor/plugins/http-proxy.plugin.ts",
+          "line": 115,
+          "column": 17,
+          "context": "action: 'NEUTRAL'"
+        },
+        {
+          "type": "string",
+          "value": "NEUTRAL",
+          "raw": "'NEUTRAL'",
+          "category": "object-property",
+          "file": "libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts",
+          "line": 55,
+          "column": 17,
+          "context": "action: 'NEUTRAL'"
+        },
+        {
+          "type": "string",
+          "value": "NEUTRAL",
+          "raw": "'NEUTRAL'",
+          "category": "object-property",
+          "file": "libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts",
+          "line": 65,
+          "column": 17,
+          "context": "action: 'NEUTRAL'"
+        },
+        {
+          "type": "string",
+          "value": "NEUTRAL",
+          "raw": "'NEUTRAL'",
+          "category": "object-property",
+          "file": "libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts",
+          "line": 73,
+          "column": 17,
+          "context": "action: 'NEUTRAL'"
+        },
+        {
+          "type": "string",
+          "value": "NEUTRAL",
+          "raw": "'NEUTRAL'",
+          "category": "object-property",
+          "file": "libs/strategy/src/factor/plugins/northbound-capital.plugin.ts",
+          "line": 59,
+          "column": 17,
+          "context": "action: 'NEUTRAL'"
+        },
+        {
+          "type": "string",
+          "value": "NEUTRAL",
+          "raw": "'NEUTRAL'",
+          "category": "object-property",
+          "file": "libs/strategy/src/factor/plugins/northbound-capital.plugin.ts",
+          "line": 96,
+          "column": 15,
+          "context": "action: 'NEUTRAL'"
         }
       ]
     },
@@ -7058,7 +7307,7 @@
           "raw": "'tr'",
           "category": "function-argument",
           "file": "libs/indicators/src/atr.ts",
-          "line": 45,
+          "line": 62,
           "column": 26,
           "context": "trExpr.alias('tr')"
         },
@@ -7068,9 +7317,75 @@
           "raw": "'tr'",
           "category": "function-argument",
           "file": "libs/indicators/src/atr.ts",
-          "line": 46,
+          "line": 63,
           "column": 16,
           "context": "df .select(trExpr.alias('tr')) .getColumn('tr')"
+        }
+      ]
+    },
+    {
+      "value": "mean",
+      "count": 6,
+      "occurrences": [
+        {
+          "type": "string",
+          "value": "mean",
+          "raw": "'mean'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/bollinger.ts",
+          "line": 66,
+          "column": 28,
+          "context": "pl.col('mean')"
+        },
+        {
+          "type": "string",
+          "value": "mean",
+          "raw": "'mean'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/bollinger.ts",
+          "line": 67,
+          "column": 28,
+          "context": "pl.col('mean')"
+        },
+        {
+          "type": "string",
+          "value": "mean",
+          "raw": "'mean'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/bollinger.ts",
+          "line": 69,
+          "column": 18,
+          "context": "pl.col('mean')"
+        },
+        {
+          "type": "string",
+          "value": "mean",
+          "raw": "'mean'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/bollinger.ts",
+          "line": 70,
+          "column": 47,
+          "context": "pl.col('mean')"
+        },
+        {
+          "type": "string",
+          "value": "mean",
+          "raw": "'mean'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/bollinger.ts",
+          "line": 74,
+          "column": 12,
+          "context": "pl.col('mean')"
+        },
+        {
+          "type": "string",
+          "value": "mean",
+          "raw": "'mean'",
+          "category": "function-argument",
+          "file": "libs/indicators/src/bollinger.ts",
+          "line": 82,
+          "column": 42,
+          "context": "calculated.getColumn('mean')"
         }
       ]
     },
@@ -7709,62 +8024,6 @@
           "context": "type: 'none'"
         }
       ]
-    },
-    {
-      "value": "MIST_REALTIME_REDIS_URL",
-      "count": 5,
-      "occurrences": [
-        {
-          "type": "string",
-          "value": "MIST_REALTIME_REDIS_URL",
-          "raw": "'MIST_REALTIME_REDIS_URL'",
-          "category": "function-argument",
-          "file": "apps/mist/src/realtime/realtime-redis.service.ts",
-          "line": 50,
-          "column": 40,
-          "context": "this.config.get<string>('MIST_REALTIME_REDIS_URL')"
-        },
-        {
-          "type": "string",
-          "value": "MIST_REALTIME_REDIS_URL",
-          "raw": "'MIST_REALTIME_REDIS_URL'",
-          "category": "function-argument",
-          "file": "apps/notification/src/delivery/alert-delivery-queue.service.ts",
-          "line": 34,
-          "column": 30,
-          "context": "config.get<string>('MIST_REALTIME_REDIS_URL')"
-        },
-        {
-          "type": "string",
-          "value": "MIST_REALTIME_REDIS_URL",
-          "raw": "'MIST_REALTIME_REDIS_URL'",
-          "category": "function-argument",
-          "file": "apps/notification/src/oo-alert/oo-alert-queue.service.ts",
-          "line": 27,
-          "column": 30,
-          "context": "config.get<string>('MIST_REALTIME_REDIS_URL')"
-        },
-        {
-          "type": "string",
-          "value": "MIST_REALTIME_REDIS_URL",
-          "raw": "'MIST_REALTIME_REDIS_URL'",
-          "category": "function-argument",
-          "file": "apps/signal/src/realtime/notification/bullmq-strategy-alert-delivery-handoff.service.ts",
-          "line": 35,
-          "column": 30,
-          "context": "config.get<string>('MIST_REALTIME_REDIS_URL')"
-        },
-        {
-          "type": "string",
-          "value": "MIST_REALTIME_REDIS_URL",
-          "raw": "'MIST_REALTIME_REDIS_URL'",
-          "category": "function-argument",
-          "file": "apps/signal/src/realtime/signal-realtime-redis.service.ts",
-          "line": 28,
-          "column": 41,
-          "context": "this.config.get<string>('MIST_REALTIME_REDIS_URL')"
-        }
-      ]
     }
   ],
   "topFiles": [
@@ -7861,6 +8120,14 @@
       22
     ],
     [
+      "libs/indicators/src/vpci.ts",
+      22
+    ],
+    [
+      "libs/indicators/src/volume.ts",
+      20
+    ],
+    [
       "tools/strategy-dev/runner.ts",
       20
     ],
@@ -7929,6 +8196,10 @@
       15
     ],
     [
+      "libs/indicators/src/bollinger.ts",
+      15
+    ],
+    [
       "libs/realtime/src/realtime-candle-redis.contract.ts",
       15
     ],
@@ -7954,18 +8225,6 @@
     ],
     [
       "apps/mist/src/strategy/runtime/signal-registry-rpc.client.ts",
-      13
-    ],
-    [
-      "apps/signal/src/observability/metrics.ts",
-      13
-    ],
-    [
-      "libs/indicators/src/rsi.ts",
-      13
-    ],
-    [
-      "libs/strategy/src/factor/plugins/chan-bsp.plugin.ts",
       13
     ]
   ],
@@ -20097,7 +20356,7 @@
       "raw": "'v'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 9,
+      "line": 14,
       "column": 23,
       "context": "pl.Series('v', arr as any)"
     },
@@ -20107,7 +20366,7 @@
       "raw": "'tail'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 13,
+      "line": 18,
       "column": 32,
       "context": "pl.Series('tail', tail as any)"
     },
@@ -20116,7 +20375,7 @@
       "value": 14,
       "raw": "14",
       "file": "libs/indicators/src/atr.ts",
-      "line": 22,
+      "line": 27,
       "column": 20,
       "context": "period: number = 14"
     },
@@ -20126,7 +20385,7 @@
       "raw": "'high'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 32,
+      "line": 49,
       "column": 21,
       "context": "pl.Series('high', high as any)"
     },
@@ -20136,7 +20395,7 @@
       "raw": "'low'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 33,
+      "line": 50,
       "column": 20,
       "context": "pl.Series('low', low as any)"
     },
@@ -20146,7 +20405,7 @@
       "raw": "'high'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 37,
+      "line": 54,
       "column": 22,
       "context": "pl.col('high')"
     },
@@ -20156,7 +20415,7 @@
       "raw": "'low'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 37,
+      "line": 54,
       "column": 41,
       "context": "pl.col('low')"
     },
@@ -20166,7 +20425,7 @@
       "raw": "'high'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 38,
+      "line": 55,
       "column": 22,
       "context": "pl.col('high')"
     },
@@ -20176,7 +20435,7 @@
       "raw": "'low'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 39,
+      "line": 56,
       "column": 22,
       "context": "pl.col('low')"
     },
@@ -20186,7 +20445,7 @@
       "raw": "'tr'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 45,
+      "line": 62,
       "column": 26,
       "context": "trExpr.alias('tr')"
     },
@@ -20196,9 +20455,168 @@
       "raw": "'tr'",
       "category": "function-argument",
       "file": "libs/indicators/src/atr.ts",
-      "line": 46,
+      "line": 63,
       "column": 16,
       "context": "df .select(trExpr.alias('tr')) .getColumn('tr')"
+    },
+    {
+      "type": "number",
+      "value": 14,
+      "raw": "14",
+      "file": "libs/indicators/src/atr.ts",
+      "line": 80,
+      "column": 20,
+      "context": "period: number = 14"
+    },
+    {
+      "type": "string",
+      "value": "price",
+      "raw": "'price'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 57,
+      "column": 23,
+      "context": "pl.Series('price', prices as any)"
+    },
+    {
+      "type": "string",
+      "value": "mean",
+      "raw": "'mean'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 66,
+      "column": 28,
+      "context": "pl.col('mean')"
+    },
+    {
+      "type": "string",
+      "value": "std",
+      "raw": "'std'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 66,
+      "column": 47,
+      "context": "pl.col('std')"
+    },
+    {
+      "type": "string",
+      "value": "mean",
+      "raw": "'mean'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 67,
+      "column": 28,
+      "context": "pl.col('mean')"
+    },
+    {
+      "type": "string",
+      "value": "std",
+      "raw": "'std'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 67,
+      "column": 47,
+      "context": "pl.col('std')"
+    },
+    {
+      "type": "string",
+      "value": "mean",
+      "raw": "'mean'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 69,
+      "column": 18,
+      "context": "pl.col('mean')"
+    },
+    {
+      "type": "string",
+      "value": "mean",
+      "raw": "'mean'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 70,
+      "column": 47,
+      "context": "pl.col('mean')"
+    },
+    {
+      "type": "string",
+      "value": "mean",
+      "raw": "'mean'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 74,
+      "column": 12,
+      "context": "pl.col('mean')"
+    },
+    {
+      "type": "string",
+      "value": "upper",
+      "raw": "'upper'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 75,
+      "column": 21,
+      "context": "upperExpr.alias('upper')"
+    },
+    {
+      "type": "string",
+      "value": "lower",
+      "raw": "'lower'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 76,
+      "column": 21,
+      "context": "lowerExpr.alias('lower')"
+    },
+    {
+      "type": "string",
+      "value": "bandwidth",
+      "raw": "'bandwidth'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 77,
+      "column": 18,
+      "context": "bwExpr.alias('bandwidth')"
+    },
+    {
+      "type": "string",
+      "value": "mean",
+      "raw": "'mean'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 82,
+      "column": 42,
+      "context": "calculated.getColumn('mean')"
+    },
+    {
+      "type": "string",
+      "value": "upper",
+      "raw": "'upper'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 83,
+      "column": 41,
+      "context": "calculated.getColumn('upper')"
+    },
+    {
+      "type": "string",
+      "value": "lower",
+      "raw": "'lower'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 84,
+      "column": 41,
+      "context": "calculated.getColumn('lower')"
+    },
+    {
+      "type": "string",
+      "value": "bandwidth",
+      "raw": "'bandwidth'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/bollinger.ts",
+      "line": 85,
+      "column": 38,
+      "context": "calculated.getColumn('bandwidth')"
     },
     {
       "type": "number",
@@ -20690,6 +21108,116 @@
     },
     {
       "type": "string",
+      "value": "middle",
+      "raw": "'middle'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 72,
+      "column": 34,
+      "context": "pl.Series('middle', middle as any)"
+    },
+    {
+      "type": "string",
+      "value": "atr",
+      "raw": "'atr'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 73,
+      "column": 31,
+      "context": "pl.Series('atr', atrArr as any)"
+    },
+    {
+      "type": "string",
+      "value": "middle",
+      "raw": "'middle'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 80,
+      "column": 28,
+      "context": "pl.col('middle')"
+    },
+    {
+      "type": "string",
+      "value": "atr",
+      "raw": "'atr'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 80,
+      "column": 49,
+      "context": "pl.col('atr')"
+    },
+    {
+      "type": "string",
+      "value": "middle",
+      "raw": "'middle'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 81,
+      "column": 28,
+      "context": "pl.col('middle')"
+    },
+    {
+      "type": "string",
+      "value": "atr",
+      "raw": "'atr'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 81,
+      "column": 49,
+      "context": "pl.col('atr')"
+    },
+    {
+      "type": "string",
+      "value": "middle",
+      "raw": "'middle'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 84,
+      "column": 12,
+      "context": "pl.col('middle')"
+    },
+    {
+      "type": "string",
+      "value": "upper",
+      "raw": "'upper'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 85,
+      "column": 21,
+      "context": "upperExpr.alias('upper')"
+    },
+    {
+      "type": "string",
+      "value": "lower",
+      "raw": "'lower'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 86,
+      "column": 21,
+      "context": "lowerExpr.alias('lower')"
+    },
+    {
+      "type": "string",
+      "value": "upper",
+      "raw": "'upper'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 89,
+      "column": 38,
+      "context": "calculated.getColumn('upper')"
+    },
+    {
+      "type": "string",
+      "value": "lower",
+      "raw": "'lower'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/keltner.ts",
+      "line": 90,
+      "column": 38,
+      "context": "calculated.getColumn('lower')"
+    },
+    {
+      "type": "string",
       "value": "v",
       "raw": "'v'",
       "category": "function-argument",
@@ -20770,6 +21298,133 @@
       "line": 51,
       "column": 26,
       "context": "dif.slice(8)"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/obv.ts",
+      "line": 43,
+      "column": 23,
+      "context": "pl.Series('volume', volumes as any)"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/obv.ts",
+      "line": 54,
+      "column": 32,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "obv",
+      "raw": "'obv'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/obv.ts",
+      "line": 55,
+      "column": 61,
+      "context": "signedVolExpr.cumSum().alias('obv')"
+    },
+    {
+      "type": "string",
+      "value": "obv",
+      "raw": "'obv'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/obv.ts",
+      "line": 57,
+      "column": 39,
+      "context": "calculated.getColumn('obv')"
+    },
+    {
+      "type": "number",
+      "value": 20,
+      "raw": "20",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 22,
+      "column": 20,
+      "context": "window: number = 20"
+    },
+    {
+      "type": "string",
+      "value": "high",
+      "raw": "'high'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 45,
+      "column": 21,
+      "context": "pl.Series('high', highs as any)"
+    },
+    {
+      "type": "string",
+      "value": "low",
+      "raw": "'low'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 46,
+      "column": 20,
+      "context": "pl.Series('low', lows as any)"
+    },
+    {
+      "type": "string",
+      "value": "low",
+      "raw": "'low'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 50,
+      "column": 25,
+      "context": "pl.col('low')"
+    },
+    {
+      "type": "string",
+      "value": "high",
+      "raw": "'high'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 51,
+      "column": 26,
+      "context": "pl.col('high')"
+    },
+    {
+      "type": "number",
+      "value": 0.5,
+      "raw": "0.5",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 57,
+      "column": 23,
+      "context": "pl.lit(0.5)"
+    },
+    {
+      "type": "string",
+      "value": "rpp",
+      "raw": "'rpp'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 59,
+      "column": 46,
+      "context": "rppExpr.alias('rpp')"
+    },
+    {
+      "type": "string",
+      "value": "rpp",
+      "raw": "'rpp'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 61,
+      "column": 39,
+      "context": "calculated.getColumn('rpp')"
+    },
+    {
+      "type": "number",
+      "value": 20,
+      "raw": "20",
+      "file": "libs/indicators/src/rpp.ts",
+      "line": 76,
+      "column": 20,
+      "context": "window: number = 20"
     },
     {
       "type": "string",
@@ -21096,7 +21751,7 @@
       "raw": "'computeTsRankSeries'",
       "category": "function-argument",
       "file": "libs/indicators/src/time-series/ts-rank.ts",
-      "line": 40,
+      "line": 19,
       "column": 29,
       "context": "assertValidWindow(window, 'computeTsRankSeries')"
     },
@@ -21105,9 +21760,69 @@
       "value": 0.5,
       "raw": "0.5",
       "file": "libs/indicators/src/time-series/ts-rank.ts",
-      "line": 60,
-      "column": 31,
+      "line": 36,
+      "column": 60,
       "context": "normalize ? 0.5 : 1"
+    },
+    {
+      "type": "string",
+      "value": "val",
+      "raw": "'val'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/time-series/ts-rank.ts",
+      "line": 40,
+      "column": 23,
+      "context": "pl.Series('val', series as any)"
+    },
+    {
+      "type": "string",
+      "value": "val",
+      "raw": "'val'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/time-series/ts-rank.ts",
+      "line": 47,
+      "column": 24,
+      "context": "pl.col('val')"
+    },
+    {
+      "type": "string",
+      "value": "val",
+      "raw": "'val'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/time-series/ts-rank.ts",
+      "line": 50,
+      "column": 29,
+      "context": "pl.col('val')"
+    },
+    {
+      "type": "string",
+      "value": "val",
+      "raw": "'val'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/time-series/ts-rank.ts",
+      "line": 56,
+      "column": 29,
+      "context": "pl.col('val')"
+    },
+    {
+      "type": "string",
+      "value": "tsRank",
+      "raw": "'tsRank'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/time-series/ts-rank.ts",
+      "line": 69,
+      "column": 48,
+      "context": "finalExpr.alias('tsRank')"
+    },
+    {
+      "type": "string",
+      "value": "tsRank",
+      "raw": "'tsRank'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/time-series/ts-rank.ts",
+      "line": 70,
+      "column": 42,
+      "context": "calculated.getColumn('tsRank')"
     },
     {
       "type": "string",
@@ -21115,7 +21830,7 @@
       "raw": "'computeTsRankObservation'",
       "category": "function-argument",
       "file": "libs/indicators/src/time-series/ts-rank.ts",
-      "line": 88,
+      "line": 87,
       "column": 29,
       "context": "assertValidWindow(window, 'computeTsRankObservation')"
     },
@@ -21124,9 +21839,493 @@
       "value": 0.5,
       "raw": "0.5",
       "file": "libs/indicators/src/time-series/ts-rank.ts",
-      "line": 100,
+      "line": 99,
       "column": 24,
       "context": "normalize ? 0.5 : 1"
+    },
+    {
+      "type": "string",
+      "value": "trailing",
+      "raw": "'trailing'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/time-series/ts-rank.ts",
+      "line": 102,
+      "column": 23,
+      "context": "pl.Series('trailing', trailing as any)"
+    },
+    {
+      "type": "number",
+      "value": 5,
+      "raw": "5",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 33,
+      "column": 45,
+      "context": "[5, 10, 20]"
+    },
+    {
+      "type": "number",
+      "value": 10,
+      "raw": "10",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 33,
+      "column": 48,
+      "context": "[5, 10, 20]"
+    },
+    {
+      "type": "number",
+      "value": 20,
+      "raw": "20",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 33,
+      "column": 52,
+      "context": "[5, 10, 20]"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 47,
+      "column": 23,
+      "context": "pl.Series('volume', volumes as any)"
+    },
+    {
+      "type": "string",
+      "value": "vma5",
+      "raw": "'vma5'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 60,
+      "column": 18,
+      "context": "pl.col('vma5')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 61,
+      "column": 18,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "vma5",
+      "raw": "'vma5'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 61,
+      "column": 39,
+      "context": "pl.col('vma5')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 65,
+      "column": 12,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "vma5",
+      "raw": "'vma5'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 66,
+      "column": 12,
+      "context": "pl.col('vma5')"
+    },
+    {
+      "type": "string",
+      "value": "vma10",
+      "raw": "'vma10'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 67,
+      "column": 12,
+      "context": "pl.col('vma10')"
+    },
+    {
+      "type": "string",
+      "value": "vma20",
+      "raw": "'vma20'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 68,
+      "column": 12,
+      "context": "pl.col('vma20')"
+    },
+    {
+      "type": "string",
+      "value": "ratio",
+      "raw": "'ratio'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 69,
+      "column": 21,
+      "context": "ratioExpr.alias('ratio')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 73,
+      "column": 39,
+      "context": "calculated.getColumn('volume')"
+    },
+    {
+      "type": "string",
+      "value": "vma5",
+      "raw": "'vma5'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 74,
+      "column": 40,
+      "context": "calculated.getColumn('vma5')"
+    },
+    {
+      "type": "string",
+      "value": "vma10",
+      "raw": "'vma10'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 75,
+      "column": 41,
+      "context": "calculated.getColumn('vma10')"
+    },
+    {
+      "type": "string",
+      "value": "vma20",
+      "raw": "'vma20'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 76,
+      "column": 41,
+      "context": "calculated.getColumn('vma20')"
+    },
+    {
+      "type": "string",
+      "value": "ratio",
+      "raw": "'ratio'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 77,
+      "column": 41,
+      "context": "calculated.getColumn('ratio')"
+    },
+    {
+      "type": "number",
+      "value": 5,
+      "raw": "5",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 96,
+      "column": 45,
+      "context": "[5, 10, 20]"
+    },
+    {
+      "type": "number",
+      "value": 10,
+      "raw": "10",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 96,
+      "column": 48,
+      "context": "[5, 10, 20]"
+    },
+    {
+      "type": "number",
+      "value": 20,
+      "raw": "20",
+      "file": "libs/indicators/src/volume.ts",
+      "line": 96,
+      "column": 52,
+      "context": "[5, 10, 20]"
+    },
+    {
+      "type": "string",
+      "value": "price",
+      "raw": "'price'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 71,
+      "column": 29,
+      "context": "pl.Series('price', prices as any)"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 72,
+      "column": 29,
+      "context": "pl.Series('volume', volumes as any)"
+    },
+    {
+      "type": "string",
+      "value": "price",
+      "raw": "'price'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 79,
+      "column": 25,
+      "context": "pl.col('price')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 79,
+      "column": 45,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "pv",
+      "raw": "'pv'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 80,
+      "column": 47,
+      "context": "pvExpr.alias('pv')"
+    },
+    {
+      "type": "string",
+      "value": "pv",
+      "raw": "'pv'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 83,
+      "column": 29,
+      "context": "pl.col('pv')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 84,
+      "column": 28,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "price",
+      "raw": "'price'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 85,
+      "column": 27,
+      "context": "pl.col('price')"
+    },
+    {
+      "type": "string",
+      "value": "pv",
+      "raw": "'pv'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 92,
+      "column": 28,
+      "context": "pl.col('pv')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 93,
+      "column": 27,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "price",
+      "raw": "'price'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 94,
+      "column": 26,
+      "context": "pl.col('price')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 121,
+      "column": 27,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 122,
+      "column": 26,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "vpc",
+      "raw": "'vpc'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 133,
+      "column": 19,
+      "context": "vpcExpr.alias('vpc')"
+    },
+    {
+      "type": "string",
+      "value": "vpr",
+      "raw": "'vpr'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 134,
+      "column": 19,
+      "context": "vprExpr.alias('vpr')"
+    },
+    {
+      "type": "string",
+      "value": "vpci",
+      "raw": "'vpci'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 135,
+      "column": 20,
+      "context": "vpciExpr.alias('vpci')"
+    },
+    {
+      "type": "string",
+      "value": "vpci",
+      "raw": "'vpci'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 139,
+      "column": 29,
+      "context": "pl.col('vpci')"
+    },
+    {
+      "type": "string",
+      "value": "signalLine",
+      "raw": "'signalLine'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 140,
+      "column": 53,
+      "context": "signalExpr.alias('signalLine')"
+    },
+    {
+      "type": "string",
+      "value": "vpc",
+      "raw": "'vpc'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 142,
+      "column": 35,
+      "context": "stage2.getColumn('vpc')"
+    },
+    {
+      "type": "string",
+      "value": "vpr",
+      "raw": "'vpr'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 143,
+      "column": 35,
+      "context": "stage2.getColumn('vpr')"
+    },
+    {
+      "type": "string",
+      "value": "vpci",
+      "raw": "'vpci'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 144,
+      "column": 36,
+      "context": "stage2.getColumn('vpci')"
+    },
+    {
+      "type": "string",
+      "value": "signalLine",
+      "raw": "'signalLine'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vpci.ts",
+      "line": 145,
+      "column": 38,
+      "context": "stage2.getColumn('signalLine')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vwap.ts",
+      "line": 57,
+      "column": 23,
+      "context": "pl.Series('volume', volumes as any)"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vwap.ts",
+      "line": 60,
+      "column": 45,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vwap.ts",
+      "line": 65,
+      "column": 16,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "volume",
+      "raw": "'volume'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vwap.ts",
+      "line": 66,
+      "column": 16,
+      "context": "pl.col('volume')"
+    },
+    {
+      "type": "string",
+      "value": "vwap",
+      "raw": "'vwap'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vwap.ts",
+      "line": 73,
+      "column": 47,
+      "context": "vwapExpr.alias('vwap')"
+    },
+    {
+      "type": "string",
+      "value": "vwap",
+      "raw": "'vwap'",
+      "category": "function-argument",
+      "file": "libs/indicators/src/vwap.ts",
+      "line": 75,
+      "column": 40,
+      "context": "calculated.getColumn('vwap')"
     },
     {
       "type": "number",
@@ -22997,6 +24196,33 @@
       "context": "path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )"
     },
     {
+      "type": "number",
+      "value": 5,
+      "raw": "5",
+      "file": "libs/strategy/src/factor/helpers/volume-features.extractor.ts",
+      "line": 184,
+      "column": 64,
+      "context": "[5, 10, 20]"
+    },
+    {
+      "type": "number",
+      "value": 10,
+      "raw": "10",
+      "file": "libs/strategy/src/factor/helpers/volume-features.extractor.ts",
+      "line": 184,
+      "column": 67,
+      "context": "[5, 10, 20]"
+    },
+    {
+      "type": "number",
+      "value": 20,
+      "raw": "20",
+      "file": "libs/strategy/src/factor/helpers/volume-features.extractor.ts",
+      "line": 184,
+      "column": 71,
+      "context": "[5, 10, 20]"
+    },
+    {
       "type": "string",
       "value": "有效行情数据为空，未形成缠论K线",
       "raw": "'有效行情数据为空，未形成缠论K线'",
@@ -23580,128 +24806,14 @@
       "context": "action: 'NEUTRAL'"
     },
     {
-      "type": "number",
-      "value": 20,
-      "raw": "20",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 38,
-      "column": 70,
-      "context": "typeof rawParams?.lookback === 'number' ? rawParams.lookback : 20"
-    },
-    {
-      "type": "number",
-      "value": 1.8,
-      "raw": "1.8",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 42,
-      "column": 11,
-      "context": "typeof rawParams?.volumeMultiple === 'number' ? rawParams.volumeMultiple : 1.8"
-    },
-    {
       "type": "string",
-      "value": "NEUTRAL",
-      "raw": "'NEUTRAL'",
-      "category": "object-property",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 47,
-      "column": 17,
-      "context": "action: 'NEUTRAL'"
-    },
-    {
-      "type": "string",
-      "value": "NEUTRAL",
-      "raw": "'NEUTRAL'",
-      "category": "object-property",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 68,
-      "column": 17,
-      "context": "action: 'NEUTRAL'"
-    },
-    {
-      "type": "string",
-      "value": "最新K线价格或成交量数据缺失",
-      "raw": "'最新K线价格或成交量数据缺失'",
-      "category": "object-property",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 70,
-      "column": 17,
-      "context": "reason: '最新K线价格或成交量数据缺失'"
-    },
-    {
-      "type": "string",
-      "value": "NEUTRAL",
-      "raw": "'NEUTRAL'",
-      "category": "object-property",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 96,
-      "column": 17,
-      "context": "action: 'NEUTRAL'"
-    },
-    {
-      "type": "string",
-      "value": "历史K线有效行情数据不足",
-      "raw": "'历史K线有效行情数据不足'",
-      "category": "object-property",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 98,
-      "column": 17,
-      "context": "reason: '历史K线有效行情数据不足'"
-    },
-    {
-      "type": "string",
-      "value": "BUY",
-      "raw": "'BUY'",
-      "category": "object-property",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 109,
-      "column": 17,
-      "context": "action: 'BUY'"
-    },
-    {
-      "type": "number",
-      "value": 0.95,
-      "raw": "0.95",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 111,
-      "column": 11,
-      "context": "Math.min( 0.95, 0.75 + Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1), )"
-    },
-    {
-      "type": "number",
-      "value": 0.75,
-      "raw": "0.75",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 112,
-      "column": 11,
-      "context": "0.75 + Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1)"
-    },
-    {
-      "type": "number",
-      "value": 0.2,
-      "raw": "0.2",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 112,
-      "column": 27,
-      "context": "Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1)"
-    },
-    {
-      "type": "number",
-      "value": 0.1,
-      "raw": "0.1",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 112,
-      "column": 65,
-      "context": "(volumeRatio - volumeMultiple) * 0.1"
-    },
-    {
-      "type": "string",
-      "value": "NEUTRAL",
-      "raw": "'NEUTRAL'",
-      "category": "object-property",
-      "file": "libs/strategy/src/factor/plugins/volume-breakout.plugin.ts",
-      "line": 129,
-      "column": 15,
-      "context": "action: 'NEUTRAL'"
+      "value": "volumeFeatures",
+      "raw": "'volumeFeatures'",
+      "category": "function-argument",
+      "file": "libs/strategy/src/kernel/strategy-evaluation-kernel.ts",
+      "line": 163,
+      "column": 22,
+      "context": "attributes.set('volumeFeatures', vf)"
     },
     {
       "type": "string",
@@ -23709,7 +24821,7 @@
       "raw": "'SIGNAL_EMITTED'",
       "category": "comparison",
       "file": "libs/strategy/src/kernel/strategy-evaluation-kernel.ts",
-      "line": 183,
+      "line": 190,
       "column": 31,
       "context": "decision.status !== 'SIGNAL_EMITTED'"
     },
@@ -23719,7 +24831,7 @@
       "raw": "'BUY'",
       "category": "comparison",
       "file": "libs/strategy/src/kernel/strategy-evaluation-kernel.ts",
-      "line": 184,
+      "line": 191,
       "column": 31,
       "context": "decision.action !== 'BUY'"
     },
@@ -23729,7 +24841,7 @@
       "raw": "'SELL'",
       "category": "comparison",
       "file": "libs/strategy/src/kernel/strategy-evaluation-kernel.ts",
-      "line": 184,
+      "line": 191,
       "column": 60,
       "context": "decision.action !== 'SELL'"
     },
@@ -23739,7 +24851,7 @@
       "raw": "'BUY'",
       "category": "comparison",
       "file": "libs/strategy/src/kernel/strategy-evaluation-kernel.ts",
-      "line": 195,
+      "line": 202,
       "column": 39,
       "context": "decision.action === 'BUY'"
     },
@@ -24154,7 +25266,7 @@
       "raw": "'play'",
       "category": "switch-case",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 133,
+      "line": 134,
       "column": 12,
       "context": "case 'play': this.play(); return this.getCurrentFrame();"
     },
@@ -24164,7 +25276,7 @@
       "raw": "'step_next'",
       "category": "switch-case",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 139,
+      "line": 140,
       "column": 12,
       "context": "case 'step_next': this.pause(); return this.stepNext();"
     },
@@ -24174,7 +25286,7 @@
       "raw": "'step_prev'",
       "category": "switch-case",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 142,
+      "line": 143,
       "column": 12,
       "context": "case 'step_prev': this.pause(); return this.stepPrev();"
     },
@@ -24184,7 +25296,7 @@
       "raw": "'seek'",
       "category": "switch-case",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 145,
+      "line": 146,
       "column": 12,
       "context": "case 'seek': this.pause(); return this.seek(command.param ?? 0);"
     },
@@ -24194,7 +25306,7 @@
       "raw": "'set_speed'",
       "category": "switch-case",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 148,
+      "line": 149,
       "column": 12,
       "context": "case 'set_speed': if ( typeof command.param === 'number' && command.param >= 20 && command.param <= "
     },
@@ -24203,7 +25315,7 @@
       "value": 20,
       "raw": "20",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 151,
+      "line": 152,
       "column": 28,
       "context": "command.param >= 20"
     },
@@ -24212,7 +25324,7 @@
       "value": 5000,
       "raw": "5000",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 152,
+      "line": 153,
       "column": 28,
       "context": "command.param <= 5000"
     },
@@ -24222,7 +25334,7 @@
       "raw": "'playing'",
       "category": "comparison",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 155,
+      "line": 156,
       "column": 31,
       "context": "this.status === 'playing'"
     },
@@ -24232,7 +25344,7 @@
       "raw": "'paused'",
       "category": "function-argument",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 179,
+      "line": 180,
       "column": 20,
       "context": "this.setStatus('paused')"
     },
@@ -24242,7 +25354,7 @@
       "raw": "'completed'",
       "category": "function-argument",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 222,
+      "line": 223,
       "column": 22,
       "context": "this.setStatus('completed')"
     },
@@ -24251,7 +25363,7 @@
       "value": 20,
       "raw": "20",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 257,
+      "line": 258,
       "column": 25,
       "context": "this.cursor % 20"
     },
@@ -24261,7 +25373,7 @@
       "raw": "'completed'",
       "category": "function-argument",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 311,
+      "line": 312,
       "column": 20,
       "context": "this.setStatus('completed')"
     },
@@ -24271,7 +25383,7 @@
       "raw": "'playing'",
       "category": "function-argument",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 325,
+      "line": 326,
       "column": 20,
       "context": "this.setStatus('playing')"
     },
@@ -24281,7 +25393,7 @@
       "raw": "'completed'",
       "category": "function-argument",
       "file": "libs/strategy/src/simulation/strategy-simulation.session.ts",
-      "line": 334,
+      "line": 335,
       "column": 26,
       "context": "this.setStatus('completed')"
     },

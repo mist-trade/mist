@@ -7,8 +7,40 @@ export { computeRsiSeries } from './rsi';
 export type { RsiSeriesResult } from './rsi';
 export { computeAdxSeries } from './adx';
 export type { AdxSeriesResult } from './adx';
-export { computeAtrSeries } from './atr';
-export type { AtrSeriesResult } from './atr';
+export { computeAtrSeries, computeAtrObservation } from './atr';
+export type { AtrSeriesResult, AtrObservation } from './atr';
+export { computeVolumeSeries, computeVolumeObservation } from './volume';
+export type {
+  VolumeSeriesResult,
+  VolumeObservation,
+  VolumeOptions,
+} from './volume';
+export { computeObvSeries, computeObvObservation } from './obv';
+export type { ObvSeriesResult, ObvObservation } from './obv';
+export { computeRppSeries, computeRppObservation } from './rpp';
+export type { RppSeriesResult, RppObservation } from './rpp';
+export { computeVwapSeries, computeVwapObservation } from './vwap';
+export type { VwapSeriesResult, VwapObservation, VwapOptions } from './vwap';
+export {
+  computeBollingerBandsSeries,
+  computeBollingerBandsObservation,
+} from './bollinger';
+export type {
+  BollingerBandsSeriesResult,
+  BollingerBandsObservation,
+  BollingerBandsOptions,
+} from './bollinger';
+export {
+  computeKeltnerChannelsSeries,
+  computeKeltnerChannelsObservation,
+} from './keltner';
+export type {
+  KeltnerChannelsSeriesResult,
+  KeltnerChannelsObservation,
+  KeltnerChannelsOptions,
+} from './keltner';
+export { computeVpciSeries, computeVpciObservation } from './vpci';
+export type { VpciSeriesResult, VpciObservation, VpciOptions } from './vpci';
 export { computeDualMaSeries } from './dual-ma';
 export type { DualMaSeriesResult, DualMaSeriesParams } from './dual-ma';
 export {

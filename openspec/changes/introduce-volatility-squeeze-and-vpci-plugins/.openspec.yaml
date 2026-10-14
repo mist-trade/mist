@@ -1,0 +1,7 @@
+schema: spec-change
+id: introduce-volatility-squeeze-and-vpci-plugins
+title: 引入Polars布林带肯特纳通道与VPCI指标及量能特征提取器
+created: 2026-10-14
+status: draft
+authors:
+  - moyui <gxy1510@gmail.com>

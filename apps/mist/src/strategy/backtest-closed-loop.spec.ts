@@ -320,10 +320,14 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
     );
 
     // 2. Wait for executor background execution to complete
-    await new Promise((resolve) => setTimeout(resolve, 50));
-
-    // 3. Query Backtest Run status via GET /v1/strategy-backtests/:runId
-    const runVo: any = await controller.findRun({ runId: 100 });
+    let runVo: any;
+    for (let i = 0; i < 40; i++) {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      runVo = await controller.findRun({ runId: 100 });
+      if (runVo?.status === BacktestRunStatus.COMPLETED) {
+        break;
+      }
+    }
 
     expect(runVo).toBeDefined();
     expect(runVo.id).toBe(100);

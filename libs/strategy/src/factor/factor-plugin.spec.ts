@@ -3,7 +3,6 @@ import { InMemoryFactorPluginRegistry } from './factor-plugin-registry';
 import type { FactorContext, FactorPlugin } from './factor.types';
 import { ChanBspFactorPlugin } from './plugins/chan-bsp.plugin';
 import { LegacyRuleDslPlugin } from './plugins/legacy-rule-dsl.plugin';
-import { VolumeBreakoutPlugin } from './plugins/volume-breakout.plugin';
 import { FinancialSafetyGuardPlugin } from './plugins/financial-guard.plugin';
 import { NorthboundCapitalPlugin } from './plugins/northbound-capital.plugin';
 import { HttpProxyFactorPlugin } from './plugins/http-proxy.plugin';
@@ -80,122 +79,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
     it('rejects plugins without valid id', () => {
       const registry = new InMemoryFactorPluginRegistry();
       expect(() => registry.register({} as any)).toThrow();
-    });
-  });
-
-  describe('VolumeBreakoutPlugin', () => {
-    const plugin = new VolumeBreakoutPlugin();
-
-    it('returns NEUTRAL if bar count is less than lookback + 1', async () => {
-      const context: FactorContext = {
-        securityId: 1,
-        securityCode: '000001',
-        timestamp: new Date(),
-        period: 5,
-        bars: [makeMockBar(new Date(), 10, 10.5, 9.8, 10.2, 5000)],
-        attributes: new Map(),
-      };
-
-      const opinion = await plugin.evaluate(context, { lookback: 20 });
-      expect(opinion.action).toBe('NEUTRAL');
-      expect(opinion.confidence).toBe(0.0);
-    });
-
-    it('returns BUY when price breaks highest high and volume surges', async () => {
-      const bars: ProjectedStrategyBar[] = [];
-      const baseTime = new Date('2026-09-07T09:30:00Z');
-
-      // 过去 20 根 K 线：价格最高 10.4，平均成交量 10000
-      for (let i = 0; i < 20; i++) {
-        bars.push(
-          makeMockBar(
-            new Date(baseTime.getTime() + i * 60000),
-            10.0,
-            10.4,
-            9.9,
-            10.1,
-            10000,
-          ),
-        );
-      }
-
-      // 最新第 21 根 K 线：收盘 11.0 (突破 10.4)，成交量 25000 (2.5倍放量)
-      bars.push(
-        makeMockBar(
-          new Date(baseTime.getTime() + 20 * 60000),
-          10.2,
-          11.2,
-          10.1,
-          11.0,
-          25000,
-        ),
-      );
-
-      const context: FactorContext = {
-        securityId: 1,
-        securityCode: '000001',
-        timestamp: new Date(baseTime.getTime() + 20 * 60000),
-        period: 5,
-        bars,
-        attributes: new Map(),
-      };
-
-      const opinion = await plugin.evaluate(context, {
-        lookback: 20,
-        volumeMultiple: 2.0,
-      });
-
-      expect(opinion.action).toBe('BUY');
-      expect(opinion.confidence).toBeGreaterThanOrEqual(0.75);
-      expect(opinion.evidence?.isPriceBreakout).toBe(true);
-      expect(opinion.evidence?.isVolumeSurge).toBe(true);
-    });
-
-    it('returns NEUTRAL if price breaks out but volume does not surge', async () => {
-      const bars: ProjectedStrategyBar[] = [];
-      const baseTime = new Date('2026-09-07T09:30:00Z');
-
-      for (let i = 0; i < 20; i++) {
-        bars.push(
-          makeMockBar(
-            new Date(baseTime.getTime() + i * 60000),
-            10.0,
-            10.4,
-            9.9,
-            10.1,
-            10000,
-          ),
-        );
-      }
-
-      // 突破但缩量 (成交量 8000 < 20000)
-      bars.push(
-        makeMockBar(
-          new Date(baseTime.getTime() + 20 * 60000),
-          10.2,
-          11.2,
-          10.1,
-          11.0,
-          8000,
-        ),
-      );
-
-      const context: FactorContext = {
-        securityId: 1,
-        securityCode: '000001',
-        timestamp: new Date(baseTime.getTime() + 20 * 60000),
-        period: 5,
-        bars,
-        attributes: new Map(),
-      };
-
-      const opinion = await plugin.evaluate(context, {
-        lookback: 20,
-        volumeMultiple: 2.0,
-      });
-
-      expect(opinion.action).toBe('NEUTRAL');
-      expect(opinion.confidence).toBe(0.0);
     });
   });
 

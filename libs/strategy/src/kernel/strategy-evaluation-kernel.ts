@@ -11,6 +11,7 @@ import {
 } from '../decision-flow/decision-pivot-evidence';
 import type { FactorContext } from '../factor/factor.types';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
+import { extractVolumeFeatures } from '../factor/helpers/volume-features.extractor';
 import type {
   KernelConfig,
   KernelDiagnostics,
@@ -155,13 +156,19 @@ export class StrategyEvaluationKernel {
   }
 
   private buildContext(timestamp: Date): FactorContext {
+    const bars = this.imputer.read();
+    const attributes = new Map<string, unknown>();
+    const vf = extractVolumeFeatures(bars);
+    if (vf) {
+      attributes.set('volumeFeatures', vf);
+    }
     return {
       securityId: this.securityId,
       securityCode: this.securityCode,
       timestamp,
       period: this.period,
-      bars: this.imputer.read(),
-      attributes: new Map(),
+      bars,
+      attributes,
     };
   }
 

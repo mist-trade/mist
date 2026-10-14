@@ -2,6 +2,7 @@ import {
   computeRsiSeries,
   computeAdxSeries,
   computeAtrSeries,
+  computeAtrObservation,
   computeDualMaSeries,
 } from './index';
 
@@ -72,6 +73,13 @@ describe('computeAtrSeries', () => {
     expect(result.begIndex).toBe(14);
     expect(result.atr).toHaveLength(66);
     expect(result.atr[0]).toBeCloseTo(4.273998, 6);
+  });
+
+  it('computes trailing observation matching last element of series', () => {
+    const series = computeAtrSeries(high, low, close, 14);
+    const obs = computeAtrObservation(high, low, close, 14);
+
+    expect(obs.atr).toBeCloseTo(series.atr.at(-1)!, 6);
   });
 });
 

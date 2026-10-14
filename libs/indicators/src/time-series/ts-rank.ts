@@ -4,30 +4,9 @@ import { TimeSeriesResult, TsRankOptions } from './time-series.types';
 import { assertValidWindow } from './time-series.utils';
 
 /**
- * Computes the ordinal or percentile rank of target element within window.
- * Ties receive average rank, identical to Polars Series.rank().
- */
-function computeWindowRank(windowSlice: readonly number[]): number {
-  const wLen = windowSlice.length;
-  const target = windowSlice[wLen - 1];
-  let smaller = 0;
-  let equal = 0;
-
-  for (let i = 0; i < wLen; i++) {
-    const val = windowSlice[i];
-    if (val < target) {
-      smaller++;
-    } else if (val === target) {
-      equal++;
-    }
-  }
-
-  // Exact average rank formula matching Polars Series.rank()
-  return smaller + (equal + 1) / 2;
-}
-
-/**
- * Computes rolling percentile rank full series (`computeTsRankSeries`).
+ * Computes rolling percentile rank full series (`computeTsRankSeries`) strictly via
+ * Polars vectorized shift and conditional accumulator expressions (Rust SIMD).
+ *
  * Each output aligns to `values[i] === input[i + begIndex]`.
  * Warmup period is `window - 1`.
  * Normalized to [0.0, 1.0] by default; flat windows evaluate to 0.5.
@@ -50,35 +29,55 @@ export function computeTsRankSeries(
   const begIndex = window - 1;
   const normalize = options?.normalize !== false;
   const outCount = len - begIndex;
-  const values = new Array<number>(outCount);
 
-  for (let i = 0; i < outCount; i++) {
-    const endIdx = i + begIndex;
-    const windowSlice = series.slice(endIdx - window + 1, endIdx + 1);
-
-    if (window === 1) {
-      values[i] = normalize ? 0.5 : 1;
-      continue;
-    }
-
-    const rank = computeWindowRank(windowSlice);
-    if (normalize) {
-      // If all values are identical, rank is (window + 1) / 2, formula evaluates exactly to 0.5
-      values[i] = (rank - 1) / (window - 1);
-    } else {
-      values[i] = rank;
-    }
+  if (window === 1) {
+    return {
+      begIndex,
+      values: new Array<number>(outCount).fill(normalize ? 0.5 : 1),
+    };
   }
+
+  const s = pl.Series('val', series as any).cast(pl.Float64);
+  const df = pl.DataFrame({ val: s });
+
+  let smallerExpr = pl.lit(0);
+  let equalExpr = pl.lit(0);
+
+  for (let k = 0; k < window; k++) {
+    const lag = pl.col('val').shift(k);
+    smallerExpr = smallerExpr.add(
+      pl
+        .when(lag.lt(pl.col('val')))
+        .then(pl.lit(1))
+        .otherwise(pl.lit(0)),
+    );
+    equalExpr = equalExpr.add(
+      pl
+        .when(lag.eq(pl.col('val')))
+        .then(pl.lit(1))
+        .otherwise(pl.lit(0)),
+    );
+  }
+
+  // Exact average rank formula matching Polars Series.rank(): smaller + (equal + 1) / 2
+  const rankExpr = smallerExpr.add(equalExpr.add(pl.lit(1)).div(pl.lit(2)));
+
+  const finalExpr = normalize
+    ? rankExpr.sub(pl.lit(1)).div(pl.lit(window - 1))
+    : rankExpr;
+
+  const calculated = df.select(finalExpr.alias('tsRank'));
+  const rawValues = calculated.getColumn('tsRank').toArray() as number[];
 
   return {
     begIndex,
-    values,
+    values: rawValues.slice(begIndex),
   };
 }
 
 /**
- * Computes trailing rolling percentile rank observation (`computeTsRankObservation`).
- * Evaluates strictly over the trailing window ending at the input's last element.
+ * Computes trailing rolling percentile rank observation (`computeTsRankObservation`)
+ * strictly via Polars Series.rank() over the trailing window ending at the input's last element.
  */
 export function computeTsRankObservation(
   series: readonly number[],
@@ -100,8 +99,7 @@ export function computeTsRankObservation(
     return normalize ? 0.5 : 1;
   }
 
-  // Cross-verify with Polars rank on the trailing observation window
-  const s = pl.Series(trailing);
+  const s = pl.Series('trailing', trailing as any).cast(pl.Float64);
   const rank = s.rank().get(window - 1) as number;
 
   if (normalize) {

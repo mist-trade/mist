@@ -1,8 +1,13 @@
 import pl from 'nodejs-polars';
+import { IndicatorInputError, IndicatorValueError } from './errors';
 
 export interface AtrSeriesResult {
   readonly begIndex: number;
   readonly atr: number[];
+}
+
+export interface AtrObservation {
+  readonly atr: number;
 }
 
 function computeWilderRma(arr: readonly number[], period: number): number[] {
@@ -21,6 +26,18 @@ export function computeAtrSeries(
   close: readonly number[],
   period: number = 14,
 ): AtrSeriesResult {
+  if (high.length !== low.length || low.length !== close.length) {
+    throw new IndicatorInputError(
+      `computeAtrSeries requires equal-length high/low/close arrays; got ${high.length}/${low.length}/${close.length}`,
+    );
+  }
+
+  if (period <= 0) {
+    throw new IndicatorInputError(
+      `computeAtrSeries period must be positive; got ${period}`,
+    );
+  }
+
   if (close.length <= period) {
     return {
       begIndex: close.length,
@@ -52,5 +69,30 @@ export function computeAtrSeries(
   return {
     begIndex: close.length - atr.length,
     atr,
+  };
+}
+
+/** ATR observation: trailing scalar snapshot over the supplied window. */
+export function computeAtrObservation(
+  high: readonly number[],
+  low: readonly number[],
+  close: readonly number[],
+  period: number = 14,
+): AtrObservation {
+  if (close.length <= period) {
+    throw new IndicatorInputError(
+      `computeAtrObservation requires more than ${period} closes; got ${close.length}`,
+    );
+  }
+
+  const series = computeAtrSeries(high, low, close, period);
+  if (series.atr.length === 0) {
+    throw new IndicatorValueError(
+      'computeAtrObservation did not produce a finite trailing value',
+    );
+  }
+
+  return {
+    atr: series.atr.at(-1) as number,
   };
 }

@@ -9,7 +9,7 @@ describe('FactorPluginController', () => {
     const ids = plugins.map((p) => p.id);
     expect(ids).toContain('plugin.chan.bsp');
     expect(ids).toContain('plugin.legacy.rule-dsl');
-    expect(ids).toContain('plugin.technical.volume-breakout');
+    expect(ids).toContain('plugin.technical.fibonacci');
     expect(ids).toContain('plugin.fundamental.safety-guard');
     expect(ids).toContain('plugin.capital.northbound');
   });

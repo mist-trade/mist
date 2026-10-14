@@ -99,7 +99,6 @@ describe('External Isolation & Anti-Leak Architectural Guard (外部插件物理
       // 验证标准开源插件已完备注册
       expect(registry.has('plugin.chan.bsp')).toBe(true);
       expect(registry.has('plugin.legacy.rule-dsl')).toBe(true);
-      expect(registry.has('plugin.technical.volume-breakout')).toBe(true);
       expect(registry.has('plugin.fundamental.safety-guard')).toBe(true);
       expect(registry.has('plugin.capital.northbound')).toBe(true);
       expect(registry.has('plugin.technical.fibonacci')).toBe(true);

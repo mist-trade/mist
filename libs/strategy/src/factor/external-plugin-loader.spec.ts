@@ -209,13 +209,23 @@ describe('ExternalFactorPluginLoader', () => {
       expect(plugins).toEqual([]);
     });
 
-    it('automatically discovers peer workspace mist-alpha-private plugins when present', () => {
-      // 不设置 customPaths，测试默认探测逻辑
+    it('discovers peer workspace plugins when the private workspace is present', () => {
+      const peerDir = path.resolve(process.cwd(), '..', 'mist-alpha-private');
       const plugins = ExternalFactorPluginLoader.loadPlugins();
-      expect(plugins.length).toBeGreaterThanOrEqual(3);
-      const ids = plugins.map((p) => p.id);
-      expect(ids).toContain('plugin.regime.shanghai-index');
-      expect(ids).toContain('plugin.private.alpha-momentum');
+
+      if (!fs.existsSync(peerDir)) {
+        // 单仓 checkout（公开 CI）：发现机制必须静默降级，公开套件不得失败。
+        expect(plugins).toEqual([]);
+        return;
+      }
+
+      // 多仓工作区：发现机制有效——断言通用插件契约，避免私有清单泄漏
+      expect(plugins.length).toBeGreaterThanOrEqual(1);
+      plugins.forEach((p) => {
+        expect(p.id).toBeDefined();
+        expect(p.name).toBeDefined();
+        expect(typeof p.evaluate).toBe('function');
+      });
     });
   });
 });

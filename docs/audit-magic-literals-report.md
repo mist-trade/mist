@@ -1,8 +1,8 @@
 # Mist 全仓硬编码数字与字符串（魔法值）审计盘点报告
 
-> 生成时间：2026-10-12T16:09:18.143Z
-> 扫描文件总数：410 个
-> 检出硬编码总量：1934 处（数字 390 处，字符串 1544 处）
+> 生成时间：2026-10-14T08:14:42.146Z
+> 扫描文件总数：417 个
+> 检出硬编码总量：2020 处（数字 397 处，字符串 1623 处）
 
 ## 一、高频魔法数字汇总（Top 30）
 
@@ -11,22 +11,22 @@
 | 1 | `3` | 37 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:640`, `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:163`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:478` | 领域常量 (*.constants.ts) |
 | 2 | `60` | 20 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101`, `apps/mist/src/visual/visual.controller.ts:94`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:256` | 领域常量 (*.constants.ts) |
 | 3 | `8` | 19 次 | `apps/backtest/src/backtest-admission.service.ts:37`, `apps/backtest/src/backtest-startup.service.ts:47`, `apps/backtest/src/health/health-state.service.ts:11` | 领域常量 (*.constants.ts) |
-| 4 | `1000` | 18 次 | `apps/backtest/src/health/health-state.service.ts:173`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:51`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:80` | 环境超时/系统参数 (.env / @app/config) |
-| 5 | `4` | 17 次 | `apps/mist/src/realtime/candle/candle-bucket.util.ts:107`, `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382` | 领域常量 (*.constants.ts) |
-| 6 | `5` | 16 次 | `apps/mist/src/collector/post-close-sync.service.ts:274`, `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165`, `apps/schedule/src/data-collection.controller.ts:105` | 领域常量 (*.constants.ts) |
-| 7 | `500` | 16 次 | `apps/mist/src/realtime/realtime-redis.service.ts:91`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:166`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:224` | 领域常量 (*.constants.ts) |
-| 8 | `6` | 16 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `apps/mist/src/sources/tdx/tdx-source.service.ts:210` | 领域常量 (*.constants.ts) |
-| 9 | `10` | 15 次 | `apps/mist/src/app.module.ts:158`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:133`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:141` | 领域常量 (*.constants.ts) |
+| 4 | `5` | 19 次 | `apps/mist/src/collector/post-close-sync.service.ts:274`, `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165`, `apps/schedule/src/data-collection.controller.ts:105` | 领域常量 (*.constants.ts) |
+| 5 | `1000` | 18 次 | `apps/backtest/src/health/health-state.service.ts:173`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:51`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:80` | 环境超时/系统参数 (.env / @app/config) |
+| 6 | `10` | 18 次 | `apps/mist/src/app.module.ts:158`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:133`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:141` | 领域常量 (*.constants.ts) |
+| 7 | `4` | 17 次 | `apps/mist/src/realtime/candle/candle-bucket.util.ts:107`, `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382` | 领域常量 (*.constants.ts) |
+| 8 | `500` | 16 次 | `apps/mist/src/realtime/realtime-redis.service.ts:91`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:166`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:224` | 领域常量 (*.constants.ts) |
+| 9 | `6` | 16 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `apps/mist/src/sources/tdx/tdx-source.service.ts:210` | 领域常量 (*.constants.ts) |
 | 10 | `5000` | 15 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1027`, `apps/mist/src/realtime/realtime-redis.service.ts:87`, `apps/mist/src/realtime/realtime-redis.service.ts:91` | 环境超时/系统参数 (.env / @app/config) |
-| 11 | `200` | 10 次 | `apps/mist/src/collector/post-close-sync.service.ts:129`, `apps/mist/src/collector/post-close-sync.service.ts:198`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:41` | 领域常量 (*.constants.ts) |
-| 12 | `50` | 10 次 | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10`, `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27`, `apps/mist/src/strategy/services/backtest-run-query.service.ts:62` | 领域常量 (*.constants.ts) |
-| 13 | `0.5` | 9 次 | `libs/indicators/src/fibonacci/fibonacci.ts:347`, `libs/indicators/src/fibonacci/fibonacci.ts:355`, `libs/indicators/src/time-series/ts-rank.ts:60` | 算法比例系数 (*.constants.ts) |
-| 14 | `30` | 8 次 | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256`, `apps/signal/src/signal-registry.service.ts:144`, `libs/utils/src/services/k-boundary-calculator.ts:168` | 领域常量 (*.constants.ts) |
-| 15 | `9` | 8 次 | `libs/chancore/src/internal/duan-channel-policy.ts:393`, `libs/chancore/src/internal/duan-channel.ts:112`, `libs/chancore/src/internal/duan-channel.ts:117` | 领域常量 (*.constants.ts) |
-| 16 | `60000` | 7 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1105`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:186`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:303` | 环境超时/系统参数 (.env / @app/config) |
-| 17 | `20` | 7 次 | `apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts:19`, `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:402` | 领域常量 (*.constants.ts) |
-| 18 | `3000` | 6 次 | `apps/mist/src/realtime/realtime-redis.service.ts:88`, `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:51`, `apps/notification/src/delivery/alert-delivery-queue.service.ts:39` | 环境超时/系统参数 (.env / @app/config) |
-| 19 | `14` | 5 次 | `apps/mist/src/indicator/indicator.service.ts:79`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `libs/indicators/src/adx.ts:22` | 领域常量 (*.constants.ts) |
+| 11 | `20` | 11 次 | `apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts:19`, `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:402` | 领域常量 (*.constants.ts) |
+| 12 | `200` | 10 次 | `apps/mist/src/collector/post-close-sync.service.ts:129`, `apps/mist/src/collector/post-close-sync.service.ts:198`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:41` | 领域常量 (*.constants.ts) |
+| 13 | `50` | 10 次 | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10`, `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27`, `apps/mist/src/strategy/services/backtest-run-query.service.ts:62` | 领域常量 (*.constants.ts) |
+| 14 | `0.5` | 10 次 | `libs/indicators/src/fibonacci/fibonacci.ts:347`, `libs/indicators/src/fibonacci/fibonacci.ts:355`, `libs/indicators/src/rpp.ts:57` | 算法比例系数 (*.constants.ts) |
+| 15 | `30` | 8 次 | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256`, `apps/signal/src/signal-registry.service.ts:144`, `libs/utils/src/services/k-boundary-calculator.ts:168` | 领域常量 (*.constants.ts) |
+| 16 | `9` | 8 次 | `libs/chancore/src/internal/duan-channel-policy.ts:393`, `libs/chancore/src/internal/duan-channel.ts:112`, `libs/chancore/src/internal/duan-channel.ts:117` | 领域常量 (*.constants.ts) |
+| 17 | `60000` | 7 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1105`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:186`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:303` | 环境超时/系统参数 (.env / @app/config) |
+| 18 | `14` | 6 次 | `apps/mist/src/indicator/indicator.service.ts:79`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `libs/indicators/src/adx.ts:22` | 领域常量 (*.constants.ts) |
+| 19 | `3000` | 6 次 | `apps/mist/src/realtime/realtime-redis.service.ts:88`, `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:51`, `apps/notification/src/delivery/alert-delivery-queue.service.ts:39` | 环境超时/系统参数 (.env / @app/config) |
 | 20 | `10000` | 5 次 | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:35`, `apps/mist/src/sources/tdx/tdx-source.service.ts:353`, `libs/decimal/src/decimal8.ts:163` | 环境超时/系统参数 (.env / @app/config) |
 | 21 | `11` | 5 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77` | 领域常量 (*.constants.ts) |
 | 22 | `30000` | 4 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:858`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:859`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:223` | 环境超时/系统参数 (.env / @app/config) |
@@ -35,36 +35,36 @@
 | 25 | `37` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77`, `libs/decimal/src/decimal8.ts:19` | 领域常量 (*.constants.ts) |
 | 26 | `1440` | 4 次 | `tools/strategy-dev/server.ts:311`, `tools/strategy-dev/server.ts:958`, `tools/strategy-dev/server.ts:1023` | 环境超时/系统参数 (.env / @app/config) |
 | 27 | `100000` | 3 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:84`, `tools/strategy-dev/runner.ts:70` | 环境超时/系统参数 (.env / @app/config) |
-| 28 | `0.95` | 3 次 | `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:121`, `libs/strategy/src/factor/plugins/northbound-capital.plugin.ts:70`, `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:111` | 算法比例系数 (*.constants.ts) |
-| 29 | `-8640000000000000` | 3 次 | `libs/strategy/src/simulation/strategy-simulation.session.ts:55`, `tools/strategy-dev/runner.ts:170`, `tools/strategy-dev/server.ts:437` | 领域常量 (*.constants.ts) |
-| 30 | `400` | 3 次 | `libs/transport/src/http/http-exception.filter.ts:36`, `libs/transport/src/http/http-exception.filter.ts:77`, `libs/transport/src/http/http-openapi.decorator.ts:79` | 领域常量 (*.constants.ts) |
+| 28 | `-8640000000000000` | 3 次 | `libs/strategy/src/simulation/strategy-simulation.session.ts:55`, `tools/strategy-dev/runner.ts:170`, `tools/strategy-dev/server.ts:437` | 领域常量 (*.constants.ts) |
+| 29 | `400` | 3 次 | `libs/transport/src/http/http-exception.filter.ts:36`, `libs/transport/src/http/http-exception.filter.ts:77`, `libs/transport/src/http/http-openapi.decorator.ts:79` | 领域常量 (*.constants.ts) |
+| 30 | `599` | 3 次 | `libs/transport/src/http/http-exception.filter.ts:77`, `libs/transport/src/http/http-openapi.decorator.ts:79`, `libs/transport/src/http/http-openapi.decorator.ts:183` | 领域常量 (*.constants.ts) |
 
 ## 二、高频魔法字符串汇总（Top 30）
 
 | 排名 | 硬编码字符串 | 出现频次 | 语法语境类别 | 典型分布位置 | 建议归宿分类 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| 1 | `qmt` | 21 次 | comparison, function-argument, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:275`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:367`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:856` | 契约字面量 (*.constants.ts) |
-| 2 | `tdx` | 18 次 | function-argument, comparison, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:855`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:870`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:886` | 契约字面量 (*.constants.ts) |
-| 3 | `high` | 14 次 | function-argument | `libs/indicators/src/adx.ts:36`, `libs/indicators/src/adx.ts:41`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
-| 4 | `low` | 14 次 | function-argument | `libs/indicators/src/adx.ts:37`, `libs/indicators/src/adx.ts:42`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
-| 5 | `discarded` | 13 次 | object-property, function-argument, comparison | `apps/mist/src/realtime/candle/candle-finalizer.ts:277`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:926`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:929` | 契约字面量 (*.constants.ts) |
-| 6 | `amount` | 13 次 | function-argument, comparison | `apps/mist/src/sources/east-money/east-money-source.service.ts:124`, `apps/mist/src/sources/east-money/east-money-source.service.ts:197`, `apps/mist/src/sources/qmt/qmt-source.service.ts:233` | 契约字面量 (*.constants.ts) |
-| 7 | `unavailable` | 12 次 | comparison, object-property | `apps/backtest/src/health/health-state.service.ts:64`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:202`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:230` | 契约字面量 (*.constants.ts) |
-| 8 | `completed` | 12 次 | object-property, function-argument | `apps/backtest/src/observability/metrics.ts:76`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:142`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:193` | 契约字面量 (*.constants.ts) |
-| 9 | `failure` | 12 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:100`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:745`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:748` | 契约字面量 (*.constants.ts) |
-| 10 | `NEUTRAL` | 12 次 | object-property | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:77`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:87`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:115` | 业务状态枚举 (Enums / *.constants.ts) |
+| 1 | `volume` | 26 次 | function-argument | `apps/mist/src/sources/east-money/east-money-source.service.ts:120`, `apps/mist/src/sources/east-money/east-money-source.service.ts:195`, `apps/mist/src/sources/qmt/qmt-source.service.ts:214` | 契约字面量 (*.constants.ts) |
+| 2 | `qmt` | 21 次 | comparison, function-argument, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:275`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:367`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:856` | 契约字面量 (*.constants.ts) |
+| 3 | `tdx` | 18 次 | function-argument, comparison, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:855`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:870`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:886` | 契约字面量 (*.constants.ts) |
+| 4 | `high` | 16 次 | function-argument | `libs/indicators/src/adx.ts:36`, `libs/indicators/src/adx.ts:41`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
+| 5 | `low` | 16 次 | function-argument | `libs/indicators/src/adx.ts:37`, `libs/indicators/src/adx.ts:42`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
+| 6 | `discarded` | 13 次 | object-property, function-argument, comparison | `apps/mist/src/realtime/candle/candle-finalizer.ts:277`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:926`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:929` | 契约字面量 (*.constants.ts) |
+| 7 | `amount` | 13 次 | function-argument, comparison | `apps/mist/src/sources/east-money/east-money-source.service.ts:124`, `apps/mist/src/sources/east-money/east-money-source.service.ts:197`, `apps/mist/src/sources/qmt/qmt-source.service.ts:233` | 契约字面量 (*.constants.ts) |
+| 8 | `unavailable` | 12 次 | comparison, object-property | `apps/backtest/src/health/health-state.service.ts:64`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:202`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:230` | 契约字面量 (*.constants.ts) |
+| 9 | `completed` | 12 次 | object-property, function-argument | `apps/backtest/src/observability/metrics.ts:76`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:142`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:193` | 契约字面量 (*.constants.ts) |
+| 10 | `failure` | 12 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:100`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:745`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:748` | 契约字面量 (*.constants.ts) |
 | 11 | `off` | 11 次 | comparison | `apps/mist/src/app.module.ts:93`, `apps/mist/src/app.module.ts:107`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:209` | 契约字面量 (*.constants.ts) |
 | 12 | `sealed` | 10 次 | function-argument, object-property, comparison | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:919`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:920`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:996` | 契约字面量 (*.constants.ts) |
-| 13 | `volume` | 10 次 | function-argument | `apps/mist/src/sources/east-money/east-money-source.service.ts:120`, `apps/mist/src/sources/east-money/east-money-source.service.ts:195`, `apps/mist/src/sources/qmt/qmt-source.service.ts:214` | 契约字面量 (*.constants.ts) |
-| 14 | `BUY` | 10 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:324`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:63`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:74` | 业务状态枚举 (Enums / *.constants.ts) |
-| 15 | `queue_full` | 8 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:125`, `apps/backtest/src/backtest-admission.service.ts:145`, `apps/backtest/src/backtest-startup.service.ts:77` | 契约字面量 (*.constants.ts) |
-| 16 | `0.1.0` | 8 次 | function-argument | `apps/backtest/src/observability/metrics.ts:16`, `apps/mist/src/realtime/observability/candle-metrics.ts:26`, `apps/mist/src/realtime/observability/startup-compensation-metrics.ts:18` | 协议键/事件名 (*.constants.ts) |
-| 17 | `success` | 8 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:98`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:695`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:755` | 契约字面量 (*.constants.ts) |
-| 18 | `chan` | 8 次 | object-property, function-argument | `apps/chan/src/health/health.controller.ts:19`, `apps/chan/src/health/health.controller.ts:20`, `apps/mist/src/main.ts:47` | 契约字面量 (*.constants.ts) |
-| 19 | `, ` | 8 次 | function-argument | `apps/mist/src/collector/collector.controller.ts:50`, `apps/mist/src/sources/k-save.helper.ts:47`, `apps/schedule/src/pre-market-inspection.service.ts:272` | 契约字面量 (*.constants.ts) |
-| 20 | `1m` | 8 次 | comparison, object-property | `apps/mist/src/collector/post-close-sync.service.ts:137`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:994`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:1010` | 契约字面量 (*.constants.ts) |
-| 21 | `text` | 8 次 | object-property | `apps/notification/src/channels/feishu.channel-adapter.ts:67`, `apps/notification/src/channels/qq.channel-adapter.ts:58`, `apps/notification/src/channels/wechat.channel-adapter.ts:52` | 契约字面量 (*.constants.ts) |
-| 22 | `TERMINAL` | 8 次 | switch-case, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:283`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:291`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:51` | 业务状态枚举 (Enums / *.constants.ts) |
+| 13 | `BUY` | 9 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:324`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:63`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:74` | 业务状态枚举 (Enums / *.constants.ts) |
+| 14 | `queue_full` | 8 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:125`, `apps/backtest/src/backtest-admission.service.ts:145`, `apps/backtest/src/backtest-startup.service.ts:77` | 契约字面量 (*.constants.ts) |
+| 15 | `0.1.0` | 8 次 | function-argument | `apps/backtest/src/observability/metrics.ts:16`, `apps/mist/src/realtime/observability/candle-metrics.ts:26`, `apps/mist/src/realtime/observability/startup-compensation-metrics.ts:18` | 协议键/事件名 (*.constants.ts) |
+| 16 | `success` | 8 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:98`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:695`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:755` | 契约字面量 (*.constants.ts) |
+| 17 | `chan` | 8 次 | object-property, function-argument | `apps/chan/src/health/health.controller.ts:19`, `apps/chan/src/health/health.controller.ts:20`, `apps/mist/src/main.ts:47` | 契约字面量 (*.constants.ts) |
+| 18 | `, ` | 8 次 | function-argument | `apps/mist/src/collector/collector.controller.ts:50`, `apps/mist/src/sources/k-save.helper.ts:47`, `apps/schedule/src/pre-market-inspection.service.ts:272` | 契约字面量 (*.constants.ts) |
+| 19 | `1m` | 8 次 | comparison, object-property | `apps/mist/src/collector/post-close-sync.service.ts:137`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:994`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:1010` | 契约字面量 (*.constants.ts) |
+| 20 | `text` | 8 次 | object-property | `apps/notification/src/channels/feishu.channel-adapter.ts:67`, `apps/notification/src/channels/qq.channel-adapter.ts:58`, `apps/notification/src/channels/wechat.channel-adapter.ts:52` | 契约字面量 (*.constants.ts) |
+| 21 | `TERMINAL` | 8 次 | switch-case, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:283`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:291`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:51` | 业务状态枚举 (Enums / *.constants.ts) |
+| 22 | `NEUTRAL` | 8 次 | object-property | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:77`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:87`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:115` | 业务状态枚举 (Enums / *.constants.ts) |
 | 23 | `ok` | 7 次 | object-property, comparison | `apps/backtest/src/health/health-state.service.ts:105`, `apps/chan/src/health/health.controller.ts:18`, `apps/mist/src/health/health.controller.ts:43` | 契约字面量 (*.constants.ts) |
 | 24 | `failed` | 7 次 | object-property, function-argument, comparison | `apps/backtest/src/observability/metrics.ts:77`, `apps/mist/src/collector/post-close-sync.service.ts:441`, `apps/notification/src/observability/oo-alert-metrics.ts:32` | 契约字面量 (*.constants.ts) |
 | 25 | `reset` | 7 次 | function-argument, comparison | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:166`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:215`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:220` | 契约字面量 (*.constants.ts) |
@@ -102,7 +102,7 @@
 ## 四、完整明细清单
 
 <details>
-<summary>展开查看全部 1934 处详细命中文档</summary>
+<summary>展开查看全部 2020 处详细命中文档</summary>
 
 | 类型 | 数值/字符串 | 文件位置 | 上下文代码片段 |
 | :--- | :--- | :--- | :--- |
@@ -1361,17 +1361,33 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `tr` | `libs/indicators/src/adx.ts:85:40` | `pl.col('tr')` |
 | string | `dx` | `libs/indicators/src/adx.ts:95:26` | `dxExpr.alias('dx')` |
 | string | `dx` | `libs/indicators/src/adx.ts:96:16` | `diDf .select(dxExpr.alias('dx')) .getColumn('dx')` |
-| string | `v` | `libs/indicators/src/atr.ts:9:23` | `pl.Series('v', arr as any)` |
-| string | `tail` | `libs/indicators/src/atr.ts:13:32` | `pl.Series('tail', tail as any)` |
-| number | `14` | `libs/indicators/src/atr.ts:22:20` | `period: number = 14` |
-| string | `high` | `libs/indicators/src/atr.ts:32:21` | `pl.Series('high', high as any)` |
-| string | `low` | `libs/indicators/src/atr.ts:33:20` | `pl.Series('low', low as any)` |
-| string | `high` | `libs/indicators/src/atr.ts:37:22` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/atr.ts:37:41` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/atr.ts:38:22` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/atr.ts:39:22` | `pl.col('low')` |
-| string | `tr` | `libs/indicators/src/atr.ts:45:26` | `trExpr.alias('tr')` |
-| string | `tr` | `libs/indicators/src/atr.ts:46:16` | `df .select(trExpr.alias('tr')) .getColumn('tr')` |
+| string | `v` | `libs/indicators/src/atr.ts:14:23` | `pl.Series('v', arr as any)` |
+| string | `tail` | `libs/indicators/src/atr.ts:18:32` | `pl.Series('tail', tail as any)` |
+| number | `14` | `libs/indicators/src/atr.ts:27:20` | `period: number = 14` |
+| string | `high` | `libs/indicators/src/atr.ts:49:21` | `pl.Series('high', high as any)` |
+| string | `low` | `libs/indicators/src/atr.ts:50:20` | `pl.Series('low', low as any)` |
+| string | `high` | `libs/indicators/src/atr.ts:54:22` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/atr.ts:54:41` | `pl.col('low')` |
+| string | `high` | `libs/indicators/src/atr.ts:55:22` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/atr.ts:56:22` | `pl.col('low')` |
+| string | `tr` | `libs/indicators/src/atr.ts:62:26` | `trExpr.alias('tr')` |
+| string | `tr` | `libs/indicators/src/atr.ts:63:16` | `df .select(trExpr.alias('tr')) .getColumn('tr')` |
+| number | `14` | `libs/indicators/src/atr.ts:80:20` | `period: number = 14` |
+| string | `price` | `libs/indicators/src/bollinger.ts:57:23` | `pl.Series('price', prices as any)` |
+| string | `mean` | `libs/indicators/src/bollinger.ts:66:28` | `pl.col('mean')` |
+| string | `std` | `libs/indicators/src/bollinger.ts:66:47` | `pl.col('std')` |
+| string | `mean` | `libs/indicators/src/bollinger.ts:67:28` | `pl.col('mean')` |
+| string | `std` | `libs/indicators/src/bollinger.ts:67:47` | `pl.col('std')` |
+| string | `mean` | `libs/indicators/src/bollinger.ts:69:18` | `pl.col('mean')` |
+| string | `mean` | `libs/indicators/src/bollinger.ts:70:47` | `pl.col('mean')` |
+| string | `mean` | `libs/indicators/src/bollinger.ts:74:12` | `pl.col('mean')` |
+| string | `upper` | `libs/indicators/src/bollinger.ts:75:21` | `upperExpr.alias('upper')` |
+| string | `lower` | `libs/indicators/src/bollinger.ts:76:21` | `lowerExpr.alias('lower')` |
+| string | `bandwidth` | `libs/indicators/src/bollinger.ts:77:18` | `bwExpr.alias('bandwidth')` |
+| string | `mean` | `libs/indicators/src/bollinger.ts:82:42` | `calculated.getColumn('mean')` |
+| string | `upper` | `libs/indicators/src/bollinger.ts:83:41` | `calculated.getColumn('upper')` |
+| string | `lower` | `libs/indicators/src/bollinger.ts:84:41` | `calculated.getColumn('lower')` |
+| string | `bandwidth` | `libs/indicators/src/bollinger.ts:85:38` | `calculated.getColumn('bandwidth')` |
 | number | `13` | `libs/indicators/src/dual-ma.ts:19:46` | `params?.shortPeriod ?? 13` |
 | number | `60` | `libs/indicators/src/dual-ma.ts:20:44` | `params?.longPeriod ?? 60` |
 | number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:23:20` | `10 ** precision` |
@@ -1423,6 +1439,17 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `50` | `libs/indicators/src/kdj.ts:60:18` | `pl.lit(50)` |
 | string | `fk` | `libs/indicators/src/kdj.ts:64:29` | `fastKExpr.alias('fk')` |
 | string | `fk` | `libs/indicators/src/kdj.ts:65:16` | `df .select(fastKExpr.alias('fk')) .getColumn('fk')` |
+| string | `middle` | `libs/indicators/src/keltner.ts:72:34` | `pl.Series('middle', middle as any)` |
+| string | `atr` | `libs/indicators/src/keltner.ts:73:31` | `pl.Series('atr', atrArr as any)` |
+| string | `middle` | `libs/indicators/src/keltner.ts:80:28` | `pl.col('middle')` |
+| string | `atr` | `libs/indicators/src/keltner.ts:80:49` | `pl.col('atr')` |
+| string | `middle` | `libs/indicators/src/keltner.ts:81:28` | `pl.col('middle')` |
+| string | `atr` | `libs/indicators/src/keltner.ts:81:49` | `pl.col('atr')` |
+| string | `middle` | `libs/indicators/src/keltner.ts:84:12` | `pl.col('middle')` |
+| string | `upper` | `libs/indicators/src/keltner.ts:85:21` | `upperExpr.alias('upper')` |
+| string | `lower` | `libs/indicators/src/keltner.ts:86:21` | `lowerExpr.alias('lower')` |
+| string | `upper` | `libs/indicators/src/keltner.ts:89:38` | `calculated.getColumn('upper')` |
+| string | `lower` | `libs/indicators/src/keltner.ts:90:38` | `calculated.getColumn('lower')` |
 | string | `v` | `libs/indicators/src/macd.ts:22:23` | `pl.Series('v', arr as any)` |
 | string | `tail` | `libs/indicators/src/macd.ts:26:32` | `pl.Series('tail', tail as any)` |
 | number | `34` | `libs/indicators/src/macd.ts:32:23` | `closes.length < 34` |
@@ -1432,6 +1459,19 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `12` | `libs/indicators/src/macd.ts:43:43` | `26 - 12` |
 | number | `9` | `libs/indicators/src/macd.ts:50:44` | `computePolarsEma(dif, 9)` |
 | number | `8` | `libs/indicators/src/macd.ts:51:26` | `dif.slice(8)` |
+| string | `volume` | `libs/indicators/src/obv.ts:43:23` | `pl.Series('volume', volumes as any)` |
+| string | `volume` | `libs/indicators/src/obv.ts:54:32` | `pl.col('volume')` |
+| string | `obv` | `libs/indicators/src/obv.ts:55:61` | `signedVolExpr.cumSum().alias('obv')` |
+| string | `obv` | `libs/indicators/src/obv.ts:57:39` | `calculated.getColumn('obv')` |
+| number | `20` | `libs/indicators/src/rpp.ts:22:20` | `window: number = 20` |
+| string | `high` | `libs/indicators/src/rpp.ts:45:21` | `pl.Series('high', highs as any)` |
+| string | `low` | `libs/indicators/src/rpp.ts:46:20` | `pl.Series('low', lows as any)` |
+| string | `low` | `libs/indicators/src/rpp.ts:50:25` | `pl.col('low')` |
+| string | `high` | `libs/indicators/src/rpp.ts:51:26` | `pl.col('high')` |
+| number | `0.5` | `libs/indicators/src/rpp.ts:57:23` | `pl.lit(0.5)` |
+| string | `rpp` | `libs/indicators/src/rpp.ts:59:46` | `rppExpr.alias('rpp')` |
+| string | `rpp` | `libs/indicators/src/rpp.ts:61:39` | `calculated.getColumn('rpp')` |
+| number | `20` | `libs/indicators/src/rpp.ts:76:20` | `window: number = 20` |
 | string | `v` | `libs/indicators/src/rsi.ts:9:23` | `pl.Series('v', arr as any)` |
 | string | `tail` | `libs/indicators/src/rsi.ts:13:32` | `pl.Series('tail', tail as any)` |
 | number | `14` | `libs/indicators/src/rsi.ts:20:20` | `period: number = 14` |
@@ -1464,10 +1504,65 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `computeTsArgMaxObservation` | `libs/indicators/src/time-series/ts-extreme.ts:100:5` | `computeExtremeObservation( series, window, true, 'computeTsArgMaxObservation', )` |
 | string | `computeTsArgMinSeries` | `libs/indicators/src/time-series/ts-extreme.ts:112:54` | `computeExtremeSeries(series, window, false, 'computeTsArgMinSeries')` |
 | string | `computeTsArgMinObservation` | `libs/indicators/src/time-series/ts-extreme.ts:126:5` | `computeExtremeObservation( series, window, false, 'computeTsArgMinObservation', )` |
-| string | `computeTsRankSeries` | `libs/indicators/src/time-series/ts-rank.ts:40:29` | `assertValidWindow(window, 'computeTsRankSeries')` |
-| number | `0.5` | `libs/indicators/src/time-series/ts-rank.ts:60:31` | `normalize ? 0.5 : 1` |
-| string | `computeTsRankObservation` | `libs/indicators/src/time-series/ts-rank.ts:88:29` | `assertValidWindow(window, 'computeTsRankObservation')` |
-| number | `0.5` | `libs/indicators/src/time-series/ts-rank.ts:100:24` | `normalize ? 0.5 : 1` |
+| string | `computeTsRankSeries` | `libs/indicators/src/time-series/ts-rank.ts:19:29` | `assertValidWindow(window, 'computeTsRankSeries')` |
+| number | `0.5` | `libs/indicators/src/time-series/ts-rank.ts:36:60` | `normalize ? 0.5 : 1` |
+| string | `val` | `libs/indicators/src/time-series/ts-rank.ts:40:23` | `pl.Series('val', series as any)` |
+| string | `val` | `libs/indicators/src/time-series/ts-rank.ts:47:24` | `pl.col('val')` |
+| string | `val` | `libs/indicators/src/time-series/ts-rank.ts:50:29` | `pl.col('val')` |
+| string | `val` | `libs/indicators/src/time-series/ts-rank.ts:56:29` | `pl.col('val')` |
+| string | `tsRank` | `libs/indicators/src/time-series/ts-rank.ts:69:48` | `finalExpr.alias('tsRank')` |
+| string | `tsRank` | `libs/indicators/src/time-series/ts-rank.ts:70:42` | `calculated.getColumn('tsRank')` |
+| string | `computeTsRankObservation` | `libs/indicators/src/time-series/ts-rank.ts:87:29` | `assertValidWindow(window, 'computeTsRankObservation')` |
+| number | `0.5` | `libs/indicators/src/time-series/ts-rank.ts:99:24` | `normalize ? 0.5 : 1` |
+| string | `trailing` | `libs/indicators/src/time-series/ts-rank.ts:102:23` | `pl.Series('trailing', trailing as any)` |
+| number | `5` | `libs/indicators/src/volume.ts:33:45` | `[5, 10, 20]` |
+| number | `10` | `libs/indicators/src/volume.ts:33:48` | `[5, 10, 20]` |
+| number | `20` | `libs/indicators/src/volume.ts:33:52` | `[5, 10, 20]` |
+| string | `volume` | `libs/indicators/src/volume.ts:47:23` | `pl.Series('volume', volumes as any)` |
+| string | `vma5` | `libs/indicators/src/volume.ts:60:18` | `pl.col('vma5')` |
+| string | `volume` | `libs/indicators/src/volume.ts:61:18` | `pl.col('volume')` |
+| string | `vma5` | `libs/indicators/src/volume.ts:61:39` | `pl.col('vma5')` |
+| string | `volume` | `libs/indicators/src/volume.ts:65:12` | `pl.col('volume')` |
+| string | `vma5` | `libs/indicators/src/volume.ts:66:12` | `pl.col('vma5')` |
+| string | `vma10` | `libs/indicators/src/volume.ts:67:12` | `pl.col('vma10')` |
+| string | `vma20` | `libs/indicators/src/volume.ts:68:12` | `pl.col('vma20')` |
+| string | `ratio` | `libs/indicators/src/volume.ts:69:21` | `ratioExpr.alias('ratio')` |
+| string | `volume` | `libs/indicators/src/volume.ts:73:39` | `calculated.getColumn('volume')` |
+| string | `vma5` | `libs/indicators/src/volume.ts:74:40` | `calculated.getColumn('vma5')` |
+| string | `vma10` | `libs/indicators/src/volume.ts:75:41` | `calculated.getColumn('vma10')` |
+| string | `vma20` | `libs/indicators/src/volume.ts:76:41` | `calculated.getColumn('vma20')` |
+| string | `ratio` | `libs/indicators/src/volume.ts:77:41` | `calculated.getColumn('ratio')` |
+| number | `5` | `libs/indicators/src/volume.ts:96:45` | `[5, 10, 20]` |
+| number | `10` | `libs/indicators/src/volume.ts:96:48` | `[5, 10, 20]` |
+| number | `20` | `libs/indicators/src/volume.ts:96:52` | `[5, 10, 20]` |
+| string | `price` | `libs/indicators/src/vpci.ts:71:29` | `pl.Series('price', prices as any)` |
+| string | `volume` | `libs/indicators/src/vpci.ts:72:29` | `pl.Series('volume', volumes as any)` |
+| string | `price` | `libs/indicators/src/vpci.ts:79:25` | `pl.col('price')` |
+| string | `volume` | `libs/indicators/src/vpci.ts:79:45` | `pl.col('volume')` |
+| string | `pv` | `libs/indicators/src/vpci.ts:80:47` | `pvExpr.alias('pv')` |
+| string | `pv` | `libs/indicators/src/vpci.ts:83:29` | `pl.col('pv')` |
+| string | `volume` | `libs/indicators/src/vpci.ts:84:28` | `pl.col('volume')` |
+| string | `price` | `libs/indicators/src/vpci.ts:85:27` | `pl.col('price')` |
+| string | `pv` | `libs/indicators/src/vpci.ts:92:28` | `pl.col('pv')` |
+| string | `volume` | `libs/indicators/src/vpci.ts:93:27` | `pl.col('volume')` |
+| string | `price` | `libs/indicators/src/vpci.ts:94:26` | `pl.col('price')` |
+| string | `volume` | `libs/indicators/src/vpci.ts:121:27` | `pl.col('volume')` |
+| string | `volume` | `libs/indicators/src/vpci.ts:122:26` | `pl.col('volume')` |
+| string | `vpc` | `libs/indicators/src/vpci.ts:133:19` | `vpcExpr.alias('vpc')` |
+| string | `vpr` | `libs/indicators/src/vpci.ts:134:19` | `vprExpr.alias('vpr')` |
+| string | `vpci` | `libs/indicators/src/vpci.ts:135:20` | `vpciExpr.alias('vpci')` |
+| string | `vpci` | `libs/indicators/src/vpci.ts:139:29` | `pl.col('vpci')` |
+| string | `signalLine` | `libs/indicators/src/vpci.ts:140:53` | `signalExpr.alias('signalLine')` |
+| string | `vpc` | `libs/indicators/src/vpci.ts:142:35` | `stage2.getColumn('vpc')` |
+| string | `vpr` | `libs/indicators/src/vpci.ts:143:35` | `stage2.getColumn('vpr')` |
+| string | `vpci` | `libs/indicators/src/vpci.ts:144:36` | `stage2.getColumn('vpci')` |
+| string | `signalLine` | `libs/indicators/src/vpci.ts:145:38` | `stage2.getColumn('signalLine')` |
+| string | `volume` | `libs/indicators/src/vwap.ts:57:23` | `pl.Series('volume', volumes as any)` |
+| string | `volume` | `libs/indicators/src/vwap.ts:60:45` | `pl.col('volume')` |
+| string | `volume` | `libs/indicators/src/vwap.ts:65:16` | `pl.col('volume')` |
+| string | `volume` | `libs/indicators/src/vwap.ts:66:16` | `pl.col('volume')` |
+| string | `vwap` | `libs/indicators/src/vwap.ts:73:47` | `vwapExpr.alias('vwap')` |
+| string | `vwap` | `libs/indicators/src/vwap.ts:75:40` | `calculated.getColumn('vwap')` |
 | number | `21` | `libs/market-data/src/k-price-projector.ts:30:30` | `trimmed.length > 21` |
 | string | `complete` | `libs/market-data/src/k-strategy-bar-mapper.ts:30:11` | `type: 'complete'` |
 | string | `ef` | `libs/market-data/src/market-data-pipeline.ts:147:54` | `source === 'ef'` |
@@ -1657,6 +1752,9 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:144:59` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
 | string | `../../../../..` | `libs/strategy/src/factor/external-plugin-loader.ts:149:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
 | string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:150:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
+| number | `5` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:184:64` | `[5, 10, 20]` |
+| number | `10` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:184:67` | `[5, 10, 20]` |
+| number | `20` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:184:71` | `[5, 10, 20]` |
 | string | `有效行情数据为空，未形成缠论K线` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:133:17` | `reason: '有效行情数据为空，未形成缠论K线'` |
 | string | `未检测到满足条件的缠论买卖点` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:147:17` | `reason: '未检测到满足条件的缠论买卖点'` |
 | string | `缠论买卖点已在先前批次发射，无需重复触发` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:191:19` | `reason: '缠论买卖点已在先前批次发射，无需重复触发'` |
@@ -1717,23 +1815,11 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `SELL` | `libs/strategy/src/factor/plugins/northbound-capital.plugin.ts:85:17` | `action: 'SELL'` |
 | number | `0.85` | `libs/strategy/src/factor/plugins/northbound-capital.plugin.ts:86:21` | `confidence: 0.85` |
 | string | `NEUTRAL` | `libs/strategy/src/factor/plugins/northbound-capital.plugin.ts:96:15` | `action: 'NEUTRAL'` |
-| number | `20` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:38:70` | `typeof rawParams?.lookback === 'number' ? rawParams.lookback : 20` |
-| number | `1.8` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:42:11` | `typeof rawParams?.volumeMultiple === 'number' ? rawParams.volumeMultiple : 1.8` |
-| string | `NEUTRAL` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:47:17` | `action: 'NEUTRAL'` |
-| string | `NEUTRAL` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:68:17` | `action: 'NEUTRAL'` |
-| string | `最新K线价格或成交量数据缺失` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:70:17` | `reason: '最新K线价格或成交量数据缺失'` |
-| string | `NEUTRAL` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:96:17` | `action: 'NEUTRAL'` |
-| string | `历史K线有效行情数据不足` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:98:17` | `reason: '历史K线有效行情数据不足'` |
-| string | `BUY` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:109:17` | `action: 'BUY'` |
-| number | `0.95` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:111:11` | `Math.min( 0.95, 0.75 + Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1), )` |
-| number | `0.75` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:112:11` | `0.75 + Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1)` |
-| number | `0.2` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:112:27` | `Math.min(0.2, (volumeRatio - volumeMultiple) * 0.1)` |
-| number | `0.1` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:112:65` | `(volumeRatio - volumeMultiple) * 0.1` |
-| string | `NEUTRAL` | `libs/strategy/src/factor/plugins/volume-breakout.plugin.ts:129:15` | `action: 'NEUTRAL'` |
-| string | `SIGNAL_EMITTED` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:183:31` | `decision.status !== 'SIGNAL_EMITTED'` |
-| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:184:31` | `decision.action !== 'BUY'` |
-| string | `SELL` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:184:60` | `decision.action !== 'SELL'` |
-| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:195:39` | `decision.action === 'BUY'` |
+| string | `volumeFeatures` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:163:22` | `attributes.set('volumeFeatures', vf)` |
+| string | `SIGNAL_EMITTED` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:190:31` | `decision.status !== 'SIGNAL_EMITTED'` |
+| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:191:31` | `decision.action !== 'BUY'` |
+| string | `SELL` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:191:60` | `decision.action !== 'SELL'` |
+| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:202:39` | `decision.action === 'BUY'` |
 | string | `finiteNumber` | `libs/strategy/src/rules/strategy-field.catalog.ts:41:16` | `valueType: 'finiteNumber'` |
 | string | `decimal` | `libs/strategy/src/rules/strategy-field.catalog.ts:48:16` | `valueType: 'decimal'` |
 | string | `forwardFillWithinTradingDay` | `libs/strategy/src/rules/strategy-field.catalog.ts:51:20` | `missingPolicy: 'forwardFillWithinTradingDay'` |
@@ -1775,20 +1861,20 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `250` | `libs/strategy/src/simulation/strategy-simulation.session.ts:37:21` | `private speedMs = 250;` |
 | number | `-8640000000000000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:55:18` | `new Date(-8640000000000000)` |
 | number | `600` | `libs/strategy/src/simulation/strategy-simulation.session.ts:77:52` | `config.windowBudget ?? 600` |
-| string | `play` | `libs/strategy/src/simulation/strategy-simulation.session.ts:133:12` | `case 'play': this.play(); return this.getCurrentFrame();` |
-| string | `step_next` | `libs/strategy/src/simulation/strategy-simulation.session.ts:139:12` | `case 'step_next': this.pause(); return this.stepNext();` |
-| string | `step_prev` | `libs/strategy/src/simulation/strategy-simulation.session.ts:142:12` | `case 'step_prev': this.pause(); return this.stepPrev();` |
-| string | `seek` | `libs/strategy/src/simulation/strategy-simulation.session.ts:145:12` | `case 'seek': this.pause(); return this.seek(command.param ?? 0);` |
-| string | `set_speed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:148:12` | `case 'set_speed': if ( typeof command.param === 'number' && command.param >= 20 && command.param <= ` |
-| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:151:28` | `command.param >= 20` |
-| number | `5000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:152:28` | `command.param <= 5000` |
-| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:155:31` | `this.status === 'playing'` |
-| string | `paused` | `libs/strategy/src/simulation/strategy-simulation.session.ts:179:20` | `this.setStatus('paused')` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:222:22` | `this.setStatus('completed')` |
-| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:257:25` | `this.cursor % 20` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:311:20` | `this.setStatus('completed')` |
-| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:325:20` | `this.setStatus('playing')` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:334:26` | `this.setStatus('completed')` |
+| string | `play` | `libs/strategy/src/simulation/strategy-simulation.session.ts:134:12` | `case 'play': this.play(); return this.getCurrentFrame();` |
+| string | `step_next` | `libs/strategy/src/simulation/strategy-simulation.session.ts:140:12` | `case 'step_next': this.pause(); return this.stepNext();` |
+| string | `step_prev` | `libs/strategy/src/simulation/strategy-simulation.session.ts:143:12` | `case 'step_prev': this.pause(); return this.stepPrev();` |
+| string | `seek` | `libs/strategy/src/simulation/strategy-simulation.session.ts:146:12` | `case 'seek': this.pause(); return this.seek(command.param ?? 0);` |
+| string | `set_speed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:149:12` | `case 'set_speed': if ( typeof command.param === 'number' && command.param >= 20 && command.param <= ` |
+| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:152:28` | `command.param >= 20` |
+| number | `5000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:153:28` | `command.param <= 5000` |
+| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:156:31` | `this.status === 'playing'` |
+| string | `paused` | `libs/strategy/src/simulation/strategy-simulation.session.ts:180:20` | `this.setStatus('paused')` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:223:22` | `this.setStatus('completed')` |
+| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:258:25` | `this.cursor % 20` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:312:20` | `this.setStatus('completed')` |
+| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:326:20` | `this.setStatus('playing')` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:335:26` | `this.setStatus('completed')` |
 | number | `10000` | `libs/timezone/src/timezone.service.ts:62:16` | `timeout: 10000` |
 | string | `T` | `libs/timezone/src/timezone.service.ts:88:47` | `normalized.replace(' ', 'T')` |
 | string | `+08:00` | `libs/timezone/src/timezone.service.ts:88:54` | `normalized.replace(' ', 'T') + '+08:00'` |
