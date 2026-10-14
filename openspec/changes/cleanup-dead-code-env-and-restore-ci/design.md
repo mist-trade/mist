@@ -72,7 +72,7 @@ it('discovers peer workspace plugins when the private workspace is present', () 
 | A5 | `libs/strategy/src/simulation/strategy-simulation.session.ts` | `:271-279` 两个方法 | 无 |
 | A6 | `libs/config/src/validation.schema.ts` | `appEnvSchema` 整块（`:33-41`）；`mistEnvSchema` 内 `redis_server_host/port/db`（`:74-76`） | 无（`allowUnknown: true` 下移除声明不影响任何部署 env） |
 | A7 | `libs/constants/src/market.constants.ts` | `MarketSourceType` / `CandleSessionType` 两个类型（`:11/:28`） | 无 |
-| A8 | 模式联合收敛 | canonical：`RealtimeProductizationMode`（`libs/config/src/realtime-candle.config.ts:7`） | `realtime-candle-health.types.ts:17` 的 `RealtimeCandleProductMode` 改为对 canonical 的类型别名；`realtime-ingress.module.ts:105` 内联字面量替换为 canonical 类型；`validation.schema.ts:331` 的 `RealtimeStrategyMode` 语义不同（strategy 开关）保留但复用同一联合基底 |
+| A8 | 模式联合收敛 | canonical：`RealtimeProductizationMode`（`libs/config/src/realtime-candle.config.ts:7`） | `realtime-candle-health.types.ts:17` 的 `RealtimeCandleProductMode` 改为对 canonical 的类型别名；`realtime-ingress.module.ts:105` 内联字面量替换为 `RealtimeStrategyMode`（canonical 的语义别名，该函数实收 `resolveRealtimeStrategyMode()` 返回值）；`validation.schema.ts:331` 的 `RealtimeStrategyMode` 语义不同（strategy 开关）保留但复用同一联合基底；`apps/mist/src/health/health.vo.ts:18/21` 的 `productizationMode` / `strategyMode` 字段类型同步替换为 canonical / 语义别名（2026-10-15 复验补入，原四处在审计时遗漏了这两个副本） |
 | A9 | `libs/signal/src/runtime/realtime-kernel-pool.ts` | `KernelGroup.capacity` 字段（`:20/:139`） | 无（数据与 `kernel.windowBudget` 等价；`add-pre-market-strategy-hydration` 的容量幂等检查将基于 `windowBudget`） |
 
 删除风险说明：
@@ -80,7 +80,9 @@ it('discovers peer workspace plugins when the private workspace is present', () 
   git 历史可回溯。
 - A6 中 `redis_server_*` 与部署 `mist-deploy` 的 `.env` 无引用（已核实），且 Joi `allowUnknown: true`，
   移除声明不会造成启动校验失败。
-- A8 属治理规则「单一语义键名对齐」的落地（同一概念一个 canonical 类型），不改变任何运行时行为。
+- A8 属治理规则「单一语义键名对齐」的落地（同一概念一个 canonical 类型），不改变任何运行时行为；
+  收敛面 = 全部 5 个类型位置（health VO 两字段为 2026-10-15 复验补入）；`@ApiProperty` 的 `enum`
+  字面量与 Joi `.valid('off','shadow','on')` 属描述符 / 运行时校验字面量，不在收敛面内。
 
 ## 3. 环境变量接线
 
