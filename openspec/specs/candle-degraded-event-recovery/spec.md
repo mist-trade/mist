@@ -1,6 +1,12 @@
 # candle-degraded-event-recovery Specification
 
 ## Purpose
+> [!NOTE] RETIRED / DEPRECATED (2026-10-15 retire-candle-degraded-verdict)
+> The windowed degraded verdict was removed with the OpenTelemetry migration
+> (`introduce-openobserve-otel-foundation`); candle production health is observed from raw OTel
+> gauges (`mist_candle_*`) on the OpenObserve side. The requirements below are kept as the
+> frozen retirement record. See `backend-candle-pipeline-observability`.
+
 Define candle production health as a windowed degraded verdict driven by non-deterministic failure counters with last-failure timestamps, a configured bounded recovery window, tiered monitoring signals and HIL verification of recovery after transient failure.
 ## Requirements
 ### Requirement: Candle Degraded SHALL Reflect Current Production Health, Not Lifetime History
