@@ -14,6 +14,7 @@
   - 动态外部因子插件与私有策略隔离（`support-external-factor-plugins` 归档）
   - Rust Polars 斐波那契指标、因子插件与 TV 工业可视化（`add-chan-fibonacci-overlay` 归档）
   - 死代码/环境断线清理与公开仓 CI 守卫恢复（`cleanup-dead-code-env-and-restore-ci` 归档）
+  - candle 降级判定退役收口：tombstone 冻结 + 死壳清理 + mist-deploy HIL 断言退役（`retire-candle-degraded-verdict` 归档）
 
 ---
 
@@ -34,6 +35,7 @@
 
 | 日期 | Change | 内容与进度 |
 |---|---|---|
+| **10-14** | `retire-candle-degraded-verdict` | 16/16：candle 窗口化降级判定退役（08-09 OTel 迁移删除实现后收口）——live spec tombstone 冻结、`*LastFailureAtMs` 死壳与窗口 env/常量清理、mist-deploy HIL 断言退役 |
 | **10-14** | `cleanup-dead-code-env-and-restore-ci` | 25/25：死代码 A1–A9 清除、`'off'\|'shadow'\|'on'` 联合收敛至 canonical、env 双向接线（5 键补声明 + TDX 心跳消费）、公开仓 CI 守卫恢复（外部插件测试守卫）、全仓 600519/茅台换 000001（mist + mist-fe 含 fixtures 重签） |
 | **10-13** | `add-shanghai-regime-and-left-right-bsp-plugins` | 18/18：上证指数全局牛熊插件（私仓实现）+ 主仓 BSP 标签纯透传 + 展示元数据逐字透传契约（茅台残留清除由 cleanup change 收尾） |
 | **10-12** | `unify-strategy-evaluation-pipeline` | 14/14：统一求值内核 push 化、双 BarSource 适配、RealtimeKernelPool、双时间戳 Migration 026、三链路同构门禁 |
