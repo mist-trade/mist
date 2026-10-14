@@ -9,10 +9,10 @@ describe('PostCloseSyncService', () => {
     const activeSecurities: Security[] = [
       {
         id: 1,
-        code: '600519',
+        code: '000001',
         status: SecurityStatus.ACTIVE,
         sourceConfigs: [
-          { source: DataSource.QMT, enabled: true, formatCode: '600519.SH' },
+          { source: DataSource.QMT, enabled: true, formatCode: '000001.SH' },
         ],
       } as Security,
       {
@@ -37,7 +37,7 @@ describe('PostCloseSyncService', () => {
       getDataSourceForSecurity: jest
         .fn()
         .mockImplementation((sec: Security) =>
-          sec.code === '600519' ? DataSource.QMT : DataSource.TDX,
+          sec.code === '000001' ? DataSource.QMT : DataSource.TDX,
         ),
     };
 
@@ -135,9 +135,9 @@ describe('PostCloseSyncService', () => {
 
     expect(
       dataSourceSelectionService.getDataSourceForSecurity,
-    ).toHaveBeenCalledWith(expect.objectContaining({ code: '600519' }));
+    ).toHaveBeenCalledWith(expect.objectContaining({ code: '000001' }));
     expect(collectorService.collectKForSource).toHaveBeenCalledWith(
-      '600519',
+      '000001',
       Period.DAY,
       expect.any(Date),
       expect.any(Date),
@@ -182,7 +182,7 @@ describe('PostCloseSyncService', () => {
     const { service, collectorService, syncMetrics } = createHarness();
     collectorService.collectKForSource.mockImplementation(
       (code: string, period: Period) => {
-        if (code === '600519' && period === Period.ONE_MIN) {
+        if (code === '000001' && period === Period.ONE_MIN) {
           throw new Error('QMT network socket closed');
         }
         return Promise.resolve(100);
@@ -274,7 +274,7 @@ describe('PostCloseSyncService', () => {
     } = createHarness();
     kRepository.count.mockResolvedValue(0);
     // 300059 清空 sourceConfigs → provider symbol 解析失败 → 跳过该标的，
-    // 600519 正常解析提交
+    // 000001 正常解析提交
     const broken = {
       id: 2,
       code: '300059',
@@ -288,7 +288,7 @@ describe('PostCloseSyncService', () => {
     expect(historyDownloadClient.submitDownloadJob).toHaveBeenCalledTimes(1);
     expect(historyDownloadClient.submitDownloadJob).toHaveBeenCalledWith(
       'qmt',
-      ['600519.SH'],
+      ['000001.SH'],
       expect.anything(),
       expect.anything(),
     );

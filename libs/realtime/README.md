@@ -26,7 +26,7 @@ import {
 } from '@app/realtime';
 
 // Redis Key 构造示例:
-// mist:candle:1m:closed:600519.SH:2026-08-25
+// mist:candle:1m:closed:000001.SH:2026-08-25
 // mist:candle:1m:manifest:2026-08-25
 ```
 

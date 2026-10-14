@@ -13,7 +13,7 @@ export class AddSecuritySourceDto {
   @ApiProperty({
     description:
       'Canonical security code. Provider-formatted inputs are normalized.',
-    example: '600519',
+    example: '000001',
   })
   @IsNotEmpty()
   @IsString()
@@ -25,8 +25,8 @@ export class AddSecuritySourceDto {
 
   @ApiProperty({
     description:
-      'Provider-specific transport code. Required when enabled; TDX/QMT use 600519.SH form.',
-    example: '600519.SH',
+      'Provider-specific transport code. Required when enabled; TDX/QMT use 000001.SH form.',
+    example: '000001.SH',
     required: false,
   })
   @IsOptional()

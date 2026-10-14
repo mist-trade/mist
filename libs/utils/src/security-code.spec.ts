@@ -7,11 +7,11 @@ import {
 
 describe('normalizeSecurityCode', () => {
   it('keeps pure stock codes as canonical internal codes', () => {
-    expect(normalizeSecurityCode('600519')).toBe('600519');
+    expect(normalizeSecurityCode('000001')).toBe('000001');
   });
 
   it.each([
-    ['600519.SH', '600519'],
+    ['000001.SH', '000001'],
     ['002475.sz', '002475'],
     ['  430047.BJ  ', '430047'],
   ])('removes provider market suffix from %s', (input, expected) => {
@@ -19,7 +19,7 @@ describe('normalizeSecurityCode', () => {
   });
 
   it.each([
-    ['SH600519', '600519'],
+    ['SH000001', '000001'],
     ['sz002475', '002475'],
     [' bj430047 ', '430047'],
   ])('removes provider market prefix from %s', (input, expected) => {
@@ -33,7 +33,7 @@ describe('normalizeSecurityCode', () => {
 
 describe('provider format code boundary', () => {
   it.each([
-    [DataSource.TDX, '600519.SH'],
+    [DataSource.TDX, '000001.SH'],
     [DataSource.TDX, '430047.BJ'],
     [DataSource.QMT, '002475.SZ'],
     [DataSource.EAST_MONEY, 'sh000001'],
@@ -42,9 +42,9 @@ describe('provider format code boundary', () => {
   });
 
   it.each([
-    [DataSource.TDX, '600519'],
-    [DataSource.TDX, '600519.sh'],
-    [DataSource.QMT, 'SH600519'],
+    [DataSource.TDX, '000001'],
+    [DataSource.TDX, '000001.sh'],
+    [DataSource.QMT, 'SH000001'],
     [DataSource.QMT, ''],
     [DataSource.EAST_MONEY, '   '],
   ])('rejects invalid %s provider symbol %s', (source, formatCode) => {
@@ -55,24 +55,24 @@ describe('provider format code boundary', () => {
     expect(
       getSecurityFormatCode(
         {
-          code: '600519',
+          code: '000001',
           sourceConfigs: [
             {
               source: DataSource.TDX,
               enabled: true,
-              formatCode: ' 600519.SH ',
+              formatCode: ' 000001.SH ',
             },
           ],
         },
         DataSource.TDX,
       ),
-    ).toBe('600519.SH');
+    ).toBe('000001.SH');
   });
 
   it('does not fall back to canonical Security.code', () => {
     expect(() =>
       getSecurityFormatCode(
-        { code: '600519', sourceConfigs: [] },
+        { code: '000001', sourceConfigs: [] },
         DataSource.TDX,
       ),
     ).toThrow('provider symbol resolution failed');
@@ -82,12 +82,12 @@ describe('provider format code boundary', () => {
     expect(() =>
       getSecurityFormatCode(
         {
-          code: '600519',
+          code: '000001',
           sourceConfigs: [
             {
               source: DataSource.QMT,
               enabled: true,
-              formatCode: '600519',
+              formatCode: '000001',
             },
           ],
         },

@@ -160,8 +160,8 @@ describe('TdxSource', () => {
       const key = (timestamp: Date) => timestamp.getTime();
       const security = {
         id: 1,
-        code: '600519',
-        sourceConfigs: [{ source: AppDataSource.TDX, formatCode: '600519.SH' }],
+        code: '000001',
+        sourceConfigs: [{ source: AppDataSource.TDX, formatCode: '000001.SH' }],
       } as Security;
       let nextId = 20;
       const storedKs = new Map<number, Record<string, unknown>>([
@@ -378,8 +378,8 @@ describe('TdxSource', () => {
         },
       ];
       const security = {
-        code: '600519',
-        sourceConfigs: [{ source: AppDataSource.TDX, formatCode: '600519.SH' }],
+        code: '000001',
+        sourceConfigs: [{ source: AppDataSource.TDX, formatCode: '000001.SH' }],
       } as Security;
 
       await service.saveK(data, security, Period.DAY);
@@ -408,14 +408,14 @@ describe('TdxSource', () => {
           data: {
             items: [
               {
-                symbol: '600519.SH',
+                symbol: '000001.SH',
                 date: '20250101',
                 forwardFactor: 1.2345,
                 backwardFactor: 0.9876,
                 provider: 'tdx',
               },
               {
-                symbol: '600519.SH',
+                symbol: '000001.SH',
                 date: '20250601',
                 bonus: 1.23,
                 provider: 'tdx',
@@ -428,7 +428,7 @@ describe('TdxSource', () => {
       });
 
       const result = await service.fetchDividFactors(
-        '600519.SH',
+        '000001.SH',
         new Date('2025-01-01T00:00:00+08:00'),
         new Date('2025-12-31T00:00:00+08:00'),
       );
@@ -436,7 +436,7 @@ describe('TdxSource', () => {
       expect(mockAxiosPost).toHaveBeenCalledWith(
         '/v1/reference/dividend-factors/query',
         {
-          symbol: '600519.SH',
+          symbol: '000001.SH',
           startTime: '20250101',
           endTime: '20251231',
         },
@@ -455,7 +455,7 @@ describe('TdxSource', () => {
       mockAxiosPost.mockRejectedValueOnce(new Error('tdx timeout'));
 
       const result = await service.fetchDividFactors(
-        '600519.SH',
+        '000001.SH',
         new Date('2025-01-01T00:00:00+08:00'),
         new Date('2025-12-31T00:00:00+08:00'),
       );
@@ -464,7 +464,7 @@ describe('TdxSource', () => {
       expect(mockAxiosPost).toHaveBeenCalledWith(
         '/v1/reference/dividend-factors/query',
         {
-          symbol: '600519.SH',
+          symbol: '000001.SH',
           startTime: '20250101',
           endTime: '20251231',
         },
@@ -492,7 +492,7 @@ describe('TdxSource', () => {
           data: {
             bars: [
               {
-                symbol: '600519.SH',
+                symbol: '000001.SH',
                 period: '1m',
                 barTime: '2026-06-26T09:31:00+08:00',
                 open: 10.1,
@@ -512,8 +512,8 @@ describe('TdxSource', () => {
       });
 
       const result = await service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.ONE_MIN,
         startDate: new Date('2026-06-26T00:00:00+08:00'),
         endDate: new Date('2026-06-26T23:59:59+08:00'),
@@ -522,7 +522,7 @@ describe('TdxSource', () => {
       expect(mockAxiosPost).toHaveBeenCalledWith(
         '/v1/bars/query',
         expect.objectContaining({
-          symbols: ['600519.SH'],
+          symbols: ['000001.SH'],
           // Python /v1 currently accepts the same TDX period tokens as PeriodMappingService.
           period: '1m',
           startTime: '2026-06-25T16:00:00.000Z',
@@ -550,7 +550,7 @@ describe('TdxSource', () => {
       ]
     >([
       [
-        'converts 万元 amount to yuan exactly (600519 daily)',
+        'converts 万元 amount to yuan exactly (000001 daily)',
         { amount: '737346.25', volume: '5512752' },
         { amount: '7373462500', volume: '5512752' },
       ],
@@ -572,7 +572,7 @@ describe('TdxSource', () => {
           data: {
             bars: [
               {
-                symbol: '600519.SH',
+                symbol: '000001.SH',
                 period: '1d',
                 barTime: '2026-07-31T15:00:00+08:00',
                 open: 1350.0,
@@ -593,8 +593,8 @@ describe('TdxSource', () => {
       });
 
       const result = await service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.DAY,
         startDate: new Date('2026-07-31T00:00:00+08:00'),
         endDate: new Date('2026-07-31T23:59:59+08:00'),
@@ -620,7 +620,7 @@ describe('TdxSource', () => {
             data: {
               bars: [
                 {
-                  symbol: '600519.SH',
+                  symbol: '000001.SH',
                   period: '1m',
                   barTime: '2026-06-26T09:31:00+08:00',
                   open: 10.1,
@@ -642,8 +642,8 @@ describe('TdxSource', () => {
 
         await expect(
           service.fetchK({
-            code: '600519',
-            formatCode: '600519.SH',
+            code: '000001',
+            formatCode: '000001.SH',
             period: Period.ONE_MIN,
             startDate: new Date('2026-06-26T00:00:00+08:00'),
             endDate: new Date('2026-06-26T23:59:59+08:00'),
@@ -660,7 +660,7 @@ describe('TdxSource', () => {
           data: {
             bars: [
               {
-                symbol: '600519.SH',
+                symbol: '000001.SH',
                 period: '1h',
                 barTime: '2026-06-26T10:30:00+08:00',
                 open: 1199,
@@ -680,8 +680,8 @@ describe('TdxSource', () => {
       });
 
       await service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.SIXTY_MIN,
         startDate: new Date('2026-06-26T09:30:00+08:00'),
         endDate: new Date('2026-06-26T15:00:00+08:00'),
@@ -703,7 +703,7 @@ describe('TdxSource', () => {
           data: {
             bars: [
               {
-                symbol: '600519.SH',
+                symbol: '000001.SH',
                 period: '1m',
                 barTime: '2026-06-26T09:31:00+08:00',
                 open: 10.1,
@@ -723,8 +723,8 @@ describe('TdxSource', () => {
       });
 
       const rows = await service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.ONE_MIN,
         startDate: new Date('2026-06-26T00:00:00+08:00'),
         endDate: new Date('2026-06-26T23:59:59+08:00'),
@@ -743,7 +743,7 @@ describe('TdxSource', () => {
           data: {
             bars: [
               {
-                symbol: '600519.SH',
+                symbol: '000001.SH',
                 period: '1d',
                 barTime: '2026-06-26T00:00:00+08:00',
                 open: 1199,
@@ -766,8 +766,8 @@ describe('TdxSource', () => {
       });
 
       const result = await service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.DAY,
         startDate: new Date('2026-06-01T00:00:00+08:00'),
         endDate: new Date('2026-06-26T23:59:59+08:00'),
@@ -813,8 +813,8 @@ describe('TdxSource', () => {
 
       await expectBadGatewayWithMessage(
         service.fetchK({
-          code: '600519',
-          formatCode: '600519.SH',
+          code: '000001',
+          formatCode: '000001.SH',
           period: Period.ONE_MIN,
           startDate: new Date('2026-06-26T00:00:00+08:00'),
           endDate: new Date('2026-06-26T23:59:59+08:00'),

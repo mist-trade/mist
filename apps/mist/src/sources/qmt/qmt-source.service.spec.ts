@@ -115,7 +115,7 @@ describe('QmtSource', () => {
         provider: 'qmt',
         data: {
           marketData: {
-            '600519.SH': {
+            '000001.SH': {
               open: { '20260703143000': 11.1 },
               high: { '20260703143000': 11.5 },
               low: { '20260703143000': 10.9 },
@@ -136,8 +136,8 @@ describe('QmtSource', () => {
     });
 
     const rows = await service.fetchK({
-      code: '600519',
-      formatCode: '600519.SH',
+      code: '000001',
+      formatCode: '000001.SH',
       period: Period.THREE_MIN,
       startDate: new Date('2026-07-03T09:30:00+08:00'),
       endDate: new Date('2026-07-03T15:00:00+08:00'),
@@ -156,7 +156,7 @@ describe('QmtSource', () => {
         'openInterest',
         'suspendFlag',
       ]),
-      stock_list: ['600519.SH'],
+      stock_list: ['000001.SH'],
       period: '3m',
       start_time: '20260703093000',
       end_time: '20260703150000',
@@ -192,7 +192,7 @@ describe('QmtSource', () => {
         provider: 'qmt',
         data: {
           marketData: {
-            '600519.SH': {
+            '000001.SH': {
               open: { '20260703143000': 11.1 },
               high: { '20260703143000': 11.5 },
               low: { '20260703143000': 10.9 },
@@ -210,8 +210,8 @@ describe('QmtSource', () => {
 
     await expect(
       service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.THREE_MIN,
         startDate: new Date('2026-07-03T09:30:00+08:00'),
         endDate: new Date('2026-07-03T15:00:00+08:00'),
@@ -227,7 +227,7 @@ describe('QmtSource', () => {
         provider: 'qmt',
         data: {
           marketData: {
-            '600519.SH': {
+            '000001.SH': {
               open: { [rowKey]: 11.1 },
               high: { [rowKey]: 11.5 },
               low: { [rowKey]: 10.9 },
@@ -244,8 +244,8 @@ describe('QmtSource', () => {
     });
 
     const rows = await service.fetchK({
-      code: '600519',
-      formatCode: '600519.SH',
+      code: '000001',
+      formatCode: '000001.SH',
       period: Period.ONE_MIN,
       startDate: new Date('2026-07-03T09:30:00+08:00'),
       endDate: new Date('2026-07-03T15:00:00+08:00'),
@@ -269,7 +269,7 @@ describe('QmtSource', () => {
         provider: 'qmt',
         data: {
           marketData: {
-            '600519.SH': {
+            '000001.SH': {
               open: { [rowKey]: 11.1 },
               high: { [rowKey]: 11.5 },
               low: { [rowKey]: 10.9 },
@@ -287,8 +287,8 @@ describe('QmtSource', () => {
 
     await expect(
       service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.ONE_MIN,
         startDate: new Date('2026-07-03T09:30:00+08:00'),
         endDate: new Date('2026-07-03T15:00:00+08:00'),
@@ -313,7 +313,7 @@ describe('QmtSource', () => {
           provider: 'qmt',
           data: {
             marketData: {
-              '600519.SH': {
+              '000001.SH': {
                 open: { [rowKey]: 11.1 },
                 high: { [rowKey]: 11.5 },
                 low: { [rowKey]: 10.9 },
@@ -331,14 +331,14 @@ describe('QmtSource', () => {
 
       await expect(
         service.fetchK({
-          code: '600519',
-          formatCode: '600519.SH',
+          code: '000001',
+          formatCode: '000001.SH',
           period: Period.ONE_MIN,
           startDate: new Date('2026-07-03T09:30:00+08:00'),
           endDate: new Date('2026-07-03T15:00:00+08:00'),
         }),
       ).rejects.toThrow(
-        `QMT_INVALID_REQUIRED_OHLC: symbol=600519.SH rowKey=${rowKey} invalidFields=close`,
+        `QMT_INVALID_REQUIRED_OHLC: symbol=000001.SH rowKey=${rowKey} invalidFields=close`,
       );
     },
   );
@@ -351,7 +351,7 @@ describe('QmtSource', () => {
         provider: 'qmt',
         data: {
           marketData: {
-            '600519.SH': {
+            '000001.SH': {
               open: { [rowKey]: 0 },
               high: { [rowKey]: 0 },
               low: { [rowKey]: 0 },
@@ -369,8 +369,8 @@ describe('QmtSource', () => {
 
     await expect(
       service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.ONE_MIN,
         startDate: new Date('2026-07-03T09:30:00+08:00'),
         endDate: new Date('2026-07-03T15:00:00+08:00'),
@@ -394,7 +394,7 @@ describe('QmtSource', () => {
         provider: 'qmt',
         data: {
           marketData: {
-            '600519.SH': {
+            '000001.SH': {
               open: { [rowKey]: 11.1 },
               high: { [rowKey]: 11.5 },
               low: { [rowKey]: 10.9 },
@@ -411,8 +411,8 @@ describe('QmtSource', () => {
     });
 
     const rows = await service.fetchK({
-      code: '600519',
-      formatCode: '600519.SH',
+      code: '000001',
+      formatCode: '000001.SH',
       period: Period.ONE_MIN,
       startDate: new Date('2026-07-03T09:30:00+08:00'),
       endDate: new Date('2026-07-03T15:00:00+08:00'),
@@ -427,15 +427,15 @@ describe('QmtSource', () => {
       data: {
         ok: true,
         provider: 'qmt',
-        data: { marketData: { '600519.SH': {} } },
+        data: { marketData: { '000001.SH': {} } },
         meta: null,
         error: null,
       },
     });
 
     await service.fetchK({
-      code: '600519',
-      formatCode: '600519.SH',
+      code: '000001',
+      formatCode: '000001.SH',
       period: Period.DAY,
       startDate: new Date('2026-07-01T00:00:00+08:00'),
       endDate: new Date('2026-07-04T00:00:00+08:00'),
@@ -470,8 +470,8 @@ describe('QmtSource', () => {
 
     await expect(
       service.fetchK({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.ONE_MIN,
         startDate: new Date('2026-07-03T09:30:00+08:00'),
         endDate: new Date('2026-07-03T15:00:00+08:00'),
@@ -502,8 +502,8 @@ describe('QmtSource', () => {
     ];
     const security = {
       id: 1,
-      code: '600519',
-      sourceConfigs: [{ source: DataSource.QMT, formatCode: '600519.SH' }],
+      code: '000001',
+      sourceConfigs: [{ source: DataSource.QMT, formatCode: '000001.SH' }],
     } as Security;
     const manager = {
       create: jest.fn((entity, payload) => ({ entity, ...payload })),

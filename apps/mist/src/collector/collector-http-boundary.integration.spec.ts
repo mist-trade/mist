@@ -37,7 +37,7 @@ describe('Collector HTTP error boundary integration', () => {
       collectorService,
       timezoneService as never,
     );
-    const security = { id: 1, code: '600519' };
+    const security = { id: 1, code: '000001' };
 
     const moduleRef = await Test.createTestingModule({
       imports: [HttpTransportModule],
@@ -79,7 +79,7 @@ describe('Collector HTTP error boundary integration', () => {
     const response = await request(app.getHttpServer())
       .post('/v1/collector/collect')
       .send({
-        code: '600519',
+        code: '000001',
         period: Period.ONE_MIN,
         source: DataSource.EAST_MONEY,
         startDate: '2026-08-03 09:30:00',

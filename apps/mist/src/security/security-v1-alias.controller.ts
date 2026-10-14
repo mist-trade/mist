@@ -67,7 +67,7 @@ export class SecurityV1AliasController {
     name: 'code',
     description:
       'Canonical security code; provider-formatted inputs are normalized',
-    example: '600519',
+    example: '000001',
   })
   @ApiEnvelopeResponse({
     status: 200,
@@ -136,7 +136,7 @@ export class SecurityV1AliasController {
     name: 'code',
     description:
       'Canonical security code; provider-formatted inputs are normalized',
-    example: '600519',
+    example: '000001',
   })
   @ApiEnvelopeResponse({
     status: 200,
@@ -158,7 +158,7 @@ export class SecurityV1AliasController {
     name: 'code',
     description:
       'Canonical security code to deactivate; provider-formatted inputs are normalized',
-    example: '600519',
+    example: '000001',
   })
   @ApiEnvelopeResponse({
     status: 200,
@@ -180,7 +180,7 @@ export class SecurityV1AliasController {
     name: 'code',
     description:
       'Canonical security code to activate; provider-formatted inputs are normalized',
-    example: '600519',
+    example: '000001',
   })
   @ApiEnvelopeResponse({
     status: 200,

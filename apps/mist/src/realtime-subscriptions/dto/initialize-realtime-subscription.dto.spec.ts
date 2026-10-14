@@ -13,11 +13,11 @@ describe('InitializeRealtimeSubscriptionDto', () => {
     await expect(
       errors({
         mode: 'new',
-        securityCode: '600519',
-        securityName: '贵州茅台',
+        securityCode: '000001',
+        securityName: '上证指数',
         securityType: 'STOCK',
         source: 'qmt',
-        providerSymbol: '600519.SH',
+        providerSymbol: '000001.SH',
       }),
     ).resolves.toHaveLength(0);
   });
@@ -44,27 +44,27 @@ describe('InitializeRealtimeSubscriptionDto', () => {
   it.each([
     {
       mode: 'new',
-      securityCode: '600519',
-      securityName: '贵州茅台',
+      securityCode: '000001',
+      securityName: '上证指数',
       securityType: 'STOCK',
       source: 'mqmt',
-      providerSymbol: '600519.SH',
+      providerSymbol: '000001.SH',
     },
     {
       mode: 'new',
-      securityCode: '600519',
-      securityName: '贵州茅台',
+      securityCode: '000001',
+      securityName: '上证指数',
       securityType: 'STOCK',
       source: 'tdx',
-      providerSymbol: '600519.sh',
+      providerSymbol: '000001.sh',
     },
     {
       mode: 'new',
-      securityCode: '600519',
-      securityName: '贵州茅台',
+      securityCode: '000001',
+      securityName: '上证指数',
       securityType: 'STOCK',
       source: 'tdx',
-      providerSymbol: '600519.SH',
+      providerSymbol: '000001.SH',
       securitySourceConfigId: 17,
     },
     { mode: 'existing', securitySourceConfigId: 17, source: 'qmt' },

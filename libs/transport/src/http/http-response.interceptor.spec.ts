@@ -53,7 +53,7 @@ describe('HttpResponseInterceptor unit', () => {
   it('wraps standard endpoint responses in an API envelope', async () => {
     const context = createMockContext('/v1/securities');
     const next: CallHandler = {
-      handle: () => of({ items: ['600519.SH'] }),
+      handle: () => of({ items: ['000001.SH'] }),
     };
 
     const result = (await lastValueFrom(
@@ -64,7 +64,7 @@ describe('HttpResponseInterceptor unit', () => {
       success: true,
       statusCode: 200,
       message: 'SUCCESS',
-      data: { items: ['600519.SH'] },
+      data: { items: ['000001.SH'] },
       path: '/v1/securities',
     });
     expect(result.requestId).toMatch(/^http-[0-9a-f-]{36}$/);

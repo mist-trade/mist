@@ -36,8 +36,8 @@ function assignmentFixture(
 ): RealtimeSubscriptionAssignment {
   const security = Object.assign(new Security(), {
     id: 1,
-    code: '600519',
-    name: '贵州茅台',
+    code: '000001',
+    name: '上证指数',
     type: SecurityType.STOCK,
     status: SecurityStatus.ACTIVE,
   });
@@ -46,7 +46,7 @@ function assignmentFixture(
     securityId: 1,
     security,
     source: DataSource.QMT,
-    formatCode: '600519.SH',
+    formatCode: '000001.SH',
     enabled: true,
   });
   return Object.assign(new RealtimeSubscriptionAssignment(), {
@@ -107,11 +107,11 @@ describe('RealtimeSubscriptionService', () => {
 
     const result = await service.initialize({
       mode: 'new',
-      securityCode: '600519',
-      securityName: '贵州茅台',
+      securityCode: '000001',
+      securityName: '上证指数',
       securityType: SecurityType.STOCK,
       source: DataSource.QMT,
-      providerSymbol: '600519.SH',
+      providerSymbol: '000001.SH',
     });
 
     expect(dataSource.transaction).toHaveBeenCalledTimes(1);
@@ -119,9 +119,9 @@ describe('RealtimeSubscriptionService', () => {
       assignmentId: 8,
       securityId: 1,
       securitySourceConfigId: 17,
-      securityCode: '600519',
+      securityCode: '000001',
       source: DataSource.QMT,
-      providerSymbol: '600519.SH',
+      providerSymbol: '000001.SH',
       desired: true,
       active: null,
       activeEvidence: null,
@@ -266,7 +266,7 @@ describe('RealtimeSubscriptionService', () => {
   it('rejects an existing config with an invalid provider symbol', async () => {
     const security = Object.assign(new Security(), {
       id: 1,
-      code: '600519',
+      code: '000001',
       type: SecurityType.STOCK,
       status: SecurityStatus.ACTIVE,
     });
@@ -275,7 +275,7 @@ describe('RealtimeSubscriptionService', () => {
       securityId: 1,
       security,
       source: DataSource.QMT,
-      formatCode: 'SH600519',
+      formatCode: 'SH000001',
       enabled: true,
     });
     const lockBuilder = chain({ getMany: jest.fn().mockResolvedValue([]) });
@@ -349,7 +349,7 @@ describe('RealtimeSubscriptionService', () => {
     expect(result).toMatchObject({
       assignmentId: 8,
       securitySourceConfigId: 17,
-      providerSymbol: '600519.SH',
+      providerSymbol: '000001.SH',
       source: DataSource.QMT,
     });
     expect(manager.create).toHaveBeenCalledWith(
@@ -381,11 +381,11 @@ describe('RealtimeSubscriptionService', () => {
 
     const result = await service.initialize({
       mode: 'new',
-      securityCode: '600519',
-      securityName: '贵州茅台',
+      securityCode: '000001',
+      securityName: '上证指数',
       securityType: SecurityType.STOCK,
       source: DataSource.TDX,
-      providerSymbol: '600519.SH',
+      providerSymbol: '000001.SH',
     });
 
     expect(result).toMatchObject({
@@ -438,7 +438,7 @@ describe('RealtimeSubscriptionService', () => {
     const assignment = assignmentFixture();
     assignment.security.status = SecurityStatus.SUSPENDED;
     const observations = new RealtimeSubscriptionLifecycleObservationStore();
-    observations.replaceActive(DataSource.QMT, ['600519.SH']);
+    observations.replaceActive(DataSource.QMT, ['000001.SH']);
     observations.succeed(DataSource.QMT);
     const repository = {
       find: jest.fn().mockResolvedValue([assignment]),

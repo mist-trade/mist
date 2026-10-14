@@ -93,7 +93,7 @@ describe('formal realtime schema-v2 ingress contract', () => {
             ? new TdxRealtimeClient(
                 new ConfigService({ TDX_BASE_URL: 'http://127.0.0.1:9001' }),
                 store as TdxRealtimeStore,
-                resolver({ '600519.SH': 600519 }) as never,
+                resolver({ '000001.SH': 1 }) as never,
                 undefined,
                 ingress,
               )
@@ -112,7 +112,7 @@ describe('formal realtime schema-v2 ingress contract', () => {
 
         expect(syncSpy).toHaveBeenCalledTimes(1);
         expect(syncSpy).toHaveBeenCalledWith(
-          provider === 'tdx' ? ['600519.SH'] : ['300502.SZ'],
+          provider === 'tdx' ? ['000001.SH'] : ['300502.SZ'],
         );
       } finally {
         delete process.env.MIST_MOCK_MODE;
@@ -131,7 +131,7 @@ describe('formal realtime schema-v2 ingress contract', () => {
           ? new TdxRealtimeClient(
               new ConfigService({ TDX_BASE_URL: 'http://127.0.0.1:9001' }),
               store as TdxRealtimeStore,
-              resolver({ '600519.SH': 600519 }) as never,
+              resolver({ '000001.SH': 1 }) as never,
               undefined,
               ingress,
             )

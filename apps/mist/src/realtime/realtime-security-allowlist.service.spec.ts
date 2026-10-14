@@ -103,17 +103,17 @@ describe('RealtimeSecurityAllowlistService', () => {
     try {
       const { repository } = repositoryReturning([]);
       const service = new RealtimeSecurityAllowlistService(
-        new ConfigService({ TDX_REALTIME_ALLOWLIST: '600519.SH' }),
+        new ConfigService({ TDX_REALTIME_ALLOWLIST: '000001.SH' }),
         repository,
       );
 
       await service.initialize(DataSource.TDX, 'TDX_REALTIME_ALLOWLIST');
 
-      expect(service.isAuthorized(DataSource.TDX, '600519.SH')).toBe(true);
-      expect(service.isAuthorized(DataSource.TDX, '600519.sh')).toBe(false);
+      expect(service.isAuthorized(DataSource.TDX, '000001.SH')).toBe(true);
+      expect(service.isAuthorized(DataSource.TDX, '000001.sh')).toBe(false);
       expect(repository.createQueryBuilder).not.toHaveBeenCalled();
-      expect(service.resolve(DataSource.TDX, '600519.SH')).toEqual({
-        formatCode: '600519.SH',
+      expect(service.resolve(DataSource.TDX, '000001.SH')).toEqual({
+        formatCode: '000001.SH',
         securityId: 1,
       });
     } finally {
@@ -132,7 +132,7 @@ describe('RealtimeSecurityAllowlistService', () => {
 
       await service.initialize(DataSource.TDX, 'TDX_REALTIME_ALLOWLIST');
 
-      expect(service.isAuthorized(DataSource.TDX, '600519.SH')).toBe(false);
+      expect(service.isAuthorized(DataSource.TDX, '000001.SH')).toBe(false);
       expect(repository.createQueryBuilder).not.toHaveBeenCalled();
     } finally {
       delete process.env.MIST_MOCK_MODE;

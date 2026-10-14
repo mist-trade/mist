@@ -32,7 +32,7 @@ describe('ChanCore HTTP mapper', () => {
     const time = new Date('2026-07-01T01:31:00.000Z');
     const coreK = toChanK({
       id: 7,
-      symbol: '600519',
+      symbol: '000001',
       time,
       open: 10,
       high: 12,
@@ -44,7 +44,7 @@ describe('ChanCore HTTP mapper', () => {
 
     expect(coreK).toEqual({
       id: 7,
-      symbol: '600519',
+      symbol: '000001',
       time,
       open: 10,
       high: 12,
@@ -59,7 +59,7 @@ describe('ChanCore HTTP mapper', () => {
   it('maps merged K into isolated canonical high/low output', () => {
     const coreK = toChanK({
       id: 7,
-      symbol: '600519',
+      symbol: '000001',
       time: new Date('2026-07-01T01:31:00.000Z'),
       open: 10,
       high: 12,

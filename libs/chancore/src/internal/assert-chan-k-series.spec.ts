@@ -4,7 +4,7 @@ import { assertChanKSeries } from './assert-chan-k-series';
 
 const baseK: ChanK = {
   id: 7,
-  symbol: '600519',
+  symbol: '000001',
   time: new Date('2026-07-01T01:31:00.000Z'),
   open: 1400,
   high: 1410,

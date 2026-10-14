@@ -22,10 +22,10 @@ export class NewRealtimeSubscriptionDto {
   @ApiProperty({ enum: ['new'] })
   mode!: 'new';
 
-  @ApiProperty({ pattern: '^[0-9]{6}$', example: '600519' })
+  @ApiProperty({ pattern: '^[0-9]{6}$', example: '000001' })
   securityCode!: string;
 
-  @ApiProperty({ minLength: 1, maxLength: 100, example: '贵州茅台' })
+  @ApiProperty({ minLength: 1, maxLength: 100, example: '上证指数' })
   securityName!: string;
 
   @ApiProperty({ enum: [SecurityType.STOCK, SecurityType.INDEX] })
@@ -36,7 +36,7 @@ export class NewRealtimeSubscriptionDto {
 
   @ApiProperty({
     pattern: '^[0-9]{6}\\.(SH|SZ|BJ)$',
-    example: '600519.SH',
+    example: '000001.SH',
   })
   providerSymbol!: string;
 }
@@ -92,13 +92,13 @@ export class InitializeRealtimeSubscriptionDto {
   @Validate(RealtimeSubscriptionInitializationShapeConstraint)
   mode!: RealtimeSubscriptionInitializationMode;
 
-  @ApiPropertyOptional({ pattern: '^[0-9]{6}$', example: '600519' })
+  @ApiPropertyOptional({ pattern: '^[0-9]{6}$', example: '000001' })
   @IsOptional()
   @IsString()
   @Matches(/^[0-9]{6}$/)
   securityCode?: string;
 
-  @ApiPropertyOptional({ minLength: 1, maxLength: 100, example: '贵州茅台' })
+  @ApiPropertyOptional({ minLength: 1, maxLength: 100, example: '上证指数' })
   @IsOptional()
   @IsString()
   @MinLength(1)
@@ -117,7 +117,7 @@ export class InitializeRealtimeSubscriptionDto {
 
   @ApiPropertyOptional({
     pattern: '^[0-9]{6}\\.(SH|SZ|BJ)$',
-    example: '600519.SH',
+    example: '000001.SH',
   })
   @IsOptional()
   @IsString()

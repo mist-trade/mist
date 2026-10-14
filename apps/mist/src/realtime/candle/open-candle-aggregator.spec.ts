@@ -600,7 +600,7 @@ describe('toSealed VWAP bound correction', () => {
     return {
       tradingDay: '2026-08-11',
       source: 'tdx',
-      providerSymbol: '600519.SH',
+      providerSymbol: '000001.SH',
       securityId: 1,
       session: 'morning',
       bucketStartMs: 1786425000000,

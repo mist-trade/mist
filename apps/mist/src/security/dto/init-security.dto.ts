@@ -6,7 +6,7 @@ export class InitSecurityDto {
   @ApiProperty({
     description:
       'Canonical security code. Provider-formatted inputs are normalized.',
-    example: '600519',
+    example: '000001',
   })
   @IsNotEmpty()
   @IsString()

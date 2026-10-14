@@ -19,7 +19,7 @@ describe('StrategyController', () => {
     const { controller, service } = createHarness();
     const createDto = {
       name: 'Strategy',
-      targetUniverse: ['600519'],
+      targetUniverse: ['000001'],
       periods: [1440],
       sources: ['tdx'],
       rule: { field: 'k.close', operator: 'gt', value: 10 },

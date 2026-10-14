@@ -106,7 +106,7 @@ describe('StrategyDefinitionService', () => {
   const createDto = {
     name: 'MACD histogram breakout',
     description: 'Track MACD histogram crosses above zero',
-    targetUniverse: ['600519', '000001'],
+    targetUniverse: ['000001', '000001'],
     periods: [Period.DAY],
     sources: [DataSource.TDX],
     rule: {

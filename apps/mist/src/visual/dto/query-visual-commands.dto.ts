@@ -5,7 +5,7 @@ import { DataSource, Period } from '@app/shared-data';
 
 export class QueryVisualCommandsDto {
   @ApiProperty({
-    description: '证券代码，例如 000001、600519',
+    description: '证券代码，例如 000001',
     example: '000001',
   })
   @IsString()

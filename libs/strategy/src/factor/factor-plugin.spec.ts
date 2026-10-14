@@ -88,7 +88,7 @@ describe('Phase 1: Factor Plugins & Registry', () => {
     it('returns BUY when ROE and debt ratio are safe', async () => {
       const context: FactorContext = {
         securityId: 1,
-        securityCode: '600519',
+        securityCode: '000001',
         timestamp: new Date(),
         period: 1440,
         bars: [],

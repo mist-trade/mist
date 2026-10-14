@@ -167,7 +167,7 @@ describe('ChanCore public facade', () => {
 function makeK(overrides: Partial<ChanK> = {}): ChanK {
   return {
     id: 1,
-    symbol: '600519',
+    symbol: '000001',
     time: new Date('2026-07-01T01:31:00.000Z'),
     open: 5,
     high: 10,

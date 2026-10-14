@@ -48,7 +48,7 @@ describe('QmtCollectionStrategy', () => {
   });
 
   it('passes manual collection through CollectorService with DataSource.QMT', async () => {
-    const security = createSecurity('600519');
+    const security = createSecurity('000001');
     const startDate = new Date('2026-07-03T09:30:00+08:00');
     const endDate = new Date('2026-07-03T15:00:00+08:00');
 
@@ -69,7 +69,7 @@ describe('QmtCollectionStrategy', () => {
   });
 
   it('calculates scheduled candle boundaries before collecting from QMT', async () => {
-    const security = createSecurity('600519');
+    const security = createSecurity('000001');
 
     await strategy.collectScheduledCandle(
       security as any,

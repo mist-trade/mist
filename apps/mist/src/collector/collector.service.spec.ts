@@ -365,7 +365,7 @@ describe('CollectorService', () => {
         sourceConfigs: [
           {
             source: DataSource.QMT,
-            formatCode: '600519.SH',
+            formatCode: '000001.SH',
             enabled: true,
           },
         ],
@@ -386,7 +386,7 @@ describe('CollectorService', () => {
       ]);
 
       const count = await service.collectKForSource(
-        '600519',
+        '000001',
         Period.THREE_MIN,
         new Date('2026-07-03T09:30:00+08:00'),
         new Date('2026-07-03T15:00:00+08:00'),
@@ -395,8 +395,8 @@ describe('CollectorService', () => {
 
       expect(count).toBe(1);
       expect(mockQmtSource.fetchK).toHaveBeenCalledWith({
-        code: '600519',
-        formatCode: '600519.SH',
+        code: '000001',
+        formatCode: '000001.SH',
         period: Period.THREE_MIN,
         startDate: new Date('2026-07-03T09:30:00+08:00'),
         endDate: new Date('2026-07-03T15:00:00+08:00'),

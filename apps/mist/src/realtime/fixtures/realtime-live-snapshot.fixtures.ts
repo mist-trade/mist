@@ -60,7 +60,7 @@ export const REALTIME_LIVE_SNAPSHOT_FIXTURES: readonly RealtimeLiveSnapshotFixtu
       evidenceRun: '30882148246',
       source: 'qmt',
       securityId: 1,
-      providerSymbol: '600519.SH',
+      providerSymbol: '000001.SH',
       capturedAt: '2026-08-04T13:54:48.576157+08:00',
       expectedEventTime: '2026-08-04T05:54:49.000Z',
       expectedCumulativeVolume: '2820400',

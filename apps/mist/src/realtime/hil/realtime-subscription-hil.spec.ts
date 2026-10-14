@@ -20,16 +20,16 @@ describe('realtime subscription HIL operation sequence', () => {
     try {
       writeFileSync(
         fixturePath,
-        JSON.stringify({ symbol: '600519.SH', nativePayload: {} }),
+        JSON.stringify({ symbol: '000001.SH', nativePayload: {} }),
       );
 
       expect(() =>
         requireMatchingRawFixtureSymbol(fixturePath, '600030.SH'),
       ).toThrow(
-        'HIL raw fixture symbol 600519.SH does not match requested symbol 600030.SH',
+        'HIL raw fixture symbol 000001.SH does not match requested symbol 600030.SH',
       );
-      expect(requireMatchingRawFixtureSymbol(fixturePath, '600519.SH')).toBe(
-        '600519.SH',
+      expect(requireMatchingRawFixtureSymbol(fixturePath, '000001.SH')).toBe(
+        '000001.SH',
       );
     } finally {
       rmSync(directory, { recursive: true, force: true });
@@ -398,7 +398,7 @@ describe('realtime subscription HIL operation sequence', () => {
       client,
       'tdx',
       '600030.SH',
-      '600519.SH',
+      '000001.SH',
     );
 
     expect(
@@ -425,7 +425,7 @@ describe('realtime subscription HIL operation sequence', () => {
     const client: RealtimeSubscriptionControl = {
       getSubscriptions: async () => {
         if (state === 'overlay') {
-          return { success: ['600030.SH', '600519.SH'] };
+          return { success: ['600030.SH', '000001.SH'] };
         }
         if (state === 'whole') {
           return { success: ['600030.SH'] };
@@ -435,7 +435,7 @@ describe('realtime subscription HIL operation sequence', () => {
           return {
             success:
               afterUnsubscribeReads === 2
-                ? ['600030.SH', '600519.SH']
+                ? ['600030.SH', '000001.SH']
                 : ['600030.SH'],
           };
         }
@@ -459,7 +459,7 @@ describe('realtime subscription HIL operation sequence', () => {
       client,
       'tdx',
       '600030.SH',
-      '600519.SH',
+      '000001.SH',
     );
 
     expect(evidence.at(-1)).toEqual({
