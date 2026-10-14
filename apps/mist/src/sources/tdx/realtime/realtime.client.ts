@@ -31,6 +31,7 @@ import {
   DEFAULT_TDX_BASE_URL,
   DEFAULT_TDX_WS_CLIENT_ID,
   DEFAULT_WS_RECONNECT_DELAY_MS,
+  DEFAULT_WS_HEARTBEAT_INTERVAL_MS,
   DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS,
   CONTROL_REQUEST_TYPES,
   CONTROL_RESPONSE_TYPES,
@@ -70,6 +71,7 @@ export class TdxRealtimeClient
   private readonly wsUrl: string;
   private readonly reconnectDelayMs: number;
   private readonly controlTimeoutMs: number;
+  private readonly heartbeatIntervalMs: number;
   private ws: WebSocket | null = null;
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -101,6 +103,10 @@ export class TdxRealtimeClient
     this.controlTimeoutMs = config.get<number>(
       'TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS',
       DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS,
+    );
+    this.heartbeatIntervalMs = config.get<number>(
+      'TDX_WS_HEARTBEAT_INTERVAL_MS',
+      DEFAULT_WS_HEARTBEAT_INTERVAL_MS,
     );
     void desiredPoster;
   }
@@ -228,7 +234,7 @@ export class TdxRealtimeClient
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({ type: 'ping' }));
         }
-      }, 30_000);
+      }, this.heartbeatIntervalMs);
     });
     this.ws.on('message', (data: WebSocket.RawData) => {
       this.lastMessageAt = new Date().toISOString();

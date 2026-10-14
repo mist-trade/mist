@@ -31,6 +31,7 @@ import {
   DEFAULT_QMT_BASE_URL,
   DEFAULT_QMT_WS_CLIENT_ID,
   DEFAULT_WS_RECONNECT_DELAY_MS,
+  DEFAULT_WS_HEARTBEAT_INTERVAL_MS,
   DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS,
   CONTROL_REQUEST_TYPES,
   CONTROL_RESPONSE_TYPES,
@@ -220,7 +221,7 @@ export class QmtRealtimeClient
         if (this.ws?.readyState === WebSocket.OPEN) {
           this.ws.send(JSON.stringify({ type: 'ping' }));
         }
-      }, 30_000);
+      }, DEFAULT_WS_HEARTBEAT_INTERVAL_MS);
     });
     this.ws.on('message', (data: WebSocket.RawData) => {
       this.lastMessageAt = new Date().toISOString();

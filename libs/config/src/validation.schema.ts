@@ -93,6 +93,12 @@ export const mistEnvSchema = commonEnvSchema
       .default(30000)
       .description('TDX WebSocket heartbeat interval in milliseconds'),
 
+    TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS: Joi.number()
+      .integer()
+      .positive()
+      .default(10_000)
+      .description('TDX subscription control request timeout in milliseconds'),
+
     TDX_REALTIME_MODE: Joi.string()
       .valid('off', 'builtin')
       .default('builtin')
@@ -116,6 +122,12 @@ export const mistEnvSchema = commonEnvSchema
       .positive()
       .default(5000)
       .description('QMT WebSocket reconnect delay in milliseconds'),
+
+    QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS: Joi.number()
+      .integer()
+      .positive()
+      .default(10_000)
+      .description('QMT subscription control request timeout in milliseconds'),
 
     QMT_REALTIME_MODE: Joi.string()
       .valid('off', 'builtin')
@@ -153,6 +165,14 @@ export const mistEnvSchema = commonEnvSchema
       .positive()
       .default(30_000)
       .description('Overall candle_finalized worker deadline in milliseconds'),
+
+    REALTIME_RECONCILE_INTERVAL_MS: Joi.number()
+      .integer()
+      .positive()
+      .default(60_000)
+      .description(
+        'Realtime subscription reconciliation interval in milliseconds',
+      ),
 
     SIGNAL_RPC_HOST: Joi.string().hostname().default('signal'),
     SIGNAL_RPC_PORT: Joi.number().port().default(9010),
@@ -230,6 +250,12 @@ export const chanEnvSchema = commonEnvSchema.append({
  */
 export const scheduleEnvSchema = commonEnvSchema.append({
   PORT: Joi.number().port().default(8003),
+  SIGNAL_HEALTH_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .default('http://signal:8010/health'),
+  BACKEND_HEALTH_URL: Joi.string()
+    .uri({ scheme: ['http', 'https'] })
+    .default('http://mist-backend:8001/health'),
   NOTIFICATION_FEISHU_WEBHOOK: Joi.string().uri().allow('').default(''),
   NOTIFICATION_FEISHU_SECRET: Joi.string().allow('').default(''),
   OO_ALERT_FEISHU_WEBHOOK: Joi.string().uri().allow('').default(''),

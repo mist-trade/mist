@@ -2,6 +2,7 @@ import {
   backtestEnvSchema,
   isMockMode,
   mistEnvSchema,
+  scheduleEnvSchema,
 } from './validation.schema';
 
 const baseEnv = {
@@ -217,5 +218,22 @@ describe('isMockMode', () => {
   it('returns false when MIST_MOCK_MODE is unset', () => {
     delete process.env.MIST_MOCK_MODE;
     expect(isMockMode()).toBe(false);
+  });
+});
+
+describe('env wiring defaults (cleanup-dead-code-env-and-restore-ci)', () => {
+  it('defaults subscription control timeouts and reconcile interval to code fallbacks', () => {
+    const { error, value } = mistEnvSchema.validate(baseEnv);
+    expect(error).toBeUndefined();
+    expect(value.REALTIME_RECONCILE_INTERVAL_MS).toBe(60_000);
+    expect(value.TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS).toBe(10_000);
+    expect(value.QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS).toBe(10_000);
+  });
+
+  it('defaults pre-market inspection health endpoints', () => {
+    const { error, value } = scheduleEnvSchema.validate(baseEnv);
+    expect(error).toBeUndefined();
+    expect(value.SIGNAL_HEALTH_URL).toBe('http://signal:8010/health');
+    expect(value.BACKEND_HEALTH_URL).toBe('http://mist-backend:8001/health');
   });
 });

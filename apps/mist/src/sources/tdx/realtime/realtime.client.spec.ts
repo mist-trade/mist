@@ -60,8 +60,10 @@ function buildFrame(native: Record<string, unknown>) {
   };
 }
 
-function createClient() {
-  const config = { get: () => undefined } as unknown as ConfigService;
+function createClient(values: Record<string, unknown> = {}) {
+  const config = {
+    get: (key: string, fallback?: unknown) => values[key] ?? fallback,
+  } as unknown as ConfigService;
   const store = {
     markConnected: jest.fn(),
     markDisconnected: jest.fn(),
@@ -266,5 +268,29 @@ describe('TdxRealtimeClient WS lifecycle logging', () => {
     expect(ingest).toContain('asOf=2026-07-22T10:00:00');
     expect(ingest).toContain('volume=10');
     expect(ingest).toContain('amount=100');
+  });
+
+  it('schedules heartbeat with the configured TDX_WS_HEARTBEAT_INTERVAL_MS', () => {
+    const setIntervalSpy = jest.spyOn(global, 'setInterval');
+    const { client } = createClient({ TDX_WS_HEARTBEAT_INTERVAL_MS: 12_345 });
+    client.onModuleInit();
+    const ws = mockInstances[0] as {
+      emit: (event: string, ...args: unknown[]) => void;
+    };
+    ws.emit('open');
+
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 12_345);
+  });
+
+  it('defaults the heartbeat interval to 30_000 when unconfigured', () => {
+    const setIntervalSpy = jest.spyOn(global, 'setInterval');
+    const { client } = createClient();
+    client.onModuleInit();
+    const ws = mockInstances[0] as {
+      emit: (event: string, ...args: unknown[]) => void;
+    };
+    ws.emit('open');
+
+    expect(setIntervalSpy).toHaveBeenCalledWith(expect.any(Function), 30_000);
   });
 });
