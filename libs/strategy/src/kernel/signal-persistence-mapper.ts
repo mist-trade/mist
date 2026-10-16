@@ -21,6 +21,7 @@ export type PersistableKernelSignal = Pick<
   readonly confidenceLevel: KernelSignal['confidenceLevel'] | null;
   readonly triggerTime?: string;
   readonly pivotTime?: string | Date | null;
+  readonly pivotPrice?: number | null;
   readonly decisionTrace?: Readonly<Record<string, unknown>> | null;
   readonly contextSnapshot?: Readonly<Record<string, unknown>>;
   readonly ruleSnapshot?: Readonly<Record<string, unknown>>;

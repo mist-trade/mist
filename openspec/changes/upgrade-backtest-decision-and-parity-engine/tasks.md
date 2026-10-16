@@ -43,26 +43,26 @@
 
 ## Phase 1: 修改原决策树与信号层，去掉关于未来函数的限制（核心任务 1）
 
-- [ ] **1.1 决策树与信号契约解绑虚拟撮合依赖**
+- [x] **1.1 决策树与信号契约解绑虚拟撮合依赖**
   - 审视并改造 `DecisionResult` 与 `KernelSignal`：剥离将当根 Bar 收盘价强行当作“虚拟撮合成交价”的语义；
   - 决策树和统一求值内核聚焦于“纯观点表达与证据提取”：产出 `action`（`BUY` / `SELL`）、`confidence` 与 `evidence`（包含用于下游止损锚定的结构点位，如笔底、中枢 `zd`、SMC 订单块等）；
   - 去除决策流中对下游交易假设的冗余过滤。
-- [ ] **1.2 因子插件责任松绑（卸除交易级防重游标）**
+- [x] **1.2 因子插件责任松绑（卸除交易级防重游标）**
   - 梳理 `libs/strategy/src/plugin/`（重点为 `ChanBspFactorPlugin`）：
     - 插件内部游标保留形态纯数学去重，**彻底卸除跨 Bar 的交易开仓防重逻辑**；
     - 明确开仓与加仓的过滤由下游单标的持仓状态机（`Holding` 状态拦截）承担。
-- [ ] **1.3 重新定界双时间戳与数据因果律门禁**
+- [x] **1.3 重新定界双时间戳与数据因果律门禁**
   - 重构 `libs/strategy/src/strategy-dual-timestamp.guard.spec.ts`：
     - 明确区分“纯数据因果律”（时序滑窗严禁偷看未来 K 线，刚性保留）与“交易因果律”（移交 `TradingEngine` 处理）；
     - `signalTime` 回归为纯粹的决策确立时间，`pivotTime` 为几何特征时间；
     - 确保架构守门测试在松绑虚拟成交限制的同时，依然能 100% 拦截数据未来函数。
-- [ ] **1.4 Phase 1 单元测试回归**
+- [x] **1.4 Phase 1 单元测试回归**
   - 运行 `pnpm -C mist test libs/strategy`，确保决策流单测、因子插件单测全部通过。
-- [ ] **1.G Phase 1 准出门禁与人机断点 (Gate 1 Checkpoint)**
-  - [ ] 自动化核验：`pnpm -C mist typecheck` 0 报错；
-  - [ ] 策略与插件单测全绿：`pnpm -C mist test libs/strategy`；
-  - [ ] 架构门禁通过：`strategy-dual-timestamp.guard.spec.ts` PASS；
-  - [ ] 输出《Phase 1 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可进入 Phase 2。
+- [x] **1.G Phase 1 准出门禁与人机断点 (Gate 1 Checkpoint)**
+  - [x] 自动化核验：`pnpm -C mist typecheck` 0 报错；
+  - [x] 策略与插件单测全绿：`pnpm -C mist test libs/strategy`；
+  - [x] 架构门禁通过：`strategy-dual-timestamp.guard.spec.ts` PASS；
+  - [x] 输出《Phase 1 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可进入 Phase 2。
 
 ---
 

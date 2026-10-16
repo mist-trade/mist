@@ -69,10 +69,10 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
           const signalMs = signal.signalTime.getTime();
           expect(pivotMs).toBeLessThanOrEqual(signalMs);
 
-          // 契约断言 3: triggerPrice 必须等于当前 Bar 的收盘价 (真实撮合基准)
+          // 契约断言 3: triggerPrice 必须等于当前 Bar 的收盘价 (决策观察基准价，非当根成交价)
           expect(signal.triggerPrice).toBe(bar.close);
 
-          // 契约断言 4: pivotPrice 必须为正数 (止损参考基准)
+          // 契约断言 4: pivotPrice 必须为正数 (初始止损关键形态极值)
           expect(signal.pivotPrice).toBeGreaterThan(0);
         }
       }

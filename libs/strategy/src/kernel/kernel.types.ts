@@ -35,15 +35,15 @@ export interface KernelSignal {
   readonly definitionId: number;
   readonly versionId: number;
   readonly signalKind: 'entry' | 'exit';
-  /** 决策触发时刻 = 当前确认 Bar timestamp（撮合/游标唯一认可时刻） */
+  /** 决策确立时刻 = 当前确认 Bar timestamp（纯观点确立时刻） */
   readonly signalTime: Date;
   /** 与 signalTime 严格等价（ISO 字符串） */
   readonly triggerTime: string;
-  /** 确认 Bar 收盘市价（撮合基准价） */
+  /** 决策确立基准观察价（当前确认 Bar 收盘价，非成交价；实际撮合由交易引擎在 Next-Bar 执行） */
   readonly triggerPrice: number;
   /** 形态几何极值时刻（图表 Marker 定位），无 pivot 语义时为 null */
   readonly pivotTime: string | null;
-  /** 形态几何极值点价格（止损参考），无 pivot 语义时为 null */
+  /** 形态几何极值点价格（初始止损关键参考基准），无 pivot 语义时为 null */
   readonly pivotPrice: number | null;
   readonly signalType: string;
   readonly confidence: number;
