@@ -6,6 +6,30 @@ lookahead-free A-share execution simulation, and three-dimensional parity verifi
 
 ## ADDED Requirements
 
+### Requirement: Decision Flow Engine Shall Focus on Evidence and Signals Decoupled from Virtual Execution
+The `DecisionFlowEngine` and factor plugins SHALL evaluate market state as pure functions, outputting
+directional opinions (`BUY` / `SELL`), confidence ratings, and structural evidence (such as stop-loss
+anchors, pivot prices, or central boundary levels). The decision flow engine SHALL NOT assume or compute
+virtual fill execution prices, and factor plugins SHALL NOT maintain cross-bar trade deduplication cursors.
+Trade entry suppression during active holdings SHALL be delegated entirely to the downstream execution
+and position state machine layers.
+
+#### Scenario: Pure opinion emission
+- **WHEN** market conditions satisfy decision flow branch or consensus rules
+- **THEN** `DecisionFlowEngine` MUST emit `DecisionResult` with `action === 'BUY' | 'SELL'`, confidence, and evidence
+- **AND** it MUST NOT enforce virtual fill price mechanics or drop valid pattern occurrences on behalf of broker execution
+
+### Requirement: Trading Engine Shall Enforce Execution Causality Decoupled from Signal Layer
+The execution simulation layer SHALL enforce strict causality by executing orders strictly on or after the bar
+following signal emission ($t_{\text{fill}} \ge t+1 > t_{\text{signal}}$). The signal layer SHALL be relieved from
+simulating execution prices (`triggerPrice` matching `close`), ensuring physical separation between pattern
+confirmation and trade execution.
+
+#### Scenario: Next-bar causal execution
+- **WHEN** an entry or exit signal is confirmed on Bar $t$
+- **THEN** simulated broker SHALL queue the order and execute on Bar $t+1$ at opening price adjusted for slippage
+- **AND** no lookahead bias or intra-bar close fill assumptions SHALL occur
+
 ### Requirement: Position State Machine Shall Manage Lifecycle Across Backtest and Realtime
 The system SHALL maintain a deterministic `PositionStateMachine` that transitions through `Empty`,
 `PendingEntry`, `Holding`, `PendingPartialExit`, `PendingExit`, and `Closed`. Both offline backtesting
@@ -97,19 +121,22 @@ The backtest engine SHALL persist detailed trade records into the `backtest_trad
 
 ### Requirement: Cross-Lane Signal Identity and Persistence Parity
 
-Backtest and realtime signal persistence SHALL expose the same identity columns so
-that parity reconciliation can compare signals per security, strategy version, direction
-and signal type without lossy defaults. The `backtest_signal_results` table SHALL carry
-`security_id`, `strategy_version_id`, `signal_kind` and `signal_source` mirroring
-`strategy_signals` identity semantics.
+Backtest and realtime signal persistence SHALL expose the identical identity and metadata columns so
+that parity reconciliation can compare signals per security, strategy version, direction, and signal type
+without lossy defaults or table-specific workarounds. The `backtest_signal_results` table SHALL carry
+`security_id` (foreign key to `securities.id`), `strategy_definition_id`, `strategy_version_id`,
+`period`, `source`, `signal_kind`, and `signal_source`. The `strategy_signals` table SHALL symmetrically
+carry `signal_type`. Both lanes SHALL attribute positions and metrics on an isolated single-security basis
+(Model A).
 
-#### Scenario: Backtest signal rows persist full identity
-- **WHEN** the backtest executor persists a signal produced by the unified kernel
-- **THEN** the row MUST record `security_id` (FK to securities), `strategy_version_id`
-  (from the run), `signal_kind` (`entry` or `exit` from the kernel signal) and
-  `signal_source = 'backtest'`
-- **AND** existing rows SHALL be backfilled by migration (security_id resolved from
-  `security_code`; legacy rows default signal_kind to `entry`)
+#### Scenario: Symmetrical signal persistence parity
+- **WHEN** either realtime signal engine or backtest executor persists an emitted signal
+- **THEN** both tables MUST record identical schema columns (`security_id`, `strategy_definition_id`,
+  `strategy_version_id`, `period`, `source`, `signal_time`, `pivot_time`, `signal_kind`, `signal_type`,
+  `signal_source`, `confidence`, `confidence_level`, `decision_trace`, `context_snapshot`, `rule_snapshot`)
+- **AND** `backtest_signal_results` SHALL omit the standalone `security_code` column, relying exclusively
+  on `security_id` foreign key relations
+- **AND** existing historical backtest rows SHALL be backfilled by resolving `security_code` against `securities`
 
 #### Scenario: Multiple signals on the same bar are not collapsed
 - **WHEN** entry and exit (or composite) signals share the same security and signal time

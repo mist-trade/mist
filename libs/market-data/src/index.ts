@@ -1,6 +1,11 @@
 export { KPriceProjector } from './k-price-projector';
 export type { StrategyPriceInput } from './k-price-projector';
-export { mapKToStrategyBar } from './k-strategy-bar-mapper';
+export {
+  mapKToStrategyBar,
+  assertOhlcTopology,
+  createCanonicalStrategyBar,
+} from './k-strategy-bar-mapper';
+export type { CanonicalStrategyBarInput } from './k-strategy-bar-mapper';
 export type {
   StrategyBar,
   StrategyBarType,

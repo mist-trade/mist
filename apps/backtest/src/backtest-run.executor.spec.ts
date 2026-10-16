@@ -1,4 +1,9 @@
-import { BacktestRunStatus, DataSource, Period } from '@app/shared-data';
+import {
+  BacktestRunStatus,
+  DataSource,
+  Period,
+  StrategyRuleSchemaVersion,
+} from '@app/shared-data';
 import {
   compileStoredDefinitionVersion,
   type StrategyBar,
@@ -45,6 +50,7 @@ function executor(overrides: Record<string, unknown> = {}) {
     versionRepository: {
       findOne: jest.fn().mockResolvedValue({
         id: 7,
+        ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
         rule: { field: 'k.close', operator: 'gt', value: 1 },
         signalKind: 'entry',
       }),
@@ -151,6 +157,7 @@ describe('BacktestRunExecutor', () => {
     ]);
     fixture.dependencies.versionRepository.findOne.mockResolvedValue({
       id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
       rule: { field: 'k.close', operator: 'gt', value: 1 },
       signalKind: 'entry',
     });
@@ -180,7 +187,6 @@ describe('BacktestRunExecutor', () => {
     // replay start (minute plans anchor at the Shanghai day open), then the
     // streaming page starts at the replay start; the public phase boundary is
     // still run.startDate (kernel timeline split).
-    const dayOpen = new Date('2026-08-04T01:30:00.000Z');
     expect(
       fixture.dependencies.marketData.loadReplayWindow,
     ).toHaveBeenCalledWith(
@@ -188,11 +194,11 @@ describe('BacktestRunExecutor', () => {
         securityId: 9,
         source: 'tdx',
         period: Period.ONE_MIN,
-        endAt: dayOpen,
+        endAt: startDate,
       }),
     );
     expect(fixture.dependencies.marketData.readReplayPage).toHaveBeenCalledWith(
-      expect.objectContaining({ startAt: dayOpen }),
+      expect.objectContaining({ startAt: startDate }),
     );
     // 矫正层消化破损 OHLC 后，确认 Bar 时刻落盘（双时间戳 trigger 语义）
     expect(fixture.dependencies.resultRepository.create).toHaveBeenCalledWith(
@@ -219,6 +225,7 @@ describe('BacktestRunExecutor', () => {
     ]);
     fixture.dependencies.versionRepository.findOne.mockResolvedValue({
       id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
       rule: { field: 'k.volume', operator: 'gt', value: '0' },
       signalKind: 'entry',
     });
@@ -242,7 +249,6 @@ describe('BacktestRunExecutor', () => {
     // page 重叠（append 抛 strictly increasing RangeError）。
     // 注：量价 plan 现在可以正常 replay（quantity profile HIL 已通过）。
     const startDate = new Date('2026-08-04T01:42:00.000Z');
-    const dayOpen = new Date('2026-08-04T01:30:00.000Z');
     const fixture = executor();
     const run = {
       ...fixture.current,
@@ -289,11 +295,11 @@ describe('BacktestRunExecutor', () => {
         securityId: 9,
         source: 'tdx',
         period: Period.ONE_MIN,
-        endAt: dayOpen, // 以 replayStart（当日开盘）为界，而非 startDate
+        endAt: run.startDate,
       }),
     );
     expect(fixture.dependencies.marketData.readReplayPage).toHaveBeenCalledWith(
-      expect.objectContaining({ startAt: dayOpen }),
+      expect.objectContaining({ startAt: run.startDate }),
     );
   });
 
@@ -308,6 +314,7 @@ describe('BacktestRunExecutor', () => {
     ]);
     fixture.dependencies.versionRepository.findOne.mockResolvedValue({
       id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
       rule: { field: 'indicator.kdj.k', operator: 'gt', value: -1 },
       signalKind: 'entry',
     });
@@ -345,6 +352,7 @@ describe('BacktestRunExecutor', () => {
     ]);
     fixture.dependencies.versionRepository.findOne.mockResolvedValue({
       id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
       rule: { field: 'k.close', operator: 'gt', value: 1 },
       signalKind: 'entry',
     });
@@ -423,6 +431,7 @@ describe('BacktestRunExecutor 统一内核回放', () => {
     fixture.dependencies.runRepository.findOne.mockResolvedValue(chanRun);
     fixture.dependencies.versionRepository.findOne.mockResolvedValue({
       id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
       rule: {
         units: 'duan',
         direction: 'both',
@@ -508,6 +517,7 @@ describe('BacktestRunExecutor 统一内核回放', () => {
     fixture.dependencies.runRepository.findOne.mockResolvedValue(flowRun);
     fixture.dependencies.versionRepository.findOne.mockResolvedValue({
       id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
       rule: {
         id: 'term_test',
         type: 'TERMINAL',

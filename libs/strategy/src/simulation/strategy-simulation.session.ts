@@ -17,6 +17,11 @@ export interface SimulationSessionListeners {
   readonly onError?: (error: Error) => void;
 }
 
+export const SIMULATION_LOCAL_FIXTURE_IDENTITY = Object.freeze({
+  definitionId: -1,
+  versionId: -1,
+});
+
 /**
  * 本地推演会话：交互式步进/回看/跳转的帧缓存壳。
  *
@@ -70,10 +75,13 @@ export class StrategySimulationSession {
       publicFrom,
       plans: [
         {
-          definitionId: 0,
-          versionId: 0,
+          definitionId:
+            config.definitionId ??
+            SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,
+          versionId:
+            config.versionId ?? SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
           flow: config.flow,
-          ruleSnapshot: Object.freeze({}),
+          ruleSnapshot: config.ruleSnapshot ?? Object.freeze({}),
           requiredBarCount: config.windowBudget ?? 600,
         },
       ],

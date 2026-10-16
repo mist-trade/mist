@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, K } from '@app/shared-data';
-import { mapKToStrategyBar } from '@app/market-data';
 import {
-  KPriceProjector,
+  createCanonicalStrategyBar,
+  mapKToStrategyBar,
+} from '@app/market-data';
+import {
   type StrategyBar,
   type StrategyMarketObservation,
   type StrategyRealtimeMarketDataPort,
@@ -73,7 +75,7 @@ export class SignalStrategyMarketDataAdapter
     criteria: StrategyRealtimeWindowCriteria,
   ): Promise<StrategyRealtimeWindow> {
     assertCriteria(criteria);
-    const hydrationBarLimit = criteria.requiredBars + 1;
+    const hydrationBarLimit = criteria.requiredBars;
     const tradingDay = shanghaiTradingDay(criteria.anchorAt);
     const dayStart = shanghaiDayStart(tradingDay);
     const redisBars = await this.loadCurrentDayBars(criteria, tradingDay);
@@ -142,27 +144,19 @@ function mapClosedRecord(
   trigger: StrategyTrigger,
   record: RealtimeClosedCandleRecordV1,
 ): StrategyBar {
-  const bar = Object.freeze({
+  return createCanonicalStrategyBar({
     securityId: trigger.securityId,
     source: trigger.source,
     period: 1,
-    timestamp: new Date(trigger.timestamp.getTime()),
-    open: KPriceProjector(record.o),
-    high: KPriceProjector(record.h),
-    low: KPriceProjector(record.l),
-    close: KPriceProjector(record.c),
+    timestamp: trigger.timestamp,
+    open: record.o,
+    high: record.h,
+    low: record.l,
+    close: record.c,
     volume: record.v,
     amount: record.a,
-    type: 'complete' as const,
+    type: 'complete',
   });
-  if (
-    bar.low > bar.high ||
-    bar.high < Math.max(bar.open, bar.close) ||
-    bar.low > Math.min(bar.open, bar.close)
-  ) {
-    throw new TypeError('closed-candle OHLC relationship is invalid');
-  }
-  return bar;
 }
 
 function derivePeriodBars(
@@ -203,8 +197,9 @@ function reducePeriod(
   );
   const first = ordered[0];
   const last = ordered.at(-1)!;
-  return Object.freeze({
+  return createCanonicalStrategyBar({
     securityId: first.securityId,
+    securityCode: first.securityCode,
     source: first.source,
     period,
     timestamp: new Date(slotStart),

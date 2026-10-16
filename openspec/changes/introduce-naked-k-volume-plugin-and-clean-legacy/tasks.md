@@ -17,3 +17,10 @@
   - [x] 3.1 运行 `pnpm typecheck` 验证全仓类型 100% 正常
   - [x] 3.2 运行 AST 魔法值检测并同步更新 `tools/audit/baseline-magic-literals.json`
   - [x] 3.3 运行全量测试套件确保无回归
+
+---
+
+> 补正注记（2026-10-16）：本 change 的 spec 已由 flat 叙述文件转换为合法 delta 格式
+> （`specs/volume-indicators/spec.md`），并并入口径修正：OBV 首根 = 0 的语义修正；VWAP 可选
+> `amounts` 精确口径与窗口累计语义声明；`volumeRatio` 显式声明为 Mist 自定义口径。实现由
+> `fix-indicator-conventions` 承接，本 change 归档前须确认其已完成，否则修正不会进入 live spec。

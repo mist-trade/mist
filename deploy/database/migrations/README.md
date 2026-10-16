@@ -366,3 +366,12 @@ application guard (`CHAN_BSP_KIND_RETIRED`) — converting the definition to a
 if ever required: `UPDATE strategy_definitions SET status='enabled' WHERE
 kind='chan_bsp';` (do not roll back rows written with the corrected trigger-time
 `signal_time` semantics).
+
+## 027 — signal_tables_schema_parity
+
+Forward-only. Completes bidirectional schema parity across live and backtest signal storage:
+1. Adds `signal_type VARCHAR(32) NOT NULL DEFAULT 'signal'` to `strategy_signals` and backfills from `decision_trace` / `context_snapshot`.
+2. Restores and extends metadata columns on `backtest_signal_results`: `security_id` (FK to `securities(id)`), `strategy_definition_id`, `strategy_version_id`, `period`, `source`, `signal_kind`, `signal_source`.
+3. Adds prewarm diagnostics columns to `backtest_runs`: `prewarm_status`, `prewarm_min_actual`, `prewarm_min_expected`.
+4. Backfills `backtest_signal_results` security IDs from `securities` and definition/version/period/source from `backtest_runs`.
+

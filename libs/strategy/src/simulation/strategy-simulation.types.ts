@@ -54,6 +54,9 @@ export interface SimulationSessionConfig {
   readonly startDate?: string | Date;
   readonly endDate?: string | Date;
   readonly filterFenxingContainment?: boolean;
+  readonly definitionId?: number;
+  readonly versionId?: number;
+  readonly ruleSnapshot?: Readonly<Record<string, unknown>>;
   readonly flow: DecisionFlowNode;
   readonly windowBudget?: number;
   readonly registry?: FactorPluginRegistry;

@@ -6,16 +6,19 @@ import {
   BacktestRunStatus,
   BacktestSignalResult,
   DataSource,
+  Period,
   Security,
   StrategyDefinition,
+  StrategyRuleSchemaVersion,
+  StrategySignalKind,
+  StrategySignalSource,
   StrategyVersion,
   type BacktestTargetIssue,
 } from '@app/shared-data';
-import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
-import { PERIOD_MINUTES } from '@app/constants';
 import {
   compileStoredDefinitionVersion,
   HistoricalBarSource,
+  mapKernelSignalToPersistencePayload,
   StrategyEvaluationKernel,
   type CompiledStoredDefinition,
   type StrategyRealtimeSource,
@@ -142,6 +145,9 @@ export class BacktestRunExecutor {
       where: { id: run.strategyVersionId },
     });
     if (!version) throw new BacktestRunFailure('BACKTEST_EXECUTION_FAILED');
+    if (version.ruleSchemaVersion !== StrategyRuleSchemaVersion.V1) {
+      throw new BacktestRunFailure('BACKTEST_EXECUTION_FAILED');
+    }
     const definition = await this.definitionRepository.findOne({
       where: { id: run.strategyDefinitionId },
     });
@@ -211,11 +217,12 @@ export class BacktestRunExecutor {
     const results: BacktestSignalResult[] = [];
     let signalCount = 0;
     const matchedCodes = new Set<string>();
+    const prewarmActuals: number[] = [];
     for (const { code, security } of executable) {
       const outcome = await this.replaySecurity(
         run,
         compiled,
-        version.rule,
+        compiled.ruleSnapshot,
         code,
         security.id,
         results,
@@ -225,6 +232,9 @@ export class BacktestRunExecutor {
           signalCount += 1;
         },
       );
+      if (outcome.hasBars) {
+        prewarmActuals.push(outcome.prewarmActual);
+      }
       if (!outcome.hasBars) {
         issues.push({ securityCode: code, code: 'NO_HISTORICAL_BARS' });
         this.health.recordTargetIssue('NO_HISTORICAL_BARS');
@@ -235,6 +245,18 @@ export class BacktestRunExecutor {
     }
     await this.flushResults(results);
 
+    const prewarmMinActual =
+      prewarmActuals.length > 0 ? Math.min(...prewarmActuals) : null;
+    const prewarmMinExpected = compiled.requiredBarCount;
+    const prewarmStatus =
+      prewarmMinActual === null
+        ? null
+        : prewarmMinActual >= prewarmMinExpected
+          ? 'full'
+          : prewarmMinActual > 0
+            ? 'partial'
+            : 'empty';
+
     const completed = await this.runRepository.update(
       { id: run.id, status: BacktestRunStatus.RUNNING },
       {
@@ -242,6 +264,9 @@ export class BacktestRunExecutor {
         targetIssues: uniqueIssues(issues),
         signalCount,
         matchedSecurityCount: matchedCodes.size,
+        prewarmStatus,
+        prewarmMinActual,
+        prewarmMinExpected,
         completedAt: new Date(),
         errorMessage: null,
       },
@@ -254,14 +279,18 @@ export class BacktestRunExecutor {
   private async replaySecurity(
     run: BacktestRun,
     compiled: CompiledStoredDefinition,
-    ruleSnapshot: Record<string, unknown>,
+    ruleSnapshot: Readonly<Record<string, unknown>>,
     securityCode: string,
     securityId: number,
     results: BacktestSignalResult[],
     matchedCodes: Set<string>,
     budget: ReplayBudget,
     onSignal: () => void,
-  ): Promise<{ hasBars: boolean }> {
+  ): Promise<{
+    hasBars: boolean;
+    prewarmStatus: 'full' | 'partial' | 'empty';
+    prewarmActual: number;
+  }> {
     const preWarmEndAt = replayStartFor(run);
     const kernel = new StrategyEvaluationKernel({
       securityId,
@@ -291,18 +320,32 @@ export class BacktestRunExecutor {
       kernel,
       async (signal) => {
         budget.consume();
+        const payload = mapKernelSignalToPersistencePayload(signal, {
+          securityId,
+          securityCode,
+          source: run.source,
+          period: run.period,
+          ruleSnapshot,
+        });
         results.push(
           this.resultRepository.create({
             backtestRunId: run.id,
-            securityCode,
-            signalTime: signal.signalTime,
-            pivotTime: signal.pivotTime ? new Date(signal.pivotTime) : null,
-            signalType: signal.signalType,
-            confidence: signal.confidence,
-            confidenceLevel: signal.confidenceLevel,
-            decisionTrace: signal.decisionTrace,
-            contextSnapshot: signal.contextSnapshot,
-            ruleSnapshot,
+            securityId: payload.securityId,
+            strategyDefinitionId: payload.definitionId,
+            strategyVersionId: payload.versionId,
+            securityCode: payload.securityCode ?? securityCode,
+            period: payload.period as Period,
+            source: payload.source as DataSource,
+            signalTime: payload.signalTime,
+            pivotTime: payload.pivotTime,
+            signalType: payload.signalType,
+            signalKind: payload.signalKind as StrategySignalKind,
+            signalSource: StrategySignalSource.BACKTEST,
+            confidence: payload.confidence,
+            confidenceLevel: payload.confidenceLevel,
+            decisionTrace: payload.decisionTrace,
+            contextSnapshot: payload.contextSnapshot,
+            ruleSnapshot: payload.ruleSnapshot,
           }),
         );
         matchedCodes.add(securityCode);
@@ -316,7 +359,11 @@ export class BacktestRunExecutor {
       },
     );
     await budget.checkpoint(true);
-    return { hasBars: outcome.publicBarCount > 0 };
+    return {
+      hasBars: outcome.publicBarCount > 0,
+      prewarmStatus: outcome.prewarmStatus,
+      prewarmActual: outcome.prewarmActual,
+    };
   }
 
   private async flushResults(results: BacktestSignalResult[]): Promise<void> {
@@ -330,9 +377,17 @@ export class BacktestRunExecutor {
       await this.resultRepository.insert(
         pending.map((result) => ({
           backtestRunId: result.backtestRunId,
+          securityId: result.securityId,
+          strategyDefinitionId: result.strategyDefinitionId,
+          strategyVersionId: result.strategyVersionId,
           securityCode: result.securityCode,
+          period: result.period,
+          source: result.source,
           signalTime: result.signalTime,
+          pivotTime: result.pivotTime,
           signalType: result.signalType,
+          signalKind: result.signalKind,
+          signalSource: result.signalSource,
           confidence: result.confidence,
           confidenceLevel: result.confidenceLevel,
           decisionTrace: result.decisionTrace,
@@ -401,21 +456,7 @@ function uniqueIssues(
 }
 
 function replayStartFor(run: BacktestRun): Date {
-  if (run.period >= PERIOD_MINUTES['1d']) {
-    return new Date(run.startDate.getTime());
-  }
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ASIA_SHANGHAI_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).formatToParts(run.startDate);
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-  if (!year || !month || !day)
-    throw new TypeError('invalid replay trading day');
-  return new Date(`${year}-${month}-${day}T01:30:00.000Z`);
+  return new Date(run.startDate.getTime());
 }
 
 function classifyFailure(error: unknown): BacktestRunFailure {

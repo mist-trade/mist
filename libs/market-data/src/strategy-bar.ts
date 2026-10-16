@@ -8,6 +8,7 @@ export type StrategyBarType = 'complete' | 'incomplete';
  */
 export interface StrategyBar {
   readonly securityId: number;
+  readonly securityCode?: string;
   readonly source: StrategyMarketSource;
   readonly period: number;
   readonly timestamp: Date;

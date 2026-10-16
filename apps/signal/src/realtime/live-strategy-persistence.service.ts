@@ -10,6 +10,7 @@ import {
   isUniqueConstraintViolation,
 } from '@app/shared-data';
 import type { ShadowStrategyCandidate } from '@app/signal';
+import { mapKernelSignalToPersistencePayload } from '@app/strategy';
 import { DataSource as TypeOrmDataSource } from 'typeorm';
 import {
   STRATEGY_ALERT_DELIVERY_HANDOFF_PORT,
@@ -38,25 +39,28 @@ export class LiveStrategyPersistenceService {
     try {
       await this.dataSource.transaction(async (manager) => {
         await manager.query('SET SESSION innodb_lock_wait_timeout = 3');
-        const signal = manager.create(StrategySignal, {
-          strategyDefinitionId: candidate.definitionId,
-          strategyVersionId: candidate.versionId,
+        const payload = mapKernelSignalToPersistencePayload(candidate, {
           securityId: candidate.securityId,
-          period: candidate.period as Period,
-          source: candidate.source as MarketDataSource,
-          signalTime: candidate.signalTime,
-          pivotTime: candidate.pivotTime ? new Date(candidate.pivotTime) : null,
+          source: candidate.source,
+          period: candidate.period,
+          ruleSnapshot: candidate.ruleSnapshot,
+        });
+        const signal = manager.create(StrategySignal, {
+          strategyDefinitionId: payload.definitionId,
+          strategyVersionId: payload.versionId,
+          securityId: payload.securityId,
+          period: payload.period as Period,
+          source: payload.source as MarketDataSource,
+          signalTime: payload.signalTime,
+          pivotTime: payload.pivotTime,
           signalSource: StrategySignalSource.LIVE,
-          signalKind: candidate.signalKind as StrategySignalKind,
-          confidence: candidate.confidence,
-          confidenceLevel: candidate.confidenceLevel,
-          decisionTrace: candidate.decisionTrace,
-          contextSnapshot: {
-            ...candidate.contextSnapshot,
-            triggerTime: candidate.triggerTime,
-            triggerPrice: candidate.triggerPrice,
-          },
-          ruleSnapshot: { ...candidate.ruleSnapshot },
+          signalKind: payload.signalKind as StrategySignalKind,
+          signalType: payload.signalType,
+          confidence: payload.confidence,
+          confidenceLevel: payload.confidenceLevel,
+          decisionTrace: payload.decisionTrace,
+          contextSnapshot: payload.contextSnapshot,
+          ruleSnapshot: payload.ruleSnapshot,
         });
         const savedSignal = await manager.save(StrategySignal, signal);
         const alert = manager.create(StrategyAlertEvent, {
@@ -106,6 +110,7 @@ export function liveStrategyAlertDedupeKey(
     | 'source'
     | 'period'
     | 'signalKind'
+    | 'signalType'
     | 'signalTime'
   >,
 ): string {
@@ -117,6 +122,7 @@ export function liveStrategyAlertDedupeKey(
     candidate.source,
     candidate.period,
     candidate.signalKind,
+    candidate.signalType,
     candidate.signalTime.getTime(),
   ].join(':');
 }

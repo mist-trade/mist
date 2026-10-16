@@ -86,7 +86,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
           period: 1,
         }),
         order: { timestamp: 'DESC' },
-        take: 2,
+        take: 1,
       }),
     );
   });
@@ -112,7 +112,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
       source: 'tdx',
       period: 1,
       anchorAt: new Date('2026-08-04T01:32:00.000Z'),
-      requiredBars: 1,
+      requiredBars: 2,
     });
 
     expect(result.bars.map((bar) => bar.volume)).toEqual(['80', null]);
@@ -140,7 +140,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
       source: 'tdx',
       period: 5,
       anchorAt: new Date('2026-08-04T01:35:00.000Z'),
-      requiredBars: 1,
+      requiredBars: 2,
     });
 
     expect(result.bars).toEqual([
@@ -201,7 +201,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
         source: 'tdx',
         period: 5,
         anchorAt: new Date('2026-08-04T07:02:00.000Z'),
-        requiredBars: 1,
+        requiredBars: 2,
       }),
     ).resolves.toMatchObject({
       bars: [

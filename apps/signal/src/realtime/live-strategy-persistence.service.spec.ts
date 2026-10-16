@@ -42,7 +42,7 @@ describe('LiveStrategyPersistenceService', () => {
     expect(manager.create.mock.calls[1]?.[1]).toMatchObject({
       strategySignalId: 77,
       status: 'pending',
-      dedupeKey: 'live-v1:3:7:9:tdx:5:entry:1785825840000',
+      dedupeKey: 'live-v1:3:7:9:tdx:5:entry:LEGACY_DSL:1785825840000',
     });
   });
 
@@ -96,7 +96,7 @@ describe('LiveStrategyPersistenceService', () => {
 
   it('builds identity only from the approved result fields', () => {
     expect(liveStrategyAlertDedupeKey(candidate())).toBe(
-      'live-v1:3:7:9:tdx:5:entry:1785825840000',
+      'live-v1:3:7:9:tdx:5:entry:LEGACY_DSL:1785825840000',
     );
   });
 });

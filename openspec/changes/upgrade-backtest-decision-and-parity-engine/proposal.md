@@ -18,20 +18,20 @@
 
 ## 2. 目标与范围（Scope & Goals）
 
-### 2.1 核心目标
+### 2.1 核心目标（明确三大分拆任务）
 
-1. **统一策略决策与持仓生命周期状态机（PositionStateMachine）**：
-   - 在 `libs/strategy` / `libs/signal` 中构建通用的持仓状态机，**回测与实盘 100% 共用同一套状态流转与持仓逻辑**；
-   - 彻底解耦职责：状态机不再重复执行入场过滤（入场门禁已收口在 `DecisionFlowEngine`），直接消费 `DecisionResult`；
-   - 严格维护 `Empty` → `PendingEntry` → `Holding` → `PendingExit` → `Closed` 的状态迁移。
-2. **全量支持 Exit Trinity（出局三部曲）的多层出场策略契约（`StrategyExitPolicy`）**：
-   - **通用结构止损**：动态从决策流返回的 `evidence` 中读取结构止损价（支持缠论中枢 `zd`、笔底、SMC 订单块 `order_block` 下轨、FVG 缺口下轨或 ATR 轨）；
-   - **1R 动态保本损机制（Breakeven Transfer）**：当持仓浮盈达到 1 倍初始风险（1R）时，无条件将止损线拉升至开仓成本价，立于不败之地；
-   - **双轨止盈出局（Take-Profit）**：支持目标位（如反向结构位）分批平仓 50%，剩余 50% 开启 Trailing Stop 移动追踪止盈（如跟踪 30m 20EMA 或最大回撤）；
-   - **硬风控兜底与反向卖点**：固定百分比硬止损（如 5%），以及决策流发出 `action === 'SELL'` 时的强制平仓。
-3. **真实严格 A 股成交与因果撮合模型（Lookahead-Free A-Share Execution Model）**：
-   - 信号在 Bar $t$ 闭合确认，订单在 **Next-Bar Open** 撮合成交；
-   - 严格执行 **T+1 制度**、**涨停一字板无法买入**、**跌停一字板无法卖出（顺延）**、滑点与交易税费（佣金、印花税、过户费）。
+1. **【任务 1】修改原决策树与信号层，去除关于未来函数的伪撮合限制**：
+   - 彻底解耦职责：决策树回归“纯大脑与观点分析器”，产出 `action`（`BUY` / `SELL`）、`confidence` 与结构证据 `evidence`；
+   - 剥离信号层对虚拟撮合成交价（`triggerPrice`）的硬性假设，卸除因子插件内不必要的跨 Bar 交易防重游标；
+   - 保留纯数据因果律（禁止偷看未来 Bar），将交易执行因果律完全移交下游交易引擎。
+2. **【任务 2】增加通用交易撮合引擎（`TradingEngine`）**：
+   - 在 `libs/strategy/src/execution/` 构建统一的交易引擎抽象（`Order`、`OrderFilledEvent`、`TradingEnginePort`），回测与实盘共用；
+   - 实现 A 股真实因果模拟撮合器（`SimulatedBroker`）：**Next-Bar Open 成交**（$t_{\text{fill}} \ge t+1 > t_{\text{signal}}$）、**T+1 制度**、**涨跌停拒单/顺延**、佣金过户费与差异化印花税（ETF 免税）、盘中触价止损。
+3. **【任务 3】增加统一持仓生命周期状态机（`PositionStateMachine`）与夏普率算子**：
+   - 在 `libs/strategy/src/position/` 实现通用的持仓状态机，**回测与实时 100% 共用同一套状态流转与持仓逻辑**；
+   - 维护 `Empty` → `PendingEntry` → `Holding` → `PendingPartialExit` → `PendingExit` → `Closed` 状态机；
+   - 全量支持 **Exit Trinity（出局三部曲）**：动态结构止损、1R 移动保本损、双轨止盈（50% 分批止盈 + Trailing Stop 跟踪）、硬风控兜底；
+   - **每日收盘逐日盯市（Mark-to-Market）**生成每日净值序列（Daily NAV Series），并在 `libs/indicators` 基于 Rust `nodejs-polars` 实现纯数学的年化夏普比率（Sharpe Ratio）、最大回撤等算子。
 4. **三维防未来函数质检与对账体系**：
    - **因果不变性断言**：代码层严格限制时间戳因果性；
    - **实时 vs 回测双轨 Parity 测试**：相同历史切片下，离线回测与实时推流产生的决策与信号 100% 逐字对齐；

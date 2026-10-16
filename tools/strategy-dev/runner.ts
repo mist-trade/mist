@@ -17,6 +17,7 @@
 import type { ChanK } from '@app/chancore';
 import {
   createTacticsDecisionFlow,
+  SIMULATION_LOCAL_FIXTURE_IDENTITY,
   type SimulationSignal,
 } from '../../libs/strategy/src/simulation';
 import {
@@ -170,8 +171,8 @@ async function runStrategyDev(): Promise<void> {
     publicFrom: new Date(-8640000000000000), // 全时序流式推演，无静默截断
     plans: [
       {
-        definitionId: 0,
-        versionId: 0,
+        definitionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,
+        versionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
         flow,
         ruleSnapshot: Object.freeze({}),
         requiredBarCount: 60,

@@ -70,6 +70,20 @@ export class BacktestRun {
   @Column({ name: 'matched_security_count', type: 'int', default: 0 })
   matchedSecurityCount: number = 0;
 
+  @Column({
+    name: 'prewarm_status',
+    type: 'enum',
+    enum: ['full', 'partial', 'empty'],
+    nullable: true,
+  })
+  prewarmStatus?: 'full' | 'partial' | 'empty' | null;
+
+  @Column({ name: 'prewarm_min_actual', type: 'int', nullable: true })
+  prewarmMinActual?: number | null;
+
+  @Column({ name: 'prewarm_min_expected', type: 'int', nullable: true })
+  prewarmMinExpected?: number | null;
+
   @Column({ name: 'started_at', type: 'datetime', nullable: true })
   startedAt?: Date | null;
 

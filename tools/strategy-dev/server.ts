@@ -15,6 +15,7 @@ import { ChanCore, type ChanK } from '@app/chancore';
 import { ChanVisualAdapter } from '../../libs/visual-command/src/adapters/chan-visual.adapter';
 import {
   StrategySimulationSession,
+  SIMULATION_LOCAL_FIXTURE_IDENTITY,
   createTacticsDecisionFlow,
   type SimulationFrame,
   type SimulationSignal,
@@ -23,6 +24,7 @@ import {
   StrategyEvaluationKernel,
   type KernelSignal,
 } from '../../libs/strategy/src/kernel';
+import { compileStoredDefinitionVersion } from '../../libs/strategy/src/decision-flow/stored-definition-compiler';
 import { mapKernelSignalToSimulationSignal } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
 import { loadCanonicalKlines, PERIOD_NAME_MAP } from './provider';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
@@ -443,8 +445,8 @@ async function runUnifiedSimulationBacktest(options: {
     publicFrom,
     plans: [
       {
-        definitionId: 0,
-        versionId: 0,
+        definitionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,
+        versionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
         flow,
         ruleSnapshot: Object.freeze({}),
         requiredBarCount: 60,
@@ -658,7 +660,25 @@ const server = http.createServer(async (req, res) => {
 
       const fullKlines = loadCanonicalKlines({ code, period });
       const bars = fullKlines.map((k) => toStrategyBar(k, period));
-      const flow = body.flow || createTacticsDecisionFlow();
+      let flow = body.flow;
+      let ruleSnapshot = body.ruleSnapshot;
+      let windowBudget = body.windowBudget;
+      const definitionId =
+        body.definitionId ?? SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId;
+      const versionId =
+        body.versionId ?? SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId;
+
+      if (!flow && body.rule) {
+        const compiled = compileStoredDefinitionVersion({
+          kind: body.kind ?? 'decision_flow',
+          rule: body.rule,
+          signalKind: body.signalKind,
+        });
+        flow = compiled.flow;
+        ruleSnapshot = compiled.ruleSnapshot;
+        windowBudget = compiled.requiredBarCount;
+      }
+      flow ||= createTacticsDecisionFlow();
 
       const session = new StrategySimulationSession(bars, {
         securityCode: code,
@@ -666,6 +686,10 @@ const server = http.createServer(async (req, res) => {
         startDate: body.startDate,
         endDate: body.endDate,
         filterFenxingContainment,
+        definitionId,
+        versionId,
+        ruleSnapshot,
+        windowBudget,
         flow,
       });
 

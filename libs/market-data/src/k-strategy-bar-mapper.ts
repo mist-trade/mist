@@ -1,6 +1,10 @@
 import { normalizeExternalDecimalText } from '@app/decimal';
 import { KPriceProjector } from './k-price-projector';
-import type { StrategyBar, StrategyMarketSource } from './strategy-bar';
+import type {
+  StrategyBar,
+  StrategyBarType,
+  StrategyMarketSource,
+} from './strategy-bar';
 import { DataSource } from '@app/shared-data';
 import { K } from '@app/shared-data';
 
@@ -14,19 +18,79 @@ import { K } from '@app/shared-data';
  * profile). This mapper therefore only normalizes the DECIMAL(36,8) text and
  * performs no source-specific scaling.
  */
+export function assertOhlcTopology(
+  open: number,
+  high: number,
+  low: number,
+  close: number,
+): void {
+  if (
+    !Number.isFinite(open) ||
+    !Number.isFinite(high) ||
+    !Number.isFinite(low) ||
+    !Number.isFinite(close) ||
+    low > high ||
+    high < Math.max(open, close) ||
+    low > Math.min(open, close)
+  ) {
+    throw new TypeError('OHLC relationship is invalid');
+  }
+}
+
+export interface CanonicalStrategyBarInput {
+  readonly securityId: number;
+  readonly securityCode?: string;
+  readonly source: StrategyMarketSource;
+  readonly period: number;
+  readonly timestamp: Date;
+  readonly open: number | string;
+  readonly high: number | string;
+  readonly low: number | string;
+  readonly close: number | string;
+  readonly volume: string | null;
+  readonly amount: string | null;
+  readonly type?: StrategyBarType;
+}
+
+export function createCanonicalStrategyBar(
+  input: CanonicalStrategyBarInput,
+): StrategyBar {
+  const open = KPriceProjector(input.open);
+  const high = KPriceProjector(input.high);
+  const low = KPriceProjector(input.low);
+  const close = KPriceProjector(input.close);
+  assertOhlcTopology(open, high, low, close);
+
+  return Object.freeze({
+    securityId: input.securityId,
+    securityCode: input.securityCode,
+    source: input.source,
+    period: requirePositivePeriod(input.period),
+    timestamp: requireTimestamp(input.timestamp),
+    open,
+    high,
+    low,
+    close,
+    volume: mapHistoricalQuantity(input.volume),
+    amount: mapHistoricalQuantity(input.amount),
+    type: input.type ?? 'complete',
+  });
+}
+
 export function mapKToStrategyBar(k: K): StrategyBar {
   const securityId = selectedSecurityId(k);
-  return Object.freeze({
+  return createCanonicalStrategyBar({
     securityId,
+    securityCode: k.security?.code,
     source: mapSource(k.source),
-    period: requirePositivePeriod(k.period),
-    timestamp: requireTimestamp(k.timestamp),
-    open: KPriceProjector(k.open as unknown as string | number),
-    high: KPriceProjector(k.high as unknown as string | number),
-    low: KPriceProjector(k.low as unknown as string | number),
-    close: KPriceProjector(k.close as unknown as string | number),
-    volume: mapHistoricalQuantity(k.volume),
-    amount: mapHistoricalQuantity(k.amount),
+    period: k.period,
+    timestamp: k.timestamp,
+    open: k.open as unknown as string | number,
+    high: k.high as unknown as string | number,
+    low: k.low as unknown as string | number,
+    close: k.close as unknown as string | number,
+    volume: k.volume,
+    amount: k.amount,
     type: 'complete',
   });
 }

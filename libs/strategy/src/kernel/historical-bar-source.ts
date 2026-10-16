@@ -58,8 +58,12 @@ export class HistoricalBarSource {
       endAt: preWarmEndAt,
       requiredBars,
     });
+    let lastPushedMs: number | null = null;
     for (const bar of initial.bars) {
+      const barMs = bar.timestamp.getTime();
+      if (lastPushedMs !== null && barMs <= lastPushedMs) continue;
       await kernel.push(bar);
+      lastPushedMs = barMs;
       if (onBar) await onBar(bar);
     }
 
@@ -77,7 +81,12 @@ export class HistoricalBarSource {
       });
       if (page.bars.length === 0) break;
       for (const bar of page.bars) {
+        const barMs = bar.timestamp.getTime();
+        if (lastPushedMs !== null && barMs <= lastPushedMs) {
+          continue;
+        }
         const signals = await kernel.push(bar);
+        lastPushedMs = barMs;
         barCount += 1;
         if (onBar) await onBar(bar);
         if (onSignal) {

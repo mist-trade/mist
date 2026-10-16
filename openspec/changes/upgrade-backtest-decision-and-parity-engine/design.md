@@ -1,310 +1,176 @@
-# Design: 量化回测决策状态机、严格 A 股撮合与防未来函数质检体系
+# Design: 量化决策执行同构架构、交易引擎与持仓状态机体系
 
-## 1. 架构总览
+## 1. 架构总览与分层拓扑（三层单向数据流）
 
-```mermaid
-graph TD
-    subgraph L1["Layer 1: 策略决策与大脑层 (Decision Flow Engine)"]
-        DF["DecisionFlowEngine (树状流: GUARD ➔ BRANCH ➔ EXTRACTOR ➔ CONSENSUS ➔ TERMINAL)"]
-        DF -->|"输出: DecisionResult (BUY / SELL / ABORT, confidence, evidence)"| Out1["决策观点与证据快照"]
-    end
-
-    subgraph L2["Layer 2: 策略决策与持仓生命周期状态机 (Position State Machine)"]
-        SM["PositionStateMachine"]
-        D1["Position Tracker (持仓量、成本价 costPrice、最高浮盈 High Watermark)"]
-        D2["Exit Trinity Evaluator (出局三部曲: 初始结构止损 / 1R保本损 / 分批止盈 / Trailing Stop)"]
-        SM --- D1
-        SM --- D2
-    end
-
-    subgraph L3["Layer 3: 执行与撮合层 (Execution / Broker)"]
-        E1["Simulated Broker (回测: Next-Bar Open / T+1 / 涨跌停 / 印花税与规费 / 滑点)"]
-        E2["Live Gateway (实盘: QMT / 券商委托与回报网关)"]
-    end
-
-    subgraph L4["Layer 4: 呈现与质检层 (Presentation & Parity)"]
-        P1["Web 控制台 (绩效报表 / 逐笔流水 / 出场归因 / 质检报告)"]
-        P2["TDX / QMT 标记回写管道 (桌面专业终端极速看盘复盘)"]
-        P3["Parity & Lookahead Test (双轨对账与因果时序断言)"]
-    end
-
-    L1 -->|"驱动状态流转"| L2
-    L2 -->|"产生撮合委托"| L3
-    L3 -->|"输出流水与事件"| L4
-```
-
----
-
-## 2. 策略决策与持仓生命周期状态机（Position State Machine）
-
-### 2.1 状态转移图
+为解决系统「有决策大脑，无执行手脚」以及回测与实时链路割裂的核心痛点，本设计将量化策略执行链路划分为严格单向依赖的体系。
+**全链路刚性同构红线：除数据流转方式（实时是 push 驱动，回测是 pull 循环）之外，其他所有数据模型、字段、计算逻辑与落盘处理必须 100% 保持一致**。
 
 ```mermaid
-stateDiagram-v2
-    [*] --> Empty: 初始空仓
-    Empty --> PendingEntry: DecisionFlow 产生 BUY 信号 (记录初始止损锚点)
-    PendingEntry --> Holding: Next-Bar Open 撮合成交 (建立全量仓位, 记录 costPrice)
-    PendingEntry --> Empty: 一字涨停无法买入 / 超时撤单
-    Holding --> Holding: 逐 Bar 更新 High Watermark；浮盈达 1R 时上移止损线至成本价
-    Holding --> PendingPartialExit: 触碰第一止盈目标位 (反向结构位 / 目标盈亏比)
-    PendingPartialExit --> Holding: 撮合平仓 50%，记录半仓收益，剩余 50% 开启 Trailing Stop
-    Holding --> PendingExit: 触发止损 (结构下轨 / 跌破成本价 / 硬止损) 或 Trailing Stop 或反向 SELL
-    PendingExit --> Closed: 撮合成交 (全量平仓，结算终局盈亏与出场归因)
-    PendingExit --> PendingExit: 一字跌停无法卖出 (受T+1及跌停限制，顺延至次日)
-    Closed --> Empty: 结算归档，重置为初始空仓
-```
+flowchart TD
+    subgraph Layer1["Layer 1: 策略决策大脑 (Decision Flow Engine / 纯函数)"]
+        K1["统一求值内核 (StrategyEvaluationKernel)"]
+        DF["DecisionFlowEngine (树状流: GUARD ➔ BRANCH ➔ EXTRACTOR ➔ CONSENSUS)"]
+        K1 --> DF
+        DF -->|"输出: DecisionResult (BUY / SELL, confidence, evidence 止损锚点)"| Sig["决策信号 (KernelSignal)"]
+    end
 
-### 2.2 出场与止损规则配置契约（`StrategyExitPolicy`，全面对齐 Exit Trinity）
+    subgraph Layer2["Layer 2: 交易撮合引擎 (TradingEngine / 订单与因果撮合)"]
+        Sig --> OMS["订单管理与风控 (Order Management)"]
+        OMS --> Matcher["因果撮合器 (SimulatedBroker / 实盘交易网关)"]
+        Matcher -->|"因果物理隔离: Bar t 信号 ➔ Bar t+1 Open 撮合 (T+1 / 滑点 / 佣金印花税 / 涨跌停)"| Fill["成交事件 (OrderFilledEvent)"]
+    end
 
-```typescript
-export interface StrategyExitPolicy {
-  // 1. 通用结构止损 (支持从决策流返回的 evidence 中动态提取结构下轨)
-  structuralStop?: {
-    enabled: boolean;
-    source: 'evidence' | 'fixed_price';
-    evidenceKey?: string; // 默认 'stopLossPrice'，亦可指定 'chan.central.zd'、'smc.order_block.bottom' 或 'smc.fvg.bottom'
-    bufferRatio?: number; // 缓冲比例，如 0.005 (0.5%)
-  };
+    subgraph Layer3["Layer 3: 单标的持仓状态机 (PositionStateMachine / 单标的账本与风控)"]
+        Fill --> PSM["PositionStateMachine (单标的独立 100% 资金闭环)"]
+        PSM --> Exit["Exit Trinity 动态跟踪 (初始结构止损 ➔ 1R移动保本 ➔ 双轨止盈)"]
+        Exit -->|"出场意向挂单"| OMS
+        PSM --> Mark["每日收盘逐日盯市 (Mark-to-Market: Cash + 标的收盘市值)"]
+        Mark --> NAV["单标的每日净值序列 (Daily NAV Series)"]
+    end
 
-  // 2. 动态保本机制 (支持 1R 保本损转移模式)
-  breakEven?: {
-    enabled: boolean;
-    mode: '1R' | 'profit_ratio'; // '1R': 浮盈达到 1 倍初始风险时保本; 'profit_ratio': 浮盈达到固定百分比时保本
-    triggerProfitRatio?: number; // mode 为 profit_ratio 时的阈值 (如 0.03 = 3%)
-  };
+    subgraph Layer4["Layer 4: 纯数学算力底座 (libs/indicators - Rust Polars)"]
+        NAV --> Sharpe["computeSharpeRatio / computeMaxDrawdown / computeDailyReturns"]
+        Sharpe --> Metrics["单标的量化绩效: 夏普比率、最大回撤、年化收益率、胜率、盈亏比"]
+    end
 
-  // 3. 双轨止盈之移动追踪止盈 (Trailing Stop)
-  trailingStop?: {
-    enabled: boolean;
-    mode: 'callback_ratio' | 'indicator_track'; // 回撤比例模式 或 均线跟踪模式
-    activationProfitRatio?: number; // 激活阈值 (如浮盈达到 5% 或 2R)
-    callbackRatio?: number; // 从最高点回撤比例 (如 2%) 触发平仓
-    indicatorKey?: string; // 跟踪指标破位离场，如 'ema20'
-  };
-
-  // 4. 双轨止盈之目标位分批止盈 (Partial Profit)
-  partialProfit?: {
-    enabled: boolean;
-    targetRatio: number; // 达到目标盈亏比 (如 2.5R 或目标位) 触发减仓
-    closeRatio: number; // 平仓比例，默认 0.5 (减仓 50%)
-  };
-
-  // 5. 硬风控止损 (底线兜底)
-  hardStopLossRatio?: number; // 固定止损比例，如 0.05 (5%)
-
-  // 6. 决策流反向卖出信号出场
-  oppositeSignalExit?: boolean; // 当决策流产生 action === 'SELL' 确立出场
-
-  // 7. 最大持仓 K 线数超时出场
-  maxHoldingBars?: number; // 超过 N 根 Bar 未触发止盈止损强制平仓
-}
+    subgraph Layer5["Layer 5: 业务闭环与呈现层 (Backtest / Live Signal / Web / 终端)"]
+        Metrics --> BApp["apps/backtest: 落盘 backtest_trade_results 与 backtest_runs 绩效"]
+        Metrics --> SApp["apps/signal: 实时持仓监控、浮动盈亏与动态止损推送"]
+        Metrics --> Fe["mist-fe: Web 控制台量化绩效卡片与交易流水"]
+        Metrics --> Term["TDX / QMT: 原生终端买卖 Pin 标与止损连接线复盘"]
+    end
 ```
 
 ---
 
-## 3. A 股严格成交撮合模型（Lookahead-Free Simulated Broker）
+## 2. 核心架构边界定界：单标的模式 A（Single-Security Model）
 
-### 3.1 时序与撮合规则
-
-| 动作 | 判定时机 | 撮合时机与价格 | 异常与边界处理 |
-| :--- | :--- | :--- | :--- |
-| **开仓买入** | Bar $t$ 闭合计算确认决策流 `BUY` | Bar $t+1$ 以 `open` 价格撮合 | 若 Bar $t+1$ 涨停一字板（`open == highLimit`），标记 `BUY_REJECTED_LIMIT_UP`，撤单放弃 |
-| **盘中触价止损** | Bar $t$ 处于持仓状态且已过 T+1 | 若 `bar.low <= stopPrice`：<br>• 若 `open <= stopPrice`，以 `open` 成交；<br>• 否则以 `stopPrice` 撮合 | 若 Bar $t$ 跌停一字板（`open == lowLimit`），标记 `SELL_BLOCKED_LIMIT_DOWN`，顺延至次日 |
-| **收盘信号/形态卖出** | Bar $t$ 闭合计算满足出场条件 | Bar $t+1$ 以 `open` 价格撮合 | 严格受 T+1 限制（当天买入的标的当天不可卖出，持仓锁定至次日） |
-
-### 3.2 摩擦成本与滑点模型（支持个股与 ETF 差异化费率）
-
-- **股票印花税 (Stamp Duty)**: 卖出单向 `tradeAmount * 0.0005`（**ETF 交易免征印花税**，系统根据标的类别自动免除）。
-- **券商佣金 (Commission)**: `max(5.0, tradeAmount * 0.00025)` (买卖双向)。
-- **过户费 (Transfer Fee)**: `tradeAmount * 0.00001` (买卖双向)。
-- **滑点 (Slippage)**: 默认 0.1% 或固定 1~2 Tick（ETF 盘口价差通常仅 0.001 元，可配置为更低滑点）。
+### 2.1 物理现实与模式 A 锁定
+根据系统实际代码机制（`backtest-run.executor.ts:214` 循环 `for (const target of targets) await replaySecurity(...)`）：
+- **物理事实**：回测在执行层是**按标的独立串行回放一整年历史**。标的之间在时间线上相互隔离，物理上不存在多标的同一时间戳并发；
+- **模式 A 规范（锁定）**：
+  1. 系统明确采用**单股票独立持仓状态机模型**（每个标的分配独立的虚拟初始资金，如 100 万元）；
+  2. 每个标的独立完成“开仓 $\rightarrow$ Exit Trinity 出局三部曲 $\rightarrow$ 逐日盯市”，生成该标的专属的**单标的每日净值曲线（NAV Series）**；
+  3. 计算出的夏普率代表**“该策略在该标的上的独立盈亏质量与风险收益比”**；
+  4. 一次回测若包含多只股票，回测引擎产出各个标的的独立绩效指标与流水明细（任务汇总层可计算各标的夏普率的等权均值）；
+  5. **明确 Non-Goal**：多股票共享母资金池、按时间切片时钟同步步进、动态仓位竞争抢占的 Portfolio 组合回测，确立为下一阶段的独立演进课题。
 
 ---
 
-## 4. 三维防未来函数质检与对账机制
+## 3. 标的身份全局统一：全面拥抱 `security_id`，废弃 `security_code`
+
+### 3.1 统一规范
+- 全系统信号层与执行层**唯一使用 `security_id` (INT NOT NULL, FK→securities.id)** 作为标的身份标识；
+- **废除对 `security_code` 字符串列的依赖**：
+  - 实时表 `strategy_signals` 保持纯粹的 `security_id`（外键关系，杜绝代码拼写错误或股票更名数据污染）；
+  - 回测表 `backtest_signal_results` 补齐 `security_id`（FK 约束），停止依赖字符串代码；
+  - 若前端或终端展示需要股票代码/名称，统一通过 `security_id` 关联 `securities` 主表获取。
+
+---
+
+## 4. 全链路同构硬门禁：消除推拉之外的所有差异
+
+依据全链路审计清单，必须在首期全面对齐以下四大维度的系统隐患：
+
+### 4.1 维度 1：数据表与持久化 100% 镜像对齐
+1. **Migration 027 双向补齐**：
+   - `strategy_signals` 补齐 `signal_type VARCHAR(32) NOT NULL DEFAULT 'signal'`（解决对账脚本崩溃及细分买卖点缺失）；
+   - `backtest_signal_results` 补齐 `security_id` (INT, FK)、`strategy_definition_id`、`strategy_version_id`、`period`、`source`、`signal_kind`、`signal_source`；
+   - `backtest_runs` 增加 `prewarm_status`、`prewarm_min_actual`、`prewarm_min_expected`。
+2. **修复回测落盘致命 Bug**：
+   - 修复 `backtest-run.executor.ts:330-341` 在 `this.resultRepository.insert` 映射中漏写 `pivotTime` 的 Bug，确保形态极值时间正确落库；
+   - 统一在两端将当期撮合基准价 `triggerPrice` 与 `triggerTime` 规范注入 `context_snapshot`（或持久化一等列）。
+3. **修复实时告警去重键阻断复合信号 Bug**：
+   - 修改 `liveStrategyAlertDedupeKey`，在哈希段中加入 `candidate.signalType`，确保同一 Bar 上的多个不同买卖点（如一买、二买）不会因告警表唯一键冲突而导致信号回滚。
+
+### 4.2 维度 2：预热机制与内核上下文完全归一
+1. **消除预热数量 `+1` 偏置**：
+   - 实时侧 `loadRealtimeWindow` 移除 `criteria.requiredBars + 1` 的隐式硬编码，两端严格以 `requiredBars` 为基准；
+2. **修复回测盘中预热切分割裂**：
+   - 回测 `preWarmEndAt` 从死锁的 09:30 改为对齐 `run.startDate`，确保回测与实时在盘中启动时的预热段完全一致；
+3. **修复实时内核上下文标的标识失真**：
+   - 修复 `RealtimeKernelPool.buildGroup` 错误传入数字 ID `String(bar.securityId)` 的问题，向 Kernel 传入统一规范的标识。
+
+### 4.3 维度 3：Bar 规范化与策略编译清洗下沉
+1. **下沉 OHLC 四价几何拓扑校验**：
+   - 将 `low <= min(o,c)` 与 `high >= max(o,c)` 的合法性校验下沉至共享 `libs/market-data`，回测读库时统一执行；
+2. **统一量额十进制清洗**：
+   - 实时侧封存 K 线映射时补齐调用 `normalizeExternalDecimalText`；
+3. **统一规则快照与 Schema 门禁**：
+   - 回测执行器向 Kernel 及结果表传递编译归一化后的 `compiled.ruleSnapshot`，补齐 `ruleSchemaVersion === V1` 校验。
+
+### 4.4 维度 4：修复游标统计泄漏
+- 在 `historical-bar-source.ts` 中加入单调时间戳防御，遇到内核拒绝的乱序/重复 Bar 时，**严禁累加 `barCount`，严禁触发 `onBar` 回调**，彻底杜绝回测配额被误扣损耗。
+
+---
+
+## 5. 防未来函数向交易层转移与决策树松绑
+
+### 5.1 交易层接管因果律（物理时序隔离）
+- **Next-Bar Open 成交法则**：
+  Bar $t$ 闭合确认决策信号；交易引擎在 Bar $t+1$ 以开盘价 `bar.open`（叠加滑点）撮合成交：
+  $$t_{\text{fill}} \ge t+1 > t_{\text{signal}}$$
+  在时间轴上物理阻隔，彻底消除同 Bar 穿越或极值点未来成交。
+
+### 5.2 决策树与信号层全面解绑
+1. **剥离虚拟成交价**：信号层不再假定自己能在当根 Bar 的 `close` 价格成交，移除虚拟撮合逻辑；
+2. **卸除因子插件交易防重负担**：插件（如 `ChanBspFactorPlugin`）内部只做纯数学形态去重，不再背负跨 Bar 开仓防重的责任；下游单标的持仓状态机处于 `Holding` 状态时，交易引擎天然忽略同向开仓信号；
+3. **保留纯数据因果律**：滑动窗口严格禁止灌入未来 K 线。
+
+---
+
+## 6. 交易引擎设计（`TradingEngine`）
+
+- 模块路径：`libs/strategy/src/execution/`
+- 核心契约：
+  - `Order`：包含 `orderId`, `securityId`, `side: 'BUY' | 'SELL'`, `orderType`, `quantity`, `signalTime`, `initialStopLossPrice`；
+  - `OrderFilledEvent`：包含实际成交时刻 `fillTime`、成交均价 `fillPrice`、成交股数、费用明细（佣金、过户费、印花税）；
+- A 股严格模拟撮合模型（`SimulatedBroker`）：
+  - Next-Bar Open 成交与滑点（默认 0.1%）；
+  - T+1 锁定（当日买入可用股数为 0，禁止日内平仓）；
+  - 涨停一字板买入拒单（`BUY_REJECTED_LIMIT_UP`）；
+  - 跌停一字板卖出顺延（`SELL_BLOCKED_LIMIT_DOWN`，延至次一交易日继续撮合）；
+  - 双向万 2.5 佣金（最低 5 元）、过户费、卖出单向 0.05% 印花税（支持 ETF 免征印花税判定）。
+
+---
+
+## 7. 单标的持仓生命周期状态机设计（`PositionStateMachine`）
+
+- 模块路径：`libs/strategy/src/position/`
+- 状态迁移：
+  `Empty` ➔ `PendingEntry` ➔ `Holding` ➔ (`PendingPartialExit` ➔ `Holding`) ➔ `PendingExit` ➔ `Closed`
+- 完整集成 Exit Trinity 出局三部曲（`StrategyExitPolicy`）：
+  1. **结构止损**：从决策信号 `evidence` 提取笔底或中枢 `zd` 动态设置初始止损价；
+  2. **1R 动态保本损**：价格浮盈达到 1 倍初始风险 R 时，无条件将止损线拉升至开仓成本线；
+  3. **双轨止盈**：目标位减仓 50%，剩余 50% 启动 Trailing Stop 移动追踪止盈；
+  4. **硬风控兜底与反向卖点**：固定百分比止损，以及决策流发出反向 `SELL` 时强制平仓。
+- **每日收盘逐日盯市（Mark-to-Market）**：
+  在每日 15:00 收盘时刻计算单标的总权益：$NAV_t = Cash_t + Position_t \times Close_t$，生成连续的 `Daily NAV Series` 数组。
+
+---
+
+## 8. 夏普率与量化绩效指标计算（`libs/indicators` Rust Polars）
+
+在纯数学指标层实现标准向量化算子：
+- $\text{Daily Return: } R_t = \frac{NAV_t - NAV_{t-1}}{NAV_{t-1}}$
+- $\text{Annualized Sharpe Ratio: } \text{Sharpe} = \frac{\text{mean}(R_t) - (R_f / 250)}{\text{std}(R_t, ddof=1)} \times \sqrt{250}$
+- 函数接口：`computeDailyReturns`、`computeSharpeRatio`、`computeMaxDrawdown`、`computeCalmarRatio`。
+
+---
+
+## 9. 分阶段工程门禁与人机交互治理机制（Phase Gates & Verification Governance）
 
 ```mermaid
-graph TD
-    subgraph V1["1. 因果不变性断言 (Causality Assertions)"]
-        A1["所有指标与决策流输入时间戳 ≤ 决策时间戳"]
-        A2["成交时间戳 > 信号确认时间戳 (严格 Next-Bar)"]
-        A3["几何形态确认时延校验 (t_confirm ≥ t_extrema)"]
-    end
-
-    subgraph V2["2. 双轨对账单元测试 (Live-Backtest Parity Suite)"]
-        B1["录制历史行情切片"]
-        B2["实时推流引擎运行 (Signal App)"]
-        B3["离线回测引擎运行 (Backtest App)"]
-        B4["断言: Signal 产生时间/内容/持仓动作 100% 逐字对齐"]
-    end
-
-    subgraph V3["3. 未来数据扰动与泄漏测试 (Lookahead Leakage Injection)"]
-        C1["在时间点 t 截断或注入未来随机噪声"]
-        C2["重新计算 t 时刻的决策输出"]
-        C3["断言: t 时刻的信号与持仓决策严格保持不变"]
-    end
+flowchart LR
+    P0["Phase 0: 全链路同构硬门禁"] -->|"Gate 0 核准"| P1["Phase 1: 决策树松绑"]
+    P1 -->|"Gate 1 核准"| P2["Phase 2: 交易引擎"]
+    P2 -->|"Gate 2 核准"| P3["Phase 3: 持仓状态机"]
+    P3 -->|"Gate 3 核准"| P4["Phase 4: 夏普算子与闭环"]
+    P4 -->|"Gate 4 核准"| P5["Phase 5: 对账与终验"]
 ```
 
----
-
-## 5. 实体与数据库设计（Schema Migrations）
-
-### 5.1 `backtest_trade_results` 表（支持全量流水与分批平仓记录）
-
-```sql
-CREATE TABLE `backtest_trade_results` (
-  `id` INT AUTO_INCREMENT PRIMARY KEY,
-  `backtest_run_id` INT NOT NULL,
-  `security_code` VARCHAR(20) NOT NULL,
-  `entry_signal_time` DATETIME(3) NOT NULL,
-  `entry_time` DATETIME(3) NOT NULL,
-  `entry_price` DECIMAL(12, 4) NOT NULL,
-  `exit_signal_time` DATETIME(3) NOT NULL,
-  `exit_time` DATETIME(3) NOT NULL,
-  `exit_price` DECIMAL(12, 4) NOT NULL,
-  `exit_reason` VARCHAR(60) NOT NULL, -- 'STRUCTURAL_STOP' | 'BREAK_EVEN' | 'PARTIAL_PROFIT' | 'TRAILING_STOP' | 'HARD_STOP_LOSS' | 'OPPOSITE_SIGNAL' | 'TIMEOUT'
-  `is_partial` TINYINT(1) NOT NULL DEFAULT 0, -- 是否为半仓分批止盈流水
-  `holding_bars` INT NOT NULL,
-  `pnl_amount` DECIMAL(14, 4) NOT NULL,
-  `pnl_ratio` DECIMAL(8, 4) NOT NULL,
-  `pnl_r_multiple` DECIMAL(6, 2) DEFAULT NULL, -- 盈亏 R 计数 (如 +2.5R, -1.0R)
-  `total_fee` DECIMAL(10, 4) NOT NULL,
-  `context_snapshot` JSON NOT NULL,
-  `created_at` DATETIME(3) DEFAULT CURRENT_TIMESTAMP(3),
-  INDEX `idx_run_id` (`backtest_run_id`),
-  INDEX `idx_security` (`security_code`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-```
-
----
-
-## 6. 与原生终端可视化（QMT / TDX）与 Web 控制台分工
-
-1. **Web 端 (`mist-fe`)**：
-   - 任务控制与状态轮询；
-   - 量化绩效卡片：总收益率、年化收益率、夏普比率、最大回撤、胜率、盈亏比、交易总次数、平均持仓周期；
-   - 逐笔 Trade 流水表格（包含入场时间/价格、出场时间/价格、持仓时长、分批平仓标记、出场归因标签）；
-   - 因果质检报告（时序断言与双轨对账状态）。
-2. **桌面端 (`TDX / QMT`)**：
-   - 通过 `openspec/changes/integrate-native-terminal-visualization` 提供的绘图指令接口，将回测生成的 Trade 序列自动转为买入 Pin 标、卖出 Pin 标、持仓连接线与动态止损警戒线，在桌面专业终端极速复盘。
-
----
-
-## 7. 信号身份与落盘字段一致性（对账坐标系）
-
-### 7.1 两表身份列现状（2026-10-13 核对）
-
-| 身份列 | 实时 `strategy_signals` | 回测 `backtest_signal_results` |
-| :--- | :--- | :--- |
-| security 身份 | `security_id` INT + FK→securities（migration 014） | `security_code` VARCHAR(20)（migration 009 移除 definition/version/period/source 后遗留） |
-| `signal_kind` (entry/exit) | ✅ enum（migration 014） | ❌ |
-| `signal_source` (live/backtest) | ✅ enum | ❌ |
-| `strategy_version_id` | ✅ INT + FK（migration 006 原建） | ❌（migration 009 已 DROP） |
-| `period` / `source` | ✅ | ❌（migration 009 已 DROP） |
-| `decision_trace` / `context_snapshot` / `rule_snapshot` | ✅ | ✅ |
-
-### 7.2 决定：回测侧补列（migration 027，forward-only）
-
-原则：**只补对账必需的身份列，不回收定义/版本再声明为「业务不可变」的列**。
-回测的版本归属本就由 `backtest_runs.strategy_definition_id/strategy_version_id`
-承载，信号行冗余一份是为了 parity 逐行对账与按版本聚合查询，不做跨表 JOIN 兜底。
-
-```sql
--- Migration 027: backtest signal result identity parity with realtime strategy_signals
-ALTER TABLE `backtest_signal_results`
-  ADD COLUMN `security_id` int NULL AFTER `backtest_run_id`,
-  ADD COLUMN `strategy_version_id` int NULL AFTER `security_id`,
-  ADD COLUMN `signal_kind` enum('entry','exit') NOT NULL DEFAULT 'entry' AFTER `signal_type`,
-  ADD COLUMN `signal_source` enum('live','backtest') NOT NULL DEFAULT 'backtest' AFTER `signal_kind`;
-
--- 1) security_code → security_id 回填（code 在 securities 中唯一）
-UPDATE `backtest_signal_results` r
-  JOIN `securities` s ON s.`code` = r.`security_code`
-  SET r.`security_id` = s.`id`
-  WHERE r.`security_id` IS NULL;
-
--- 2) 存量行 signal_kind 以 entry 位保留（原 dedupe/parity 工具即按 entry 处理）
--- 3) security_id 回填失败的存量行保留 NULL（不阻断迁移；新写入必填）
-```
-
-- 新增列先 NULL 容忍（存量回填），代码层收口为写入必填；`security_code`
-  列保留为展示/兼容列（前端与旧查询依赖），不作为对账主键。
-- 不回填 `period`/`source`：回测 run 级已有 `period`/`source`，信号行不重复；
-  对账时从 `backtest_runs` 取，避免第二个写入点。
-- Entity 同步：`BacktestSignalResult` 实体补映射 `securityId /
-  strategyVersionId / signalKind / signalSource`；executor 写入时从
-  `run.securityId` / `run.strategyVersionId` / `signal.signalKind` 取值。
-
-### 7.3 唯一性与多信号语义
-
-migration 025 已 drop 业务唯一键（保留主键 id 身份），同一 Bar 多信号
-（entry+exit 或复合信号）不折叠，与实时一致。本 change **不**重建业务唯一键；
-对账按 `(run_id, security_id, signal_time, signal_kind, strategy_version_id,
-signal_type)` 六元组做集合比对。
-
----
-
-## 8. 推演计划身份注入与编译边界对齐（③⑥）
-
-### 8.1 版本身份注入
-
-```typescript
-// strategy-simulation.types.ts 扩展
-export interface SimulationPlanIdentity {
-  readonly definitionId: number;
-  readonly versionId: number;
-}
-
-export interface SimulationSessionConfig {
-  // ...existing fields
-  /** 计划身份；缺省时为本地演示注入显式哨兵身份，禁止隐式 0 */
-  readonly planIdentity?: SimulationPlanIdentity;
-}
-```
-
-- 会话内存具名常量 `SIMULATION_LOCAL_FIXTURE_IDENTITY = { definitionId: -1,
-  versionId: -1 }` 作为「本地演示夹具」显式哨兵（负值，绝不可能与 DB
-  自增主键碰撞）；构造入参给出的真实身份优先。
-- `SimulationSignal` 映射补 `definitionId/versionId` 透出，便于推演帧与
-  回测信号逐条对账。
-
-### 8.2 编译边界对齐（⑥）
-
-- 推演计划的 `flow` 来源唯一化：`tools/strategy-dev/server.ts` 的
-  `createTacticsDecisionFlow()` 本地工厂属于 dev fixture，必须显式声明
-  fixture 身份（哨兵），不得伪装成 DB 定义；若以后端点为「加载存量定义推演」，
-  必须走 `compileStoredDefinitionVersion`（现有编译边界），不得再抄一条流。
-- 门禁断言（静态 + 单测双守）：`StrategySimulationSession` 构造中不得出现
-  字面量 `definitionId: 0` / `versionId: 0`；计划身份必须来自 config 或
-  显式哨兵常量。
-
----
-
-## 9. 预热状态贯通（④）
-
-### 9.1 现状与决定
-
-`prewarmStatus / prewarmActual / prewarmExpected` 已由内核诊断产出、
-`HistoricalBarSource.PreparedReplay` 透出，但无下游消费（回测不落盘、
-实时不暴露）。决定：**贯通而非删除**——预热不足（`partial`）本身就是策略
-有效性与对账可信度的关键输入（窗口不足期间内核不判定不发射）。
-
-### 9.2 传播路径
-
-1. **回测侧**：
-   - `replaySecurity` 从 replay outcome 取 `prewarmStatus/prewarmActual/
-     prewarmExpected`，聚合到 run 级（多标的多窗口时取最保守值：任一
-     `empty` → `empty`，任一 `partial` → `partial`，全部 `full` → `full`）。
-   - 落 `backtest_runs` 新列（migration 027 一并加）：
-     `prewarm_status enum('full','partial','empty') NULL`、
-     `prewarm_min_actual INT NULL`、`prewarm_min_expected INT NULL`。
-   - Web 控制台绩效卡片与因果质检报告展示预热覆盖度（Phase 4 一并做）。
-2. **实时侧**：
-   - `RealtimeKernelPool.diagnostics()` 聚合各组内核诊断：
-     `prewarmStatusCounts: { full, partial, empty }`（组级计数）+
-     `minPrewarmActual/minPrewarmExpected`（最保守组）；
-   - `SignalHealthVo.marketData` 区块补预热覆盖字段
-     （盘前预热 change `add-pre-market-strategy-hydration` 已预构建组后，
-     该字段在 09:30 前即为 `full`，两 change 字段命名对齐）；
-   - 「窗口不足不判定不发射」的现有语义（`insufficient_history`）不变，
-     预热覆盖度只是使其可观测。
+### 硬性治理铁律（Mandatory Checkpoint & Zero Auto-Advance）
+1. **单阶段严格闭环**：任务与代码严格限制在当前 Phase，严禁跨 Phase 提前编写；
+2. **强制人机停顿（Mandatory Halt）**：每个 Phase 完成后，系统**必须立即停顿**，向人类工程师提交《Phase 交付与审计报告》；
+3. **人类授权解锁（Explicit Sign-off）**：未获得人类明确回复（如“批准 Phase X / 进入 Phase X+1”）前，**绝对禁止自动启动下一 Phase**；
+4. **逐阶段共同走通**：每个 Phase 实施前后由人类工程师与 Agent 共同核对验收。

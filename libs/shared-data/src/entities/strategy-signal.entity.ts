@@ -14,10 +14,11 @@ import { StrategySignalKind } from '../enums/strategy-signal-kind.enum';
 import { Security } from './security.entity';
 import { StrategyDefinition } from './strategy-definition.entity';
 import { StrategyVersion } from './strategy-version.entity';
+import type { StrategySignalParityRecord } from './strategy-signal-parity.interface';
 
 @Entity({ name: 'strategy_signals' })
 @Index('idx_strategy_signals_security_time', ['securityId', 'signalTime'])
-export class StrategySignal {
+export class StrategySignal implements StrategySignalParityRecord {
   @PrimaryGeneratedColumn()
   id!: number;
 
@@ -78,6 +79,14 @@ export class StrategySignal {
     enum: StrategySignalKind,
   })
   signalKind!: StrategySignalKind;
+
+  @Column({
+    name: 'signal_type',
+    type: 'varchar',
+    length: 32,
+    default: 'signal',
+  })
+  signalType: string = 'signal';
 
   @Column({
     name: 'confidence',

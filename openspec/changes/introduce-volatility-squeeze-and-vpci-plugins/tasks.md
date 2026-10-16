@@ -15,3 +15,11 @@
   - [x] **任务 3.1**：运行 `pnpm typecheck`，确保全局类型 0 报错。
   - [x] **任务 3.2**：运行 `pnpm check:magic`，更新 AST 魔法值门禁基线确保 100% 绿灯。
   - [x] **任务 3.3**：全量单元测试回归，验证 `libs/indicators` 与 `libs/strategy` 所有测试 100% PASS。
+
+---
+
+> 补正注记（2026-10-16）：本 change 的 spec 已由 flat 叙述文件转换为合法 delta 格式
+> （`specs/volatility-indicators/spec.md`、`specs/vpci-indicator/spec.md`），并并入口径修正：
+> BOLL 总体标准差 ddof=0（复用 `computeRollingStdSeries`）；特征提取器 VWAP 精确 amount 口径
+> （`Σamount / Σvolume`）与 amount 不可用 fail-closed。实现由 `fix-indicator-conventions` 承接，
+> 本 change 归档前须确认其已完成，否则修正不会进入 live spec。

@@ -118,9 +118,13 @@ export class RealtimeKernelPool {
       anchorAt: bar.timestamp,
       requiredBars,
     });
+    const securityCode =
+      bar.securityCode ??
+      hydrated.bars.find((b) => b.securityCode)?.securityCode ??
+      String(bar.securityId);
     const kernel = new StrategyEvaluationKernel({
       securityId: bar.securityId,
-      securityCode: String(bar.securityId),
+      securityCode,
       period: bar.period,
       publicFrom: bar.timestamp,
       plans: plans.map((plan) => ({
