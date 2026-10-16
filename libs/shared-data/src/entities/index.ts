@@ -13,4 +13,5 @@ export * from './strategy-alert-event.entity';
 export * from './strategy-alert-delivery.entity';
 export * from './backtest-run.entity';
 export * from './backtest-signal-result.entity';
+export * from './backtest-trade-result.entity';
 export * from './strategy-signal-parity.interface';

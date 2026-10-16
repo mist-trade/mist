@@ -5,6 +5,7 @@ import { backtestEnvSchema } from '@app/config';
 import {
   BacktestRun,
   BacktestSignalResult,
+  BacktestTradeResult,
   K,
   KExtensionEf,
   KExtensionQmt,
@@ -68,6 +69,7 @@ import { BacktestStartupService } from './backtest-startup.service';
             StrategyAlertEvent,
             BacktestRun,
             BacktestSignalResult,
+            BacktestTradeResult,
           ],
           poolSize: 10,
           connectorPackage: 'mysql2' as const,
@@ -81,6 +83,7 @@ import { BacktestStartupService } from './backtest-startup.service';
       StrategyDefinition,
       BacktestRun,
       BacktestSignalResult,
+      BacktestTradeResult,
     ]),
   ],
   controllers: [AppController, HealthController, BacktestCommandController],

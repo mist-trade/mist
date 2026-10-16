@@ -13,6 +13,7 @@ import { Period } from '../enums/period.enum';
 import { StrategyKind } from '../enums/strategy-kind.enum';
 import { BacktestRunStatus } from '../enums/backtest-run-status.enum';
 import { BacktestSignalResult } from './backtest-signal-result.entity';
+import { BacktestTradeResult } from './backtest-trade-result.entity';
 import { StrategyDefinition } from './strategy-definition.entity';
 import { StrategyVersion } from './strategy-version.entity';
 import type { BacktestTargetIssue } from '../backtest-target-issue';
@@ -71,6 +72,72 @@ export class BacktestRun {
   matchedSecurityCount: number = 0;
 
   @Column({
+    name: 'total_return',
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  totalReturn?: number | null;
+
+  @Column({
+    name: 'annualized_return',
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  annualizedReturn?: number | null;
+
+  @Column({
+    name: 'max_drawdown',
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  maxDrawdown?: number | null;
+
+  @Column({
+    name: 'sharpe_ratio',
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  sharpeRatio?: number | null;
+
+  @Column({
+    name: 'calmar_ratio',
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  calmarRatio?: number | null;
+
+  @Column({
+    name: 'win_rate',
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  winRate?: number | null;
+
+  @Column({
+    name: 'profit_loss_ratio',
+    type: 'decimal',
+    precision: 10,
+    scale: 4,
+    nullable: true,
+  })
+  profitLossRatio?: number | null;
+
+  @Column({ name: 'trade_count', type: 'int', default: 0 })
+  tradeCount: number = 0;
+
+  @Column({
     name: 'prewarm_status',
     type: 'enum',
     enum: ['full', 'partial', 'empty'],
@@ -95,6 +162,9 @@ export class BacktestRun {
 
   @OneToMany(() => BacktestSignalResult, (result) => result.backtestRun)
   signalResults!: BacktestSignalResult[];
+
+  @OneToMany(() => BacktestTradeResult, (trade) => trade.backtestRun)
+  tradeResults!: BacktestTradeResult[];
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

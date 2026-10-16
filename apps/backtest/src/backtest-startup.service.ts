@@ -5,6 +5,7 @@ import {
   BacktestRun,
   BacktestRunStatus,
   BacktestSignalResult,
+  BacktestTradeResult,
 } from '@app/shared-data';
 import { DataSource, LessThanOrEqual, Repository } from 'typeorm';
 import { BacktestAdmissionService } from './backtest-admission.service';
@@ -40,6 +41,7 @@ export class BacktestStartupService implements OnApplicationBootstrap {
         );
         if (updated.affected === 1) {
           await manager.delete(BacktestSignalResult, { backtestRunId: run.id });
+          await manager.delete(BacktestTradeResult, { backtestRunId: run.id });
         }
       }
     });

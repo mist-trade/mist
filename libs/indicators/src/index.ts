@@ -105,3 +105,5 @@ export type {
   StaticSwingFibonacciResult,
   TradingViewFibStyle,
 } from './fibonacci';
+
+export * from './performance';

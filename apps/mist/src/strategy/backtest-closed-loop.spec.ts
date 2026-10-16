@@ -7,6 +7,7 @@ import {
   Security,
   StrategyDefinition,
   StrategyKind,
+  StrategyRuleSchemaVersion,
   StrategyVersion,
 } from '@app/shared-data';
 import { StrategyBacktestController } from './controllers/strategy-backtest.controller';
@@ -60,6 +61,7 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
       id: 10,
       strategyDefinitionId: 1,
       version: 1,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
       rule: {
         id: 'term_breakout',
         type: 'TERMINAL',
@@ -247,12 +249,21 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
       }),
     };
 
+    const tradeRepo: any = {
+      insert: jest.fn(async (rows: any) => {
+        const arr = Array.isArray(rows) ? rows : [rows];
+        return { identifiers: arr.map((_, i) => ({ id: i + 1 })) };
+      }),
+      create: jest.fn((input: object) => ({ id: 1, ...input })),
+    };
+
     const healthService = new HealthStateService();
 
     // Instantiate executor (apps/backtest runtime)
     executor = new BacktestRunExecutor(
       runRepo,
       resultRepo,
+      tradeRepo,
       versionRepo,
       securityRepo,
       definitionRepo,

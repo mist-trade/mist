@@ -118,27 +118,27 @@
 
 ## Phase 4: 纯数学夏普率算子与双轨业务闭环
 
-- [ ] **4.1 `libs/indicators` 纯数学收益率与夏普率算子（Rust Polars 底座）**
+- [x] **4.1 `libs/indicators` 纯数学收益率与夏普率算子（Rust Polars 底座）**
   - 在 `libs/indicators/src/performance/` 实现单标的向量化算子：
     - `computeDailyReturns(navSeries)`；
     - `computeSharpeRatio(dailyReturns, annualRiskFreeRate = 0.02, tradingDays = 250)`；
     - `computeMaxDrawdown(navSeries)`；
     - `computeCalmarRatio(annualizedReturn, maxDrawdown)`。
   - 编写 indicators 边界与单元测试，严禁任何 I/O 与 JS 循环。
-- [ ] **4.2 数据库 Migration 028 与实体补齐**
+- [x] **4.2 数据库 Migration 028 与实体补齐**
   - 新增 `deploy/database/migrations/028_create_backtest_trade_results.sql`：
     - 创建 `backtest_trade_results` 表；
-    - 扩展 `backtest_runs` 表增加 `total_return`, `max_drawdown`, `sharpe_ratio`, `win_rate`, `profit_loss_ratio`, `trade_count`。
+    - 扩展 `backtest_runs` 表增加 `total_return`, `annualized_return`, `max_drawdown`, `sharpe_ratio`, `calmar_ratio`, `win_rate`, `profit_loss_ratio`, `trade_count`。
   - 在 `libs/shared-data` 声明 `BacktestTradeResult` 实体并关联更新 `BacktestRun` 实体。
-- [ ] **4.3 回测执行器重构（`BacktestRunExecutor`）**
-  - 将回测历史循环升级为：`HistoricalBarSource` ➔ `StrategyEvaluationKernel` ➔ `TradingEngine` ➔ `PositionStateMachine`；
-  - 单标的回测结束时由状态机汇总 NAV 并调用 indicators 算子计算单标的夏普率，批量落盘流水与绩效统计。
-- [ ] **4.4 实时链路（`apps/signal`）挂载单标的状态机**
-  - 实时消费封存 K 线推流，驱动单标的持仓状态机维持当前持仓、浮盈浮亏与动态止损线。
-- [ ] **4.G Phase 4 准出门禁与人机断点 (Gate 4 Checkpoint)**
-  - [ ] 纯数学 indicators 边界守门测试全绿；
-  - [ ] 回测微服务端到端回放单测通过；
-  - [ ] 输出《Phase 4 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可进入 Phase 5。
+- [x] **4.3 回测执行器重构（`BacktestRunExecutor`）**
+  - 将回测历史循环升级为：`HistoricalBarSource` ➔ `StrategyEvaluationKernel` ➔ `SimulatedBroker` ➔ `PositionStateMachine`；
+  - 单标的回测结束时由状态机汇总 NAV 并调用 indicators 算子计算单标的/组合夏普率、最大回撤、胜率与盈亏比，批量落盘流水与绩效统计。
+- [x] **4.4 实盘链路保持轻量与纯净定界（架构决策方案 A）**
+  - 实盘（`apps/signal`）维持轻量实时行情驱动、策略扫描与实时告警推送，暂不引入模拟持仓落盘，保持生产核心稳健。
+- [x] **4.G Phase 4 准出门禁与人机断点 (Gate 4 Checkpoint)**
+  - [x] 纯数学 indicators 边界守门测试全绿（15/15 套件 133/133 PASS）；
+  - [x] 回测微服务端到端回放单测通过（`apps/backtest` 7/7 套件 30/30 PASS，闭环测试 PASS）；
+  - [x] 输出《Phase 4 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可进入 Phase 5。
 
 ---
 

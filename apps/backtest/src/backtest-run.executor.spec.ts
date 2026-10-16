@@ -47,6 +47,10 @@ function executor(overrides: Record<string, unknown> = {}) {
       insert: jest.fn(),
       create: jest.fn((input: object) => ({ id: 1, ...input })),
     },
+    tradeRepository: {
+      insert: jest.fn(),
+      create: jest.fn((input: object) => ({ id: 1, ...input })),
+    },
     versionRepository: {
       findOne: jest.fn().mockResolvedValue({
         id: 7,
@@ -82,6 +86,7 @@ function executor(overrides: Record<string, unknown> = {}) {
       const inst = new BacktestRunExecutor(
         dependencies.runRepository as any,
         dependencies.resultRepository as any,
+        dependencies.tradeRepository as any,
         dependencies.versionRepository as any,
         dependencies.securityRepository as any,
         dependencies.definitionRepository as any,

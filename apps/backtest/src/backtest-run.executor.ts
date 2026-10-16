@@ -5,6 +5,7 @@ import {
   BacktestRun,
   BacktestRunStatus,
   BacktestSignalResult,
+  BacktestTradeResult,
   DataSource,
   Period,
   Security,
@@ -17,12 +18,23 @@ import {
 } from '@app/shared-data';
 import {
   compileStoredDefinitionVersion,
+  DEFAULT_BROKER_INITIAL_CASH,
   HistoricalBarSource,
   mapKernelSignalToPersistencePayload,
+  ORDER_SIDES,
+  ORDER_TYPES,
+  POSITION_STATUSES,
+  PositionStateMachine,
+  SIGNAL_KINDS,
+  SimulatedBroker,
   StrategyEvaluationKernel,
   type CompiledStoredDefinition,
+  type DailyNavSnapshot,
+  type PositionClosedRecord,
+  type StrategyBar,
   type StrategyRealtimeSource,
 } from '@app/strategy';
+import { computePerformanceSummary } from '@app/indicators';
 import { DataSource as TypeOrmDataSource, In, Repository } from 'typeorm';
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
 import { BacktestRunFailure } from './backtest-run-error';
@@ -30,6 +42,9 @@ import { HealthStateService } from './health/health-state.service';
 
 const BACKTEST_CALCULATION_BATCH_SIZE = 100;
 const BACKTEST_RESULT_BATCH_SIZE = 100;
+const CST_TIMEZONE_OFFSET_HOURS = 8;
+const HOURS_PER_DAY = 24;
+const AFTERNOON_CLOSE_HOUR_CST = 15;
 
 class ReplayBudget {
   consumed = 0;
@@ -76,6 +91,8 @@ export class BacktestRunExecutor {
     private readonly runRepository: Repository<BacktestRun>,
     @InjectRepository(BacktestSignalResult)
     private readonly resultRepository: Repository<BacktestSignalResult>,
+    @InjectRepository(BacktestTradeResult)
+    private readonly tradeRepository: Repository<BacktestTradeResult>,
     @InjectRepository(StrategyVersion)
     private readonly versionRepository: Repository<StrategyVersion>,
     @InjectRepository(Security)
@@ -215,6 +232,8 @@ export class BacktestRunExecutor {
     }
 
     const results: BacktestSignalResult[] = [];
+    const trades: BacktestTradeResult[] = [];
+    const allNavHistories: (readonly DailyNavSnapshot[])[] = [];
     let signalCount = 0;
     const matchedCodes = new Set<string>();
     const prewarmActuals: number[] = [];
@@ -242,8 +261,36 @@ export class BacktestRunExecutor {
           `backtest target_issue code=NO_HISTORICAL_BARS securityCode=${code}`,
         );
       }
+      for (const t of outcome.trades) {
+        trades.push(
+          this.tradeRepository.create({
+            backtestRunId: run.id,
+            securityId: t.securityId,
+            securityCode: t.securityCode,
+            entryTime: t.entryTime,
+            exitTime: t.exitTime,
+            holdingBars: t.holdingBars,
+            entryPrice: t.entryPrice,
+            exitPrice: t.exitPrice,
+            quantity: t.quantity,
+            realizedPnl: t.realizedPnl,
+            returnRatio: t.returnRatio,
+            exitReason: t.exitReason,
+          }),
+        );
+      }
+      if (outcome.navHistory.length > 0) {
+        allNavHistories.push(outcome.navHistory);
+      }
     }
     await this.flushResults(results);
+    await this.flushTrades(trades);
+
+    const combinedNavSeries = combineDailyNavHistories(
+      allNavHistories,
+      DEFAULT_BROKER_INITIAL_CASH,
+    );
+    const summary = computePerformanceSummary(combinedNavSeries, trades);
 
     const prewarmMinActual =
       prewarmActuals.length > 0 ? Math.min(...prewarmActuals) : null;
@@ -264,6 +311,14 @@ export class BacktestRunExecutor {
         targetIssues: uniqueIssues(issues),
         signalCount,
         matchedSecurityCount: matchedCodes.size,
+        totalReturn: summary.totalReturn,
+        annualizedReturn: summary.annualizedReturn,
+        maxDrawdown: summary.maxDrawdown,
+        sharpeRatio: summary.sharpeRatio,
+        calmarRatio: summary.calmarRatio,
+        winRate: summary.winRate,
+        profitLossRatio: summary.profitLossRatio,
+        tradeCount: summary.tradeCount,
         prewarmStatus,
         prewarmMinActual,
         prewarmMinExpected,
@@ -290,6 +345,8 @@ export class BacktestRunExecutor {
     hasBars: boolean;
     prewarmStatus: 'full' | 'partial' | 'empty';
     prewarmActual: number;
+    trades: readonly PositionClosedRecord[];
+    navHistory: readonly DailyNavSnapshot[];
   }> {
     const preWarmEndAt = replayStartFor(run);
     const kernel = new StrategyEvaluationKernel({
@@ -316,9 +373,18 @@ export class BacktestRunExecutor {
       endAt: new Date(run.endDate.getTime()),
       requiredBars: compiled.requiredBarCount,
     });
+
+    const broker = new SimulatedBroker(DEFAULT_BROKER_INITIAL_CASH);
+    const positionMachine = new PositionStateMachine(
+      securityId,
+      securityCode,
+      DEFAULT_BROKER_INITIAL_CASH,
+    );
+    let lastSeenBar: StrategyBar | null = null;
+
     const outcome = await source.drive(
       kernel,
-      async (signal) => {
+      async (signal, bar) => {
         budget.consume();
         const payload = mapKernelSignalToPersistencePayload(signal, {
           securityId,
@@ -350,19 +416,66 @@ export class BacktestRunExecutor {
         );
         matchedCodes.add(securityCode);
         onSignal();
+
+        if (
+          positionMachine.getStatus() === POSITION_STATUSES.EMPTY &&
+          signal.signalKind === SIGNAL_KINDS.ENTRY
+        ) {
+          const availableCash = positionMachine.getCash();
+          const targetQty = Math.floor(availableCash / bar.close / 100) * 100;
+          if (targetQty >= 100) {
+            broker.submitOrder({
+              securityId,
+              securityCode,
+              side: ORDER_SIDES.BUY,
+              orderType: ORDER_TYPES.MARKET,
+              quantity: targetQty,
+              signalTime: signal.signalTime,
+            });
+          }
+        } else if (positionMachine.getStatus() === POSITION_STATUSES.HOLDING) {
+          const exitDraft = positionMachine.onSignal(signal);
+          if (exitDraft) {
+            broker.submitOrder(exitDraft);
+          }
+        }
+
         if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
           await this.flushResults(results);
       },
-      async () => {
+      async (bar) => {
         budget.consume();
+        lastSeenBar = bar;
+
+        const fills = broker.onBar(bar);
+        for (const fill of fills) {
+          positionMachine.onOrderFilled(fill);
+        }
+
+        const orderDraft = positionMachine.onBar(bar);
+        if (orderDraft) {
+          broker.submitOrder(orderDraft);
+        }
+
+        if (isDailyCloseBar(bar, run.period)) {
+          positionMachine.onDayClose(bar);
+        }
+
         await budget.checkpoint();
       },
     );
     await budget.checkpoint(true);
+
+    if (lastSeenBar && positionMachine.getNavHistory().length === 0) {
+      positionMachine.onDayClose(lastSeenBar);
+    }
+
     return {
       hasBars: outcome.publicBarCount > 0,
       prewarmStatus: outcome.prewarmStatus,
       prewarmActual: outcome.prewarmActual,
+      trades: positionMachine.getClosedTrades(),
+      navHistory: positionMachine.getNavHistory(),
     };
   }
 
@@ -405,6 +518,34 @@ export class BacktestRunExecutor {
     }
   }
 
+  private async flushTrades(trades: BacktestTradeResult[]): Promise<void> {
+    if (trades.length === 0) return;
+    const pending = trades.splice(0, trades.length);
+    try {
+      await this.tradeRepository.insert(
+        pending.map((t) => ({
+          backtestRunId: t.backtestRunId,
+          securityId: t.securityId,
+          securityCode: t.securityCode,
+          entryTime: t.entryTime,
+          exitTime: t.exitTime,
+          holdingBars: t.holdingBars,
+          entryPrice: t.entryPrice,
+          exitPrice: t.exitPrice,
+          quantity: t.quantity,
+          realizedPnl: t.realizedPnl,
+          returnRatio: t.returnRatio,
+          exitReason: t.exitReason,
+        })) as never,
+      );
+    } catch (error) {
+      this.logger.error(
+        `backtest trades_batch_failed runId=${pending[0]?.backtestRunId}`,
+      );
+      throw error;
+    }
+  }
+
   private async failAndCleanup(
     runId: number,
     failure: BacktestRunFailure,
@@ -429,6 +570,7 @@ export class BacktestRunExecutor {
         );
         if (updated.affected !== 1) return;
         await manager.delete(BacktestSignalResult, { backtestRunId: runId });
+        await manager.delete(BacktestTradeResult, { backtestRunId: runId });
       });
     } catch (error) {
       this.logger.error(
@@ -470,4 +612,61 @@ function classifyFailure(error: unknown): BacktestRunFailure {
 
 function errorTrace(error: unknown): string | undefined {
   return error instanceof Error ? error.stack : undefined;
+}
+
+function isDailyCloseBar(bar: StrategyBar, period: Period): boolean {
+  if (period >= Period.DAY) {
+    return true;
+  }
+  const cstHour =
+    (bar.timestamp.getUTCHours() + CST_TIMEZONE_OFFSET_HOURS) % HOURS_PER_DAY;
+  const minute = bar.timestamp.getUTCMinutes();
+  return cstHour === AFTERNOON_CLOSE_HOUR_CST && minute === 0;
+}
+
+function combineDailyNavHistories(
+  allNavHistories: readonly (readonly DailyNavSnapshot[])[],
+  initialCashPerSecurity: number,
+): number[] {
+  if (allNavHistories.length === 0) {
+    return [];
+  }
+  if (allNavHistories.length === 1) {
+    return allNavHistories[0].map((s) => s.totalEquity);
+  }
+
+  const dateSet = new Set<string>();
+  for (const history of allNavHistories) {
+    for (const item of history) {
+      dateSet.add(item.date);
+    }
+  }
+  const sortedDates = Array.from(dateSet).sort();
+
+  const dateMaps = allNavHistories.map((history) => {
+    const map = new Map<string, DailyNavSnapshot>();
+    for (const item of history) {
+      map.set(item.date, item);
+    }
+    return map;
+  });
+
+  const lastKnownEquities = new Array(allNavHistories.length).fill(
+    initialCashPerSecurity,
+  );
+
+  const combinedSeries: number[] = [];
+  for (const date of sortedDates) {
+    let dayTotalEquity = 0;
+    for (let i = 0; i < allNavHistories.length; i++) {
+      const snap = dateMaps[i].get(date);
+      if (snap) {
+        lastKnownEquities[i] = snap.totalEquity;
+      }
+      dayTotalEquity += lastKnownEquities[i];
+    }
+    combinedSeries.push(dayTotalEquity);
+  }
+
+  return combinedSeries;
 }
