@@ -82,3 +82,23 @@ export const EXECUTION_RULES = Object.freeze({
   STAMP_DUTY_RATE: 0.0005,
   DEFAULT_SLIPPAGE_RATIO: 0.001,
 } as const);
+
+export const POSITION_STATUSES = Object.freeze({
+  EMPTY: 'EMPTY',
+  HOLDING: 'HOLDING',
+  CLOSED: 'CLOSED',
+} as const);
+
+export const EXIT_ACTIONS = Object.freeze({
+  HOLD: 'HOLD',
+  EXIT: 'EXIT',
+} as const);
+
+export const POSITION_DECIMAL_PLACES = Object.freeze({
+  RATIO_SCALE: 10000,
+  DATE_STRING_LENGTH: 10,
+} as const);
+
+export const POSITION_EXIT_REASONS = Object.freeze({
+  SIGNAL_EXIT: 'SIGNAL_EXIT',
+} as const);

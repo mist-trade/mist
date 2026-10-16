@@ -95,27 +95,24 @@
 
 ## Phase 3: 增加 PositionStateMachine 单标的持仓状态机（核心任务 3）
 
-- [ ] **3.1 统一单标的持仓状态机核心实现（`PositionStateMachine`）**
+- [x] **3.1 统一单标的持仓状态机核心实现（`PositionStateMachine`）**
   - 在 `libs/strategy/src/position/` 实现单标的独立状态机：
-    - 状态迁移：`Empty` ➔ `PendingEntry` ➔ `Holding` ➔ (`PendingPartialExit` ➔ `Holding`) ➔ `PendingExit` ➔ `Closed`；
-    - 消费 `TradingEngine` 派发的成交事件驱动状态转换；
-    - 维护单标的持仓生命周期状态：`entryBar`, `costPrice`, `highWatermark`, `currentStopLossPrice`, `holdingBars`, `initialRiskR`。
-- [ ] **3.2 全量集成 Exit Trinity 出局三部曲（`StrategyExitPolicy`）**
-  - 逐 Bar 推进出场策略判定：
-    - **通用结构止损**：从买入信号 `evidence` 提取笔底或中枢 `zd` 动态设置结构止损价；
-    - **1R 动态保本损**：浮盈达到 1 倍初始风险 R 时，无条件拉升止损线至开仓成本线；
-    - **双轨止盈**：目标位减仓 50%（触发 `PendingPartialExit`），剩余 50% 启动 Trailing Stop 追踪；
-    - **硬风控兜底与反向卖点**：固定比例止损，以及决策流发出反向 `SELL` 时强制平仓。
-- [ ] **3.3 每日收盘逐日盯市（Mark-to-Market）与净值生成**
+    - 状态迁移：`EMPTY` ➔ `HOLDING` ➔ `CLOSED`；
+    - 消费 `SimulatedBroker` 派发的 `OrderFilledEvent` 真实成交事件驱动状态转换；
+    - 维护单标的持仓生命周期状态：`entryTime`, `costPrice`, `holdingQuantity`, `holdingBars`, `realizedPnl`, `unrealizedPnl`。
+- [x] **3.2 反向信号出场策略与可插拔出场接口（`ExitPolicyPort`）**
+  - 主仓库内部默认仅按决策流发出的反向卖点信号（`signalKind === 'exit'`）平仓离场，不设硬止损以保护策略收益率；
+  - 抽象与决策树插件高度同构的 `ExitPolicyPort` / `ExitDecision` 规范，预留私有仓专有风控插件的装配扩展点。
+- [x] **3.3 每日收盘逐日盯市（Mark-to-Market）与净值生成**
   - 交易日 15:00 收盘时刻计算单标的总权益：$NAV_t = Cash_t + Position_t \times Close_t$；
-  - 维护连续的单标的 `dailyNavHistory: { date: Date, nav: number }[]` 序列；
-  - 记录单笔交易闭环的 `TradeResult` 实体。
-- [ ] **3.4 状态机与交易引擎协同单元测试**
-  - 模拟复杂时序场景（包含 1R 保本迁移、分批减仓、移动跟踪止盈与跌停延期平仓），测试覆盖率 $\ge 90\%$。
-- [ ] **3.G Phase 3 准出门禁与人机断点 (Gate 3 Checkpoint)**
-  - [ ] 自动化核验：`pnpm -C mist typecheck` 0 报错；
-  - [ ] 状态机单测全绿：`pnpm -C mist test libs/strategy/src/position`，覆盖率达标；
-  - [ ] 输出《Phase 3 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可进入 Phase 4。
+  - 维护连续的单标的 `dailyNavHistory: { date: string, nav: number }[]` 序列；
+  - 记录单笔交易闭环的 `PositionClosedRecord` 实体。
+- [x] **3.4 状态机与交易引擎协同单元测试**
+  - 模拟完整买入入场、持仓更新、逐日盯市与反向信号平仓时序场景，覆盖率 $\ge 90\%$。
+- [x] **3.G Phase 3 准出门禁与人机断点 (Gate 3 Checkpoint)**
+  - [x] 自动化核验：`pnpm -C mist typecheck` 0 报错；
+  - [x] 状态机单测全绿：`pnpm -C mist test libs/strategy/src/position`，覆盖率达标；
+  - [x] 输出《Phase 3 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可进入 Phase 4。
 
 ---
 

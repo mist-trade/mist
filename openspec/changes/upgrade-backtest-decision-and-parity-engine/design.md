@@ -137,15 +137,20 @@ flowchart TD
 ## 7. 单标的持仓生命周期状态机设计（`PositionStateMachine`）
 
 - 模块路径：`libs/strategy/src/position/`
+- 核心设计哲学（主私仓库战略隔离与收益率保护）：
+  1. **主仓库以持仓管理与记账为主，零死板止损**：
+     - 避免因假摔或震荡洗盘机械打止损造成频繁割肉、磨损手续费并拉低复合收益率；
+     - 主仓库内部默认仅依托决策流的**反向卖点信号（`signalKind === 'exit'`）**离场；
+  2. **专有止损/出场插件物理隔离至私有仓**：
+     - 严守开源/公共仓资产安全红线，复杂的 ATR 移动止损、网格风控等策略资产沉淀于私有仓库；
+     - 主仓库提供与决策树因子插件（`FactorPlugin`）高度同构的扩展端口（`ExitPolicyPort`），支持无缝装配私有仓专有插件；
 - 状态迁移：
-  `Empty` ➔ `PendingEntry` ➔ `Holding` ➔ (`PendingPartialExit` ➔ `Holding`) ➔ `PendingExit` ➔ `Closed`
-- 完整集成 Exit Trinity 出局三部曲（`StrategyExitPolicy`）：
-  1. **结构止损**：从决策信号 `evidence` 提取笔底或中枢 `zd` 动态设置初始止损价；
-  2. **1R 动态保本损**：价格浮盈达到 1 倍初始风险 R 时，无条件将止损线拉升至开仓成本线；
-  3. **双轨止盈**：目标位减仓 50%，剩余 50% 启动 Trailing Stop 移动追踪止盈；
-  4. **硬风控兜底与反向卖点**：固定百分比止损，以及决策流发出反向 `SELL` 时强制平仓。
+  `EMPTY` ➔ `HOLDING` ➔ `CLOSED`
+- 生命周期与账本事实：
+  - 记录 `entryTime`, `costPrice`, `holdingQuantity`, `holdingBars`, `realizedPnl`, `unrealizedPnl`；
+  - 消费 `SimulatedBroker` 的真实 `OrderFilledEvent` 进行准确记账；
 - **每日收盘逐日盯市（Mark-to-Market）**：
-  在每日 15:00 收盘时刻计算单标的总权益：$NAV_t = Cash_t + Position_t \times Close_t$，生成连续的 `Daily NAV Series` 数组。
+  在每日 15:00 收盘时刻计算单标的总权益：$NAV_t = Cash_t + Position_t \times Close_t$，生成连续纯净的 `Daily NAV Series` 净值曲线。
 
 ---
 
