@@ -2,167 +2,180 @@ import type { ProjectedStrategyBar } from '@app/market-data';
 import type { FactorContext } from '../factor.types';
 import { FibonacciRetracementPlugin } from './fibonacci.plugin';
 
-function makeMockBar(
-  time: Date,
-  open: number,
-  high: number,
-  low: number,
-  close: number,
-  volume: number = 10000,
-): ProjectedStrategyBar {
+/**
+ * Synthetic series used by the Chan-anchored Fibonacci tests. The series are designed so
+ * the real `@app/chancore` derivation produces exactly the stated completed units
+ * (verified against `deriveCompletedBis` while authoring these tests):
+ * - pullback: completed UP bi 89.5 → 108.5, final close 96.8 (61.6% retracement);
+ * - rebound: completed DOWN bi 110.5 → 97.5, final close 104.6 (54.6% rebound);
+ * - monotonic: no fractal pair → no completed unit at all.
+ */
+function makeMockBar(time: Date, value: number): ProjectedStrategyBar {
+  const high = value + 0.5;
+  const low = value - 0.5;
   return {
     rawBar: {
       securityId: 1,
       source: 'tdx',
       period: 5,
       timestamp: time,
-      open,
+      open: value,
       high,
       low,
-      close,
-      volume: String(volume),
-      amount: String(volume * close),
+      close: value,
+      volume: '1000',
+      amount: String(1000 * value),
       type: 'complete',
     },
     tradingDay: '2026-09-07',
     ohlc: {
-      raw: { open, high, low, close },
-      effective: { open, high, low, close },
+      raw: { open: value, high, low, close: value },
+      effective: { open: value, high, low, close: value },
       resolution: 'observed',
     },
     volume: {
-      raw: String(volume),
-      effective: String(volume),
+      raw: '1000',
+      effective: '1000',
       resolution: 'observed',
     },
     amount: {
-      raw: String(volume * close),
-      effective: String(volume * close),
+      raw: String(1000 * value),
+      effective: String(1000 * value),
       resolution: 'observed',
     },
+  } as unknown as ProjectedStrategyBar;
+}
+
+function toBars(values: number[]): ProjectedStrategyBar[] {
+  const start = new Date('2026-09-07T01:30:00.000Z');
+  return values.map((value, index) =>
+    makeMockBar(new Date(start.getTime() + index * 60_000), value),
+  );
+}
+
+function makeContext(bars: ProjectedStrategyBar[]): FactorContext {
+  return {
+    securityId: 1,
+    securityCode: '000001',
+    timestamp:
+      bars.length > 0
+        ? bars[bars.length - 1].rawBar.timestamp
+        : new Date('2026-09-07T01:30:00.000Z'),
+    period: 5,
+    bars,
+    attributes: new Map(),
   };
 }
 
-describe('FibonacciRetracementPlugin', () => {
+/** Up swing then a pullback into the golden pocket of the completed up bi. */
+function pullbackSeries(): number[] {
+  const values: number[] = [];
+  for (let i = 0; i <= 5; i += 1) values.push(100 + i * 0.4);
+  for (let i = 1; i <= 20; i += 1) values.push(102 - i * 0.6);
+  for (let i = 1; i <= 20; i += 1) values.push(90 + i * 0.9);
+  for (let i = 1; i <= 14; i += 1) values.push(108 - i * 0.8);
+  return values;
+}
+
+/** Down swing then a rebound into the golden pocket of the completed down bi. */
+function reboundSeries(): number[] {
+  const values: number[] = [];
+  for (let i = 0; i <= 5; i += 1) values.push(102 - i * 0.4);
+  for (let i = 1; i <= 20; i += 1) values.push(100 + i * 0.5);
+  for (let i = 1; i <= 20; i += 1) values.push(110 - i * 0.6);
+  for (let i = 1; i <= 10; i += 1) values.push(98 + i * 0.66);
+  return values;
+}
+
+/** Monotonic rise: no fractal pair, hence no completed bi/duan. */
+function monotonicSeries(): number[] {
+  return Array.from({ length: 60 }, (_, i) => 90 + i * 0.3);
+}
+
+describe('FibonacciRetracementPlugin (Chan swing anchor)', () => {
   const plugin = new FibonacciRetracementPlugin();
 
-  it('has valid metadata in TECHNICAL category', () => {
+  it('has valid metadata in TECHNICAL category with the Chan-anchor parameter schema', () => {
     expect(plugin.id).toBe('plugin.technical.fibonacci');
     expect(plugin.category).toBe('TECHNICAL');
     expect(plugin.name).toContain('斐波那契');
+    expect(plugin.paramSchema.units.default).toBe('bi');
+    expect('period' in plugin.paramSchema).toBe(false);
   });
 
-  it('returns NEUTRAL with 0 confidence when bars are insufficient', async () => {
-    const context: FactorContext = {
-      securityId: 1,
-      securityCode: '000001',
-      timestamp: new Date('2026-09-01T15:00:00Z'),
-      period: 1440,
-      bars: [makeMockBar(new Date('2026-09-01T15:00:00Z'), 10, 12, 9, 11)],
-      attributes: new Map(),
-    };
+  it('returns NEUTRAL with 0 confidence when bars are insufficient for the bi derivation', async () => {
+    const context = makeContext(toBars(pullbackSeries().slice(0, 49)));
+    const opinion = await plugin.evaluate(context);
 
-    const opinion = await plugin.evaluate(context, { period: 10 });
     expect(opinion.action).toBe('NEUTRAL');
     expect(opinion.confidence).toBe(0.0);
     expect(opinion.reason).toContain('K线数量不足');
   });
 
-  it('triggers BUY when price pulls back into Golden Pocket (0.500 ~ 0.618)', async () => {
-    // 10 bars: Max High is 20, Min Low is 10 (diff = 10)
-    // 55% pullback: close = 20 - 5.5 = 14.5
-    const bars: ProjectedStrategyBar[] = [
-      makeMockBar(new Date('2026-09-01T10:00:00Z'), 12, 15, 10, 12),
-      makeMockBar(new Date('2026-09-01T10:01:00Z'), 12, 16, 11, 14),
-      makeMockBar(new Date('2026-09-01T10:02:00Z'), 14, 18, 12, 16),
-      makeMockBar(new Date('2026-09-01T10:03:00Z'), 16, 20, 14, 19), // Peak 20
-      makeMockBar(new Date('2026-09-01T10:04:00Z'), 19, 19, 15, 17),
-      makeMockBar(new Date('2026-09-01T10:05:00Z'), 17, 18, 14, 16),
-      makeMockBar(new Date('2026-09-01T10:06:00Z'), 16, 17, 13, 15.5),
-      makeMockBar(new Date('2026-09-01T10:07:00Z'), 15.5, 16, 12, 15),
-      makeMockBar(new Date('2026-09-01T10:08:00Z'), 15, 15.5, 12, 14.8),
-      makeMockBar(new Date('2026-09-01T10:09:00Z'), 14.8, 15, 12, 14.5), // Close 14.5 -> 55% pullback
-    ];
+  it('returns NEUTRAL when the duan level is requested without enough bars for a duan', async () => {
+    const context = makeContext(toBars(pullbackSeries()));
+    const opinion = await plugin.evaluate(context, { units: 'duan' });
 
-    const context: FactorContext = {
-      securityId: 1,
-      securityCode: '000001',
-      timestamp: new Date('2026-09-01T10:09:00Z'),
-      period: 5,
-      bars,
-      attributes: new Map(),
-    };
+    expect(opinion.action).toBe('NEUTRAL');
+    expect(opinion.reason).toContain('K线数量不足');
+  });
 
-    const opinion = await plugin.evaluate(context, { period: 10 });
+  it('returns NEUTRAL when no completed chan swing exists (never falls back to a rolling window)', async () => {
+    const context = makeContext(toBars(monotonicSeries()));
+    const opinion = await plugin.evaluate(context);
+
+    expect(opinion.action).toBe('NEUTRAL');
+    expect(opinion.confidence).toBe(0.0);
+    expect(opinion.reason).toContain('不回退滚动窗口');
+    expect(opinion.evidence?.insufficientSwing).toBe(true);
+  });
+
+  it('triggers BUY when price pulls back into the golden pocket of the completed up bi', async () => {
+    const context = makeContext(toBars(pullbackSeries()));
+    const opinion = await plugin.evaluate(context);
+
     expect(opinion.action).toBe('BUY');
     expect(opinion.confidence).toBe(0.75);
     expect(opinion.reason).toContain('黄金口袋');
     expect(opinion.evidence?.isGoldenPocket).toBe(true);
-    expect(opinion.evidence?.ratio).toBe(0.55);
+    expect(Number(opinion.evidence?.ratio)).toBeCloseTo(0.6158, 4);
+    expect(opinion.evidence?.swingDirection).toBe('up');
+    expect(opinion.evidence?.units).toBe('bi');
+    expect(opinion.evidence?.swingHigh).toBeCloseTo(108.5, 6);
+    expect(opinion.evidence?.swingLow).toBeCloseTo(89.5, 6);
+    expect(typeof opinion.evidence?.swingStartTime).toBe('string');
+    expect(typeof opinion.evidence?.swingEndTime).toBe('string');
     expect(opinion.evidence?.levels).toBeDefined();
     expect(opinion.evidence?.styles).toBeDefined();
   });
 
-  it('triggers SELL when direction is rebound and price bounces to Golden Pocket', async () => {
-    // High is 20, Low is 10 (diff = 10). Close is 15.5 (55% rebound from low 10)
-    const bars: ProjectedStrategyBar[] = [
-      makeMockBar(new Date('2026-09-01T10:00:00Z'), 18, 20, 16, 18), // High 20
-      makeMockBar(new Date('2026-09-01T10:01:00Z'), 18, 18, 14, 15),
-      makeMockBar(new Date('2026-09-01T10:02:00Z'), 15, 15, 12, 12.5),
-      makeMockBar(new Date('2026-09-01T10:03:00Z'), 12.5, 13, 10, 10.5), // Low 10
-      makeMockBar(new Date('2026-09-01T10:04:00Z'), 10.5, 12, 10.2, 11.5),
-      makeMockBar(new Date('2026-09-01T10:05:00Z'), 11.5, 13, 11, 12.8),
-      makeMockBar(new Date('2026-09-01T10:06:00Z'), 12.8, 14, 12, 13.5),
-      makeMockBar(new Date('2026-09-01T10:07:00Z'), 13.5, 15, 13, 14.5),
-      makeMockBar(new Date('2026-09-01T10:08:00Z'), 14.5, 15.8, 14, 15.0),
-      makeMockBar(new Date('2026-09-01T10:09:00Z'), 15.0, 16.0, 14.8, 15.5), // Rebound to 15.5
-    ];
+  it('triggers SELL when price rebounds into the golden pocket of the completed down bi', async () => {
+    const context = makeContext(toBars(reboundSeries()));
+    const opinion = await plugin.evaluate(context, { direction: 'rebound' });
 
-    const context: FactorContext = {
-      securityId: 1,
-      securityCode: '000001',
-      timestamp: new Date('2026-09-01T10:09:00Z'),
-      period: 5,
-      bars,
-      attributes: new Map(),
-    };
-
-    const opinion = await plugin.evaluate(context, {
-      period: 10,
-      direction: 'rebound',
-    });
     expect(opinion.action).toBe('SELL');
     expect(opinion.confidence).toBe(0.75);
-    expect(opinion.reason).toContain('黄金口袋阻力区');
+    expect(opinion.reason).toContain('黄金口袋');
+    expect(opinion.evidence?.isGoldenPocket).toBe(true);
+    expect(Number(opinion.evidence?.ratio)).toBeCloseTo(0.5462, 4);
+    expect(opinion.evidence?.swingDirection).toBe('down');
+    expect(opinion.evidence?.swingHigh).toBeCloseTo(110.5, 6);
+    expect(opinion.evidence?.swingLow).toBeCloseTo(97.5, 6);
   });
 
-  it('returns NEUTRAL when price is in shallow pullback', async () => {
-    // High is 20, Low is 10. Close is 18 (20% pullback)
-    const bars: ProjectedStrategyBar[] = [
-      makeMockBar(new Date('2026-09-01T10:00:00Z'), 12, 15, 10, 12),
-      makeMockBar(new Date('2026-09-01T10:01:00Z'), 12, 16, 11, 14),
-      makeMockBar(new Date('2026-09-01T10:02:00Z'), 14, 18, 12, 16),
-      makeMockBar(new Date('2026-09-01T10:03:00Z'), 16, 20, 14, 19), // Peak 20
-      makeMockBar(new Date('2026-09-01T10:04:00Z'), 19, 19.5, 17, 18.5),
-      makeMockBar(new Date('2026-09-01T10:05:00Z'), 18.5, 19, 17, 18.2),
-      makeMockBar(new Date('2026-09-01T10:06:00Z'), 18.2, 18.8, 17, 18.0),
-      makeMockBar(new Date('2026-09-01T10:07:00Z'), 18.0, 18.5, 17, 18.1),
-      makeMockBar(new Date('2026-09-01T10:08:00Z'), 18.1, 18.5, 17.5, 18.0),
-      makeMockBar(new Date('2026-09-01T10:09:00Z'), 18.0, 18.4, 17.5, 18.0), // Close 18 (20% pullback)
-    ];
+  it('stays NEUTRAL when the enabled direction does not match the completed swing direction', async () => {
+    const context = makeContext(toBars(reboundSeries()));
+    const opinion = await plugin.evaluate(context);
 
-    const context: FactorContext = {
-      securityId: 1,
-      securityCode: '000001',
-      timestamp: new Date('2026-09-01T10:09:00Z'),
-      period: 5,
-      bars,
-      attributes: new Map(),
-    };
-
-    const opinion = await plugin.evaluate(context, { period: 10 });
     expect(opinion.action).toBe('NEUTRAL');
-    expect(opinion.confidence).toBe(0.0);
-    expect(opinion.reason).toContain('浅度回调');
+    expect(opinion.evidence?.swingDirection).toBe('down');
+  });
+
+  it('is deterministic for identical inputs', async () => {
+    const context = makeContext(toBars(pullbackSeries()));
+    const first = await plugin.evaluate(context);
+    const second = await plugin.evaluate(context);
+
+    expect(second).toEqual(first);
   });
 });

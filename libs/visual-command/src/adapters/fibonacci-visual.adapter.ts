@@ -1,7 +1,9 @@
 import {
-  computeFibonacciObservation,
+  computeFibonacciLevels,
   TRADINGVIEW_FIB_STYLES,
 } from '@app/indicators';
+import { TrendDirection, type ChanK } from '@app/chancore';
+import { findLastCompletedSwing, type ChanSwingLevel } from './chan-swing.util';
 import type {
   BandVisualCommand,
   LineVisualCommand,
@@ -9,16 +11,9 @@ import type {
   VisualCommand,
 } from '../visual-command.types';
 
-export interface FibonacciVisualKLine {
-  readonly time: Date;
-  readonly high: number;
-  readonly low: number;
-  readonly close: number;
-}
-
 export interface FibonacciVisualOptions {
-  /** Rolling window for Fibonacci swing anchor (default 50) */
-  readonly period?: number;
+  /** Chan swing level used as the Fibonacci anchor: bi by default. */
+  readonly units?: ChanSwingLevel;
   /** Whether to include shaded TradingView color bands between levels (default true) */
   readonly includeBands?: boolean;
   /** Whether to include text price labels on lines (default true) */
@@ -27,40 +22,37 @@ export interface FibonacciVisualOptions {
 
 /**
  * 斐波那契视觉指令适配器
- * 基于 TradingView 官方工业级色谱与半透明色带规范，将行情序列转换为标准绘图原语
+ * 锚定最近一根"已完成且有效"的缠论单元（笔/段）端点（与因子插件同源），
+ * 基于 TradingView 官方工业级色谱与半透明色带规范，将摆动区间转换为标准绘图原语。
+ * 无已完成摆动时输出空指令集（不回退滚动窗口锚点）。
  */
 export class FibonacciVisualAdapter {
   static convert(
-    klines: readonly FibonacciVisualKLine[],
+    klines: readonly ChanK[],
     options: FibonacciVisualOptions = {},
   ): readonly VisualCommand[] {
-    const period = options.period ?? 50;
-    if (!klines || klines.length < period) {
+    const units = options.units ?? 'bi';
+    if (!klines || klines.length === 0) {
       return [];
     }
+
+    const unit = findLastCompletedSwing(klines, units);
+    if (!unit || !(unit.high > unit.low)) {
+      return [];
+    }
+
+    const direction = unit.trend === TrendDirection.Up ? 'up' : 'down';
+    const levelsResult = computeFibonacciLevels(unit.high, unit.low, direction);
+    const levels = levelsResult.levelsByRatio;
 
     const { includeBands = true, includeLabels = true } = options;
 
-    const highs: number[] = [];
-    const lows: number[] = [];
-    const closes: number[] = [];
-
-    for (let i = 0; i < klines.length; i++) {
-      highs.push(klines[i].high);
-      lows.push(klines[i].low);
-      closes.push(klines[i].close);
-    }
-
-    let obs;
-    try {
-      obs = computeFibonacciObservation(highs, lows, closes, { period });
-    } catch {
-      return [];
-    }
-
     const commands: VisualCommand[] = [];
     const endIndex = klines.length - 1;
-    const startIndex = Math.max(0, klines.length - period);
+    const foundStart = klines.findIndex(
+      (k) => k.time.getTime() === unit.startTime.getTime(),
+    );
+    const startIndex = Math.max(0, foundStart);
     const startTime = klines[startIndex].time.toISOString();
     const endTime = klines[endIndex].time.toISOString();
 
@@ -85,8 +77,8 @@ export class FibonacciVisualAdapter {
       ];
 
       for (const pair of bandPairs) {
-        const topPrice = obs.levels[pair.upper];
-        const bottomPrice = obs.levels[pair.lower];
+        const topPrice = levels[pair.upper];
+        const bottomPrice = levels[pair.lower];
         const style = TRADINGVIEW_FIB_STYLES[pair.lower];
 
         if (
@@ -114,7 +106,7 @@ export class FibonacciVisualAdapter {
 
     // 2. 斐波那契水平位虚线与右侧标签 (Lines and Labels)
     for (const ratioStr of standardRatios) {
-      const price = obs.levels[ratioStr];
+      const price = levels[ratioStr];
       const style = TRADINGVIEW_FIB_STYLES[ratioStr];
       if (price === undefined || !style) continue;
 

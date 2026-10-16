@@ -28,6 +28,47 @@ function generateSampleKlines(count = 60): ChanK[] {
   return klines;
 }
 
+/** Synthetic series forming a completed UP bi (89.5 → 108.5) with a golden-pocket pullback close. */
+function generateSwingKlines(): ChanK[] {
+  const values: number[] = [];
+  for (let i = 0; i <= 5; i += 1) values.push(100 + i * 0.4);
+  for (let i = 1; i <= 20; i += 1) values.push(102 - i * 0.6);
+  for (let i = 1; i <= 20; i += 1) values.push(90 + i * 0.9);
+  for (let i = 1; i <= 14; i += 1) values.push(108 - i * 0.8);
+
+  const base = new Date(Date.UTC(2026, 0, 1, 9, 30));
+  return values.map((value, index) => ({
+    id: index + 1,
+    symbol: '000001',
+    time: new Date(base.getTime() + index * 5 * 60 * 1000),
+    open: value,
+    high: value + 0.5,
+    low: value - 0.5,
+    close: value,
+    volume: '1000',
+    amount: String(1000 * value),
+  }));
+}
+
+/** Monotonic rise: no completed Chan unit, so the fibonacci layer must stay empty. */
+function generateNoSwingKlines(): ChanK[] {
+  const base = new Date(Date.UTC(2026, 0, 1, 9, 30));
+  return Array.from({ length: 60 }, (_, index) => {
+    const value = 90 + index * 0.3;
+    return {
+      id: index + 1,
+      symbol: '000001',
+      time: new Date(base.getTime() + index * 5 * 60 * 1000),
+      open: value,
+      high: value + 0.5,
+      low: value - 0.5,
+      close: value,
+      volume: '1000',
+      amount: String(1000 * value),
+    };
+  });
+}
+
 describe('VisualCommandService', () => {
   let service: VisualCommandService;
 
@@ -70,19 +111,32 @@ describe('VisualCommandService', () => {
   });
 
   it('generates fibonacci layer commands with TradingView styles', () => {
-    const klines = generateSampleKlines(60);
+    const klines = generateSwingKlines();
     const result = service.generateCommands({
       code: '000001',
       period: 5,
       source: 'tdx',
       klines,
       layers: ['fibonacci'],
-      fibOptions: { period: 50 },
+      fibOptions: { units: 'bi' },
     });
 
     expect(result.commands.length).toBeGreaterThan(0);
     expect(result.commands.every((c) => c.layer === 'fibonacci')).toBe(true);
     expect(result.commands.some((c) => c.type === 'band')).toBe(true);
     expect(result.commands.some((c) => c.type === 'line')).toBe(true);
+  });
+
+  it('emits no fibonacci commands when no completed chan swing exists', () => {
+    const klines = generateNoSwingKlines();
+    const result = service.generateCommands({
+      code: '000001',
+      period: 5,
+      source: 'tdx',
+      klines,
+      layers: ['fibonacci'],
+    });
+
+    expect(result.commands).toEqual([]);
   });
 });

@@ -14,11 +14,11 @@ import {
   computeChanUnitForces,
   checkZhongshuZeroRetracement,
 } from '@app/indicators';
-import type { ProjectedStrategyBar } from '@app/market-data';
 import {
   detectLatestConfirmedFenxing,
   type ConfirmedFenxingResult,
 } from '../../analysis/chan-fenxing-trigger';
+import { toChanKSeries } from '../../analysis/chan-derivation';
 import type {
   FactorContext,
   FactorOpinion,
@@ -125,7 +125,7 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       };
     }
 
-    const klines = this.toChanKSeries(context.bars);
+    const klines = toChanKSeries(context.bars);
     if (klines.length === 0) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
@@ -330,29 +330,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       deduplicate: params?.deduplicate !== false,
       requireConfirmedFenxing: params?.requireConfirmedFenxing === true,
     };
-  }
-
-  private toChanKSeries(
-    bars: readonly ProjectedStrategyBar[],
-  ): readonly ChanK[] {
-    const series: ChanK[] = [];
-    for (let i = 0; i < bars.length; i += 1) {
-      const b = bars[i];
-      const ohlc = b.ohlc.effective;
-      if (!ohlc) continue;
-      series.push({
-        id: i + 1,
-        symbol: String(b.rawBar.securityId),
-        time: b.rawBar.timestamp,
-        open: ohlc.open,
-        high: ohlc.high,
-        low: ohlc.low,
-        close: ohlc.close,
-        volume: b.volume.effective,
-        amount: b.amount.effective,
-      });
-    }
-    return series;
   }
 
   private detectEvents(

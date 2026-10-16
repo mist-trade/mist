@@ -30,6 +30,11 @@ function roundPrice(value: number, precision?: number): number {
  * Computes full Fibonacci rolling series via Polars Rust-vectorized expressions.
  * Warm-up positions carry no value; `out[i]` aligns to `in[i + begIndex]`.
  *
+ * Declared semantics: the swing anchors are the ROLLING WINDOW's extreme high/low — NOT
+ * Chan bi/duan endpoints — and `ratio` is always measured from the window high downward.
+ * The production factor and visualization paths anchor on confirmed Chan units instead
+ * (see `plugin.technical.fibonacci`); this operator remains a generic library primitive.
+ *
  * @param highs - High price series
  * @param lows - Low price series
  * @param closes - Close price series
@@ -135,6 +140,9 @@ export function computeFibonacciSeries(
 
 /**
  * Computes trailing Fibonacci observation on a window of price bars via Polars.
+ *
+ * Declared semantics: the swing anchors are the trailing window's extreme high/low — NOT
+ * Chan bi/duan endpoints — and `ratio` is always measured from the window high downward.
  */
 export function computeFibonacciObservation(
   highs: readonly number[],

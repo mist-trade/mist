@@ -1,33 +1,60 @@
-import {
-  FibonacciVisualAdapter,
-  type FibonacciVisualKLine,
-} from './fibonacci-visual.adapter';
+import type { ChanK } from '@app/chancore';
+import { FibonacciVisualAdapter } from './fibonacci-visual.adapter';
 
-function generateMockKlines(count: number): FibonacciVisualKLine[] {
-  const klines: FibonacciVisualKLine[] = [];
-  const baseDate = new Date('2026-09-01T09:30:00Z');
+/**
+ * Synthetic ChanK series forming a completed UP bi 89.5 → 108.5 (bars 25 → 45) with the
+ * final close at 96.8 (61.6% retracement) — the same structure verified against the real
+ * `deriveCompletedBis` derivation used by the factor plugin.
+ */
+function buildSwingKlines(): ChanK[] {
+  const values: number[] = [];
+  for (let i = 0; i <= 5; i += 1) values.push(100 + i * 0.4);
+  for (let i = 1; i <= 20; i += 1) values.push(102 - i * 0.6);
+  for (let i = 1; i <= 20; i += 1) values.push(90 + i * 0.9);
+  for (let i = 1; i <= 14; i += 1) values.push(108 - i * 0.8);
 
-  for (let i = 0; i < count; i++) {
-    const time = new Date(baseDate.getTime() + i * 5 * 60 * 1000);
-    const high = i === 10 ? 25 : 15 + (i % 5);
-    const low = i === 0 ? 10 : 12;
-    const close = 14;
-    klines.push({ time, high, low, close });
-  }
-
-  return klines;
+  const base = new Date('2026-09-01T09:30:00Z');
+  return values.map((value, index) => ({
+    id: index + 1,
+    symbol: '000001',
+    time: new Date(base.getTime() + index * 5 * 60 * 1000),
+    open: value,
+    high: value + 0.5,
+    low: value - 0.5,
+    close: value,
+    volume: '1000',
+    amount: String(1000 * value),
+  }));
 }
 
-describe('FibonacciVisualAdapter', () => {
-  it('returns empty commands when klines are fewer than required period', () => {
-    const klines = generateMockKlines(10);
-    const cmds = FibonacciVisualAdapter.convert(klines, { period: 20 });
-    expect(cmds).toEqual([]);
+/** Monotonic rise: no fractal pair, hence no completed Chan unit. */
+function buildMonotonicKlines(): ChanK[] {
+  const base = new Date('2026-09-01T09:30:00Z');
+  return Array.from({ length: 60 }, (_, index) => {
+    const value = 90 + index * 0.3;
+    return {
+      id: index + 1,
+      symbol: '000001',
+      time: new Date(base.getTime() + index * 5 * 60 * 1000),
+      open: value,
+      high: value + 0.5,
+      low: value - 0.5,
+      close: value,
+      volume: '1000',
+      amount: String(1000 * value),
+    };
+  });
+}
+
+describe('FibonacciVisualAdapter (Chan swing anchor)', () => {
+  it('returns empty commands for empty input or when no completed swing exists', () => {
+    expect(FibonacciVisualAdapter.convert([])).toEqual([]);
+    expect(FibonacciVisualAdapter.convert(buildMonotonicKlines())).toEqual([]);
   });
 
-  it('generates TradingView-styled bands, lines, and text labels', () => {
-    const klines = generateMockKlines(30);
-    const cmds = FibonacciVisualAdapter.convert(klines, { period: 20 });
+  it('generates TradingView-styled bands, lines, and text labels anchored on the swing', () => {
+    const klines = buildSwingKlines();
+    const cmds = FibonacciVisualAdapter.convert(klines, { units: 'bi' });
 
     expect(cmds.length).toBeGreaterThan(0);
 
@@ -52,17 +79,36 @@ describe('FibonacciVisualAdapter', () => {
     const text618 = texts.find((t) => t.id.includes('_0.618_'));
     expect(text618).toBeDefined();
     expect((text618 as any).text).toContain('0.618');
+
+    // span: from the swing start bar (index 25) to the latest bar
+    const expectedStart = 25;
+    const expectedEnd = klines.length - 1;
+    for (const band of bands) {
+      expect((band as any).fromIndex).toBe(expectedStart);
+      expect((band as any).toIndex).toBe(expectedEnd);
+    }
+    for (const line of lines) {
+      expect((line as any).startIndex).toBe(expectedStart);
+      expect((line as any).endIndex).toBe(expectedEnd);
+    }
   });
 
   it('respects includeBands: false and includeLabels: false', () => {
-    const klines = generateMockKlines(30);
+    const klines = buildSwingKlines();
     const cmds = FibonacciVisualAdapter.convert(klines, {
-      period: 20,
+      units: 'bi',
       includeBands: false,
       includeLabels: false,
     });
 
     expect(cmds.every((c) => c.type === 'line')).toBe(true);
     expect(cmds.length).toBe(7);
+  });
+
+  it('returns empty commands for the duan level when no completed duan exists', () => {
+    const klines = buildSwingKlines();
+    expect(FibonacciVisualAdapter.convert(klines, { units: 'duan' })).toEqual(
+      [],
+    );
   });
 });
