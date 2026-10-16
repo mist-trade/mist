@@ -1,8 +1,10 @@
 ## Purpose
 
-Signal-level strategy backtesting replays immutable strategy versions over
-historical K-line data, persists historical signal matches, and exposes
-aggregate signal statistics without modeling portfolio execution.
+Strategy backtesting replays immutable strategy versions over historical
+K-line data, evaluates signals through the unified StrategyEvaluationKernel,
+executes causal Next-Bar simulated broker matching and single-asset position
+state machine mark-to-market settlement, persists signal results and closed
+trade results, and computes comprehensive pure mathematical performance metrics.
 ## Requirements
 ### Requirement: Backtests Shall Replay Strategy Versions
 
@@ -67,15 +69,22 @@ Backtest runs SHALL expose aggregate signal-level statistics after replay.
 - **AND** it MUST set signal count and matched security count
 - **AND** it MUST set started and completed timestamps
 
-### Requirement: Backtests Shall Exclude Portfolio Simulation
+### Requirement: Backtests Shall Support Causal Execution And Performance Simulation
 
-Signal-level backtests SHALL NOT include portfolio-level execution semantics.
+Backtests SHALL support next-bar causal simulated trading execution, single-asset
+position tracking, and pure mathematical performance metrics calculation.
 
-#### Scenario: Backtest response is inspected
+#### Scenario: Backtest run is completed with trading execution
 
-- **WHEN** a backtest run is returned
-- **THEN** it MUST NOT require or populate cash, positions, orders, fills, fees,
-  slippage, allocation, equity curve, or portfolio return fields
+- **WHEN** a backtest run completes historical replay
+- **THEN** it MUST execute next-bar trade orders through `SimulatedBroker`
+  adhering to T+1, price limits, slippage, and fee rules
+- **AND** it MUST track cash, holding position, and daily mark-to-market NAV
+  through `PositionStateMachine`
+- **AND** it MUST compute and record performance metrics (`total_return`,
+  `annualized_return`, `max_drawdown`, `sharpe_ratio`, `calmar_ratio`,
+  `win_rate`, `profit_loss_ratio`, `trade_count`) on the `BacktestRun`
+- **AND** it MUST persist closed-out trades as `BacktestTradeResult` rows
 
 ### Requirement: Backtest Failure Shall Be Recorded
 
@@ -124,7 +133,7 @@ typed analysis context used by live evaluation.
 - **THEN** it MUST build current and prior context deterministically
 - **AND** each matching result MUST use the immutable strategy version's required signal kind
 - **AND** it MUST NOT derive a second entry or exit result from the same rule
-- **AND** it MUST remain signal-level without portfolio execution fields
+- **AND** it MUST record signal events without unconfirmed future data
 
 #### Scenario: Historical replay evaluates a fixed-window indicator
 - **WHEN** a backtest reaches an anchor whose execution plan references KDJ or MACD
@@ -209,4 +218,15 @@ the owning run reaches COMPLETED.
 - **AND** the page MUST contain at most the approved limit
 - **AND** additional results MUST be followed only through nextCursor
 - **AND** the API MUST NOT return the entire growing collection as a bare array
+
+### Requirement: Backtests Shall Expose Trade Results Endpoint
+
+Mist SHALL expose paginated closed trade execution results for completed backtest runs.
+
+#### Scenario: Trade results collection is queried
+
+- **WHEN** a client queries `GET /v1/strategy-backtests/:runId/trades` with valid pagination parameters
+- **THEN** the API MUST return the paginated list of `BacktestTradeResultVo` items ordered chronologically
+- **AND** each item MUST include entry time, exit time, entry price, exit price, quantity, realized PnL, PnL ratio, holding bars, and exit reason
+- **AND** the response MUST return empty results when the run completed with zero trades
 

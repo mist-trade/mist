@@ -18,7 +18,7 @@ module.exports = {
   ignorePatterns: ['.eslintrc.js'],
   overrides: [
     {
-      files: ['tools/*.mjs'],
+      files: ['**/*.mjs'],
       parser: 'espree',
       parserOptions: {
         sourceType: 'module',

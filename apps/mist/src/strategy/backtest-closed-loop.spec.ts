@@ -249,12 +249,25 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
       }),
     };
 
+    const tradeStore: any[] = [];
     const tradeRepo: any = {
       insert: jest.fn(async (rows: any) => {
         const arr = Array.isArray(rows) ? rows : [rows];
+        for (const item of arr) {
+          tradeStore.push({ id: tradeStore.length + 1, ...item });
+        }
         return { identifiers: arr.map((_, i) => ({ id: i + 1 })) };
       }),
       create: jest.fn((input: object) => ({ id: 1, ...input })),
+      findAndCount: jest.fn(async (options: any) => {
+        let list = tradeStore;
+        if (options?.where?.backtestRunId) {
+          list = list.filter(
+            (t) => t.backtestRunId === options.where.backtestRunId,
+          );
+        }
+        return [list, list.length];
+      }),
     };
 
     const healthService = new HealthStateService();
@@ -296,7 +309,7 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
       definitionRepo,
     );
 
-    queryService = new BacktestRunQueryService(runRepo, resultRepo);
+    queryService = new BacktestRunQueryService(runRepo, resultRepo, tradeRepo);
 
     controller = new StrategyBacktestController(commandService, queryService);
   });
@@ -394,5 +407,15 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
     expect(listRuns[0].id).toBe(100);
     expect(listRuns[0].status).toBe(BacktestRunStatus.COMPLETED);
     expect(listRuns[0].signalCount).toBe(1);
+
+    // 6. Query Backtest Trades via GET /v1/strategy-backtests/:runId/trades
+    const tradesPage: any = await controller.listTrades(
+      { runId: 100 },
+      { limit: 50, offset: 0 },
+    );
+    expect(tradesPage).toBeDefined();
+    expect(tradesPage.total).toBeDefined();
+    expect(tradesPage.limit).toBe(50);
+    expect(tradesPage.offset).toBe(0);
   });
 });

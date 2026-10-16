@@ -4,10 +4,12 @@ import {
   BacktestRun,
   BacktestRunStatus,
   BacktestSignalResult,
+  BacktestTradeResult,
 } from '@app/shared-data';
 import { HttpBusinessRejection } from '@app/transport/http';
 import { Repository } from 'typeorm';
 import { BacktestSignalResultQueryDto } from '../dto/backtest-signal-result-query.dto';
+import { BacktestTradeResultQueryDto } from '../dto/backtest-trade-result-query.dto';
 import { ListBacktestRunsQueryDto } from '../dto/list-backtest-runs-query.dto';
 
 import {
@@ -18,11 +20,15 @@ import {
 import { BacktestRunVo } from '../vo/backtest-run.vo';
 import { BacktestSignalResultPageVo } from '../vo/backtest-signal-result-page.vo';
 import { BacktestSignalResultVo } from '../vo/backtest-signal-result.vo';
+import { BacktestTradeResultPageVo } from '../vo/backtest-trade-result-page.vo';
+import { BacktestTradeResultVo } from '../vo/backtest-trade-result.vo';
 
 type QueryRejection = HttpBusinessRejection<
   string,
   { runId: number; status?: BacktestRunStatus }
 >;
+
+const DEFAULT_TRADE_QUERY_LIMIT = 50;
 
 const SAFE_FAILURE_CODES = new Set([
   'BACKTEST_QUEUE_FULL',
@@ -50,6 +56,8 @@ export class BacktestRunQueryService {
     private readonly runRepository: Repository<BacktestRun>,
     @InjectRepository(BacktestSignalResult)
     private readonly resultRepository: Repository<BacktestSignalResult>,
+    @InjectRepository(BacktestTradeResult)
+    private readonly tradeRepository: Repository<BacktestTradeResult>,
   ) {}
 
   async findRun(runId: number): Promise<BacktestRunVo | QueryRejection> {
@@ -155,6 +163,54 @@ export class BacktestRunQueryService {
           : null,
     };
   }
+
+  async listTrades(
+    runId: number,
+    query: BacktestTradeResultQueryDto,
+  ): Promise<BacktestTradeResultPageVo | QueryRejection> {
+    const run = await this.runRepository.findOne({ where: { id: runId } });
+    if (!run) return notFound(runId);
+    if (
+      run.status === BacktestRunStatus.PENDING ||
+      run.status === BacktestRunStatus.RUNNING
+    ) {
+      return new HttpBusinessRejection(
+        'BACKTEST_RESULTS_NOT_READY',
+        'Backtest results are not ready',
+        { runId, status: run.status },
+      );
+    }
+    if (run.status === BacktestRunStatus.FAILED) {
+      return new HttpBusinessRejection(
+        'BACKTEST_RESULTS_UNAVAILABLE',
+        'Backtest results are unavailable',
+        { runId, status: run.status },
+      );
+    }
+
+    const limit = query.limit ?? DEFAULT_TRADE_QUERY_LIMIT;
+    const offset = query.offset ?? 0;
+    const where: { backtestRunId: number; securityCode?: string } = {
+      backtestRunId: runId,
+    };
+    if (query.securityCode) {
+      where.securityCode = query.securityCode;
+    }
+
+    const [rows, total] = await this.tradeRepository.findAndCount({
+      where,
+      order: { entryTime: 'ASC', id: 'ASC' },
+      take: limit,
+      skip: offset,
+    });
+
+    return {
+      items: rows.map(mapTrade),
+      total,
+      limit,
+      offset,
+    };
+  }
 }
 
 function notFound(runId: number): QueryRejection {
@@ -182,6 +238,14 @@ function mapRun(run: BacktestRun): BacktestRunVo {
     startedAt: toIsoOrNull(run.startedAt),
     completedAt: toIsoOrNull(run.completedAt),
     errorMessage: safeErrorMessage(run.errorMessage),
+    totalReturn: toNumberOrNull(run.totalReturn),
+    annualizedReturn: toNumberOrNull(run.annualizedReturn),
+    maxDrawdown: toNumberOrNull(run.maxDrawdown),
+    sharpeRatio: toNumberOrNull(run.sharpeRatio),
+    calmarRatio: toNumberOrNull(run.calmarRatio),
+    winRate: toNumberOrNull(run.winRate),
+    profitLossRatio: toNumberOrNull(run.profitLossRatio),
+    tradeCount: run.tradeCount ?? null,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
   };
@@ -251,4 +315,31 @@ function mapTargetIssues(value: unknown): BacktestRunVo['targetIssues'] {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function mapTrade(trade: BacktestTradeResult): BacktestTradeResultVo {
+  return {
+    id: trade.id,
+    backtestRunId: trade.backtestRunId,
+    securityId: trade.securityId ?? null,
+    securityCode: trade.securityCode,
+    entryTime: trade.entryTime.toISOString(),
+    exitTime: trade.exitTime.toISOString(),
+    holdingBars: trade.holdingBars,
+    entryPrice: Number(trade.entryPrice),
+    exitPrice: Number(trade.exitPrice),
+    quantity: trade.quantity,
+    realizedPnl: Number(trade.realizedPnl),
+    returnRatio: Number(trade.returnRatio),
+    exitReason: trade.exitReason,
+    createdAt: (trade.createdAt ?? new Date()).toISOString(),
+  };
+}
+
+function toNumberOrNull(
+  value: number | string | null | undefined,
+): number | null {
+  if (value === null || value === undefined) return null;
+  const num = Number(value);
+  return Number.isFinite(num) ? num : null;
 }

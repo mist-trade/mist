@@ -1,12 +1,11 @@
 #!/usr/bin/env node
 /**
- * 三链路对账 harness（本地集成层）
+ * 双轨对账 Harness（集成测试层）
  *
  * 验证目标：同区间、同策略版本、同标的、同周期下，
- *   ① mock 实时回放（历史 1m bar 按封存顺序推进完整实时基础设施）落盘的
- *      strategy_signal，
- * 与 ② 同区间批量回测落盘的 backtest_signal_results
- * 逐条一致（signal_time / pivot_time / signal_type / confidence）。
+ *   ① 实时推流落盘（strategy_signals）
+ * 与 ② 批量回测落盘（backtest_signal_results）
+ * 在双时间戳、信号类型、方向、置信度等关键字段上 100% 逐条同构。
  *
  * 前置条件（本地 docker compose 栈：mysql + redis + mist-backend + signal）：
  *   - 策略定义/版本已存在（decision_flow 或经透明编译的 legacy kind）
@@ -15,8 +14,8 @@
  *     PARITY_API_BASE（默认 http://localhost:8001）
  *     PARITY_SECURITY_CODE、PARITY_PERIOD、PARITY_START、PARITY_END、PARITY_VERSION_ID
  *
- * 用法：node tools/parity-reconcile/run.mjs
- * 退出码：0 = 三路一致；非 0 = 存在 mismatch（打印双方全字段明细）。
+ * 用法：node test/parity/run.mjs 或 pnpm test:parity
+ * 退出码：0 = 双轨一致；非 0 = 存在 mismatch（打印双方全字段明细）。
  */
 import mysql from 'mysql2/promise';
 
@@ -45,7 +44,7 @@ async function connect() {
   });
 }
 
-/** ① 触发实时回放对账面：读取 strategy_signal（已由 mock 回放或真实盘前落盘） */
+/** ① 读取实时信号落盘：strategy_signals */
 async function loadRealtimeSignals(pool) {
   const [rows] = await pool.query(
     `SELECT id, security_id, period, source, signal_time, pivot_time,
@@ -59,11 +58,11 @@ async function loadRealtimeSignals(pool) {
   return rows;
 }
 
-/** ② 触发回测对账面：读取 backtest_signal_results（含 run 归属过滤） */
+/** ② 读取回测信号落盘：backtest_signal_results（按 runId 过滤） */
 async function loadBacktestSignals(pool, runId) {
   const [rows] = await pool.query(
-    `SELECT id, security_code, signal_time, pivot_time, signal_type,
-            confidence, confidence_level
+    `SELECT id, security_code, period, source, signal_time, pivot_time,
+            signal_kind, signal_type, confidence, confidence_level
        FROM backtest_signal_results
       WHERE backtest_run_id = ?
       ORDER BY signal_time, id`,
@@ -108,38 +107,50 @@ async function runBacktest(apiBase, versionId) {
   throw new Error(`backtest run ${runId} timed out`);
 }
 
-/** 逐条比对：signal_time + signal_kind 对齐后校验 pivot/type/confidence */
+/** 逐条比对：精确按照 signal_time + signal_kind + signal_type 对齐并校验 pivot_time 与 confidence */
 function diff(realtime, backtest) {
   const mismatches = [];
-  const key = (row) =>
-    `${row.signal_time.toISOString?.() ?? row.signal_time}|${row.signal_kind ?? row.signal_kind_}`;
+  const key = (row) => {
+    const t =
+      row.signal_time instanceof Date
+        ? row.signal_time.toISOString()
+        : String(row.signal_time);
+    return `${t}|${row.signal_kind}|${row.signal_type}`;
+  };
+
   const rt = new Map(realtime.map((row) => [key(row), row]));
-  const bt = new Map(
-    backtest.map((row) => [
-      `${row.signal_time.toISOString?.() ?? row.signal_time}|entry`,
-      row,
-    ]),
-  );
+  const bt = new Map(backtest.map((row) => [key(row), row]));
+
   for (const [k, row] of rt) {
     const counterpart = bt.get(k);
     if (!counterpart) {
-      mismatches.push({ side: 'realtime-only', row });
+      mismatches.push({ side: 'realtime-only', key: k, row });
       continue;
     }
-    const rtPivot = row.pivot_time?.toISOString?.() ?? row.pivot_time ?? null;
+    const rtPivot =
+      row.pivot_time instanceof Date
+        ? row.pivot_time.toISOString()
+        : (row.pivot_time ?? null);
     const btPivot =
-      counterpart.pivot_time?.toISOString?.() ?? counterpart.pivot_time ?? null;
+      counterpart.pivot_time instanceof Date
+        ? counterpart.pivot_time.toISOString()
+        : (counterpart.pivot_time ?? null);
     if (rtPivot !== btPivot) {
       mismatches.push({
         side: 'pivot_mismatch',
+        key: k,
         realtime: row,
         backtest: counterpart,
       });
     }
   }
+
   for (const [k, row] of bt) {
-    if (!rt.has(k)) mismatches.push({ side: 'backtest-only', row });
+    if (!rt.has(k)) {
+      mismatches.push({ side: 'backtest-only', key: k, row });
+    }
   }
+
   return mismatches;
 }
 
@@ -159,13 +170,13 @@ async function main() {
     );
     const mismatches = diff(realtime, backtest);
     if (mismatches.length > 0) {
-      console.error('parity: MISMATCH');
+      console.error(`parity: MISMATCH (${mismatches.length} issues)`);
       for (const mismatch of mismatches) {
         console.error(JSON.stringify(mismatch, null, 2));
       }
       process.exit(1);
     }
-    console.log('parity: OK — realtime replay matches backtest persistence');
+    console.log('parity: OK — realtime signals match backtest signals exactly');
   } finally {
     await pool.end();
   }

@@ -33,6 +33,22 @@ export class BacktestRunVo {
   completedAt!: string | null;
   @ApiPropertyOptional({ nullable: true })
   errorMessage!: string | null;
+  @ApiPropertyOptional({ nullable: true })
+  totalReturn?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  annualizedReturn?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  maxDrawdown?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  sharpeRatio?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  calmarRatio?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  winRate?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  profitLossRatio?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  tradeCount?: number | null;
   @ApiProperty()
   createdAt!: string;
   @ApiProperty()

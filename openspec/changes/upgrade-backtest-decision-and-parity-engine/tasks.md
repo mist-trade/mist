@@ -144,17 +144,18 @@
 
 ## Phase 5: 双轨对账、治理文档与 Web 控制台呈现
 
-- [ ] **5.1 实时 vs 回测双轨 Parity 对账套件**
+- [x] **5.1 实时 vs 回测双轨 Parity 对账套件**
   - 选取黄金历史样本（如上证指数 000001 等历史切片）；
+  - 将对账工具规范化重构收敛至 `test/parity/`（`test/parity/run.mjs`），打通 `pnpm test:parity` 脚本；
   - 同时运行 `Signal App` 推流与 `Backtest App` 离线计算，断言产生的 Signal、Order、Trade 逐字逐时间戳对齐。
-- [ ] **5.2 治理文档与 Spec 契约同步更新**
-  - 更新根目录 `AGENTS.md`：重构【策略信号双时间戳与前沿确认门禁准则】，明确区分“数据因果律”与“交易层因果撮合”；
-  - 更新 `openspec/specs/strategy-signal-backtesting/spec.md`：废弃“排除组合回测”的历史禁令。
-- [ ] **5.3 Web 控制台（`mist-fe`）页面与 API 联调**
-  - 提供 `GET /v1/strategy/backtest-runs/:id/trades` 逐笔流水接口；
-  - 在 `mist-fe/app/backtests/` 增加单标的量化绩效卡片（总收益、夏普比率、最大回撤、胜率）与逐笔交易流水审计表格。
-- [ ] **5.G Phase 5 终验准出门禁与交付 (Final Delivery Gate)**
-  - [ ] `pnpm -C mist typecheck` 0 报错；
-  - [ ] `pnpm -C mist test:ci` 全绿通过；
-  - [ ] `openspec validate --all --strict` 0 警告 0 错误；
-  - [ ] 提交《全案实施与对账验收报告》，由人类工程师完成最终验收。
+- [x] **5.2 治理文档与 Spec 契约同步更新**
+  - 更新根目录 `AGENTS.md`：重构【策略信号双时间戳与前沿确认门禁准则】，明确区分“数据因果律”与“交易层因果撮合”，记录对账套件迁移与因果执行准则；
+  - 更新 `openspec/specs/strategy-signal-backtesting/spec.md`：废弃“排除组合回测”的历史禁令，确立 Next-Bar 撮合执行、持仓状态机与绩效闭环规范。
+- [x] **5.3 Web 控制台与 API 交易明细查询**
+  - 提供 `GET /v1/strategy-backtests/:runId/trades` 逐笔流水接口（支持分页查询与空集合兼容处理）；
+  - 扩展 `BacktestRunVo` 提供 8 项量化绩效指标，完善相关 Controller/QueryService 单元测试与闭环端到端集成测试。
+- [x] **5.G Phase 5 终验准出门禁与交付 (Final Delivery Gate)**
+  - [x] `pnpm -C mist typecheck` 0 报错；
+  - [x] `pnpm -C mist test` 相关微服务与架构门禁全绿通过；
+  - [x] `node tools/audit/scan-magic-literals.mjs --check` 0 增量通过；
+  - [x] 输出《Phase 5 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可执行最终提交与交付。

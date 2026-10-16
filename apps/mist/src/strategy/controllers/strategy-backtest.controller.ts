@@ -20,6 +20,7 @@ import {
 import { CreateBacktestRunDto } from '../dto/create-backtest-run.dto';
 import { BacktestRunIdParamDto } from '../dto/backtest-run-id-param.dto';
 import { BacktestSignalResultQueryDto } from '../dto/backtest-signal-result-query.dto';
+import { BacktestTradeResultQueryDto } from '../dto/backtest-trade-result-query.dto';
 import { ListBacktestRunsQueryDto } from '../dto/list-backtest-runs-query.dto';
 
 import {
@@ -30,6 +31,7 @@ import { BacktestRunQueryService } from '../services/backtest-run-query.service'
 import { BacktestRunReceiptVo } from '../vo/backtest-run-receipt.vo';
 import { BacktestRunVo } from '../vo/backtest-run.vo';
 import { BacktestSignalResultPageVo } from '../vo/backtest-signal-result-page.vo';
+import { BacktestTradeResultPageVo } from '../vo/backtest-trade-result-page.vo';
 
 @ApiTags('strategy backtests v1')
 @Controller('v1/strategy-backtests')
@@ -115,5 +117,22 @@ export class StrategyBacktestController {
     @Query() query: BacktestSignalResultQueryDto,
   ) {
     return await this.queryService.listSignals(params.runId, query);
+  }
+
+  @Get(':runId/trades')
+  @ApiEnvelopeResponse({
+    status: 200,
+    type: BacktestTradeResultPageVo,
+    businessErrors: [
+      { code: 'BACKTEST_RUN_NOT_FOUND' },
+      { code: 'BACKTEST_RESULTS_NOT_READY' },
+      { code: 'BACKTEST_RESULTS_UNAVAILABLE' },
+    ],
+  })
+  async listTrades(
+    @Param() params: BacktestRunIdParamDto,
+    @Query() query: BacktestTradeResultQueryDto,
+  ) {
+    return await this.queryService.listTrades(params.runId, query);
   }
 }

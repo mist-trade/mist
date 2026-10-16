@@ -39,6 +39,7 @@
     "typecheck": "tsc --noEmit",
     "test": "jest",
     "test:ci": "jest --runInBand --watchman=false --forceExit",
+    "test:parity": "node test/parity/run.mjs",
     "ci:contracts": "node tools/test-ci-contracts.mjs",
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",

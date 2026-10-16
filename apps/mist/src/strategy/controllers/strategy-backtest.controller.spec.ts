@@ -63,4 +63,18 @@ describe('StrategyBacktestController', () => {
     await expect(controller.listRuns(dto)).resolves.toEqual([{ id: 10 }]);
     expect(query.listRuns).toHaveBeenCalledWith(dto);
   });
+
+  it('delegates listTrades to queryService', async () => {
+    const query = {
+      listTrades: jest.fn().mockResolvedValue({ items: [], total: 0 }),
+    };
+    const controller = new StrategyBacktestController({} as any, query as any);
+    const params = { runId: 41 };
+    const queryDto = { limit: 50, offset: 0 };
+    await expect(controller.listTrades(params, queryDto)).resolves.toEqual({
+      items: [],
+      total: 0,
+    });
+    expect(query.listTrades).toHaveBeenCalledWith(41, queryDto);
+  });
 });

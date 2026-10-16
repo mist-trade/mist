@@ -3,6 +3,7 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import {
   BacktestRun,
   BacktestSignalResult,
+  BacktestTradeResult,
   StrategyAlertEvent,
   StrategyDefinition,
   StrategySignal,
@@ -25,6 +26,7 @@ const strategyEntities = [
   StrategyAlertEvent,
   BacktestRun,
   BacktestSignalResult,
+  BacktestTradeResult,
 ];
 
 const strategyProviders = [
