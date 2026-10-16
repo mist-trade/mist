@@ -108,8 +108,9 @@ describe('IndicatorService', () => {
     expect(result.K).toHaveLength(68);
     expect(result.D).toHaveLength(result.K.length);
     expect(result.J).toHaveLength(result.K.length);
-    expect(result.K[0]).toBeCloseTo(31.687287, 6);
-    expect(result.D[0]).toBeCloseTo(45.808939, 6);
+    expect(result.K[0]).toBeCloseTo(41.904921, 6);
+    expect(result.D[0]).toBeCloseTo(56.713644, 6);
+    expect(result.J[0]).toBeCloseTo(12.287475, 6);
     expect(result.J[0]).toBeCloseTo(3 * result.K[0] - 2 * result.D[0], 10);
   });
 

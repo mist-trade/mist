@@ -6,6 +6,7 @@ function makeMockBar(
   low: number,
   close: number,
   volume: number,
+  amountText: string | null = String(volume * close),
 ) {
   return {
     rawBar: {
@@ -18,7 +19,7 @@ function makeMockBar(
       low,
       close,
       volume: String(volume),
-      amount: String(volume * close),
+      amount: amountText,
       type: 'complete',
     },
     tradingDay: '2026-09-07',
@@ -33,8 +34,8 @@ function makeMockBar(
       resolution: 'observed',
     },
     amount: {
-      raw: String(volume * close),
-      effective: String(volume * close),
+      raw: amountText,
+      effective: amountText,
       resolution: 'observed',
     },
   };
@@ -83,10 +84,71 @@ describe('VolumeFeaturesExtractor', () => {
       low: 10 + i - 1,
       close: 10 + i + 0.5,
       volume: 1000 + i * 50,
+      amount: (1000 + i * 50) * (10 + i + 0.5),
     }));
 
     const features = extractVolumeFeatures(bars);
     expect(features).toBeDefined();
     expect(features?.close).toBe(10 + 34 + 0.5);
+  });
+
+  it('computes the exact amount-weighted VWAP (Σamount / Σvolume) on the window', () => {
+    const n = 35;
+    // amount deliberately implies a per-bar VWAP that differs from close
+    const bars = Array.from({ length: n }, (_, i) =>
+      makeMockBar(
+        10 + i,
+        10 + i + 1,
+        10 + i - 1,
+        10 + i + 0.5,
+        1000 + i * 50,
+        String((1000 + i * 50) * (10 + i + 1)), // implied VWAP = close + 0.5
+      ),
+    );
+
+    const features = extractVolumeFeatures(bars);
+    expect(features).toBeDefined();
+    if (!features) return;
+
+    let amountSum = 0;
+    let volumeSum = 0;
+    for (let i = 0; i < n; i += 1) {
+      amountSum += (1000 + i * 50) * (10 + i + 1);
+      volumeSum += 1000 + i * 50;
+    }
+    expect(features.vwap).toBeCloseTo(amountSum / volumeSum, 6);
+
+    // must NOT equal the close × volume approximation
+    let closeWeighted = 0;
+    for (let i = 0; i < n; i += 1) {
+      closeWeighted += (1000 + i * 50) * (10 + i + 0.5);
+    }
+    expect(features.vwap).not.toBeCloseTo(closeWeighted / volumeSum, 4);
+  });
+
+  it('returns undefined when any bar amount is missing (fail-closed, no silent fallback)', () => {
+    const n = 35;
+    const bars = Array.from({ length: n }, (_, i) =>
+      makeMockBar(10 + i, 10 + i + 1, 10 + i - 1, 10 + i + 0.5, 1000 + i * 50),
+    );
+    bars[10] = makeMockBar(20, 21, 19, 20.5, 1500, null);
+
+    expect(extractVolumeFeatures(bars)).toBeUndefined();
+  });
+
+  it('returns undefined when the window amount sum is not positive (e.g. all-zero QMT history)', () => {
+    const n = 35;
+    const bars = Array.from({ length: n }, (_, i) =>
+      makeMockBar(
+        10 + i,
+        10 + i + 1,
+        10 + i - 1,
+        10 + i + 0.5,
+        1000 + i * 50,
+        '0',
+      ),
+    );
+
+    expect(extractVolumeFeatures(bars)).toBeUndefined();
   });
 });

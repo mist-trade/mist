@@ -17,9 +17,9 @@ describe('Strategy-owned fixed-window analysis', () => {
       bars.slice(-STRATEGY_KDJ_CALCULATION_BAR_COUNT),
     );
 
-    expect(observation.k).toBeCloseTo(42.3151543767, 10);
-    expect(observation.d).toBeCloseTo(30.3967192863, 10);
-    expect(observation.j).toBeCloseTo(66.1520245574, 10);
+    expect(observation.k).toBeCloseTo(38.7404686018, 10);
+    expect(observation.d).toBeCloseTo(27.4580485507, 10);
+    expect(observation.j).toBeCloseTo(61.305308704, 10);
   });
 
   it('calculates the accepted MACD(12,26,9) observation from exactly 130 bars', () => {

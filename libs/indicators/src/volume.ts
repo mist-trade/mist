@@ -56,9 +56,12 @@ export function computeVolumeSeries(
     vma20: rawVma20,
   });
 
+  // Standard 量比 realized on a bar series: the current bar's volume over the mean of
+  // the PREVIOUS five bars (the current bar is excluded from the denominator).
+  const prevVma5Expr = pl.col('volume').rollingMean(p1).shift(1);
   const ratioExpr = pl
-    .when(pl.col('vma5').gt(0))
-    .then(pl.col('volume').div(pl.col('vma5')))
+    .when(prevVma5Expr.gt(0))
+    .then(pl.col('volume').div(prevVma5Expr))
     .otherwise(pl.lit(1.0));
 
   const calculated = df.select(

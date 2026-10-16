@@ -46,6 +46,15 @@ describe('computeAdxSeries', () => {
     expect(result.adx[0]).toBeCloseTo(63.72878, 6);
   });
 
+  it('produces finite zero ADX on a flat market (zero true range, no NaN)', () => {
+    const flat = new Array<number>(80).fill(100);
+    const result = computeAdxSeries(flat, flat, flat, 14);
+
+    expect(result.adx.length).toBeGreaterThan(0);
+    expect(result.adx.every((value) => Number.isFinite(value))).toBe(true);
+    expect(result.adx.every((value) => value === 0)).toBe(true);
+  });
+
   it('is deterministic and does not mutate its inputs', () => {
     const h = [...high];
     const l = [...low];

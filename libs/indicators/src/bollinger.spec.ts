@@ -50,6 +50,28 @@ describe('Bollinger Bands (Polars Vectorized Implementation)', () => {
     );
   });
 
+  it('uses the population standard deviation (ddof = 0) for the bands', () => {
+    // Hand-computed oracle for this fixture: mean = 15.5, Σ(x − mean)² = 185
+    const prices = [
+      10, 12, 11, 13, 12, 14, 13, 15, 14, 16, 15, 17, 16, 18, 17, 19, 18, 20,
+      19, 21,
+    ];
+    const res = computeBollingerBandsSeries(prices, {
+      period: 20,
+      stdDevMultiplier: 2.0,
+    });
+
+    const middle = 15.5;
+    const populationStd = Math.sqrt(185 / 20);
+    const sampleStd = Math.sqrt(185 / 19);
+
+    expect(res.middle[0]).toBeCloseTo(middle, 10);
+    expect(res.upper[0]).toBeCloseTo(middle + 2 * populationStd, 10);
+    expect(res.lower[0]).toBeCloseTo(middle - 2 * populationStd, 10);
+    // must NOT match the sample (Bessel-corrected) standard deviation values
+    expect(res.upper[0]).not.toBeCloseTo(middle + 2 * sampleStd, 6);
+  });
+
   it('computes single observation correctly', () => {
     const prices = [
       10, 12, 11, 13, 12, 14, 13, 15, 14, 16, 15, 17, 16, 18, 17, 19, 18, 20,

@@ -81,8 +81,16 @@ export function computeAdxSeries(
     mdm: mdmSmooth,
   });
 
-  const pdi = pl.col('pdm').div(pl.col('tr')).mul(100);
-  const mdi = pl.col('mdm').div(pl.col('tr')).mul(100);
+  // Zero true-range guard: a flat (zero-range) window must produce defined zero
+  // directional values instead of 0/0 = NaN, which would poison the whole ADX series.
+  const pdi = pl
+    .when(pl.col('tr').gt(0))
+    .then(pl.col('pdm').div(pl.col('tr')).mul(100))
+    .otherwise(pl.lit(0));
+  const mdi = pl
+    .when(pl.col('tr').gt(0))
+    .then(pl.col('mdm').div(pl.col('tr')).mul(100))
+    .otherwise(pl.lit(0));
   const diDiff = pdi.sub(mdi).abs();
   const diSum = pdi.add(mdi);
 

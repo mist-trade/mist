@@ -1,5 +1,6 @@
 import pl from 'nodejs-polars';
 import { IndicatorInputError, IndicatorValueError } from './errors';
+import { computeRollingStdSeries } from './time-series';
 
 export interface BollingerBandsSeriesResult {
   readonly begIndex: number;
@@ -56,13 +57,19 @@ export function computeBollingerBandsSeries(
     };
   }
 
+  // Classic Bollinger Bands use the POPULATION standard deviation (ddof = 0).
+  // nodejs-polars ignores the `ddof` rolling option, so the shared ddof-aware
+  // operator is the single source of truth for the Bessel correction.
+  const begIndex = period - 1;
+  const stdResult = computeRollingStdSeries(prices, period, { ddof: 0 });
   const s = pl.Series('price', prices as any).cast(pl.Float64);
-  const meanSeries = s.rollingMean(period);
-  const stdSeries = s.rollingStd(period);
+  const meanArr = (s.rollingMean(period).toArray() as (number | null)[]).slice(
+    begIndex,
+  ) as number[];
 
   const df = pl.DataFrame({
-    mean: meanSeries,
-    std: stdSeries,
+    mean: meanArr,
+    std: stdResult.values,
   });
 
   const upperExpr = pl.col('mean').add(pl.col('std').mul(multiplier));
@@ -79,8 +86,6 @@ export function computeBollingerBandsSeries(
     bwExpr.alias('bandwidth'),
   );
 
-  const begIndex = period - 1;
-
   const middleArr = calculated.getColumn('mean').toArray() as number[];
   const upperArr = calculated.getColumn('upper').toArray() as number[];
   const lowerArr = calculated.getColumn('lower').toArray() as number[];
@@ -88,10 +93,10 @@ export function computeBollingerBandsSeries(
 
   return {
     begIndex,
-    middle: middleArr.slice(begIndex),
-    upper: upperArr.slice(begIndex),
-    lower: lowerArr.slice(begIndex),
-    bandwidth: bwArr.slice(begIndex),
+    middle: middleArr,
+    upper: upperArr,
+    lower: lowerArr,
+    bandwidth: bwArr,
   };
 }
 

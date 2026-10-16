@@ -66,19 +66,23 @@ export function computeKdjSeries(
     .toArray()
     .slice(period - 1) as number[];
 
-  const slowK = pl
+  // Classic KDJ (Chinese charting convention): K = SMA(RSV, 3, 1), D = SMA(K, 3, 1),
+  // where SMA(X, N, M) is the exponential recursion Y = Y' + (M / N) * (X - Y') seeded
+  // at the first full-window RSV / K (equivalent to ewmMean(M / N, adjust = false)).
+  const kFull = pl
     .Series(fK)
-    .rollingMean(kSmoothing)
-    .toArray()
-    .slice(kSmoothing - 1) as number[];
+    .ewmMean(1 / kSmoothing, false)
+    .toArray() as number[];
+  const dFull = pl
+    .Series(kFull)
+    .ewmMean(1 / dSmoothing, false)
+    .toArray() as number[];
 
-  const D = pl
-    .Series(slowK)
-    .rollingMean(dSmoothing)
-    .toArray()
-    .slice(dSmoothing - 1) as number[];
-
-  const K = slowK.slice(slowK.length - D.length);
+  // Keep the historical output contract: the first output stays aligned to index
+  // `period + kSmoothing + dSmoothing - 3` (= index 12 for the 9/3/3 catalog default).
+  const drop = kSmoothing + dSmoothing - 2;
+  const K = kFull.slice(drop);
+  const D = dFull.slice(drop);
 
   const J = pl.Series(K).mul(3).sub(pl.Series(D).mul(2)).toArray() as number[];
 

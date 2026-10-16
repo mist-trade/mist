@@ -45,6 +45,13 @@ interface ExtractedBar {
   readonly low: number;
   readonly close: number;
   readonly volume: number;
+  readonly amount: number | null;
+}
+
+function toFiniteNumberOrNull(value: unknown): number | null {
+  if (value === null || value === undefined) return null;
+  const n = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(n) ? n : null;
 }
 
 function parseBar(item: unknown): ExtractedBar | null {
@@ -65,6 +72,7 @@ function parseBar(item: unknown): ExtractedBar | null {
       low: obj.low,
       close: obj.close,
       volume: obj.volume,
+      amount: toFiniteNumberOrNull(obj.amount),
     };
   }
 
@@ -78,6 +86,14 @@ function parseBar(item: unknown): ExtractedBar | null {
     const rawVol =
       volObj?.effective ?? volObj?.raw ?? (obj.rawBar as any)?.volume;
     const vol = typeof rawVol === 'number' ? rawVol : Number(rawVol) || 0;
+    const amountObj = obj.amount as Record<string, unknown> | undefined;
+    const rawAmount =
+      amountObj?.effective ??
+      amountObj?.raw ??
+      (obj.rawBar as any)?.amount ??
+      (typeof obj.amount === 'number' || typeof obj.amount === 'string'
+        ? obj.amount
+        : undefined);
 
     if (
       eff &&
@@ -92,6 +108,7 @@ function parseBar(item: unknown): ExtractedBar | null {
         low: eff.low,
         close: eff.close,
         volume: vol,
+        amount: toFiniteNumberOrNull(rawAmount),
       };
     }
   }
@@ -113,6 +130,7 @@ function parseBar(item: unknown): ExtractedBar | null {
         low: raw.low,
         close: raw.close,
         volume: vol,
+        amount: toFiniteNumberOrNull(raw.amount),
       };
     }
   }
@@ -135,6 +153,7 @@ export function extractVolumeFeatures(
   const lows: number[] = [];
   const closes: number[] = [];
   const volumes: number[] = [];
+  const amounts: (number | null)[] = [];
 
   for (const b of bars) {
     const parsed = parseBar(b);
@@ -144,12 +163,27 @@ export function extractVolumeFeatures(
     lows.push(parsed.low);
     closes.push(parsed.close);
     volumes.push(parsed.volume);
+    amounts.push(parsed.amount);
   }
 
   const total = closes.length;
   if (total < MIN_BARS_FOR_FEATURES) {
     return undefined;
   }
+
+  // Fail-closed: the exact amount-weighted VWAP requires a usable amount series over the
+  // whole window. Missing / non-finite amounts, or a non-positive amount sum (e.g. the
+  // known all-zero QMT historical amount), suppress the whole feature bundle instead of
+  // silently mixing口径 or zero-filling — plugins observe the absence via the existing
+  // insufficient/degraded path.
+  const amountUsable =
+    amounts.length === closes.length &&
+    amounts.every((a): a is number => a !== null && Number.isFinite(a)) &&
+    amounts.reduce((sum, a) => sum + (a as number), 0) > 0;
+  if (!amountUsable) {
+    return undefined;
+  }
+  const amountArr = amounts as number[];
 
   // 1. Squeeze State Computation (Bollinger Bands vs Keltner Channels)
   const bbSeries = computeBollingerBandsSeries(closes, {
@@ -186,7 +220,9 @@ export function extractVolumeFeatures(
   const atrObs = computeAtrObservation(highs, lows, closes, ATR_PERIOD);
   const tsRankObs = computeTsRankObservation(volumes, TS_RANK_PERIOD);
   const volObs = computeVolumeObservation(volumes, { periods: [5, 10, 20] });
-  const vwapObs = computeVwapObservation(closes, volumes);
+  const vwapObs = computeVwapObservation(closes, volumes, {
+    amounts: amountArr,
+  });
   const rppObs = computeRppObservation(highs, lows, closes, RPP_PERIOD);
   const vpciObs = computeVpciObservation(closes, volumes, {
     shortPeriod: VPCI_SHORT,
