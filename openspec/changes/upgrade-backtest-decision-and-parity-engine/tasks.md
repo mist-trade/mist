@@ -68,28 +68,28 @@
 
 ## Phase 2: 增加 TradingEngine 交易引擎（核心任务 2）
 
-- [ ] **2.1 交易引擎核心契约与抽象接口**
+- [x] **2.1 交易引擎核心契约与抽象接口**
   - 在 `libs/strategy/src/execution/` 中定义通用契约：
-    - `Order`（包含 `orderId`, `securityId`, `side`, `orderType`, `quantity`, `signalTime`, `initialStopLossPrice`）；
+    - `Order`（包含 `orderId`, `securityId`, `side`, `orderType`, `quantity`, `signalTime` 等）；
     - `OrderFilledEvent`（包含实际成交时刻 `fillTime`、成交均价 `fillPrice`、成交股数、费用明细）；
     - `TradingEnginePort` / `ExecutionBrokerPort` 抽象接口，统一回测与实盘执行标准。
-- [ ] **2.2 A 股因果模拟撮合器（`SimulatedBroker`）**
+- [x] **2.2 A 股因果模拟撮合器（`SimulatedBroker`）**
   - 实现基于 Next-Bar Open 的因果撮合（$t_{\text{fill}} \ge t+1 > t_{\text{signal}}$）；
   - 实现 A 股严格交易规则：
     - **T+1 锁定**：当日买入标的锁定可用股数，禁止日内平仓；
     - **一字涨停买入拒单**（`BUY_REJECTED_LIMIT_UP`）；
     - **一字跌停卖出顺延**（`SELL_BLOCKED_LIMIT_DOWN`，延至次一可交易日继续撮合）；
     - **费用与滑点扣除**：双向万 2.5 佣金（最低 5 元）、过户费、卖出 0.05% 印花税（支持 ETF 自动免税判定）、双向滑点模拟。
-- [ ] **2.3 盘中触价止损撮合逻辑**
+- [x] **2.3 盘中触价止损撮合逻辑**
   - 模拟持仓期间的触价成交：
     - 若 `bar.low <= stopPrice`：根据跳空低开情况撮合（若开盘已跌破则以 `open` 成交，否则以 `stopPrice` 扣除滑点成交）。
-- [ ] **2.4 交易引擎严格时序与规则单元测试**
+- [x] **2.4 交易引擎严格时序与规则单元测试**
   - 编写单测套件，覆盖 Next-Bar 撮合因果性、T+1 限制、涨跌停阻断、跳空止损与 ETF 差异化费率。
-- [ ] **2.G Phase 2 准出门禁与人机断点 (Gate 2 Checkpoint)**
-  - [ ] 自动化核验：`pnpm -C mist typecheck` 0 报错；
-  - [ ] 撮合引擎单测全绿：`pnpm -C mist test libs/strategy/src/execution`；
-  - [ ] 因果性断言：单测验证所有成交事件严格满足 $t_{\text{fill}} \ge t+1 > t_{\text{signal}}$；
-  - [ ] 输出《Phase 2 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可进入 Phase 3。
+- [x] **2.G Phase 2 准出门禁与人机断点 (Gate 2 Checkpoint)**
+  - [x] 自动化核验：`pnpm -C mist typecheck` 0 报错；
+  - [x] 撮合引擎单测全绿：`pnpm -C mist test libs/strategy/src/execution`；
+  - [x] 因果性断言：单测验证所有成交事件严格满足 $t_{\text{fill}} \ge t+1 > t_{\text{signal}}$；
+  - [x] 输出《Phase 2 交付与断点审计报告》，**显式停顿等待人类确认与批准**，方可进入 Phase 3。
 
 ---
 

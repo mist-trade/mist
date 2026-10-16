@@ -10,6 +10,7 @@ import {
   type ChanSwingUnitLevel,
 } from '../../analysis/chan-derivation';
 import {
+  CHAN_BSP_UNITS,
   DECISION_ACTIONS,
   DEFAULT_REQUIRED_BARS_BI,
   DEFAULT_REQUIRED_BARS_DUAN,
@@ -71,17 +72,21 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
     rawParams?: Record<string, unknown>,
   ): Promise<FactorOpinion> {
     const units: ChanSwingUnitLevel =
-      rawParams?.units === 'duan' ? 'duan' : 'bi';
+      rawParams?.units === CHAN_BSP_UNITS.DUAN
+        ? CHAN_BSP_UNITS.DUAN
+        : CHAN_BSP_UNITS.BI;
     const toleranceRatio =
       typeof rawParams?.toleranceRatio === 'number'
         ? rawParams.toleranceRatio
         : DEFAULT_TOLERANCE_RATIO;
     const direction =
       (rawParams?.direction as 'pullback' | 'rebound' | 'both') ?? 'pullback';
-    const unitLabel = units === 'bi' ? '笔' : '段';
+    const unitLabel = units === CHAN_BSP_UNITS.BI ? '笔' : '段';
 
     const minBars =
-      units === 'duan' ? DEFAULT_REQUIRED_BARS_DUAN : DEFAULT_REQUIRED_BARS_BI;
+      units === CHAN_BSP_UNITS.DUAN
+        ? DEFAULT_REQUIRED_BARS_DUAN
+        : DEFAULT_REQUIRED_BARS_BI;
     if (context.bars.length < minBars) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,

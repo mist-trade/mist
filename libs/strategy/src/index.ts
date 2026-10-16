@@ -86,4 +86,5 @@ export * from './factor';
 export * from './decision-flow';
 export * from './simulation';
 export * from './kernel';
+export * from './execution';
 export * from './strategy.constants';

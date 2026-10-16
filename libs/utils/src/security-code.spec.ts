@@ -1,6 +1,8 @@
 import { DataSource } from '@app/shared-data';
 import {
   getSecurityFormatCode,
+  isChiNextOrStarMarket,
+  isEtfSecurity,
   isValidSecuritySourceFormatCode,
   normalizeSecurityCode,
 } from './security-code';
@@ -95,4 +97,36 @@ describe('provider format code boundary', () => {
       ),
     ).toThrow('Invalid enabled qmt formatCode');
   });
+});
+
+describe('isEtfSecurity', () => {
+  it.each(['510300', '510050.SH', '159915.SZ', '588000', '518880'])(
+    'recognizes %s as an ETF',
+    (code) => {
+      expect(isEtfSecurity(code)).toBe(true);
+    },
+  );
+
+  it.each(['600519', '000001', '300750', '688981'])(
+    'recognizes %s as a stock rather than an ETF',
+    (code) => {
+      expect(isEtfSecurity(code)).toBe(false);
+    },
+  );
+});
+
+describe('isChiNextOrStarMarket', () => {
+  it.each(['300750', '301001.SZ', '688981', '688001.SH'])(
+    'recognizes %s as ChiNext or STAR market',
+    (code) => {
+      expect(isChiNextOrStarMarket(code)).toBe(true);
+    },
+  );
+
+  it.each(['600519', '000001', '510300'])(
+    'recognizes %s as main board or ETF',
+    (code) => {
+      expect(isChiNextOrStarMarket(code)).toBe(false);
+    },
+  );
 });

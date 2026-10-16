@@ -14,12 +14,14 @@ function computeWilderRma(arr: readonly number[], period: number): number[] {
   return tailSeries.ewmMean(1 / period, false).toArray() as number[];
 }
 
+const DEFAULT_ADX_PERIOD = 14;
+
 /** ADX(14) full series computed via Polars vectorized operators. Warm-up positions carry no value; `out[i]` aligns to `in[i + begIndex]`. */
 export function computeAdxSeries(
   high: readonly number[],
   low: readonly number[],
   close: readonly number[],
-  period: number = 14,
+  period: number = DEFAULT_ADX_PERIOD,
 ): AdxSeriesResult {
   if (
     close.length < 2 * period ||

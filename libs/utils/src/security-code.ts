@@ -68,3 +68,19 @@ export function getSecurityFormatCode(
   }
   return formatCode;
 }
+
+/**
+ * 判定标的是否为 ETF 基金 (上交所 510-518/588, 深交所 159)
+ */
+export function isEtfSecurity(code: string): boolean {
+  const normalized = normalizeSecurityCode(code);
+  return /^(51[0-358]|588|159)\d{3}$/.test(normalized);
+}
+
+/**
+ * 判定标的是否为创业板或科创板 (创业板 300/301, 科创板 688，涨跌幅 20%)
+ */
+export function isChiNextOrStarMarket(code: string): boolean {
+  const normalized = normalizeSecurityCode(code);
+  return /^(30[01]|688)\d{3}$/.test(normalized);
+}

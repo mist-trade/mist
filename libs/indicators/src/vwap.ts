@@ -20,6 +20,11 @@ export interface VwapOptions {
   readonly amounts?: readonly number[];
 }
 
+const COL_CLOSE = 'close';
+const COL_VOLUME = 'volume';
+const COL_AMOUNT = 'amount';
+const COL_VWAP = 'vwap';
+
 /**
  * VWAP (Volume-Weighted Average Price) computed via Polars vectorized operators.
  * Cumulative (window-accumulated) VWAP by default, or rolling window VWAP when a
@@ -69,32 +74,32 @@ export function computeVwapSeries(
   }
 
   const df = pl.DataFrame({
-    close: pl.Series('close', closes as any).cast(pl.Float64),
-    volume: pl.Series('volume', volumes as any).cast(pl.Float64),
+    close: pl.Series(COL_CLOSE, closes as any).cast(pl.Float64),
+    volume: pl.Series(COL_VOLUME, volumes as any).cast(pl.Float64),
     ...(amounts !== undefined
-      ? { amount: pl.Series('amount', amounts as any).cast(pl.Float64) }
+      ? { amount: pl.Series(COL_AMOUNT, amounts as any).cast(pl.Float64) }
       : {}),
   });
 
   const pvExpr =
     amounts !== undefined
-      ? pl.col('amount')
-      : pl.col('close').mul(pl.col('volume'));
+      ? pl.col(COL_AMOUNT)
+      : pl.col(COL_CLOSE).mul(pl.col(COL_VOLUME));
   const pvSumExpr =
     window !== undefined ? pvExpr.rollingSum(window) : pvExpr.cumSum();
   const volSumExpr =
     window !== undefined
-      ? pl.col('volume').rollingSum(window)
-      : pl.col('volume').cumSum();
+      ? pl.col(COL_VOLUME).rollingSum(window)
+      : pl.col(COL_VOLUME).cumSum();
 
   const vwapExpr = pl
     .when(volSumExpr.gt(0).and(pvSumExpr.gt(0)))
     .then(pvSumExpr.div(volSumExpr))
-    .otherwise(pl.col('close'));
+    .otherwise(pl.col(COL_CLOSE));
 
-  const calculated = df.select(vwapExpr.alias('vwap'));
+  const calculated = df.select(vwapExpr.alias(COL_VWAP));
   const begIndex = window !== undefined ? window - 1 : 0;
-  const rawVwap = calculated.getColumn('vwap').toArray() as number[];
+  const rawVwap = calculated.getColumn(COL_VWAP).toArray() as number[];
 
   return {
     begIndex,
