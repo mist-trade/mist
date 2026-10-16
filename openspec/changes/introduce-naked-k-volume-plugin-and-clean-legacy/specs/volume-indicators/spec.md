@@ -6,10 +6,14 @@
 `computeVolumeObservation(volumes, options?)` with defaults `periods = [5, 10, 20]`, computed strictly
 via `nodejs-polars` expressions. The output SHALL carry `volumes`, `vma5`, `vma10`, `vma20` and
 `volumeRatio`.
-1. `vmaN = rollingMean(volumes, N)`; `volumeRatio = volume / vma5` with a `1.0` fallback when `vma5 = 0`.
-2. **Declared口径**: this `volumeRatio` is Mist's own convention — the current bar over the five-bar
-   rolling mean that includes the current bar. It is NOT the time-normalized exchange "量比"; a
-   standard量比 variant is explicitly out of scope of this operator.
+1. `vmaN = rollingMean(volumes, N)`; `volumeRatio` SHALL be the **standard 量比 definition realized
+   on a bar series**: the current bar's volume over the mean of the **previous five bars** —
+   `volume / shift(rollingMean(volumes, 5), 1)` — excluding the current bar, with a `1.0` fallback when
+   that previous-five mean is `0`.
+2. **Declared scope**: at daily close this definition coincides with the exchange-quoted 量比
+   (current volume over the past-5-day average volume). Intraday trading-time normalization (the
+   minutes-elapsed-adjusted 量比 that fluctuates during a session) requires trading-calendar
+   machinery and is explicitly out of scope of this pure operator.
 3. Minimum length 20; below it the series returns empty with `begIndex = input.length` and the
    observation throws `IndicatorInputError`. Alignment follows `out[i] === in[i + begIndex]`.
 
@@ -17,11 +21,12 @@ via `nodejs-polars` expressions. The output SHALL carry `volumes`, `vma5`, `vma1
 
 - **WHEN** a fixed volume fixture is evaluated
 - **THEN** `vma5` / `vma10` / `vma20` MUST match the rolling means
-- **AND** `volumeRatio` MUST equal `volume / vma5`
+- **AND** `volumeRatio` at each aligned position MUST equal `v[t] / mean(v[t−5..t−1])` (the current
+  bar over the previous five bars, current bar excluded)
 
 #### Scenario: Zero-average guard
 
-- **WHEN** `vma5` evaluates to `0`
+- **WHEN** the previous-five mean evaluates to `0`
 - **THEN** `volumeRatio` MUST be `1.0`
 
 ### Requirement: OBV Operator

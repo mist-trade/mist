@@ -6,12 +6,12 @@
   - [ ] 1.3 ADX（A4）：`adx.ts` 增加零真实波幅守卫（tr = 0 → +DI/−DI = 0；diSum = 0 → DX = 0 已有）；`adx.spec.ts` 新增全平盘无 NaN 用例 + 常规序列回归。
   - [ ] 1.4 VWAP（A6）：`vwap.ts` 增加可选 `amounts` 输入（精确口径 `Σamount / Σvolume`），保留 close×volume 兼容路径与零量守卫；`vwap.spec.ts` 新增精确口径与守卫用例。
   - [ ] 1.5 特征提取器（A6）：`volume-features.extractor.ts` 读取 amount（`effective ?? raw`）并传入 amounts；amount 缺失/非有限/`Σamount ≤ 0` 时返回 undefined（不装配 `volumeFeatures`）；`volume-features.extractor.spec.ts` 新增精确 VWAP oracle 与抑制路径用例。
-  - [ ] 1.6 声明（A9）：`fibonacci.ts` JSDoc 注明 rolling 窗口口径（窗口极值、恒从高点向下计 ratio，非缠论笔/段极值）。
+  - [ ] 1.6 量比（A7）：`volume.ts` 的 `volumeRatio` 改为标准口径 `volume / shift(rollingMean(volumes, 5), 1)`（分母 0 → 1.0）；`volume.spec.ts` 更新并新增参考用例。
 - [ ] **阶段二：影响面排查**
   - [ ] 2.1 检索 DB `strategy_definition` 与测试夹具中引用 `indicator.kdj.*` 的定义，人工确认 KDJ 数值变化后的策略行为可接受并记录。
   - [ ] 2.2 确认 squeeze / VPCI 相关测试（extractor spec、插件 spec）在新口径下的期望值更新与新行为一致。
 - [ ] **阶段三：门禁与验证**
   - [ ] 3.1 `libs/indicators` 与 `libs/strategy` 相关全量单测 100% PASS。
   - [ ] 3.2 `pnpm typecheck`、`pnpm lint:check`、`pnpm check:magic` 零报错。
-  - [ ] 3.3 `openspec validate fix-indicator-conventions`、`openspec validate introduce-volatility-squeeze-and-vpci-plugins`、`openspec validate introduce-naked-k-volume-plugin-and-clean-legacy` 三个全绿。
+  - [ ] 3.3 `openspec validate fix-indicator-conventions`、`openspec validate introduce-volatility-squeeze-and-vpci-plugins`、`openspec validate introduce-naked-k-volume-plugin-and-clean-legacy`、`openspec validate anchor-fibonacci-on-chan-swing-endpoints` 四个全绿。
   - [ ] 3.4 归档前置检查：确认两个 owning change 的 delta 修正已生效后再执行其归档（否则修正不会进入 live spec）。

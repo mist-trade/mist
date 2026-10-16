@@ -44,9 +44,11 @@
 
 - **决策**：代码不动（首根 OBV = 0，其后涨 `+volume` / 跌 `−volume` / 平盘不变）。修正 owning change delta 的表述（原文"首根自身的 volume（若涨）或 0"含糊）。
 
-### D7 · volumeRatio 口径声明 — A7
+### D7 · volumeRatio 改为标准量比口径 — A7（由"只声明"升级为代码修正）
 
-- **决策**：不改行为；在 owning change delta 显式声明"Mist 口径 = 当期量 / 含当根的 5 根平滑均量；非时间归一的标准量比"。标准量比口径留给未来量比因子立项。
+- **决策**：`volume.ts` 的 `volumeRatio` 改为**标准量比**在 bar 序列上的实现：`当期量 / 前 5 根均量（不含当根）`，即 `volume / shift(rollingMean(volumes, 5), 1)`；分母为 0 时兜底 `1.0`。日线收盘口径下与行情软件口径的量比一致（现量 / 过去 5 日日均量）。
+- **声明边界**：盘中时间归一化版本（按开市分钟数动态调整的量比）需要交易日历机制，超出纯算子边界，spec 中明确声明为不做。
+- **影响**：`volumeRatio` 数值变化（大阳线日不再被自身成交量抬高分母）；唯一生产消费方是特征提取器的 evidence 字段（不参与阈值判定），行为影响面极小；`vma5/10/20` 保持含当根的常规均线定义不变。
 
 ### D8 · TSRANK ↔ GTJA 映射注记（非规范）— A8
 
@@ -54,14 +56,21 @@
 - GTJA Alpha191 的 TSRANK 消费口径为 pct-rank `rank / W ∈ (0,1]`；两者为线性映射：`pct = v × (W−1)/W + 1/W`，或使用 `normalize: false` 取原始平均秩后 `/W`。实现 Alpha191 因子层时按此换算，不新增原语参数（YAGNI）。
 - 平窗语义：全等窗口 → 0.5；GTJA 社区 pct 实现为 `(W+1)/2W = 0.5 + 1/(2W)`，差 `1/(2W)`，在因子层逐因子对齐时记录。
 
-### D9 · 斐波那契 rolling 口径声明 — A9
+### D9 · 斐波那契锚点迁移 — A9（移交独立 change）
 
-- 声明：`computeFibonacciSeries / computeFibonacciObservation` 的 ratio 为"滚动窗口极值"口径（窗口 high/low、恒从高点向下计），**非**缠论笔/段极值；rebound 方向由消费者自行换算 `(close − low)/diff`。落入 JSDoc + 本 design 记录；未来因子规范细化时正式化。
+- 经评估，斐波那契从"滚动窗口极值"迁移到"缠论笔/段端点"在技术链路完全可行：`ChanBi` 含
+  `startTime/endTime/high/low/trend/type/status`；`chan.bsp.plugin.ts:381` 已有
+  `Complete && Valid` 过滤先例；`visual-command` 已依赖 `@app/chancore`。
+- 该迁移是**因子语义升级**（锚点来源变化 → 因子信号与可视化指令都变化），不属于"口径声明"，由独立
+  change `anchor-fibonacci-on-chan-swing-endpoints` 承接，spec 落点为 `chan-fibonacci-overlay`
+  的 MODIFIED delta。
+- 本 change 不再包含斐波那契任务；`computeFibonacciSeries / computeFibonacciObservation`
+  （rolling 算子）保留为纯数学库原语，其窗口口径声明（JSDoc）随新 change 一并落地。
 
 ### D10 · 明确不做（本次排除）
 
 - A3 换 TDX 种子 / histogram ×2（破坏存量策略阈值语义）；
-- A7 改排除当根量比；
+- 量比的盘中时间归一化版本（需交易日历机制）；
 - A6 session VWAP / 锚定 VWAP；
 - B 组数据口径（TDX volume 单位假设矛盾、复权链路、volume 静默补零、混合源滑窗）——均属治理指南 §5 "必须停下讨论"类事项，单独立项。
 
