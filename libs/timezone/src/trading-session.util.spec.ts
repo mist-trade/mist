@@ -1,9 +1,14 @@
+import { Period } from '@app/shared-data';
 import {
   isInTradingHours,
   isIntradayAddWindow,
   INTRADAY_ADD_WINDOW_START_MIN,
   INTRADAY_ADD_WINDOW_END_MIN,
+  formatShanghaiDateString,
+  formatShanghaiDateTimeString,
+  isSessionCloseBar,
 } from './trading-session.util';
+
 import {
   CRON_PRE_MARKET_INSPECTION_0905,
   CRON_SUBSCRIPTION_RESET_0915,
@@ -73,5 +78,48 @@ describe('cron-schedules.const', () => {
     expect(CRON_SUBSCRIPTION_RESET_0915).toBe('0 15 9 * * 1-5');
     expect(CRON_POST_CLOSE_SYNC_NIGHTLY_2230).toBe('30 22 * * 1-5');
     expect(CRON_POST_CLOSE_SYNC_MORNING_0630).toBe('30 6 * * 2-6');
+  });
+});
+
+describe('trading-session.util formatShanghaiDateString and formatShanghaiDateTimeString', () => {
+  it('formats Date and number timestamp as YYYY-MM-DD in Shanghai timezone', () => {
+    // 2026-10-16 16:30:00 UTC = 2026-10-17 00:30:00 Asia/Shanghai
+    const utcDate = new Date('2026-10-16T16:30:00Z');
+    expect(formatShanghaiDateString(utcDate)).toBe('2026-10-17');
+    expect(formatShanghaiDateString(utcDate.getTime())).toBe('2026-10-17');
+  });
+
+  it('formats Date and number timestamp as YYYY-MM-DD HH:mm in Shanghai timezone', () => {
+    // 2026-10-17 01:30:00 UTC = 2026-10-17 09:30:00 Asia/Shanghai
+    const utcDate = new Date('2026-10-17T01:30:00Z');
+    expect(formatShanghaiDateTimeString(utcDate)).toBe('2026-10-17 09:30');
+    expect(formatShanghaiDateTimeString(utcDate.getTime())).toBe(
+      '2026-10-17 09:30',
+    );
+  });
+});
+
+describe('trading-session.util isSessionCloseBar', () => {
+  it('returns true for daily and higher periods regardless of bar time', () => {
+    const morningDate = shanghai(2026, 10, 17, 9, 30);
+    expect(isSessionCloseBar(morningDate, Period.DAY)).toBe(true);
+    expect(isSessionCloseBar(morningDate, Period.WEEK)).toBe(true);
+    expect(isSessionCloseBar(morningDate, Period.MONTH)).toBe(true);
+  });
+
+  it('evaluates 15:00 Shanghai time correctly for intraday periods', () => {
+    const at1500 = shanghai(2026, 10, 17, 15, 0);
+    const at1459 = shanghai(2026, 10, 17, 14, 59);
+    const at1501 = shanghai(2026, 10, 17, 15, 1);
+    const at1130 = shanghai(2026, 10, 17, 11, 30);
+
+    expect(isSessionCloseBar(at1500, Period.ONE_MIN)).toBe(true);
+    expect(isSessionCloseBar(at1500, Period.FIVE_MIN)).toBe(true);
+    expect(isSessionCloseBar(at1500, Period.THIRTY_MIN)).toBe(true);
+    expect(isSessionCloseBar(at1500, Period.SIXTY_MIN)).toBe(true);
+
+    expect(isSessionCloseBar(at1459, Period.ONE_MIN)).toBe(false);
+    expect(isSessionCloseBar(at1501, Period.ONE_MIN)).toBe(false);
+    expect(isSessionCloseBar(at1130, Period.ONE_MIN)).toBe(false);
   });
 });

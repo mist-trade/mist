@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { IndicatorController } from './indicator.controller';
 import { IndicatorService } from './indicator.service';
 import { TimezoneService } from '@app/timezone';
-import { DataSourceService } from '@app/utils';
+import { DataSourceService } from '../sources/services';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { K, Security } from '@app/shared-data';
 

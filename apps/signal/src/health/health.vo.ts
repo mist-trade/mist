@@ -1,5 +1,5 @@
 import type { RealtimeStrategyMode } from '@app/config';
-import type { BaseHealthVo, HealthStatus } from '@app/observability';
+import type { BaseHealthVo, HealthStatus } from '@app/transport';
 
 export interface SignalHealthVo extends BaseHealthVo {
   status: HealthStatus;

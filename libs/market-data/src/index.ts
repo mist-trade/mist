@@ -36,10 +36,7 @@ export type {
   StrategyImputationResolution,
   StrategyOhlcTuple,
 } from './projection/strategy-series-imputer';
-export {
-  prepareMarketData,
-  MarketDataPipelineError,
-} from './market-data-pipeline';
+export { prepareMarketData } from './market-data-pipeline';
 export type {
   MarketDataPipelineInput,
   MarketDataPipelineOutput,

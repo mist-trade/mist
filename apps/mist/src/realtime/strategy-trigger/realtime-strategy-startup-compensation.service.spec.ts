@@ -4,7 +4,7 @@ import {
   dueKey,
   manifestKey,
   watermarkKey,
-} from '@app/realtime';
+} from '@app/contracts';
 import { RealtimeStrategyStartupCompensationService } from './realtime-strategy-startup-compensation.service';
 
 describe('RealtimeStrategyStartupCompensationService', () => {

@@ -5,8 +5,9 @@ import {
   StrategyDefinition,
   StrategySignal,
 } from '@app/shared-data';
-import { ASIA_SHANGHAI_TIMEZONE, MINUTES_PER_HOUR } from '@app/timezone';
+import { formatShanghaiDateTimeString, MINUTES_PER_HOUR } from '@app/timezone';
 import { PERIOD_MINUTES } from '@app/constants';
+
 import { CHAN_BSP_UNITS, SIGNAL_KINDS } from '@app/strategy';
 
 export interface NotificationMessage {
@@ -154,18 +155,5 @@ function formatPeriod(period: unknown): string {
 }
 
 function formatShanghaiTime(date: Date): string {
-  const parts = new Intl.DateTimeFormat('zh-CN', {
-    timeZone: ASIA_SHANGHAI_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hour12: false,
-  }).formatToParts(date);
-  const get = (type: string): string =>
-    parts.find((p) => p.type === type)?.value ?? '';
-  return `${get('year')}-${get('month')}-${get('day')} ${get('hour')}:${get(
-    'minute',
-  )}`;
+  return formatShanghaiDateTimeString(date);
 }

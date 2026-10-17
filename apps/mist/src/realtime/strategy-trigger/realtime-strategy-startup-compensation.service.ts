@@ -11,11 +11,13 @@ import {
   dueKey,
   manifestKey,
   watermarkKey,
-} from '@app/realtime';
-import type { CandleFinalizedTriggerV1 } from '@app/signal';
+  type CandleFinalizedTriggerV1,
+} from '@app/contracts';
 import { DataSource } from '@app/shared-data';
-import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
+import { toErrorMessage } from '@app/utils';
+import { formatTradingDayString } from '@app/timezone';
 import type Redis from 'ioredis';
+
 import { Clock } from '../clock.service';
 import { RealtimeRedisService } from '../realtime-redis.service';
 import { RealtimeSecurityAllowlistService } from '../realtime-security-allowlist.service';
@@ -64,9 +66,7 @@ export class RealtimeStrategyStartupCompensationService
       this.outcome = 'failed';
       this.observability?.recordStartup(this.outcome, this.submitted);
       this.logger.error(
-        `Realtime strategy same-day best-effort startup compensation failed after submitted=${this.submitted}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Realtime strategy same-day best-effort startup compensation failed after submitted=${this.submitted}: ${toErrorMessage(error)}`,
       );
     }
   }
@@ -207,12 +207,5 @@ function compareTriggers(
 }
 
 function shanghaiDayCompact(value: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: ASIA_SHANGHAI_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  })
-    .format(value)
-    .replaceAll('-', '');
+  return formatTradingDayString(value);
 }

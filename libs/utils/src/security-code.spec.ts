@@ -1,10 +1,10 @@
 import { DataSource } from '@app/shared-data';
 import {
   getSecurityFormatCode,
-  isChiNextOrStarMarket,
-  isEtfSecurity,
+  isProviderSymbol,
   isValidSecuritySourceFormatCode,
   normalizeSecurityCode,
+  PROVIDER_SYMBOL_PATTERN,
 } from './security-code';
 
 describe('normalizeSecurityCode', () => {
@@ -99,34 +99,40 @@ describe('provider format code boundary', () => {
   });
 });
 
-describe('isEtfSecurity', () => {
-  it.each(['510300', '510050.SH', '159915.SZ', '588000', '518880'])(
-    'recognizes %s as an ETF',
-    (code) => {
-      expect(isEtfSecurity(code)).toBe(true);
-    },
-  );
+describe('isProviderSymbol', () => {
+  it('recognizes valid Shanghai, Shenzhen, and Beijing symbols', () => {
+    expect(isProviderSymbol('600519.SH')).toBe(true);
+    expect(isProviderSymbol('000001.SZ')).toBe(true);
+    expect(isProviderSymbol('430047.BJ')).toBe(true);
+  });
 
-  it.each(['600519', '000001', '300750', '688981'])(
-    'recognizes %s as a stock rather than an ETF',
-    (code) => {
-      expect(isEtfSecurity(code)).toBe(false);
-    },
-  );
-});
+  it('recognizes valid Hong Kong symbols (5-digit and 6-digit)', () => {
+    expect(isProviderSymbol('00700.HK')).toBe(true);
+    expect(isProviderSymbol('09988.HK')).toBe(true);
+    expect(isProviderSymbol('123456.HK')).toBe(true);
+  });
 
-describe('isChiNextOrStarMarket', () => {
-  it.each(['300750', '301001.SZ', '688981', '688001.SH'])(
-    'recognizes %s as ChiNext or STAR market',
-    (code) => {
-      expect(isChiNextOrStarMarket(code)).toBe(true);
-    },
-  );
+  it('rejects invalid symbols and non-strings', () => {
+    expect(isProviderSymbol('000001')).toBe(false);
+    expect(isProviderSymbol('600519.sh')).toBe(false);
+    expect(isProviderSymbol('SH600519')).toBe(false);
+    expect(isProviderSymbol('0070.HK')).toBe(false);
+    expect(isProviderSymbol('1234567.HK')).toBe(false);
+    expect(isProviderSymbol('000001.US')).toBe(false);
+    expect(isProviderSymbol('')).toBe(false);
+    expect(isProviderSymbol('   ')).toBe(false);
+    expect(isProviderSymbol(null)).toBe(false);
+    expect(isProviderSymbol(undefined)).toBe(false);
+    expect(isProviderSymbol(600519)).toBe(false);
+    expect(isProviderSymbol({})).toBe(false);
+  });
 
-  it.each(['600519', '000001', '510300'])(
-    'recognizes %s as main board or ETF',
-    (code) => {
-      expect(isChiNextOrStarMarket(code)).toBe(false);
-    },
-  );
+  it('matches PROVIDER_SYMBOL_PATTERN correctly', () => {
+    expect(PROVIDER_SYMBOL_PATTERN.test('600519.SH')).toBe(true);
+    expect(PROVIDER_SYMBOL_PATTERN.test('000001.SZ')).toBe(true);
+    expect(PROVIDER_SYMBOL_PATTERN.test('832089.BJ')).toBe(true);
+    expect(PROVIDER_SYMBOL_PATTERN.test('00700.HK')).toBe(true);
+    expect(PROVIDER_SYMBOL_PATTERN.test('01810.HK')).toBe(true);
+    expect(PROVIDER_SYMBOL_PATTERN.test('000001')).toBe(false);
+  });
 });

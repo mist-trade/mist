@@ -2,7 +2,7 @@ import { DataSource, Period } from '@app/shared-data';
 import type {
   StrategyRealtimeSource,
   StrategyReplayWindowCriteria,
-} from '@app/strategy';
+} from '@app/market-data';
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
 
 function makeBuilder(rows: unknown[]) {

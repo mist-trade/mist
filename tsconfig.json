@@ -57,14 +57,17 @@
       "@app/constants/*": [
         "libs/constants/src/*"
       ],
+      "@app/transport": [
+        "libs/transport/src/index.ts"
+      ],
       "@app/transport/http": [
         "libs/transport/src/http/index.ts"
       ],
       "@app/transport/rpc": [
         "libs/transport/src/rpc/index.ts"
       ],
-      "@app/backtest": [
-        "libs/backtest/src/index.ts"
+      "@app/contracts": [
+        "libs/contracts/src/index.ts"
       ],
       "@app/signal": [
         "libs/signal/src/index.ts"
@@ -78,17 +81,8 @@
       "@app/decimal": [
         "libs/decimal/src/index.ts"
       ],
-      "@app/realtime": [
-        "libs/realtime/src/index.ts"
-      ],
       "@app/indicators": [
         "libs/indicators/src/index.ts"
-      ],
-      "@app/observability": [
-        "libs/observability/src"
-      ],
-      "@app/observability/*": [
-        "libs/observability/src/*"
       ],
       "@app/visual-command": [
         "libs/visual-command/src/index.ts"

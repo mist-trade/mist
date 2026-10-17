@@ -36,3 +36,10 @@ export function isRfc3339(value: unknown): value is string {
     Number.isFinite(Date.parse(value))
   );
 }
+
+/**
+ * 校验值是否为有效且非 NaN 的 Date 对象
+ */
+export function isValidDate(value: unknown): value is Date {
+  return value instanceof Date && Number.isFinite(value.getTime());
+}

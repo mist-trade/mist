@@ -2,6 +2,7 @@ import { Injectable, Logger, OnApplicationBootstrap } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { BacktestRun, BacktestRunStatus } from '@app/shared-data';
+import { isRecord, toErrorMessage } from '@app/utils';
 import { LessThanOrEqual, Repository } from 'typeorm';
 import {
   BacktestRpcClient,
@@ -87,7 +88,7 @@ export class BacktestStartupCompensationService
       );
     } catch (error) {
       this.logger.warn(
-        `Backtest startup health check failed: ${error instanceof Error ? error.message : 'unknown'}`,
+        `Backtest startup health check failed: ${toErrorMessage(error, 'unknown')}`,
       );
       return false;
     }
@@ -117,8 +118,4 @@ export class BacktestStartupCompensationService
       },
     );
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

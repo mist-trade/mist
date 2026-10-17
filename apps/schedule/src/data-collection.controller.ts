@@ -1,6 +1,8 @@
 import { Controller, Logger, Post } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import { Period } from '@app/shared-data';
+import { toErrorMessage } from '@app/utils';
+
 import {
   ASIA_SHANGHAI_TIMEZONE,
   CRON_POST_CLOSE_SYNC_MORNING_0630,
@@ -71,7 +73,7 @@ export class DataCollectionController {
           `status=${report.overallStatus} sentToFeishu=${report.sentToFeishu}`,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = toErrorMessage(error);
       this.logger.error(
         `[Schedule] event=pre_market_inspection_failed error="${message}"`,
       );
@@ -125,7 +127,7 @@ export class DataCollectionController {
           `saved=${report.totalKLinesSaved} durationMs=${report.durationMs}`,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = toErrorMessage(error);
       this.logger.error(
         `[Schedule] event=nightly_sync_failed error="${message}"`,
       );
@@ -174,7 +176,7 @@ export class DataCollectionController {
           `saved=${report.totalKLinesSaved} durationMs=${report.durationMs}`,
       );
     } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
+      const message = toErrorMessage(error);
       this.logger.error(
         `[Schedule] event=morning_retry_failed error="${message}"`,
       );

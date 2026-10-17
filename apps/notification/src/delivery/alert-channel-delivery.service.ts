@@ -11,7 +11,9 @@ import {
   StrategyDefinition,
   StrategySignal,
 } from '@app/shared-data';
-import type { AlertDeliveryChannelJobV1 } from '@app/signal';
+import { toErrorMessage } from '@app/utils';
+import type { AlertDeliveryChannelJobV1 } from '@app/contracts';
+
 import {
   CHANNEL_ADAPTERS,
   type ChannelAdapter,
@@ -113,7 +115,7 @@ export class AlertChannelDeliveryService {
     } catch (error) {
       result = {
         status: 'transient_failure',
-        error: error instanceof Error ? error.message : String(error),
+        error: toErrorMessage(error),
       };
     }
     this.counters.recordAttempt(channel);

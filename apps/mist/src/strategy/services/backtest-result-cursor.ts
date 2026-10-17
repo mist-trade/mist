@@ -1,3 +1,5 @@
+import { isRecord } from '@app/utils';
+
 export interface BacktestResultCursor {
   readonly runId: number;
   readonly signalTime: Date;
@@ -79,8 +81,4 @@ function sameKeys(
     actual.length === expected.length &&
     [...actual].sort().every((key, index) => key === expected[index])
   );
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

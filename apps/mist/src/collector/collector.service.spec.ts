@@ -12,7 +12,7 @@ import {
 } from '@app/shared-data';
 import { BadRequestException, Logger, NotFoundException } from '@nestjs/common';
 import { getRepositoryToken } from '@nestjs/typeorm';
-import { DataSourceSelectionService } from '@app/utils';
+import { DataSourceSelectionService } from '../sources/services';
 
 const mockSecurityRepository = {
   findOne: jest.fn(),

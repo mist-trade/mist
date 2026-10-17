@@ -1,4 +1,5 @@
 import { toZonedTime } from 'date-fns-tz';
+import { Period } from '@app/shared-data';
 import { ASIA_SHANGHAI_TIMEZONE } from './date-format.constants';
 
 /**
@@ -61,4 +62,53 @@ export function formatTradingDayString(dateOrTimestamp: Date | number): string {
     (zoned.getMonth() + 1).toString().padStart(2, '0'),
     zoned.getDate().toString().padStart(2, '0'),
   ].join('');
+}
+
+/**
+ * Format a Date or timestamp into Shanghai date string (YYYY-MM-DD).
+ */
+export function formatShanghaiDateString(
+  dateOrTimestamp: Date | number,
+): string {
+  const date =
+    typeof dateOrTimestamp === 'number'
+      ? new Date(dateOrTimestamp)
+      : dateOrTimestamp;
+  const zoned = toZonedTime(date, TIME_ZONE);
+  const year = zoned.getFullYear().toString().padStart(4, '0');
+  const month = (zoned.getMonth() + 1).toString().padStart(2, '0');
+  const day = zoned.getDate().toString().padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Format a Date or timestamp into Shanghai datetime string (YYYY-MM-DD HH:mm).
+ */
+export function formatShanghaiDateTimeString(
+  dateOrTimestamp: Date | number,
+): string {
+  const date =
+    typeof dateOrTimestamp === 'number'
+      ? new Date(dateOrTimestamp)
+      : dateOrTimestamp;
+  const zoned = toZonedTime(date, TIME_ZONE);
+  const year = zoned.getFullYear().toString().padStart(4, '0');
+  const month = (zoned.getMonth() + 1).toString().padStart(2, '0');
+  const day = zoned.getDate().toString().padStart(2, '0');
+  const hours = zoned.getHours().toString().padStart(2, '0');
+  const minutes = zoned.getMinutes().toString().padStart(2, '0');
+  return `${year}-${month}-${day} ${hours}:${minutes}`;
+}
+
+/**
+ * Check if the given bar timestamp marks a session close (15:00 in Asia/Shanghai).
+ * For day-level or longer periods (period >= Period.DAY), any bar is effectively a session close.
+ * For intraday bars (< Period.DAY), checks if the wall-clock time in Asia/Shanghai is 15:00.
+ */
+export function isSessionCloseBar(timestamp: Date, period: Period): boolean {
+  if (period >= Period.DAY) {
+    return true;
+  }
+  const zoned = toZonedTime(timestamp, TIME_ZONE);
+  return zoned.getHours() === 15 && zoned.getMinutes() === 0;
 }

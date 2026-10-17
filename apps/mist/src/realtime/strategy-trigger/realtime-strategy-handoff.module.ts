@@ -1,11 +1,11 @@
 import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
-import { parseRedisConnectionUrl } from '@app/realtime';
 import {
+  parseRedisConnectionUrl,
   STRATEGY_TRIGGER_BULLMQ_PREFIX,
   STRATEGY_TRIGGER_QUEUE_NAME,
-} from '@app/signal';
+} from '@app/contracts';
 import { BullMqCandleFinalizationHandoffService } from './bullmq-candle-finalization-handoff.service';
 import { CANDLE_FINALIZATION_HANDOFF_PORT } from './candle-finalization-handoff.port';
 

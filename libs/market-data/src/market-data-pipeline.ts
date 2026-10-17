@@ -1,20 +1,15 @@
 import { KPriceProjector } from './k-price-projector';
 import type { StrategyBar } from './strategy-bar';
 import { Decimal8, normalizeExternalDecimalText } from '@app/decimal';
+import { isValidDate } from '@app/utils';
 import type { K } from '@app/shared-data';
 import { DataSource } from '@app/shared-data';
+
 import {
   StrategySeriesImputer,
   type ProjectedStrategyBar,
   type StrategyImputationResolution,
 } from './projection/strategy-series-imputer';
-
-export class MarketDataPipelineError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'MarketDataPipelineError';
-  }
-}
 
 export interface MarketDataPipelineInput {
   readonly rawBars: readonly K[] | readonly StrategyBar[];
@@ -63,10 +58,9 @@ function mapKToStrategyBarInternal(k: K): StrategyBar | null {
         ? k.period
         : null;
     if (period === null) return null;
-    const timestamp =
-      k.timestamp instanceof Date && Number.isFinite(k.timestamp.getTime())
-        ? new Date(k.timestamp.getTime())
-        : null;
+    const timestamp = isValidDate(k.timestamp)
+      ? new Date(k.timestamp.getTime())
+      : null;
     if (!timestamp) return null;
 
     // Open/High/Low/Close: K entity stores as string "10.00", TypeORM returns string

@@ -1,4 +1,4 @@
-import type { BaseHealthVo, HealthStatus } from '@app/observability';
+import type { BaseHealthVo, HealthStatus } from '@app/transport';
 
 export interface NotificationHealthVo extends BaseHealthVo {
   status: HealthStatus;

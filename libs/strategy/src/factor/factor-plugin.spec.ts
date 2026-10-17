@@ -5,7 +5,6 @@ import { ChanBspFactorPlugin } from './plugins/chan-bsp.plugin';
 import { LegacyRuleDslPlugin } from './plugins/legacy-rule-dsl.plugin';
 import { FinancialSafetyGuardPlugin } from './plugins/financial-guard.plugin';
 import { NorthboundCapitalPlugin } from './plugins/northbound-capital.plugin';
-import { HttpProxyFactorPlugin } from './plugins/http-proxy.plugin';
 
 function makeMockBar(
   time: Date,
@@ -163,31 +162,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       const opinion = await plugin.evaluate(context, { minInflowWan: 2000 });
       expect(opinion.action).toBe('SELL');
       expect(opinion.confidence).toBe(0.85);
-    });
-  });
-
-  describe('HttpProxyFactorPlugin', () => {
-    it('safely handles timeouts and degrades to NEUTRAL', async () => {
-      const plugin = new HttpProxyFactorPlugin({
-        id: 'plugin.ai.mock',
-        name: 'Mock AI',
-        endpointUrl: 'http://127.0.0.1:59999/timeout-test',
-        timeoutMs: 50,
-      });
-
-      const context: FactorContext = {
-        securityId: 1,
-        securityCode: '000001',
-        timestamp: new Date(),
-        period: 5,
-        bars: [],
-        attributes: new Map(),
-      };
-
-      const opinion = await plugin.evaluate(context);
-      expect(opinion.action).toBe('NEUTRAL');
-      expect(opinion.confidence).toBe(0.0);
-      expect(opinion.reason).toContain('自动弃权');
     });
   });
 

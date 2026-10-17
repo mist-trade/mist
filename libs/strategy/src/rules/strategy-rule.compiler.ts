@@ -1,9 +1,13 @@
 import { Decimal8, normalizeExternalDecimalText } from '@app/decimal';
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
 import {
   STRATEGY_FIELD_CATALOG,
   type StrategyFieldCatalogEntry,
   type StrategyFieldPath,
 } from './strategy-field.catalog';
+
 import type {
   CompiledStrategyCondition,
   CompiledStrategyExecutionPlan,
@@ -243,8 +247,4 @@ function hasExactKeys(actual: string[], expected: string[]): boolean {
   const actualKeys = [...actual].sort();
   const expectedKeys = [...expected].sort();
   return actualKeys.every((key, index) => key === expectedKeys[index]);
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

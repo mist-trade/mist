@@ -8,7 +8,7 @@ import {
   candleFinalizedJobId,
   decodeCandleFinalizedTriggerV1,
   type CandleFinalizedTriggerV1,
-} from '@app/signal';
+} from '@app/contracts';
 import type { CandleFinalizationHandoffPort } from './candle-finalization-handoff.port';
 
 @Injectable()

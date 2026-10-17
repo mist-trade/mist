@@ -1,5 +1,6 @@
 import type { ProjectedStrategyBar } from '@app/market-data';
-import { compileStoredStrategyRule, evaluateStrategyPlan } from '../index';
+import { compileStoredStrategyRule } from '../index';
+import { evaluateStrategyPlan } from '../evaluation/strategy-rule.evaluator';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
 import { LegacyRuleDslPlugin } from '../factor/plugins/legacy-rule-dsl.plugin';
 import { DecisionFlowEvaluator } from './decision-flow-evaluator';

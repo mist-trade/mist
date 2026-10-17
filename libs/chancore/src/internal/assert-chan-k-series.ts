@@ -27,7 +27,7 @@ export function assertChanKSeries(orderedK: readonly ChanK[]): void {
       throw inputError(index, `symbol must equal ${symbol}`);
     }
 
-    if (!(k.time instanceof Date) || !Number.isFinite(k.time.getTime())) {
+    if (!isValidDate(k.time)) {
       throw inputError(index, 'time must be a valid Date');
     }
     const time = k.time.getTime();
@@ -59,6 +59,10 @@ export function assertChanKSeries(orderedK: readonly ChanK[]): void {
 
 function isDecimal36Scale8(value: unknown): value is string {
   return typeof value === 'string' && DECIMAL_36_8_PATTERN.test(value);
+}
+
+function isValidDate(value: unknown): value is Date {
+  return value instanceof Date && Number.isFinite(value.getTime());
 }
 
 function inputError(index: number, reason: string): ChanInputError {

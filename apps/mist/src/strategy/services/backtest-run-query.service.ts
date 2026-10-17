@@ -6,7 +6,9 @@ import {
   BacktestSignalResult,
   BacktestTradeResult,
 } from '@app/shared-data';
+import { isRecord } from '@app/utils';
 import { HttpBusinessRejection } from '@app/transport/http';
+
 import { Repository } from 'typeorm';
 import { BacktestSignalResultQueryDto } from '../dto/backtest-signal-result-query.dto';
 import { BacktestTradeResultQueryDto } from '../dto/backtest-trade-result-query.dto';
@@ -311,10 +313,6 @@ function mapTargetIssues(value: unknown): BacktestRunVo['targetIssues'] {
     });
   }
   return issues;
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function mapTrade(trade: BacktestTradeResult): BacktestTradeResultVo {

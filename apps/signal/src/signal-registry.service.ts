@@ -11,13 +11,11 @@ import { normalizeSecurityCode } from '@app/utils';
 import {
   compileStoredDefinitionVersion,
   StoredDefinitionCompileError,
-  type StrategyRealtimeSource,
-} from '@app/strategy';
-import { In, Repository } from 'typeorm';
-import {
   type RealtimeStrategyExecutionPlan,
-  type SignalRegistryRefreshV1,
-} from '@app/signal';
+} from '@app/strategy';
+import type { StrategyRealtimeSource } from '@app/market-data';
+import { In, Repository } from 'typeorm';
+import type { SignalRegistryRefreshV1 } from '@app/contracts';
 import { HealthStateService } from './health/health-state.service';
 import type {
   SignalRegistryDefinition,

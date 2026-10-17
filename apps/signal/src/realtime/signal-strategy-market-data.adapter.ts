@@ -4,22 +4,21 @@ import { DataSource, K } from '@app/shared-data';
 import {
   createCanonicalStrategyBar,
   mapKToStrategyBar,
-} from '@app/market-data';
-import {
   type StrategyBar,
   type StrategyMarketObservation,
   type StrategyRealtimeMarketDataPort,
   type StrategyRealtimeWindow,
   type StrategyRealtimeWindowCriteria,
   type StrategyTrigger,
-} from '@app/strategy';
+} from '@app/market-data';
 import {
   closedCandleKey,
   decodeRealtimeClosedCandleRecordV1,
   type RealtimeClosedCandleRecordV1,
-} from '@app/realtime';
+} from '@app/contracts';
 import { Decimal8 } from '@app/decimal';
-import { fromZonedTime } from 'date-fns-tz';
+import { isValidDate } from '@app/utils';
+import { fromZonedTime, toZonedTime } from 'date-fns-tz';
 import {
   ASIA_SHANGHAI_TIMEZONE,
   MORNING_START_MIN,
@@ -264,29 +263,16 @@ function shanghaiParts(timestamp: Date): {
   hour: number;
   minute: number;
 } {
-  if (!(timestamp instanceof Date) || !Number.isFinite(timestamp.getTime())) {
+  if (!isValidDate(timestamp)) {
     throw new TypeError('realtime K timestamp must be valid');
   }
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ASIA_SHANGHAI_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(timestamp);
-  const read = (type: Intl.DateTimeFormatPartTypes): number => {
-    const value = parts.find((part) => part.type === type)?.value;
-    if (!value) throw new TypeError('could not resolve Shanghai timestamp');
-    return Number(value);
-  };
+  const zoned = toZonedTime(timestamp, ASIA_SHANGHAI_TIMEZONE);
   return {
-    year: read('year'),
-    month: read('month'),
-    day: read('day'),
-    hour: read('hour'),
-    minute: read('minute'),
+    year: zoned.getFullYear(),
+    month: zoned.getMonth() + 1,
+    day: zoned.getDate(),
+    hour: zoned.getHours(),
+    minute: zoned.getMinutes(),
   };
 }
 

@@ -4,7 +4,6 @@ export * from './plugins/chan-bsp.plugin';
 export * from './plugins/legacy-rule-dsl.plugin';
 export * from './plugins/financial-guard.plugin';
 export * from './plugins/northbound-capital.plugin';
-export * from './plugins/http-proxy.plugin';
 export * from './plugins/fibonacci.plugin';
 export * from './standard-plugins';
 export * from './external-plugin-loader';

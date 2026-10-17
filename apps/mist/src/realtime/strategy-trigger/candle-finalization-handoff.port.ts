@@ -1,4 +1,4 @@
-import type { CandleFinalizedTriggerV1 } from '@app/signal';
+import type { CandleFinalizedTriggerV1 } from '@app/contracts';
 
 export const CANDLE_FINALIZATION_HANDOFF_PORT = Symbol(
   'CANDLE_FINALIZATION_HANDOFF_PORT',

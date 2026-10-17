@@ -24,6 +24,7 @@ import { QmtCollectionStrategy } from './strategies/qmt-collection.strategy';
 import { EastMoneySource } from '../sources/east-money/east-money-source.service';
 import { QmtSource } from '../sources/qmt/qmt-source.service';
 import { TdxSource } from '../sources/tdx/tdx-source.service';
+import { SourcesModule } from '../sources/sources.module';
 import { UtilsModule } from '@app/utils';
 import { SecurityModule } from '../security/security.module';
 import { TimezoneModule } from '@app/timezone';
@@ -60,6 +61,7 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
       Security,
       SecuritySourceConfig,
     ]),
+    SourcesModule,
     UtilsModule,
     SecurityModule,
     TimezoneModule,

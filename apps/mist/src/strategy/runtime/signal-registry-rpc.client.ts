@@ -11,7 +11,7 @@ import {
   decodeSignalRegistryRefreshV1,
   SIGNAL_REGISTRY_REFRESH_PATTERN,
   type SignalRegistryRefreshV1,
-} from '@app/signal';
+} from '@app/contracts';
 import { firstValueFrom, timeout, TimeoutError } from 'rxjs';
 import {
   SIGNAL_REGISTRY_REFRESH_TIMEOUT_MS,

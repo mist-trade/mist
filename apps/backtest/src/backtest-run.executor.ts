@@ -31,10 +31,10 @@ import {
   type CompiledStoredDefinition,
   type DailyNavSnapshot,
   type PositionClosedRecord,
-  type StrategyBar,
-  type StrategyRealtimeSource,
 } from '@app/strategy';
+import type { StrategyBar, StrategyRealtimeSource } from '@app/market-data';
 import { computePerformanceSummary } from '@app/indicators';
+import { isSessionCloseBar } from '@app/timezone';
 import { DataSource as TypeOrmDataSource, In, Repository } from 'typeorm';
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
 import { BacktestRunFailure } from './backtest-run-error';
@@ -42,9 +42,6 @@ import { HealthStateService } from './health/health-state.service';
 
 const BACKTEST_CALCULATION_BATCH_SIZE = 100;
 const BACKTEST_RESULT_BATCH_SIZE = 100;
-const CST_TIMEZONE_OFFSET_HOURS = 8;
-const HOURS_PER_DAY = 24;
-const AFTERNOON_CLOSE_HOUR_CST = 15;
 
 class ReplayBudget {
   consumed = 0;
@@ -457,7 +454,7 @@ export class BacktestRunExecutor {
           broker.submitOrder(orderDraft);
         }
 
-        if (isDailyCloseBar(bar, run.period)) {
+        if (isSessionCloseBar(bar.timestamp, run.period)) {
           positionMachine.onDayClose(bar);
         }
 
@@ -612,16 +609,6 @@ function classifyFailure(error: unknown): BacktestRunFailure {
 
 function errorTrace(error: unknown): string | undefined {
   return error instanceof Error ? error.stack : undefined;
-}
-
-function isDailyCloseBar(bar: StrategyBar, period: Period): boolean {
-  if (period >= Period.DAY) {
-    return true;
-  }
-  const cstHour =
-    (bar.timestamp.getUTCHours() + CST_TIMEZONE_OFFSET_HOURS) % HOURS_PER_DAY;
-  const minute = bar.timestamp.getUTCMinutes();
-  return cstHour === AFTERNOON_CLOSE_HOUR_CST && minute === 0;
 }
 
 function combineDailyNavHistories(

@@ -9,8 +9,10 @@ import {
   SecurityStatus,
 } from '@app/shared-data';
 import { TimezoneService } from '@app/timezone';
-import { DataSourceSelectionService, getSecurityFormatCode } from '@app/utils';
+import { getSecurityFormatCode, toErrorMessage } from '@app/utils';
+import { DataSourceSelectionService } from '../sources/services';
 import { CollectorService } from './collector.service';
+
 import { DataFreshnessValidator } from './helpers/data-freshness.validator';
 import {
   HistoryDownloadClient,
@@ -122,7 +124,7 @@ export class PostCloseSyncService {
       try {
         providerCode = getSecurityFormatCode(security, source);
       } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
+        const message = toErrorMessage(error);
         this.logger.warn(
           `[PostCloseSync] event=history_download_symbol_unresolved ` +
             `securityCode=${security.code} source=${downloadSource} ` +
@@ -191,8 +193,7 @@ export class PostCloseSyncService {
             securityIds: chunk.map((e) => e.security.id),
           });
         } catch (error) {
-          const message =
-            error instanceof Error ? error.message : String(error);
+          const message = toErrorMessage(error);
           this.logger.warn(
             `[PostCloseSync] event=history_download_submit_failed source=${source} ` +
               `error="${message.slice(0, 200)}"`,
@@ -436,8 +437,7 @@ export class PostCloseSyncService {
         count,
       };
     } catch (error) {
-      const errorMessage =
-        error instanceof Error ? error.message : String(error);
+      const errorMessage = toErrorMessage(error);
       this.syncMetrics.recordTask('failed', source, period);
 
       this.logger.error(

@@ -14,4 +14,4 @@ export {
   manifestKey,
   marketDayExpiryEpochSeconds,
   watermarkKey,
-} from '@app/realtime';
+} from '@app/contracts';

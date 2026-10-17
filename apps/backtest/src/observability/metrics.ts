@@ -1,5 +1,5 @@
 import { metrics } from '@opentelemetry/api';
-import { createIdempotentMetricRegistration } from '@app/observability';
+import { createIdempotentMetricRegistration } from '@app/transport';
 import { BacktestAdmissionService } from '../backtest-admission.service';
 import { HealthStateService } from '../health/health-state.service';
 

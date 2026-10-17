@@ -19,7 +19,12 @@ import {
   CRON_SUBSCRIPTION_RESET_0915,
   isIntradayAddWindow,
 } from '@app/timezone';
-import { isRecord, hasExactKeys } from '@app/utils';
+import {
+  isRecord,
+  hasExactKeys,
+  isProviderSymbol,
+  withTimeout,
+} from '@app/utils';
 import { Clock } from '../realtime/clock.service';
 import { RealtimeSecurityAllowlistService } from '../realtime/realtime-security-allowlist.service';
 import { RealtimeSnapshotIngressService } from '../realtime/realtime-snapshot-ingress.service';
@@ -374,7 +379,11 @@ export class RealtimeSubscriptionLifecycleCoordinator
     if (remainingMs <= 0) {
       throw new Error('REALTIME_SUBSCRIPTION_RECONCILIATION_DEADLINE');
     }
-    const result = await withDeadline(operation(control), remainingMs);
+    const result = await withTimeout(
+      operation(control),
+      remainingMs,
+      () => new Error('REALTIME_SUBSCRIPTION_RECONCILIATION_DEADLINE'),
+    );
     if ('failure' in result) throw new Error(result.failure.reason);
     return result;
   }
@@ -476,32 +485,7 @@ function decodeActiveSymbols(
   return [...new Set(symbols)].sort();
 }
 
-function isProviderSymbol(value: unknown): value is string {
-  return (
-    typeof value === 'string' &&
-    /^(?:\d{6}\.(?:SH|SZ|BJ)|\d{5,6}\.HK)$/.test(value)
-  );
-}
-
 export { isIntradayAddWindow };
-
-async function withDeadline<T>(promise: Promise<T>, timeoutMs: number) {
-  let timer: ReturnType<typeof setTimeout> | null = null;
-  try {
-    return await Promise.race([
-      promise,
-      new Promise<never>((_, reject) => {
-        timer = setTimeout(
-          () =>
-            reject(new Error('REALTIME_SUBSCRIPTION_RECONCILIATION_DEADLINE')),
-          timeoutMs,
-        );
-      }),
-    ]);
-  } finally {
-    if (timer) clearTimeout(timer);
-  }
-}
 
 function stableFailureReason(error: unknown): string {
   if (!(error instanceof Error)) return 'unknown';

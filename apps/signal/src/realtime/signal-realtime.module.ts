@@ -3,11 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { K } from '@app/shared-data';
-import { parseRedisConnectionUrl } from '@app/realtime';
 import {
+  parseRedisConnectionUrl,
   STRATEGY_TRIGGER_BULLMQ_PREFIX,
   STRATEGY_TRIGGER_QUEUE_NAME,
-} from '@app/signal';
+} from '@app/contracts';
 import { CandleFinalizedBullMqWorker } from './candle-finalized-bullmq.worker';
 import { CandleFinalizedJobProcessor } from './candle-finalized-job.processor';
 import { SignalRealtimeRedisService } from './signal-realtime-redis.service';

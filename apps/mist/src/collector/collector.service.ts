@@ -1,5 +1,6 @@
 import { DataSource, Period, Security } from '@app/shared-data';
-import { DataSourceSelectionService, getSecurityFormatCode } from '@app/utils';
+import { getSecurityFormatCode } from '@app/utils';
+import { DataSourceSelectionService } from '../sources/services';
 import {
   BadRequestException,
   Injectable,

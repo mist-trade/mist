@@ -1,9 +1,8 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
-import { parseRedisConnectionUrl } from '@app/realtime';
-import { NotificationChannel } from '@app/shared-data';
 import {
+  parseRedisConnectionUrl,
   STRATEGY_ALERT_DELIVERY_BULLMQ_PREFIX,
   STRATEGY_ALERT_DELIVERY_CHANNEL_JOB,
   STRATEGY_ALERT_DELIVERY_CHANNEL_JOB_OPTIONS,
@@ -14,7 +13,8 @@ import {
   alertDeliveryFanoutJobId,
   decodeAlertDeliveryChannelJobV1,
   decodeAlertDeliveryFanoutJobV1,
-} from '@app/signal';
+} from '@app/contracts';
+import { NotificationChannel } from '@app/shared-data';
 
 /**
  * Owns the single producer-side BullMQ Queue for strategy-alert-delivery.

@@ -4,13 +4,10 @@ import type { StrategyBar } from '@app/market-data';
 import {
   compileStoredStrategyRule,
   HistoricalBarSource,
-  StrategyEvaluationKernel,
-} from '@app/strategy';
-import {
   RealtimeKernelPool,
-  RealtimeStrategyEvaluationService,
+  StrategyEvaluationKernel,
   type RealtimeStrategyExecutionPlan,
-} from '@app/signal';
+} from '@app/strategy';
 import { StrategySimulationSession } from './simulation/strategy-simulation.session';
 import { mapKernelSignalToSimulationSignal } from './simulation/kernel-signal-mapper';
 
@@ -233,7 +230,6 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
           .mockResolvedValue({ bars: [...preWarmBars] }),
         resolveRealtimeObservation: jest.fn(),
       });
-      const evaluation = new RealtimeStrategyEvaluationService(kernelPool);
       const plans: RealtimeStrategyExecutionPlan[] = [
         {
           definitionId: 1,
@@ -249,16 +245,19 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
       ];
       const laneB: ComparableSimulationSignal[] = [];
       for (const bar of publicBars) {
-        const candidates = await evaluation.evaluate(bar, plans);
-        for (const candidate of candidates) {
+        const signals = await kernelPool.push(bar, plans);
+        for (const signal of signals) {
+          const mapped = mapKernelSignalToSimulationSignal(signal, {
+            securityCode: '600000.SH',
+            period: 1,
+          });
           laneB.push({
-            signalTime: candidate.signalTime.toISOString(),
-            triggerTime: candidate.triggerTime,
-            pivotTime:
-              candidate.pivotTime ?? candidate.signalTime.toISOString(),
-            triggerPrice: candidate.triggerPrice,
-            signalType: candidate.signalType,
-            isBuy: candidate.signalKind === 'entry',
+            signalTime: mapped.signalTime,
+            triggerTime: mapped.triggerTime,
+            pivotTime: mapped.pivotTime,
+            triggerPrice: mapped.triggerPrice,
+            signalType: mapped.signalType,
+            isBuy: mapped.isBuy,
           });
         }
       }

@@ -1,5 +1,8 @@
-import { RealtimePeriodBuilder, REALTIME_STRATEGY_PERIODS } from '@app/signal';
-import type { StrategyBar, StrategyTrigger } from '@app/strategy';
+import {
+  RealtimePeriodBuilder,
+  REALTIME_STRATEGY_PERIODS,
+} from '@app/strategy';
+import type { StrategyBar, StrategyTrigger } from '@app/market-data';
 import { resolveCandleBucket } from './candle-bucket.util';
 
 /**

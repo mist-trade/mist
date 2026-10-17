@@ -11,7 +11,7 @@ import {
   decodeAlertDeliveryFanoutJobV1,
   type AlertDeliveryChannelJobV1,
   type AlertDeliveryFanoutJobV1,
-} from '@app/signal';
+} from '@app/contracts';
 import { AlertChannelDeliveryService } from './alert-channel-delivery.service';
 import { AlertFanoutService } from './alert-fanout.service';
 

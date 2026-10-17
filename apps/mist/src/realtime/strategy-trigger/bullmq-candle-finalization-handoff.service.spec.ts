@@ -1,4 +1,4 @@
-import { CANDLE_FINALIZED_JOB_NAME } from '@app/signal';
+import { CANDLE_FINALIZED_JOB_NAME } from '@app/contracts';
 import { BullMqCandleFinalizationHandoffService } from './bullmq-candle-finalization-handoff.service';
 
 describe('BullMqCandleFinalizationHandoffService', () => {

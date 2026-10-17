@@ -8,7 +8,9 @@ import {
   StrategyAlertStatus,
   isUniqueConstraintViolation,
 } from '@app/shared-data';
-import type { AlertDeliveryFanoutJobV1 } from '@app/signal';
+import { toErrorMessage } from '@app/utils';
+
+import type { AlertDeliveryFanoutJobV1 } from '@app/contracts';
 import type { ChannelAdapter } from '../channels/channel-adapter.port';
 import { CHANNEL_ADAPTERS } from '../channels/channel-adapter.port';
 import { AlertDeliveryQueueService } from './alert-delivery-queue.service';
@@ -84,7 +86,7 @@ export class AlertFanoutService {
             !isUniqueConstraintViolation(error, DELIVERY_ROW_UNIQUE_CONSTRAINT)
           ) {
             this.logger.error(
-              `fanout delivery row creation failed event=${alertEventId} channel=${channel}: ${error instanceof Error ? error.message : String(error)}`,
+              `fanout delivery row creation failed event=${alertEventId} channel=${channel}: ${toErrorMessage(error)}`,
             );
             throw error;
           }

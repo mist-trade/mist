@@ -5,7 +5,7 @@ import {
   STRATEGY_TRIGGER_QUEUE_NAME,
   STRATEGY_TRIGGER_WORKER_CONCURRENCY,
   type CandleFinalizedTriggerV1,
-} from '@app/signal';
+} from '@app/contracts';
 import {
   CandleFinalizedJobProcessor,
   RealtimeStrategyJobDeadlineExceededError,

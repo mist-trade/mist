@@ -10,7 +10,8 @@ import {
   Period,
   Security,
 } from '@app/shared-data';
-import { PeriodMappingService, UtilsService } from '@app/utils';
+import { UtilsService } from '@app/utils';
+import { PeriodMappingService } from '../services';
 import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
 import { QmtSource } from './qmt-source.service';
 import { QmtResponse } from './types';

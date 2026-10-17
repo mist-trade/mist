@@ -6,7 +6,7 @@ import {
   PeriodicExportingMetricReader,
 } from '@opentelemetry/sdk-metrics';
 import type { MetricData } from '@opentelemetry/sdk-metrics';
-import { resetMetricRegistrationsForTest } from '@app/observability';
+import { resetMetricRegistrationsForTest } from '@app/transport';
 import { registerBacktestMetrics } from './metrics';
 import type { HealthStateService } from '../health/health-state.service';
 import type { BacktestAdmissionService } from '../backtest-admission.service';

@@ -2,6 +2,8 @@ import { createHmac } from 'node:crypto';
 import { Inject, Injectable, Optional } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NotificationChannel } from '@app/shared-data';
+import { toErrorMessage } from '@app/utils';
+
 import type {
   ChannelAdapter,
   ChannelMessage,
@@ -104,7 +106,7 @@ export class FeishuChannelAdapter implements ChannelAdapter {
     } catch (error) {
       return {
         status: 'transient_failure',
-        error: error instanceof Error ? error.message : String(error),
+        error: toErrorMessage(error),
       };
     }
   }

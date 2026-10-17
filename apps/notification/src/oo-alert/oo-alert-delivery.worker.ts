@@ -1,7 +1,9 @@
 import { Inject, Logger } from '@nestjs/common';
 import { Processor, WorkerHost } from '@nestjs/bullmq';
 import { ConfigService } from '@nestjs/config';
+import { toErrorMessage } from '@app/utils';
 import type { Job } from 'bullmq';
+
 import type {
   ChannelAdapter,
   ChannelMessage,
@@ -124,7 +126,7 @@ export class OoAlertDeliveryWorker extends WorkerHost {
       throw new Error(result.error ?? 'transient failure');
     } catch (error) {
       this.logger.error(
-        `oo alert send failed channel=${channel} error=${error instanceof Error ? error.message : String(error)}`,
+        `oo alert send failed channel=${channel} error=${toErrorMessage(error)}`,
       );
       throw error;
     }

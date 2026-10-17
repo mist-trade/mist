@@ -13,12 +13,16 @@ const ownedLibraries: readonly OwnedLibrary[] = [
   {
     alias: '@app/transport',
     sourceRoot: join(root, 'libs', 'transport', 'src'),
-    publicAliases: new Set(['@app/transport/http', '@app/transport/rpc']),
+    publicAliases: new Set([
+      '@app/transport',
+      '@app/transport/http',
+      '@app/transport/rpc',
+    ]),
   },
   {
-    alias: '@app/backtest',
-    sourceRoot: join(root, 'libs', 'backtest', 'src'),
-    publicAliases: new Set(['@app/backtest']),
+    alias: '@app/contracts',
+    sourceRoot: join(root, 'libs', 'contracts', 'src'),
+    publicAliases: new Set(['@app/contracts']),
   },
   {
     alias: '@app/signal',
@@ -50,7 +54,7 @@ describe('service boundary import graph', () => {
     };
     const paths = config.compilerOptions.paths;
 
-    expect(paths['@app/transport']).toBeUndefined();
+    expect(paths['@app/transport']).toEqual(['libs/transport/src/index.ts']);
     expect(paths['@app/transport/*']).toBeUndefined();
     expect(paths['@app/transport/http']).toEqual([
       'libs/transport/src/http/index.ts',
@@ -58,11 +62,11 @@ describe('service boundary import graph', () => {
     expect(paths['@app/transport/rpc']).toEqual([
       'libs/transport/src/rpc/index.ts',
     ]);
-    expect(paths['@app/backtest']).toEqual(['libs/backtest/src/index.ts']);
+    expect(paths['@app/contracts']).toEqual(['libs/contracts/src/index.ts']);
     expect(paths['@app/signal']).toEqual(['libs/signal/src/index.ts']);
     expect(paths['@app/strategy']).toEqual(['libs/strategy/src/index.ts']);
     expect(paths['@app/chancore']).toEqual(['libs/chancore/src/index.ts']);
-    expect(paths['@app/backtest/*']).toBeUndefined();
+    expect(paths['@app/contracts/*']).toBeUndefined();
     expect(paths['@app/signal/*']).toBeUndefined();
     expect(paths['@app/strategy/*']).toBeUndefined();
     expect(paths['@app/chancore/*']).toBeUndefined();
@@ -74,7 +78,7 @@ describe('service boundary import graph', () => {
       '@app/constants',
       '@app/shared-data',
       '@app/strategy',
-      '@app/backtest',
+      '@app/contracts',
       '@app/signal',
       'typeorm',
       'ioredis',
@@ -158,12 +162,12 @@ describe('service boundary import graph', () => {
     ).toBe(true);
     expect(isExternalOwnedLibraryImport(appFile, strategyInternal)).toBe(true);
     expect(
-      isExternalOwnedLibraryImport(appFile, '@app/backtest/internal'),
+      isExternalOwnedLibraryImport(appFile, '@app/contracts/internal'),
     ).toBe(true);
     expect(
       isExternalOwnedLibraryImport(appFile, '@app/transport/rpc/internal'),
     ).toBe(true);
-    expect(isExternalOwnedLibraryImport(appFile, '@app/backtest')).toBe(false);
+    expect(isExternalOwnedLibraryImport(appFile, '@app/contracts')).toBe(false);
     expect(isExternalOwnedLibraryImport(appFile, '@app/transport/rpc')).toBe(
       false,
     );
@@ -176,19 +180,19 @@ describe('service boundary import graph', () => {
     expect(
       importsFromSource(`
         import '@app/transport/rpc/internal';
-        import { value } from '@app/backtest/internal';
+        import { value } from '@app/contracts/internal';
         export * from '@app/signal/internal';
         const strategy = import('@app/strategy/internal');
         const transport = require('@app/transport/http/internal');
-        import legacy = require('@app/backtest/legacy');
+        import legacy = require('@app/contracts/legacy');
       `),
     ).toEqual([
       '@app/transport/rpc/internal',
-      '@app/backtest/internal',
+      '@app/contracts/internal',
       '@app/signal/internal',
       '@app/strategy/internal',
       '@app/transport/http/internal',
-      '@app/backtest/legacy',
+      '@app/contracts/legacy',
     ]);
   });
 
@@ -225,7 +229,7 @@ describe('service boundary import graph', () => {
 
   it('keeps domain contracts pure and the dependency graph acyclic', () => {
     const domainFiles = productionFiles.filter((file) =>
-      ['/libs/backtest/', '/libs/signal/', '/libs/strategy/'].some((segment) =>
+      ['/libs/contracts/', '/libs/signal/', '/libs/strategy/'].some((segment) =>
         file.includes(segment),
       ),
     );
@@ -243,7 +247,7 @@ describe('service boundary import graph', () => {
       );
       const strategyReverseDependency = file.includes('/libs/strategy/')
         ? sources.filter(
-            (source) => source === '@app/backtest' || source === '@app/signal',
+            (source) => source === '@app/contracts' || source === '@app/signal',
           )
         : [];
       return [...contractViolations, ...strategyReverseDependency].map(

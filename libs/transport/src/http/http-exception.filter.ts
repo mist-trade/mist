@@ -6,7 +6,9 @@ import {
   Logger,
 } from '@nestjs/common';
 import type { Request, Response } from 'express';
+import { isRecord } from '@app/utils';
 import { ApiErrorDto } from './api-error.dto';
+
 import {
   defaultHttpCode,
   defaultHttpMessage,
@@ -117,10 +119,6 @@ export class HttpExceptionFilter implements ExceptionFilter {
     }
     this.logger.error(summary, exceptionTrace(exception));
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function isValidationErrors(value: unknown): value is Record<string, string[]> {

@@ -11,7 +11,8 @@ import {
   K,
   KExtensionTdx,
 } from '@app/shared-data';
-import { UtilsService, PeriodMappingService } from '@app/utils';
+import { UtilsService } from '@app/utils';
+import { PeriodMappingService } from '../services';
 import { TdxResponse } from './types';
 import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
 import { createInsertBuilderMock } from '../testing/typeorm-mock-helpers';

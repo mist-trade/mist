@@ -8,7 +8,8 @@ import {
 } from '../source-fetcher.interface';
 import { EfExtension, EfMinuteVo, EfDailyVo } from './types';
 import { AxiosInstance } from 'axios';
-import { UtilsService, PeriodMappingService } from '@app/utils';
+import { UtilsService } from '@app/utils';
+import { PeriodMappingService } from '../services';
 import {
   DataSource,
   Period,

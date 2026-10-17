@@ -1,4 +1,4 @@
-import { isRecord, hasExactKeys, isRfc3339 } from './type-guards';
+import { isRecord, hasExactKeys, isRfc3339, isValidDate } from './type-guards';
 
 describe('type-guards', () => {
   describe('isRecord', () => {
@@ -43,6 +43,29 @@ describe('type-guards', () => {
       expect(isRfc3339('invalid')).toBe(false);
       expect(isRfc3339(123456789)).toBe(false);
       expect(isRfc3339(null)).toBe(false);
+    });
+  });
+
+  describe('isValidDate', () => {
+    it('returns true for valid Date instances', () => {
+      expect(isValidDate(new Date())).toBe(true);
+      expect(isValidDate(new Date('2026-10-17T00:00:00Z'))).toBe(true);
+      expect(isValidDate(new Date(1760000000000))).toBe(true);
+    });
+
+    it('returns false for Invalid Date instances', () => {
+      expect(isValidDate(new Date('invalid'))).toBe(false);
+      expect(isValidDate(new Date(NaN))).toBe(false);
+    });
+
+    it('returns false for null, undefined, and non-Date types', () => {
+      expect(isValidDate(null)).toBe(false);
+      expect(isValidDate(undefined)).toBe(false);
+      expect(isValidDate('2026-10-17')).toBe(false);
+      expect(isValidDate(1760000000000)).toBe(false);
+      expect(isValidDate({})).toBe(false);
+      expect(isValidDate([])).toBe(false);
+      expect(isValidDate(true)).toBe(false);
     });
   });
 });

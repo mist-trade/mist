@@ -12,7 +12,7 @@ import {
   decodeSubmitBacktestRunCommandV1,
   type SubmitBacktestRunCommandV1,
   type SubmitBacktestRunErrorCode,
-} from '@app/backtest';
+} from '@app/contracts';
 import { BacktestAdmissionService } from './backtest-admission.service';
 
 @Controller()

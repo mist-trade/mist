@@ -1,7 +1,9 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { CanonicalRealtimeSnapshot } from './realtime.types';
 import type { RealtimeSource } from './realtime.types';
+import { toErrorMessage } from '@app/utils';
 import { RealtimeMarketDataProductService } from './candle/realtime-market-data-product.service';
+
 import { trace } from '@opentelemetry/api';
 import { marketSeriesKey } from './candle/market-series-key';
 import { resolveCandleBucket } from './candle/candle-bucket.util';
@@ -68,9 +70,7 @@ export class RealtimeSnapshotIngressService {
         source: snapshot.source,
       });
       this.logger.warn(
-        `candle product_sink_failed securityId=${snapshot.securityId} source=${snapshot.source} error=${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `candle product_sink_failed securityId=${snapshot.securityId} source=${snapshot.source} error=${toErrorMessage(error)}`,
       );
     }
     return snapshot;

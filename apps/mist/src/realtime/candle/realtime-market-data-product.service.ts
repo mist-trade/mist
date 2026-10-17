@@ -21,6 +21,7 @@ import {
   HOURS_PER_DAY,
   MINUTES_PER_HOUR,
 } from '@app/timezone';
+import { toErrorMessage } from '@app/utils';
 import type Redis from 'ioredis';
 import { Clock } from '../clock.service';
 import { RealtimeRedisService } from '../realtime-redis.service';
@@ -54,7 +55,7 @@ import {
   REALTIME_REDIS_RECORD_LIMITS,
   assertRealtimeRedisBytes,
 } from '../realtime-redis.constants';
-import type { CandleFinalizedTriggerV1 } from '@app/signal';
+import type { CandleFinalizedTriggerV1 } from '@app/contracts';
 import {
   CANDLE_FINALIZATION_HANDOFF_PORT,
   type CandleFinalizationHandoffPort,
@@ -534,9 +535,7 @@ export class RealtimeMarketDataProductService
       );
       // A6 (design 303-304): mark candle redis_due_registration_failed.
       this.logger.error(
-        `Due registration failed for securityId=${identity.securityId} source=${identity.source} bucket ${bucket.bucketStartMs}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Due registration failed for securityId=${identity.securityId} source=${identity.source} bucket ${bucket.bucketStartMs}: ${toErrorMessage(error)}`,
       );
       if (!expected) {
         this.aggregator.markInvalid(
@@ -583,9 +582,7 @@ export class RealtimeMarketDataProductService
     } catch (error) {
       this.dueScanFailureCount++;
       this.logger.error(
-        `Due scan failed for ${tradingDay}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Due scan failed for ${tradingDay}: ${toErrorMessage(error)}`,
       );
       return;
     }
@@ -600,9 +597,7 @@ export class RealtimeMarketDataProductService
           member,
         });
         this.logger.warn(
-          `candle malformed_due_member member=${member} error=${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          `candle malformed_due_member member=${member} error=${toErrorMessage(error)}`,
         );
         continue;
       }
@@ -739,9 +734,7 @@ export class RealtimeMarketDataProductService
       return true;
     } catch (error) {
       this.logger.error(
-        `Current-day manifest replay failed for ${tradingDay}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Current-day manifest replay failed for ${tradingDay}: ${toErrorMessage(error)}`,
       );
       return false;
     }
@@ -993,9 +986,7 @@ export class RealtimeMarketDataProductService
       .catch((error: unknown) => {
         this.handoffObservability?.recordLiveFailure();
         this.logger.error(
-          `Realtime strategy handoff failed after candle commit for securityId=${trigger.securityId} source=${trigger.source} triggerTime=${trigger.triggerTime}: ${
-            error instanceof Error ? error.message : String(error)
-          }`,
+          `Realtime strategy handoff failed after candle commit for securityId=${trigger.securityId} source=${trigger.source} triggerTime=${trigger.triggerTime}: ${toErrorMessage(error)}`,
         );
       });
   }
@@ -1010,9 +1001,7 @@ export class RealtimeMarketDataProductService
       await client.zrem(dueKey(tradingDay), member);
     } catch (error) {
       this.logger.error(
-        `Hard-horizon due cleanup failed for securityId=${decoded.securityId} source=${decoded.source} bucket ${decoded.bucketStartMs}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Hard-horizon due cleanup failed for securityId=${decoded.securityId} source=${decoded.source} bucket ${decoded.bucketStartMs}: ${toErrorMessage(error)}`,
       );
       return;
     }

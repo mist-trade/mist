@@ -5,7 +5,8 @@ import { AxiosInstance } from 'axios';
 import { parseISO } from 'date-fns';
 import { formatInTimeZone } from 'date-fns-tz';
 import { DataSource as TypeOrmDataSource } from 'typeorm';
-import { PeriodMappingService, UtilsService } from '@app/utils';
+import { UtilsService, isRecord, toErrorMessage } from '@app/utils';
+import { PeriodMappingService } from '../services';
 import {
   DataSource,
   K,
@@ -121,7 +122,7 @@ export class QmtSource implements ISourceFetcher<QmtResponse> {
         throw error;
       }
       throw new HttpException(
-        `Failed to fetch QMT data: ${errorMessage(error)}`,
+        `Failed to fetch QMT data: ${toErrorMessage(error)}`,
         HttpStatus.BAD_GATEWAY,
         { cause: error },
       );
@@ -307,7 +308,7 @@ export class QmtSource implements ISourceFetcher<QmtResponse> {
       const column = symbolData[field];
       if (Array.isArray(column)) {
         column.forEach((_, index) => keys.add(String(index)));
-      } else if (this.isRecord(column)) {
+      } else if (isRecord(column)) {
         Object.keys(column).forEach((key) => keys.add(key));
       }
     }
@@ -364,7 +365,7 @@ export class QmtSource implements ISourceFetcher<QmtResponse> {
     if (Array.isArray(column)) {
       return column[Number(rowKey)];
     }
-    if (this.isRecord(column)) {
+    if (isRecord(column)) {
       return column[rowKey];
     }
     return undefined;
@@ -412,14 +413,6 @@ export class QmtSource implements ISourceFetcher<QmtResponse> {
     const message = envelope?.error?.message || fallbackMessage;
     throw new HttpException(`${code}: ${message}`, HttpStatus.BAD_GATEWAY);
   }
-
-  private isRecord(value: unknown): value is Record<string, unknown> {
-    return value != null && typeof value === 'object' && !Array.isArray(value);
-  }
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 /**

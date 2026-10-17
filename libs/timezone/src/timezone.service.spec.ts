@@ -1,5 +1,4 @@
 import { AxiosError } from 'axios';
-import { UtilsService } from '@app/utils';
 import { TimezoneService } from './timezone.service';
 
 describe('TimezoneService', () => {
@@ -30,11 +29,7 @@ describe('TimezoneService', () => {
       get: jest.fn(),
     };
 
-    const mockUtilsService = {
-      createAxiosInstance: jest.fn(() => mockAxios),
-    } as unknown as UtilsService;
-
-    service = new TimezoneService(mockUtilsService);
+    service = new TimezoneService(mockAxios as any);
   });
 
   afterEach(() => {

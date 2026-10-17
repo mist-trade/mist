@@ -1,9 +1,11 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { formatTradingDayString } from '@app/timezone';
+import { toErrorMessage } from '@app/utils';
 import type Redis from 'ioredis';
+
 import type { RealtimeSource } from '../realtime.types';
 import type { InvalidReason, SealedCandle } from './candle.types';
-import type { RealtimeClosedCandleRecordV1 } from '@app/realtime';
+import type { RealtimeClosedCandleRecordV1 } from '@app/contracts';
 import {
   closedCandleKey,
   watermarkKey,
@@ -129,9 +131,7 @@ export class CandleFinalizer {
     } catch (error) {
       this.recordFinalizationFailure(true);
       this.logger.error(
-        `Candle seal bounds failed for securityId=${candle.securityId} source=${candle.source} bucket ${candle.bucketStartMs}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Candle seal bounds failed for securityId=${candle.securityId} source=${candle.source} bucket ${candle.bucketStartMs}: ${toErrorMessage(error)}`,
       );
       return false;
     }
@@ -206,9 +206,7 @@ export class CandleFinalizer {
     } catch (error) {
       this.recordFinalizationFailure(false);
       this.logger.error(
-        `Candle seal failed for ${candle.providerSymbol} bucket ${candle.bucketStartMs}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `Candle seal failed for ${candle.providerSymbol} bucket ${candle.bucketStartMs}: ${toErrorMessage(error)}`,
       );
       return false;
     }
@@ -257,9 +255,7 @@ export class CandleFinalizer {
     } catch (error) {
       this.recordFinalizationFailure(true);
       this.logger.error(
-        `discardDue bounds failed for securityId=${decoded.securityId} source=${decoded.source} bucket ${decoded.bucketStartMs}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `discardDue bounds failed for securityId=${decoded.securityId} source=${decoded.source} bucket ${decoded.bucketStartMs}: ${toErrorMessage(error)}`,
       );
       return false;
     }
@@ -292,9 +288,7 @@ export class CandleFinalizer {
     } catch (error) {
       this.recordFinalizationFailure(false);
       this.logger.error(
-        `discardDue failed for securityId=${decoded.securityId} source=${decoded.source} bucket ${decoded.bucketStartMs}: ${
-          error instanceof Error ? error.message : String(error)
-        }`,
+        `discardDue failed for securityId=${decoded.securityId} source=${decoded.source} bucket ${decoded.bucketStartMs}: ${toErrorMessage(error)}`,
       );
       return false;
     }

@@ -6,9 +6,9 @@ const repositoryRoot = process.cwd();
 const contractsRoot = join(
   repositoryRoot,
   'libs',
-  'signal',
-  'src',
   'contracts',
+  'src',
+  'signal',
 );
 const productionRoots = [
   join(repositoryRoot, 'apps'),
@@ -51,7 +51,7 @@ describe('Signal contract boundary', () => {
       .map((file) => relative(repositoryRoot, file));
 
     expect(occurrences).toEqual([
-      'libs/signal/src/contracts/signal-registry-refresh.contract.ts',
+      'libs/contracts/src/signal/signal-registry-refresh.contract.ts',
     ]);
   });
 

@@ -1,16 +1,20 @@
 import type {
   StrategyBar,
   StrategyRealtimeMarketDataPort,
-} from '@app/strategy';
+} from '@app/market-data';
 import {
   CANDLE_FINALIZED_JOB_NAME,
   STRATEGY_TRIGGER_JOB_TIMEOUT_MS,
-  RealtimePeriodBuilder,
-  RealtimeStrategyEvaluationService,
   decodeCandleFinalizedTriggerV1,
   toStrategyTrigger,
+} from '@app/contracts';
+import {
+  RealtimePeriodBuilder,
   RealtimeKernelPool,
   type RealtimeStrategyExecutionPlan,
+} from '@app/strategy';
+import {
+  RealtimeStrategyEvaluationService,
   type ShadowStrategyCandidate,
 } from '@app/signal';
 import type { SignalRegistrySnapshot } from '../signal-registry.types';
@@ -19,7 +23,7 @@ import type {
   LiveStrategyPersistenceService,
 } from './live-strategy-persistence.service';
 import type { RuntimeObservabilityService } from '../observability/runtime-observability.service';
-import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
+import { formatShanghaiDateString } from '@app/timezone';
 
 export type CandleFinalizedJobOutcome =
   | 'completed'
@@ -295,10 +299,5 @@ function completed(outcome: Exclude<CandleFinalizedJobOutcome, 'completed'>) {
 }
 
 function shanghaiDay(timestamp: Date): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone: ASIA_SHANGHAI_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(timestamp);
+  return formatShanghaiDateString(timestamp);
 }

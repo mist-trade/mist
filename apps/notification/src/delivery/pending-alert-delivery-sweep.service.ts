@@ -7,6 +7,7 @@ import {
   StrategyAlertEvent,
   StrategyAlertStatus,
 } from '@app/shared-data';
+import { toErrorMessage } from '@app/utils';
 import { AlertDeliveryQueueService } from './alert-delivery-queue.service';
 
 /** Sweep cadence: one pass per minute. */
@@ -68,9 +69,7 @@ export class PendingAlertDeliverySweepService {
         );
       }
     } catch (error) {
-      this.logger.error(
-        `sweep pass failed: ${error instanceof Error ? error.message : String(error)}`,
-      );
+      this.logger.error(`sweep pass failed: ${toErrorMessage(error)}`);
     } finally {
       this.running = false;
     }

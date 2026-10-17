@@ -11,7 +11,7 @@ import {
   SIGNAL_REGISTRY_REFRESH_PATTERN,
   type RefreshSignalRegistryCommandV1,
   type SignalRegistryRefreshV1,
-} from '@app/signal';
+} from '@app/contracts';
 import { SignalRegistryService } from './signal-registry.service';
 
 @Controller()

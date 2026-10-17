@@ -1,5 +1,7 @@
 import { normalizeExternalDecimalText } from '@app/decimal';
+import { isValidDate } from '@app/utils';
 import { KPriceProjector } from './k-price-projector';
+
 import type {
   StrategyBar,
   StrategyBarType,
@@ -123,7 +125,7 @@ function mapHistoricalQuantity(value: string | null): string | null {
 }
 
 function requireTimestamp(value: Date): Date {
-  if (!(value instanceof Date) || !Number.isFinite(value.getTime())) {
+  if (!isValidDate(value)) {
     throw new TypeError('historical strategy K requires a valid timestamp');
   }
   return new Date(value.getTime());

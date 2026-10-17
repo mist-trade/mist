@@ -7,7 +7,7 @@ import {
   IDataCollectionStrategy,
   CollectionMode,
 } from './data-collection.strategy.interface';
-import { KBoundaryCalculator } from '@app/utils';
+import { KBoundaryCalculator } from '../../sources/services';
 import { TimezoneService } from '@app/timezone';
 
 @Injectable()

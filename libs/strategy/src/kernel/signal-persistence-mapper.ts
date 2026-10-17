@@ -1,4 +1,7 @@
 import type { KernelSignal } from './kernel.types';
+function isValidDate(value: unknown): value is Date {
+  return value instanceof Date && !Number.isNaN(value.getTime());
+}
 
 export interface SignalPersistenceContext {
   readonly securityId: number;
@@ -55,12 +58,15 @@ export function mapKernelSignalToPersistencePayload(
   signal: PersistableKernelSignal,
   context: SignalPersistenceContext,
 ): SignalPersistencePayload {
-  const signalTime =
-    signal.signalTime instanceof Date
-      ? signal.signalTime
-      : new Date(signal.signalTime);
+  const signalTime = isValidDate(signal.signalTime)
+    ? signal.signalTime
+    : new Date(signal.signalTime);
 
-  const pivotTime = signal.pivotTime ? new Date(signal.pivotTime) : null;
+  const pivotTime = signal.pivotTime
+    ? isValidDate(signal.pivotTime)
+      ? signal.pivotTime
+      : new Date(signal.pivotTime)
+    : null;
   const triggerTime = signal.triggerTime || signalTime.toISOString();
   const triggerPrice = signal.triggerPrice;
 

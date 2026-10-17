@@ -3,7 +3,7 @@ import type {
   RealtimeProductizationMode,
   RealtimeStrategyMode,
 } from '@app/config';
-import type { BaseHealthVo, HealthStatus } from '@app/observability';
+import type { BaseHealthVo, HealthStatus } from '@app/transport';
 
 export class BackendHealthVo implements BaseHealthVo {
   @ApiProperty({ example: 'ok' })

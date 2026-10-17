@@ -2,7 +2,7 @@ import { Test, TestingModule } from '@nestjs/testing';
 import { IndicatorService } from './indicator.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Period, Security, K } from '@app/shared-data';
-import { DataSourceService } from '@app/utils';
+import { DataSourceService } from '../sources/services';
 
 describe('IndicatorService', () => {
   let service: IndicatorService;

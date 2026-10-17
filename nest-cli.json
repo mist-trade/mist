@@ -102,13 +102,13 @@
         "tsConfigPath": "libs/transport/tsconfig.lib.json"
       }
     },
-    "backtest-lib": {
+    "contracts": {
       "type": "library",
-      "root": "libs/backtest",
+      "root": "libs/contracts",
       "entryFile": "index",
-      "sourceRoot": "libs/backtest/src",
+      "sourceRoot": "libs/contracts/src",
       "compilerOptions": {
-        "tsConfigPath": "libs/backtest/tsconfig.lib.json"
+        "tsConfigPath": "libs/contracts/tsconfig.lib.json"
       }
     },
     "signal-lib": {
@@ -156,15 +156,6 @@
         "tsConfigPath": "libs/decimal/tsconfig.lib.json"
       }
     },
-    "realtime": {
-      "type": "library",
-      "root": "libs/realtime",
-      "entryFile": "index",
-      "sourceRoot": "libs/realtime/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/realtime/tsconfig.lib.json"
-      }
-    },
     "chan": {
       "type": "application",
       "root": "apps/chan",
@@ -181,15 +172,6 @@
       "sourceRoot": "apps/notification/src",
       "compilerOptions": {
         "tsConfigPath": "apps/notification/tsconfig.app.json"
-      }
-    },
-    "observability": {
-      "type": "library",
-      "root": "libs/observability",
-      "entryFile": "index",
-      "sourceRoot": "libs/observability/src",
-      "compilerOptions": {
-        "tsConfigPath": "libs/observability/tsconfig.lib.json"
       }
     },
     "indicators": {

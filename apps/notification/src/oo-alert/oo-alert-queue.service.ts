@@ -1,7 +1,7 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
-import { parseRedisConnectionUrl } from '@app/realtime';
+import { parseRedisConnectionUrl } from '@app/contracts';
 import { ONE_MINUTE_MS } from '@app/timezone';
 import {
   OO_ALERT_BULLMQ_PREFIX,

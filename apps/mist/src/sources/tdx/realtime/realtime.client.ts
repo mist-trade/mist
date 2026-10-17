@@ -7,7 +7,9 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { DataSource } from '@app/shared-data';
 import { isMockMode } from '@app/config';
+import { isProviderSymbol, toErrorMessage } from '@app/utils';
 import WebSocket from 'ws';
+
 import {
   decodeRealtimeNativeMapMessage,
   isRecord,
@@ -208,9 +210,7 @@ export class TdxRealtimeClient
       try {
         this.ws?.send(JSON.stringify(request));
       } catch (error) {
-        this.logger.warn(
-          `ws send failed error=${error instanceof Error ? error.message : String(error)}`,
-        );
+        this.logger.warn(`ws send failed error=${toErrorMessage(error)}`);
         clearTimeout(timeout);
         this.pendingControl = null;
         resolve(localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_SEND_FAILED'));
@@ -382,7 +382,7 @@ export class TdxRealtimeClient
       const [providerSymbol, value] = Object.entries(decoded.data.native)[0];
       span.setAttribute('symbol', providerSymbol);
       span.setAttribute('capturedAt', decoded.data.capturedAt);
-      if (!TDX_SYMBOL_PATTERN.test(providerSymbol) || !isRecord(value)) {
+      if (!isProviderSymbol(providerSymbol) || !isRecord(value)) {
         reject('symbol_invalid', providerSymbol);
         this.store.recordReject(
           'validationError',
@@ -421,7 +421,7 @@ export class TdxRealtimeClient
         span.setStatus({ code: SpanStatusCode.OK });
       } catch (error) {
         this.logger.warn(
-          `converter error source=tdx symbol=${providerSymbol} error=${error instanceof Error ? error.message : String(error)}`,
+          `converter error source=tdx symbol=${providerSymbol} error=${toErrorMessage(error)}`,
         );
         reject('converter_error', providerSymbol);
         this.store.recordReject(
@@ -518,7 +518,6 @@ function localFailure(
   return { failure: { symbol, reason } };
 }
 
-const TDX_SYMBOL_PATTERN = /^(?:\d{6}\.(?:SH|SZ|BJ)|\d{5,6}\.HK)$/;
 const CONTROL_RESPONSE_OUTER_KEYS = [
   'type',
   'provider',

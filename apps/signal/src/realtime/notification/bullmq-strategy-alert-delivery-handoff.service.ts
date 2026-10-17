@@ -1,8 +1,8 @@
 import { Injectable, OnModuleDestroy } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Queue } from 'bullmq';
-import { parseRedisConnectionUrl } from '@app/realtime';
 import {
+  parseRedisConnectionUrl,
   STRATEGY_ALERT_DELIVERY_BULLMQ_PREFIX,
   STRATEGY_ALERT_DELIVERY_FANOUT_JOB,
   STRATEGY_ALERT_DELIVERY_FANOUT_JOB_OPTIONS,
@@ -10,7 +10,7 @@ import {
   alertDeliveryFanoutJobId,
   decodeAlertDeliveryFanoutJobV1,
   type AlertDeliveryFanoutJobV1,
-} from '@app/signal';
+} from '@app/contracts';
 import type { StrategyAlertDeliveryHandoffPort } from './strategy-alert-delivery-handoff.port';
 
 /**

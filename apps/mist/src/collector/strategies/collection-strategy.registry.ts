@@ -1,6 +1,6 @@
 import { Injectable, Inject, BadRequestException } from '@nestjs/common';
 import { DataSource } from '@app/shared-data';
-import { DataSourceService } from '@app/utils';
+import { DataSourceService } from '../../sources/services';
 import { IDataCollectionStrategy } from './data-collection.strategy.interface';
 
 export const COLLECTION_STRATEGIES = Symbol('COLLECTION_STRATEGIES');

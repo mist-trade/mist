@@ -1,15 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, K } from '@app/shared-data';
-import { mapKToStrategyBar } from '@app/market-data';
-import type {
-  StrategyRealtimeSource,
-  StrategyReplayMarketDataPort,
-  StrategyReplayPage,
-  StrategyReplayPageCriteria,
-  StrategyReplayWindow,
-  StrategyReplayWindowCriteria,
-} from '@app/strategy';
+import { isValidDate } from '@app/utils';
+import {
+  mapKToStrategyBar,
+  type StrategyRealtimeSource,
+  type StrategyReplayMarketDataPort,
+  type StrategyReplayPage,
+  type StrategyReplayPageCriteria,
+  type StrategyReplayWindow,
+  type StrategyReplayWindowCriteria,
+} from '@app/market-data';
 import { LessThan } from 'typeorm';
 import type { Repository } from 'typeorm';
 import { MARKET_SOURCES } from '@app/constants';
@@ -100,13 +101,13 @@ function assertCriteria(criteria: StrategyReplayPageCriteria): void {
   ) {
     throw new TypeError('backtest replay source must be tdx or qmt');
   }
-  if (!validDate(criteria.startAt) || !validDate(criteria.endAt)) {
+  if (!isValidDate(criteria.startAt) || !isValidDate(criteria.endAt)) {
     throw new TypeError('replay range requires valid dates');
   }
   if (criteria.startAt > criteria.endAt) {
     throw new RangeError('replay startAt must not be after endAt');
   }
-  if (criteria.afterTimestamp && !validDate(criteria.afterTimestamp)) {
+  if (criteria.afterTimestamp && !isValidDate(criteria.afterTimestamp)) {
     throw new TypeError('replay cursor requires a valid date');
   }
 }
@@ -126,7 +127,7 @@ function assertWindowCriteria(criteria: StrategyReplayWindowCriteria): void {
   ) {
     throw new TypeError('backtest replay window source must be tdx or qmt');
   }
-  if (!validDate(criteria.endAt)) {
+  if (!isValidDate(criteria.endAt)) {
     throw new TypeError('replay window endAt must be a valid date');
   }
   if (
@@ -141,8 +142,4 @@ function assertWindowCriteria(criteria: StrategyReplayWindowCriteria): void {
 
 function toDataSource(source: StrategyRealtimeSource): DataSource {
   return source === MARKET_SOURCES.TDX ? DataSource.TDX : DataSource.QMT;
-}
-
-function validDate(value: Date): boolean {
-  return value instanceof Date && Number.isFinite(value.getTime());
 }

@@ -1,11 +1,5 @@
-import {
-  HttpException,
-  HttpStatus,
-  Inject,
-  Injectable,
-  Logger,
-} from '@nestjs/common';
-import axios from 'axios';
+import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import axios, { type AxiosInstance } from 'axios';
 import {
   format,
   fromUnixTime,
@@ -15,7 +9,6 @@ import {
 } from 'date-fns';
 import { toZonedTime } from 'date-fns-tz';
 import { ERROR_MESSAGES } from '@app/constants';
-import { UtilsService } from '@app/utils';
 import {
   ASIA_SHANGHAI_TIMEZONE,
   BEIJING_DATE_REGEX,
@@ -36,7 +29,7 @@ interface SzseTradingDayResponse {
 @Injectable()
 export class TimezoneService {
   private readonly logger = new Logger(TimezoneService.name);
-  private readonly axios: ReturnType<UtilsService['createAxiosInstance']>;
+  private readonly axios: AxiosInstance;
 
   /**
    * Trading day cache.
@@ -55,12 +48,12 @@ export class TimezoneService {
    */
   private cacheTimestamps: Map<string, number> = new Map();
 
-  constructor(
-    @Inject(UtilsService) private readonly utilsService: UtilsService,
-  ) {
-    this.axios = this.utilsService.createAxiosInstance({
-      timeout: 10000,
-    });
+  constructor(axiosInstance?: AxiosInstance) {
+    this.axios =
+      axiosInstance ??
+      axios.create({
+        timeout: 10000,
+      });
   }
 
   convertTimestamp2Date(timestamp: number) {

@@ -10,7 +10,9 @@ import {
   Security,
   SecurityStatus,
 } from '@app/shared-data';
+import { toErrorMessage } from '@app/utils';
 import { TimezoneService } from '@app/timezone';
+
 import {
   BEIJING_DATE_SUFFIX,
   INSPECTION_STATUS,
@@ -166,9 +168,7 @@ export class PreMarketInspectionService {
         }
       }
     } catch (err) {
-      errors.push(
-        `QMT datasource unreachable: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      errors.push(`QMT datasource unreachable: ${toErrorMessage(err)}`);
     }
 
     // Probe TDX health
@@ -180,9 +180,7 @@ export class PreMarketInspectionService {
         errors.push(`TDX health probe returned HTTP ${tdxRes.status}`);
       }
     } catch (err) {
-      errors.push(
-        `TDX datasource unreachable: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      errors.push(`TDX datasource unreachable: ${toErrorMessage(err)}`);
     }
 
     if (errors.length > 0) {
@@ -385,9 +383,7 @@ export class PreMarketInspectionService {
     try {
       await this.securityRepo.query('SELECT 1');
     } catch (err) {
-      errors.push(
-        `MySQL 连接探测失败: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      errors.push(`MySQL 连接探测失败: ${toErrorMessage(err)}`);
     }
 
     // Signal service probe
@@ -409,9 +405,7 @@ export class PreMarketInspectionService {
         }
       }
     } catch (err) {
-      errors.push(
-        `Signal 服务无法访问: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      errors.push(`Signal 服务无法访问: ${toErrorMessage(err)}`);
     }
 
     if (errors.length > 0) {
@@ -518,9 +512,7 @@ export class PreMarketInspectionService {
         }
       }
     } catch (err) {
-      errors.push(
-        `Backend 健康端点无法访问: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      errors.push(`Backend 健康端点无法访问: ${toErrorMessage(err)}`);
       statusBadges.backend = 'unreachable';
     }
 
@@ -546,9 +538,7 @@ export class PreMarketInspectionService {
         }
       }
     } catch (err) {
-      errors.push(
-        `Signal 服务无法访问: ${err instanceof Error ? err.message : String(err)}`,
-      );
+      errors.push(`Signal 服务无法访问: ${toErrorMessage(err)}`);
       statusBadges.signal = 'unreachable';
     }
 

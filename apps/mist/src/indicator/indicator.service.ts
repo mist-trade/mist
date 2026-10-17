@@ -3,7 +3,7 @@ import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Between, Repository } from 'typeorm';
 import { K, Security, Period, DataSource } from '@app/shared-data';
-import { DataSourceService } from '@app/utils';
+import { DataSourceService } from '../sources/services';
 import {
   computeMacdSeries,
   computeKdjSeries,

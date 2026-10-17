@@ -12,7 +12,9 @@ import * as url from 'url';
 import * as fs from 'fs';
 import * as path from 'path';
 import { ChanCore, type ChanK } from '@app/chancore';
+import { isValidDate } from '@app/utils';
 import { ChanVisualAdapter } from '../../libs/visual-command/src/adapters/chan-visual.adapter';
+
 import {
   StrategySimulationSession,
   SIMULATION_LOCAL_FIXTURE_IDENTITY,
@@ -354,14 +356,12 @@ function getBacktestCacheKey(options: {
   endDate?: string | Date;
   filterFenxingContainment?: boolean;
 }): string {
-  const start =
-    options.startDate instanceof Date
-      ? options.startDate.toISOString()
-      : options.startDate || '';
-  const end =
-    options.endDate instanceof Date
-      ? options.endDate.toISOString()
-      : options.endDate || '';
+  const start = isValidDate(options.startDate)
+    ? options.startDate.toISOString()
+    : options.startDate || '';
+  const end = isValidDate(options.endDate)
+    ? options.endDate.toISOString()
+    : options.endDate || '';
   return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${start}:${end}`;
 }
 

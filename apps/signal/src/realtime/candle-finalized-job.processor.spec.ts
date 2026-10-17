@@ -1,7 +1,8 @@
-import { compileStoredStrategyRule, type StrategyBar } from '@app/strategy';
+import { compileStoredStrategyRule } from '@app/strategy';
+import type { StrategyBar } from '@app/market-data';
 import { StrategySignalKind } from '@app/shared-data';
 import type { SignalRegistryDefinition } from '../signal-registry.types';
-import { CANDLE_FINALIZED_JOB_NAME } from '@app/signal';
+import { CANDLE_FINALIZED_JOB_NAME } from '@app/contracts';
 import {
   CandleFinalizedJobProcessor,
   RealtimeStrategyJobDeadlineExceededError,

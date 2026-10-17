@@ -2,7 +2,9 @@ import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
 import { Decimal8, normalizeExternalDecimalText } from '@app/decimal';
 import { ConfigService } from '@nestjs/config';
 import { AxiosInstance } from 'axios';
-import { UtilsService, PeriodMappingService } from '@app/utils';
+import { UtilsService, toErrorMessage } from '@app/utils';
+import { PeriodMappingService } from '../services';
+
 import {
   DataSource,
   Period,
@@ -139,7 +141,7 @@ export class TdxSource implements ITdxSourceFetcher {
         throw error;
       }
       throw new HttpException(
-        `Failed to fetch TDX data: ${errorMessage(error)}`,
+        `Failed to fetch TDX data: ${toErrorMessage(error)}`,
         HttpStatus.BAD_GATEWAY,
         { cause: error },
       );
@@ -354,8 +356,4 @@ function normalizeTdxBarQuantity(
       .formatCanonical();
   }
   return normalized;
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }

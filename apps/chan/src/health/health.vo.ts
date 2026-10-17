@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import type { BaseHealthVo, HealthStatus } from '@app/observability';
+import type { BaseHealthVo, HealthStatus } from '@app/transport';
 
 export class ChanHealthVo implements BaseHealthVo {
   @ApiProperty({ example: 'ok' })

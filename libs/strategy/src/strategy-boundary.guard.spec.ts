@@ -11,7 +11,7 @@ import type {
   StrategyReplayMarketDataPort,
   StrategyReplayWindow,
   StrategyTrigger,
-} from './index';
+} from '@app/market-data';
 
 const repositoryRoot = process.cwd();
 const sourceRoot = join(repositoryRoot, 'libs', 'strategy', 'src');

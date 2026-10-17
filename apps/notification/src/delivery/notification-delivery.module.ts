@@ -2,11 +2,11 @@ import { Module } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import { parseRedisConnectionUrl } from '@app/realtime';
 import {
+  parseRedisConnectionUrl,
   STRATEGY_ALERT_DELIVERY_BULLMQ_PREFIX,
   STRATEGY_ALERT_DELIVERY_QUEUE_NAME,
-} from '@app/signal';
+} from '@app/contracts';
 import {
   Security,
   StrategyAlertDelivery,

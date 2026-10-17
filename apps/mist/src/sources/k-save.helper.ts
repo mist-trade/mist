@@ -1,5 +1,6 @@
 import { Decimal8 } from '@app/decimal';
 import { DataSource, K, Period, Security } from '@app/shared-data';
+import { isValidDate } from '@app/utils';
 import { EntityManager, In } from 'typeorm';
 
 export const K_UPSERT_COLUMNS = [
@@ -39,10 +40,9 @@ function assertFiniteRequiredPrices(data: BaseKInput[]): void {
       return;
     }
 
-    const timestamp =
-      row.timestamp instanceof Date && Number.isFinite(row.timestamp.getTime())
-        ? row.timestamp.toISOString()
-        : String(row.timestamp);
+    const timestamp = isValidDate(row.timestamp)
+      ? row.timestamp.toISOString()
+      : String(row.timestamp);
     throw new TypeError(
       `Invalid required K prices at row ${index} (timestamp=${timestamp}): ${invalidFields.join(', ')} must be finite numbers`,
     );

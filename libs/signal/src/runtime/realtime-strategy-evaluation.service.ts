@@ -1,25 +1,16 @@
-import type { StrategyBar } from '@app/market-data';
-import type {
-  DecisionFlowNode,
-  KernelSignal,
-  StrategyRealtimeSource,
-} from '@app/strategy';
+import type { StrategyBar, StrategyRealtimeSource } from '@app/market-data';
+import type { KernelSignal } from '@app/strategy';
 import {
   RealtimeKernelPool,
   type RealtimeLastOutcome,
-} from './realtime-kernel-pool';
+  type RealtimeStrategyExecutionPlan,
+  type RealtimeWindowGroupIdentity,
+} from '@app/strategy';
 
-export type RealtimeStrategyExecutionPlan = {
-  readonly definitionId: number;
-  readonly versionId: number;
-  readonly source: StrategyRealtimeSource;
-  readonly period: number;
-  readonly ruleSnapshot: Readonly<Record<string, unknown>>;
-  /** 统一求值计划：编译边界已把全部来源 kind 透明编译为决策流树 */
-  readonly kind: 'decision_flow';
-  readonly flow: DecisionFlowNode;
-  readonly signalKind?: 'entry' | 'exit';
-  readonly requiredBarCount: number;
+export type {
+  RealtimeStrategyExecutionPlan,
+  RealtimeWindowGroupIdentity,
+  RealtimeLastOutcome,
 };
 
 export interface ShadowStrategyCandidate {
@@ -47,12 +38,6 @@ export interface ShadowStrategyCandidate {
   readonly contextSnapshot: Readonly<Record<string, unknown>>;
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
 }
-
-export type RealtimeWindowGroupIdentity = {
-  readonly securityId: number;
-  readonly source: StrategyRealtimeSource;
-  readonly period: number;
-};
 
 export interface RealtimeKernelPoolLike {
   push(

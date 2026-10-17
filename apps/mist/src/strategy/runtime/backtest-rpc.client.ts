@@ -6,7 +6,7 @@ import {
   decodeSubmitBacktestRunErrorCodeV1,
   decodeSubmitBacktestRunSuccessV1,
   type SubmitBacktestRunErrorCode,
-} from '@app/backtest';
+} from '@app/contracts';
 import {
   createRpcRequestV1,
   decodeRpcResultV1,

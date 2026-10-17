@@ -12,6 +12,12 @@ type SecurityFormatCodeSource = {
 
 const MARKET_QUALIFIED_PROVIDER_SYMBOL = /^\d{6}\.(SH|SZ|BJ)$/;
 
+export const PROVIDER_SYMBOL_PATTERN = /^(?:\d{6}\.(?:SH|SZ|BJ)|\d{5,6}\.HK)$/;
+
+export function isProviderSymbol(value: unknown): value is string {
+  return typeof value === 'string' && PROVIDER_SYMBOL_PATTERN.test(value);
+}
+
 export function normalizeSecurityCode(code: string): string {
   const normalized = code.trim().toUpperCase();
 
@@ -67,20 +73,4 @@ export function getSecurityFormatCode(
     );
   }
   return formatCode;
-}
-
-/**
- * 判定标的是否为 ETF 基金 (上交所 510-518/588, 深交所 159)
- */
-export function isEtfSecurity(code: string): boolean {
-  const normalized = normalizeSecurityCode(code);
-  return /^(51[0-358]|588|159)\d{3}$/.test(normalized);
-}
-
-/**
- * 判定标的是否为创业板或科创板 (创业板 300/301, 科创板 688，涨跌幅 20%)
- */
-export function isChiNextOrStarMarket(code: string): boolean {
-  const normalized = normalizeSecurityCode(code);
-  return /^(30[01]|688)\d{3}$/.test(normalized);
 }

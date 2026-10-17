@@ -1,4 +1,4 @@
-import { CANDLE_FINALIZED_JOB_NAME } from '@app/signal';
+import { CANDLE_FINALIZED_JOB_NAME } from '@app/contracts';
 import { CandleFinalizedBullMqWorker } from './candle-finalized-bullmq.worker';
 import { SignalRuntimeMutex } from '../signal-runtime-mutex.service';
 

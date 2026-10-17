@@ -1,6 +1,7 @@
 import { ConfigService } from '@nestjs/config';
-import { compileStoredStrategyRule, type StrategyBar } from '@app/strategy';
-import { CANDLE_FINALIZED_JOB_NAME } from '@app/signal';
+import { compileStoredStrategyRule } from '@app/strategy';
+import type { StrategyBar } from '@app/market-data';
+import { CANDLE_FINALIZED_JOB_NAME } from '@app/contracts';
 import { QmtRealtimeClient } from '../../../mist/src/sources/qmt/realtime/realtime.client';
 import { QmtRealtimeStore } from '../../../mist/src/sources/qmt/realtime/realtime.store';
 import { TdxRealtimeClient } from '../../../mist/src/sources/tdx/realtime/realtime.client';

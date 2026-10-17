@@ -4,10 +4,8 @@ import {
   Period,
   StrategyRuleSchemaVersion,
 } from '@app/shared-data';
-import {
-  compileStoredDefinitionVersion,
-  type StrategyBar,
-} from '@app/strategy';
+import { compileStoredDefinitionVersion } from '@app/strategy';
+import type { StrategyBar } from '@app/market-data';
 import { createChanFullOutputFixture } from '../../../libs/chancore/src/chan-full-output.characterization.fixture';
 import { HealthStateService } from './health/health-state.service';
 import { BacktestRunExecutor } from './backtest-run.executor';
