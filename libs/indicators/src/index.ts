@@ -1,6 +1,12 @@
 export { IndicatorInputError, IndicatorValueError } from './errors';
-export { computeMacdSeries, computeMacdObservation } from './macd';
-export type { MacdSeriesResult, MacdObservation } from './macd';
+export {
+  computeMacdSeries,
+  computeMacdObservation,
+  DEFAULT_MACD_FAST_PERIOD,
+  DEFAULT_MACD_SLOW_PERIOD,
+  DEFAULT_MACD_SIGNAL_PERIOD,
+} from './macd';
+export type { MacdSeriesResult, MacdObservation, MacdOptions } from './macd';
 export { computeKdjSeries, computeKdjObservation } from './kdj';
 export type { KdjSeriesResult, KdjObservation, KdjSeriesParams } from './kdj';
 export { computeRsiSeries } from './rsi';

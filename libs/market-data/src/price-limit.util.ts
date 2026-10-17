@@ -6,32 +6,65 @@ export interface PriceLimits {
   readonly limitDown: number;
 }
 
+export const ETF_SECURITY_PATTERN = /^(51[0-8]|56[0-3]|588|159)\d{3}$/;
+export const CHINEXT_STAR_SECURITY_PATTERN = /^(30[01]|68[89])\d{3}$/;
+export const BSE_SECURITY_PATTERN = /^(43|83|87|92)\d{4}$/;
+export const ST_SECURITY_PATTERN = /ST/i;
+
+function extractSixDigitCode(code: string): string {
+  const trimmed = code.trim().toUpperCase();
+  const match = trimmed.match(/^(\d{6})/);
+  return match ? match[1] : trimmed;
+}
+
 /**
- * 判定标的是否为 ETF 基金 (上交所 510-518/588, 深交所 159)
+ * 判定标的是否为 ETF 基金 (上交所 510-518/560-563/588, 深交所 159)
  */
 export function isEtfSecurity(code: string): boolean {
-  const trimmed = code.trim().toUpperCase();
-  const match = trimmed.match(/^(\d{6})/);
-  const sixCode = match ? match[1] : trimmed;
-  return /^(51[0-358]|588|159)\d{3}$/.test(sixCode);
+  return ETF_SECURITY_PATTERN.test(extractSixDigitCode(code));
 }
 
 /**
- * 判定标的是否为创业板或科创板 (创业板 300/301, 科创板 688，涨跌幅 20%)
+ * 判定标的是否为创业板或科创板 (创业板 300/301, 科创板 688/689 CDR，涨跌幅 20%)
  */
 export function isChiNextOrStarMarket(code: string): boolean {
-  const trimmed = code.trim().toUpperCase();
-  const match = trimmed.match(/^(\d{6})/);
-  const sixCode = match ? match[1] : trimmed;
-  return /^(30[01]|688)\d{3}$/.test(sixCode);
+  return CHINEXT_STAR_SECURITY_PATTERN.test(extractSixDigitCode(code));
 }
 
 /**
- * 获取标的法定涨跌幅限制比例（双创板 20%，主板及普通股票 10%）
+ * 判定标的是否为北交所股票 (43/83/87/92，涨跌幅 30%)
  */
-export function getPriceLimitRatio(securityCode?: string): number {
-  if (securityCode && isChiNextOrStarMarket(securityCode)) {
-    return TRADING_RULES.CHINEXT_STAR_LIMIT_RATIO;
+export function isBseMarket(code: string): boolean {
+  return BSE_SECURITY_PATTERN.test(extractSixDigitCode(code));
+}
+
+/**
+ * 判定标的是否为风险警示股票 (ST / *ST，涨跌幅 5%)
+ */
+export function isStSecurity(codeOrName: string): boolean {
+  return ST_SECURITY_PATTERN.test(codeOrName.trim());
+}
+
+/**
+ * 获取标的法定涨跌幅限制比例（ST 5%，主板 10%，双创板 20%，北交所 30%）
+ */
+export function getPriceLimitRatio(
+  securityCode?: string,
+  securityName?: string,
+): number {
+  if (securityName && isStSecurity(securityName)) {
+    return TRADING_RULES.ST_LIMIT_RATIO;
+  }
+  if (securityCode) {
+    if (isStSecurity(securityCode)) {
+      return TRADING_RULES.ST_LIMIT_RATIO;
+    }
+    if (isBseMarket(securityCode)) {
+      return TRADING_RULES.BSE_LIMIT_RATIO;
+    }
+    if (isChiNextOrStarMarket(securityCode)) {
+      return TRADING_RULES.CHINEXT_STAR_LIMIT_RATIO;
+    }
   }
   return TRADING_RULES.MAIN_BOARD_LIMIT_RATIO;
 }

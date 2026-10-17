@@ -131,6 +131,12 @@ export const CHANNEL_CORE_LENGTH = 4;
 /** 中枢确认完满封存最小构件数：进入构件 e0 + 至少 3 个内部构件 + 1 个离开构件 e = 5 构件 */
 export const CHANNEL_MIN_SEALED_LENGTH = 5;
 
+/** 中枢内部构件延伸门槛：内部构件数 >= 4 构件属于延伸震荡 */
+export const CHAN_ZHONGSHU_EXTENSION_MIN_UNITS = 4;
+
+/** 缠论第 35 课核心定理：中枢延伸达九段升级为高一级中枢（Macro 级别） */
+export const CHAN_ZHONGSHU_UPGRADE_NINE_UNITS = 9;
+
 /**
  * 判断两个构件元素是否为同一构件（优先基于 originIds，兜底支持时间戳与极值对齐）
  */

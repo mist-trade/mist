@@ -85,3 +85,23 @@ export interface ExecutionBrokerPort {
   getAccount(): BrokerAccountSnapshot;
   getOpenOrders(): readonly Order[];
 }
+
+export interface BrokerFeeConfig {
+  /** 佣金费率，默认万分之 2.5 (0.00025) */
+  readonly commissionRate?: number;
+  /** 最低佣金，默认 5 元；若设置为 0 则支持大客户免五 */
+  readonly minCommission?: number;
+  /** 过户费率，默认万分之 0.1 (0.00001) */
+  readonly transferFeeRate?: number;
+  /** 印花税率，默认万分之 5 (0.0005)，仅卖出非 ETF 征收 */
+  readonly stampDutyRate?: number;
+}
+
+export interface BrokerExecutionOptions {
+  /** 账户初始资金，默认 1,000,000 */
+  readonly initialCash?: number;
+  /** 冲击滑点比例，默认 0.001（0.1%） */
+  readonly slippageRatio?: number;
+  /** 费率设置 */
+  readonly feeConfig?: BrokerFeeConfig;
+}

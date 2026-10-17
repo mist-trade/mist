@@ -22,6 +22,8 @@ import {
 import { BacktestRunVo } from '../vo/backtest-run.vo';
 import { BacktestSignalResultPageVo } from '../vo/backtest-signal-result-page.vo';
 import { BacktestSignalResultVo } from '../vo/backtest-signal-result.vo';
+import { SAFE_FAILURE_CODES_SET } from '@app/contracts';
+import { DEFAULT_API_PAGE_LIMIT } from '@app/constants';
 import { BacktestTradeResultPageVo } from '../vo/backtest-trade-result-page.vo';
 import { BacktestTradeResultVo } from '../vo/backtest-trade-result.vo';
 
@@ -30,26 +32,7 @@ type QueryRejection = HttpBusinessRejection<
   { runId: number; status?: BacktestRunStatus }
 >;
 
-const DEFAULT_TRADE_QUERY_LIMIT = 50;
-
-const SAFE_FAILURE_CODES = new Set([
-  'BACKTEST_QUEUE_FULL',
-  'BACKTEST_NOT_READY',
-  'BACKTEST_UNAVAILABLE',
-  'BACKTEST_COMMAND_TIMEOUT',
-  'BACKTEST_RPC_INTERNAL_ERROR',
-  'BACKTEST_SOURCE_UNSUPPORTED',
-  'BACKTEST_TARGET_UNIVERSE_EMPTY',
-  'BACKTEST_NO_EXECUTABLE_TARGETS',
-  'BACKTEST_DATABASE_ERROR',
-  'BACKTEST_EXECUTION_TIMEOUT',
-  'BACKTEST_BAR_LIMIT_EXCEEDED',
-  'BACKTEST_QUANTITY_PROFILE_UNAVAILABLE',
-  'BACKTEST_EXECUTION_FAILED',
-  'BACKTEST_INTERRUPTED',
-  'BACKTEST_STARTUP_QUEUE_FULL',
-  'BACKTEST_STARTUP_UNAVAILABLE',
-]);
+const DEFAULT_TRADE_QUERY_LIMIT = DEFAULT_API_PAGE_LIMIT;
 
 @Injectable()
 export class BacktestRunQueryService {
@@ -279,7 +262,9 @@ function toIsoOrNull(value: Date | null | undefined): string | null {
 
 function safeErrorMessage(value: string | null | undefined): string | null {
   if (!value) return null;
-  return SAFE_FAILURE_CODES.has(value) ? value : 'BACKTEST_EXECUTION_FAILED';
+  return SAFE_FAILURE_CODES_SET.has(value)
+    ? value
+    : 'BACKTEST_EXECUTION_FAILED';
 }
 
 const TARGET_ISSUE_CODES = new Set([

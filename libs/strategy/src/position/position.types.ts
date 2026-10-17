@@ -65,3 +65,12 @@ export interface ExitPolicyPort {
     position: Readonly<PositionSnapshot>,
   ): ExitDecision;
 }
+
+export interface PositionStateMachineOptions {
+  /** 初始可用资金，默认 1,000,000 */
+  readonly initialCash?: number;
+  /** 自定义出场风控策略插件 */
+  readonly exitPolicy?: ExitPolicyPort;
+  /** 平仓比例，取值范围 (0, 1.0]，默认 1.0（全部平仓） */
+  readonly exitRatio?: number;
+}

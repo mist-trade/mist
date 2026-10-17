@@ -1,4 +1,5 @@
 import { Decimal8 } from '@app/decimal';
+import { formatShanghaiDateString } from '@app/timezone';
 import type { StrategyBar } from '../strategy-bar';
 
 export type StrategyImputationResolution =
@@ -40,14 +41,8 @@ export interface ProjectedStrategyBar {
   readonly amount: ProjectedStrategyQuantity;
 }
 
-const SHANGHAI_TRADING_DAY_FORMATTER = new Intl.DateTimeFormat('en-CA', {
-  timeZone: 'Asia/Shanghai',
-  year: 'numeric',
-  month: '2-digit',
-  day: '2-digit',
-});
-
 /**
+
  * Deterministic evaluation-only OHLCVA imputation over one ordered bar sequence
  * (the current evaluation window). Raw bars and persistence remain untouched.
  *
@@ -400,12 +395,5 @@ function assertStrictlyIncreasing(bars: readonly StrategyBar[]): void {
 }
 
 export function toShanghaiTradingDay(timestamp: Date): string {
-  const parts = SHANGHAI_TRADING_DAY_FORMATTER.formatToParts(timestamp);
-  const year = parts.find((part) => part.type === 'year')?.value;
-  const month = parts.find((part) => part.type === 'month')?.value;
-  const day = parts.find((part) => part.type === 'day')?.value;
-  if (!year || !month || !day) {
-    throw new TypeError('could not resolve Shanghai trading day');
-  }
-  return `${year}-${month}-${day}`;
+  return formatShanghaiDateString(timestamp);
 }

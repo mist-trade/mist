@@ -18,6 +18,12 @@ type CompleteBiWithFenxings = ChanBi & {
 };
 type ThreeBiPattern = 'up-down-up' | 'down-up-down';
 
+/** 缠论第 62/65 课原典公理：分型由连续 3 根包含合并后的 K 线组成（左、中、右） */
+export const CHAN_FENXING_ELEMENT_COUNT = 3;
+
+/** 缠论第 77/81 课宽笔公理：顶分型与底分型之间至少有 3 根未处理包含关系的独立原始 K 线 */
+export const CHAN_WIDE_BI_MIN_INTERMEDIATE_K_COUNT = 3;
+
 export class BiCalculator {
   constructor(private readonly options?: ChanBiOptions) {}
 
@@ -682,8 +688,7 @@ export class BiCalculator {
 
     // 条件2：按当前候选笔的有序原始K位置计算，不把数据库主键当作连续序号。
     const betweenCount = Math.abs(endPosition - startPosition) - 1;
-
-    return betweenCount >= 3;
+    return betweenCount >= CHAN_WIDE_BI_MIN_INTERMEDIATE_K_COUNT;
   }
 
   /**

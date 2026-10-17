@@ -34,8 +34,10 @@ import {
 } from '@app/strategy';
 import type { StrategyBar, StrategyRealtimeSource } from '@app/market-data';
 import { computePerformanceSummary } from '@app/indicators';
-import { isSessionCloseBar } from '@app/timezone';
+import { formatShanghaiDateString, isSessionCloseBar } from '@app/timezone';
+import { TRADING_RULES } from '@app/constants';
 import { DataSource as TypeOrmDataSource, In, Repository } from 'typeorm';
+
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
 import { BacktestRunFailure } from './backtest-run-error';
 import { HealthStateService } from './health/health-state.service';
@@ -419,8 +421,11 @@ export class BacktestRunExecutor {
           signal.signalKind === SIGNAL_KINDS.ENTRY
         ) {
           const availableCash = positionMachine.getCash();
-          const targetQty = Math.floor(availableCash / bar.close / 100) * 100;
-          if (targetQty >= 100) {
+          const lotSize = TRADING_RULES.MAIN_BOARD_LOT_SIZE;
+          const allocatableCash = availableCash * 0.995;
+          const targetQty =
+            Math.floor(allocatableCash / bar.close / lotSize) * lotSize;
+          if (targetQty >= lotSize) {
             broker.submitOrder({
               securityId,
               securityCode,
@@ -455,7 +460,9 @@ export class BacktestRunExecutor {
         }
 
         if (isSessionCloseBar(bar.timestamp, run.period)) {
+          const dateStr = formatShanghaiDateString(bar.timestamp);
           positionMachine.onDayClose(bar);
+          broker.settleDayClose(dateStr);
         }
 
         await budget.checkpoint();
@@ -463,8 +470,11 @@ export class BacktestRunExecutor {
     );
     await budget.checkpoint(true);
 
-    if (lastSeenBar && positionMachine.getNavHistory().length === 0) {
-      positionMachine.onDayClose(lastSeenBar);
+    const finalBar = lastSeenBar as StrategyBar | null;
+    if (finalBar && positionMachine.getNavHistory().length === 0) {
+      const dateStr = formatShanghaiDateString(finalBar.timestamp);
+      positionMachine.onDayClose(finalBar);
+      broker.settleDayClose(dateStr);
     }
 
     return {

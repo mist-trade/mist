@@ -11,6 +11,7 @@ import {
 import {
   RealtimePeriodBuilder,
   RealtimeKernelPool,
+  REALTIME_STRATEGY_PERIODS,
   type RealtimeStrategyExecutionPlan,
 } from '@app/strategy';
 import {
@@ -257,7 +258,10 @@ export class CandleFinalizedJobProcessor {
         if (source !== 'tdx' && source !== 'qmt') continue;
         for (const securityId of definition.securityIds) {
           for (const period of definition.periods) {
-            if (![1, 5, 15, 30, 60].includes(period)) continue;
+            if (
+              !(REALTIME_STRATEGY_PERIODS as readonly number[]).includes(period)
+            )
+              continue;
             groups.push({ securityId, source, period });
           }
         }

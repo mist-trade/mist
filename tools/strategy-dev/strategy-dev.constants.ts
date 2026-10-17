@@ -36,3 +36,9 @@ export const DEV_CORS_HEADERS = Object.freeze({
 
 export const SSE_HEARTBEAT_INTERVAL_MS = 15000;
 export const SESSION_INACTIVE_TTL_MS = 30 * 60 * 1000;
+
+/** 本地推演网关并发活跃会话容量上限（防内存爆炸） */
+export const MAX_DEV_SESSIONS = 10;
+
+/** 诊断快照磁盘文件最大保留份数（轮转修剪，防磁盘膨胀） */
+export const MAX_SNAPSHOT_DUMP_FILES = 20;

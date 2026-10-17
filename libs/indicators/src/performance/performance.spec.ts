@@ -79,6 +79,16 @@ describe('Performance Indicators (Rust Polars SIMD Engine)', () => {
       expect(computeCalmarRatio(0.15, -0.05)).toBe(0);
     });
 
+    it('returns 0 when annualized return is non-positive', () => {
+      expect(computeCalmarRatio(0, 0.1)).toBe(0);
+      expect(computeCalmarRatio(-0.05, 0.1)).toBe(0);
+    });
+
+    it('caps Calmar ratio at 999.0 when max drawdown is near zero (epsilon protection)', () => {
+      expect(computeCalmarRatio(0.2, 1e-6)).toBe(999.0);
+      expect(computeCalmarRatio(0.5, 0.00001)).toBe(999.0);
+    });
+
     it('computes Calmar ratio as annualizedReturn / maxDrawdown', () => {
       const calmar = computeCalmarRatio(0.2, 0.1);
       expect(calmar).toBe(2.0);

@@ -1,8 +1,11 @@
+import { TRADING_RULES } from '@app/constants';
 import type { StrategyBar } from '@app/market-data';
+import { formatShanghaiDateString } from '@app/timezone';
 import type {
   CreateOrderDto,
   OrderFilledEvent,
 } from '../execution/execution.types';
+
 import type { KernelSignal } from '../kernel/kernel.types';
 import {
   DEFAULT_BROKER_INITIAL_CASH,
@@ -19,6 +22,7 @@ import type {
   ExitPolicyPort,
   PositionClosedRecord,
   PositionSnapshot,
+  PositionStateMachineOptions,
   PositionStatus,
 } from './position.types';
 
@@ -35,19 +39,39 @@ export class PositionStateMachine {
   private accumulatedBuyFees = 0;
   private cash: number;
   private readonly exitPolicy?: ExitPolicyPort;
+  private readonly exitRatio: number;
   private readonly navHistory: DailyNavSnapshot[] = [];
   private readonly closedTrades: PositionClosedRecord[] = [];
 
   constructor(
     securityId: number,
     securityCode: string,
-    initialCash = DEFAULT_BROKER_INITIAL_CASH,
+    initialCashOrOptions?: number | PositionStateMachineOptions,
     exitPolicy?: ExitPolicyPort,
+    exitRatio = 1.0,
   ) {
     this.securityId = securityId;
     this.securityCode = securityCode;
-    this.cash = initialCash;
-    this.exitPolicy = exitPolicy;
+
+    if (
+      typeof initialCashOrOptions === 'object' &&
+      initialCashOrOptions !== null
+    ) {
+      this.cash =
+        initialCashOrOptions.initialCash ?? DEFAULT_BROKER_INITIAL_CASH;
+      this.exitPolicy = initialCashOrOptions.exitPolicy;
+      this.exitRatio = initialCashOrOptions.exitRatio ?? 1.0;
+    } else {
+      this.cash = initialCashOrOptions ?? DEFAULT_BROKER_INITIAL_CASH;
+      this.exitPolicy = exitPolicy;
+      this.exitRatio = exitRatio;
+    }
+
+    if (this.exitRatio <= 0 || this.exitRatio > 1.0) {
+      throw new Error(
+        `exitRatio must be in range (0, 1.0], got ${this.exitRatio}`,
+      );
+    }
   }
 
   onOrderFilled(event: OrderFilledEvent): void {
@@ -123,6 +147,25 @@ export class PositionStateMachine {
     }
   }
 
+  /**
+   * 计算平仓股数。
+   * 支持通过 overrideRatio 临时覆盖平仓比例。
+   * 按照 A 股规则按百股（手）向下取整；若计算结果不足一手且持有股数大于零，则平剩余最小单位。
+   */
+  public calculateExitQuantity(overrideRatio?: number): number {
+    const ratio = overrideRatio ?? this.exitRatio;
+    if (ratio >= 1.0) {
+      return this.holdingQuantity;
+    }
+    const targetQty = Math.floor(this.holdingQuantity * ratio);
+    const lotSize = TRADING_RULES.MAIN_BOARD_LOT_SIZE;
+    const roundedQty = Math.floor(targetQty / lotSize) * lotSize;
+    if (roundedQty <= 0) {
+      return Math.min(this.holdingQuantity, lotSize);
+    }
+    return Math.min(this.holdingQuantity, roundedQty);
+  }
+
   onBar(bar: StrategyBar): CreateOrderDto | null {
     if (this.status !== POSITION_STATUSES.HOLDING) {
       return null;
@@ -139,7 +182,7 @@ export class PositionStateMachine {
           securityCode: this.securityCode,
           side: ORDER_SIDES.SELL,
           orderType: ORDER_TYPES.MARKET,
-          quantity: this.holdingQuantity,
+          quantity: this.calculateExitQuantity(),
           signalTime: bar.timestamp,
         };
       }
@@ -148,7 +191,10 @@ export class PositionStateMachine {
     return null;
   }
 
-  onSignal(signal: KernelSignal): CreateOrderDto | null {
+  onSignal(
+    signal: KernelSignal,
+    options?: { readonly exitRatio?: number },
+  ): CreateOrderDto | null {
     if (this.status !== POSITION_STATUSES.HOLDING) {
       return null;
     }
@@ -161,20 +207,20 @@ export class PositionStateMachine {
           securityCode: this.securityCode,
           side: ORDER_SIDES.SELL,
           orderType: ORDER_TYPES.MARKET,
-          quantity: this.holdingQuantity,
+          quantity: this.calculateExitQuantity(options?.exitRatio),
           signalTime: signal.signalTime,
         };
       }
     }
 
-    // 主仓核心默认准则：反向卖出信号触发全平，不设死板止损以防洗盘割肉
+    // 主仓核心默认准则：反向卖出信号触发平仓（默认全平，支持配置 exitRatio），不设死板止损以防洗盘割肉
     if (signal.signalKind === SIGNAL_KINDS.EXIT) {
       return {
         securityId: this.securityId,
         securityCode: this.securityCode,
         side: ORDER_SIDES.SELL,
         orderType: ORDER_TYPES.MARKET,
-        quantity: this.holdingQuantity,
+        quantity: this.calculateExitQuantity(options?.exitRatio),
         signalTime: signal.signalTime,
       };
     }
@@ -201,9 +247,7 @@ export class PositionStateMachine {
           ) / POSITION_DECIMAL_PLACES.RATIO_SCALE
         : 0;
 
-    const date = bar.timestamp
-      .toISOString()
-      .slice(0, POSITION_DECIMAL_PLACES.DATE_STRING_LENGTH);
+    const date = formatShanghaiDateString(bar.timestamp);
     const snapshot: DailyNavSnapshot = {
       date,
       securityCode: this.securityCode,
@@ -265,5 +309,9 @@ export class PositionStateMachine {
 
   getStatus(): PositionStatus {
     return this.status;
+  }
+
+  getExitRatio(): number {
+    return this.exitRatio;
   }
 }

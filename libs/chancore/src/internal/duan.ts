@@ -87,17 +87,20 @@ function hasExpandingCounterStructure(
   return false;
 }
 
+/** 缠论第 65 课线段公理：线段至少由三笔组成，前三笔必须有价格重叠区间（ZD <= ZG） */
+export const CHAN_DUAN_MIN_BI_COUNT = 3;
+
 export class DuanCalculator {
   /**
    * 入参 = `createBi` 返回值的 `phaseB`（`ChanBi[]`，最终笔数组）——段算法只消费最终笔，
    * 不需要两阶段 envelope。返回确认后的段序列（单数组，无 phaseA）。
    */
   createDuan(bis: readonly ChanBi[]): ChanDuan[] {
-    if (bis.length < 3) {
+    if (bis.length < CHAN_DUAN_MIN_BI_COUNT) {
       return [];
     }
     const startIdx = this.findValidSegmentStart(bis);
-    if (startIdx > bis.length - 3) {
+    if (startIdx > bis.length - CHAN_DUAN_MIN_BI_COUNT) {
       return [];
     }
     return this.segment(bis, startIdx);

@@ -49,6 +49,8 @@ import {
   DEV_CORS_HEADERS,
   SSE_HEARTBEAT_INTERVAL_MS,
   SESSION_INACTIVE_TTL_MS,
+  MAX_DEV_SESSIONS,
+  MAX_SNAPSHOT_DUMP_FILES,
 } from './strategy-dev.constants';
 
 const PORT = Number(process.env.PORT) || DEFAULT_DEV_PORT;
@@ -156,6 +158,32 @@ function sendJson(
 ) {
   res.writeHead(statusCode, DEV_CORS_HEADERS);
   res.end(wrapEnvelope(data, statusCode, reqPath));
+}
+
+function pruneDumpFiles(dumpDir: string, maxFiles: number): void {
+  try {
+    if (!fs.existsSync(dumpDir)) return;
+    const files = fs
+      .readdirSync(dumpDir)
+      .filter((file) => file.endsWith('.json') && file !== 'latest-dump.json')
+      .map((file) => {
+        const filePath = path.join(dumpDir, file);
+        return { file: filePath, mtime: fs.statSync(filePath).mtimeMs };
+      })
+      .sort((a, b) => b.mtime - a.mtime);
+
+    if (files.length > maxFiles) {
+      for (const toDelete of files.slice(maxFiles)) {
+        try {
+          fs.unlinkSync(toDelete.file);
+        } catch {
+          // ignore individual deletion failure
+        }
+      }
+    }
+  } catch {
+    // ignore directory traversal failure
+  }
 }
 
 function parseJsonBody(req: http.IncomingMessage): Promise<any> {
@@ -698,6 +726,19 @@ const server = http.createServer(async (req, res) => {
         await session.stepNext();
       }
 
+      // 容量防爆保护：超过最大活跃会话数时淘汰最旧会话
+      if (activeSessions.size >= MAX_DEV_SESSIONS) {
+        const oldestSessionId = activeSessions.keys().next().value;
+        if (oldestSessionId) {
+          console.log(
+            `[SIMULATION] 会话达到容量上限 (${MAX_DEV_SESSIONS})，自动淘汰最旧会话: ${oldestSessionId}`,
+          );
+          activeSessions.get(oldestSessionId)?.destroy();
+          activeSessions.delete(oldestSessionId);
+          sessionStreamClients.delete(oldestSessionId);
+        }
+      }
+
       activeSessions.set(session.sessionId, session);
       sessionStreamClients.set(session.sessionId, new Set());
       console.log(
@@ -957,6 +998,9 @@ const server = http.createServer(async (req, res) => {
           JSON.stringify(fullDump, null, 2),
           'utf-8',
         );
+
+        // 诊断快照轮转修剪：最多保留最近 MAX_SNAPSHOT_DUMP_FILES 份，防磁盘膨胀
+        pruneDumpFiles(dumpDir, MAX_SNAPSHOT_DUMP_FILES);
       } catch {
         // ignore disk write failure
       }

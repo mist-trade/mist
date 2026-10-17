@@ -150,7 +150,7 @@ export function computeFibonacciObservation(
   closes: readonly number[],
   params?: FibonacciParams,
 ): FibonacciObservation {
-  const period = params?.period ?? 50;
+  const period = params?.period ?? DEFAULT_FIBONACCI_PERIOD;
   if (!Number.isInteger(period) || period <= 0) {
     throw new IndicatorInputError(
       `Fibonacci period must be a positive integer (got ${period})`,
@@ -350,24 +350,25 @@ export function computeStaticSwingFibonacci(
   const retracementRatio =
     Math.round(rawRatio * 10 ** precision) / 10 ** precision;
 
-  const tolerance = options?.toleranceRatio ?? 0.008;
+  const tolerance =
+    options?.toleranceRatio ?? DEFAULT_FIBONACCI_TOLERANCE_RATIO;
   const isGoldenPocket =
-    retracementRatio >= 0.5 - tolerance &&
-    retracementRatio <= 0.618 + tolerance;
+    retracementRatio >= FIBONACCI_RATIOS.HALF - tolerance &&
+    retracementRatio <= FIBONACCI_RATIOS.GOLDEN_RATIO + tolerance;
 
   let zone: RetracementZone;
   if (retracementRatio < 0) {
-    zone = 'ABOVE_SWING';
-  } else if (retracementRatio < 0.382) {
-    zone = 'SHALLOW';
-  } else if (retracementRatio < 0.5 - tolerance) {
-    zone = 'MODERATE';
+    zone = RETRACEMENT_ZONES.ABOVE_SWING;
+  } else if (retracementRatio < FIBONACCI_RATIOS.SHALLOW_RATIO) {
+    zone = RETRACEMENT_ZONES.SHALLOW;
+  } else if (retracementRatio < FIBONACCI_RATIOS.HALF - tolerance) {
+    zone = RETRACEMENT_ZONES.MODERATE;
   } else if (isGoldenPocket) {
-    zone = 'GOLDEN_POCKET';
+    zone = RETRACEMENT_ZONES.GOLDEN_POCKET;
   } else if (retracementRatio <= 1.0) {
-    zone = 'DEEP';
+    zone = RETRACEMENT_ZONES.DEEP;
   } else {
-    zone = 'INVALIDATED';
+    zone = RETRACEMENT_ZONES.INVALIDATED;
   }
 
   return Object.freeze({

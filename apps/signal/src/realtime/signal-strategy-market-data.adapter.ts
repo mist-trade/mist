@@ -28,10 +28,11 @@ import {
   MINUTES_PER_HOUR,
   ONE_MINUTE_MS,
 } from '@app/timezone';
+import { REALTIME_STRATEGY_PERIODS } from '@app/strategy';
 import { LessThan, Repository } from 'typeorm';
 import { SignalRealtimeRedisService } from './signal-realtime-redis.service';
 
-const REALTIME_PERIODS = new Set([1, 5, 15, 30, 60]);
+const REALTIME_PERIODS = new Set<number>(REALTIME_STRATEGY_PERIODS);
 
 @Injectable()
 export class SignalStrategyMarketDataAdapter

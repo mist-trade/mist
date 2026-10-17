@@ -112,3 +112,25 @@ export function isSessionCloseBar(timestamp: Date, period: Period): boolean {
   const zoned = toZonedTime(timestamp, TIME_ZONE);
   return zoned.getHours() === 15 && zoned.getMinutes() === 0;
 }
+
+/**
+ * 提取给定时间在上海时区（Asia/Shanghai）的实际挂钟时、分及日内累计分钟数
+ */
+export function getShanghaiHourAndMinute(dateOrTimestamp: Date | number): {
+  readonly hour: number;
+  readonly minute: number;
+  readonly wallMinute: number;
+} {
+  const date =
+    typeof dateOrTimestamp === 'number'
+      ? new Date(dateOrTimestamp)
+      : dateOrTimestamp;
+  const zoned = toZonedTime(date, TIME_ZONE);
+  const hour = zoned.getHours();
+  const minute = zoned.getMinutes();
+  return {
+    hour,
+    minute,
+    wallMinute: hour * 60 + minute,
+  };
+}

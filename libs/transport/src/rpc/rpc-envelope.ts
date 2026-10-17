@@ -4,6 +4,9 @@ export const RPC_CORRELATION_ID_PATTERN = /^[A-Za-z0-9._:-]{1,128}$/;
 export const RPC_PATTERN_NAME_PATTERN =
   /^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*){2}\.v[1-9][0-9]*$/;
 
+/** 内部微服务 RPC 默认超时时间（毫秒） */
+export const DEFAULT_INTERNAL_RPC_TIMEOUT_MS = 3_000;
+
 export interface RpcMetaV1 {
   correlationId: string;
 }

@@ -292,4 +292,50 @@ describe('SimulatedBroker', () => {
     expect(etfFees.stampDuty).toBe(0); // ETF 严格免税
     expect(etfFees.totalFees).toBe(5.1);
   });
+
+  it('TC-7: verifies configurable fee options and zero minimum commission (免五)', () => {
+    // 免五账户测试：minCommission = 0
+    const mianWuFees = calculateExecutionFees(
+      'BUY',
+      10.0,
+      1000,
+      '600519',
+      0.001,
+      { commissionRate: 0.0003, minCommission: 0 },
+    );
+    // 10000 * 0.0003 = 3.0 元，无需保底 5 元
+    expect(mianWuFees.commission).toBe(3.0);
+
+    // 自定义 Broker 初始资金与费率
+    const customBroker = new SimulatedBroker({
+      initialCash: 500_000,
+      slippageRatio: 0.002,
+      feeConfig: { commissionRate: 0.0002, minCommission: 0 },
+    });
+    expect(customBroker.getAccount().availableCash).toBe(500_000);
+
+    customBroker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T09:30:00.000Z'),
+    });
+
+    const bar = createBar(
+      '2026-10-15T09:31:00.000Z',
+      10.0,
+      10.1,
+      9.9,
+      10.0,
+      '600519',
+    );
+    const fills = customBroker.onBar(bar);
+    expect(fills).toHaveLength(1);
+    // 10.0 * (1 + 0.002) = 10.02 (滑点 0.2%)
+    expect(fills[0].fillPrice).toBe(10.02);
+    // 佣金 10020 * 0.0002 = 2.004 -> 2.00 (免五)
+    expect(fills[0].fees.commission).toBe(2.0);
+  });
 });

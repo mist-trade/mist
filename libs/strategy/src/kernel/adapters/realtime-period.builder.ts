@@ -1,13 +1,14 @@
 import { Decimal8 } from '@app/decimal';
 import type { StrategyBar, StrategyTrigger } from '@app/market-data';
 
-const ASIA_SHANGHAI_TIMEZONE = 'Asia/Shanghai';
-const MORNING_START_MIN = 9 * 60 + 30; // 09:30
-const MORNING_END_MIN = 11 * 60 + 31; // 11:31 (half-open)
-const AFTERNOON_START_MIN = 13 * 60; // 13:00
-const AFTERNOON_END_MIN = 15 * 60 + 1; // 15:01 (half-open)
-const MINUTES_PER_HOUR = 60;
-const ONE_MINUTE_MS = 60_000;
+import {
+  MORNING_START_MIN,
+  MORNING_END_MIN,
+  AFTERNOON_START_MIN,
+  AFTERNOON_END_MIN,
+  ONE_MINUTE_MS,
+  getShanghaiHourAndMinute,
+} from '@app/timezone';
 
 export const REALTIME_STRATEGY_PERIODS = [1, 5, 15, 30, 60] as const;
 export type RealtimeStrategyPeriod = (typeof REALTIME_STRATEGY_PERIODS)[number];
@@ -135,26 +136,10 @@ function sumQuantity(
 
 function sessionPosition(timestamp: Date): SessionPosition {
   const timestampMs = timestamp.getTime();
-  if (!Number.isFinite(timestampMs) || timestampMs % 60_000 !== 0) {
+  if (!Number.isFinite(timestampMs) || timestampMs % ONE_MINUTE_MS !== 0) {
     throw new TypeError('finalized strategy trigger must be minute-aligned');
   }
-  const parts = new Intl.DateTimeFormat('en-CA', {
-    timeZone: ASIA_SHANGHAI_TIMEZONE,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    hourCycle: 'h23',
-  }).formatToParts(timestamp);
-  const value = (type: Intl.DateTimeFormatPartTypes): number => {
-    const text = parts.find((part) => part.type === type)?.value;
-    if (!text) throw new TypeError('could not resolve Shanghai session time');
-    return Number(text);
-  };
-  const hour = value('hour');
-  const minute = value('minute');
-  const wallMinute = hour * MINUTES_PER_HOUR + minute;
+  const { wallMinute } = getShanghaiHourAndMinute(timestamp);
   // Half-open sessions with a 1-minute close extension, aligned with the
   // producer bucket universe (242 buckets): 11:30 and 15:00 are legal
   // session-terminal buckets that absorb post-close tail frames and the

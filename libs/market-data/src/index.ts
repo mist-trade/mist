@@ -47,7 +47,13 @@ export {
   getPriceLimitRatio,
   isChiNextOrStarMarket,
   isEtfSecurity,
+  isBseMarket,
+  isStSecurity,
   isOneWordLimitUp,
   isOneWordLimitDown,
+  ETF_SECURITY_PATTERN,
+  CHINEXT_STAR_SECURITY_PATTERN,
+  BSE_SECURITY_PATTERN,
+  ST_SECURITY_PATTERN,
 } from './price-limit.util';
 export type { PriceLimits } from './price-limit.util';

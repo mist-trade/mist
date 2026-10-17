@@ -29,6 +29,8 @@ import {
   type AbsorbResult,
   CHANNEL_CORE_LENGTH,
   CHANNEL_MIN_SEALED_LENGTH,
+  CHAN_ZHONGSHU_EXTENSION_MIN_UNITS,
+  CHAN_ZHONGSHU_UPGRADE_NINE_UNITS,
   resolveChannelAnchorIds,
   validateStandardCoreGeometry,
 } from './channel-lifecycle';
@@ -390,8 +392,10 @@ export class DuanChannelLifecyclePolicy
     const zg = geometry.zg;
     const zd = geometry.zd;
 
-    const isNineDuans = internalDuans.length >= 9;
-    const isExtended = extended || internalDuans.length >= 4;
+    const isNineDuans =
+      internalDuans.length >= CHAN_ZHONGSHU_UPGRADE_NINE_UNITS;
+    const isExtended =
+      extended || internalDuans.length >= CHAN_ZHONGSHU_EXTENSION_MIN_UNITS;
 
     return {
       duans: [...internalDuans],

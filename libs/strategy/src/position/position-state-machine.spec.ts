@@ -262,4 +262,94 @@ describe('PositionStateMachine', () => {
     expect(exitDraft).not.toBeNull();
     expect(exitDraft?.side).toBe(ORDER_SIDES.SELL);
   });
+
+  it('supports custom exitRatio via options and generates partial exit orders', () => {
+    const partialPsm = new PositionStateMachine(1, '600519', {
+      initialCash: 1_000_000,
+      exitRatio: 0.5,
+    });
+    expect(partialPsm.getExitRatio()).toBe(0.5);
+
+    partialPsm.onOrderFilled(
+      createFillEvent(
+        ORDER_SIDES.BUY,
+        10.0,
+        1000,
+        10,
+        new Date('2026-10-15T09:31:00.000Z'),
+      ),
+    );
+
+    const exitSignal: KernelSignal = {
+      definitionId: 1,
+      versionId: 1,
+      signalKind: SIGNAL_KINDS.EXIT,
+      signalTime: new Date('2026-10-15T14:30:00.000Z'),
+      triggerTime: '2026-10-15T14:30:00.000Z',
+      triggerPrice: 12.0,
+      pivotTime: '2026-10-15T14:00:00.000Z',
+      pivotPrice: 12.2,
+      signalType: 'first_sell',
+      confidence: 0.9,
+      confidenceLevel: 'HIGH',
+      decisionTrace: {},
+      contextSnapshot: {},
+      ruleSnapshot: {},
+    };
+
+    const draft = partialPsm.onSignal(exitSignal);
+    expect(draft).not.toBeNull();
+    expect(draft?.side).toBe(ORDER_SIDES.SELL);
+    expect(draft?.quantity).toBe(500); // 50% of 1000
+  });
+
+  it('supports per-call exitRatio override in onSignal', () => {
+    psm.onOrderFilled(
+      createFillEvent(
+        ORDER_SIDES.BUY,
+        10.0,
+        1000,
+        10,
+        new Date('2026-10-15T09:31:00.000Z'),
+      ),
+    );
+
+    const exitSignal: KernelSignal = {
+      definitionId: 1,
+      versionId: 1,
+      signalKind: SIGNAL_KINDS.EXIT,
+      signalTime: new Date('2026-10-15T14:30:00.000Z'),
+      triggerTime: '2026-10-15T14:30:00.000Z',
+      triggerPrice: 12.0,
+      pivotTime: '2026-10-15T14:00:00.000Z',
+      pivotPrice: 12.2,
+      signalType: 'first_sell',
+      confidence: 0.9,
+      confidenceLevel: 'HIGH',
+      decisionTrace: {},
+      contextSnapshot: {},
+      ruleSnapshot: {},
+    };
+
+    // 覆盖默认 exitRatio (1.0) 为 0.3 (30%)
+    const draft = psm.onSignal(exitSignal, { exitRatio: 0.3 });
+    expect(draft).not.toBeNull();
+    expect(draft?.quantity).toBe(300); // 30% of 1000
+  });
+
+  it('validates exitRatio range (must be (0, 1.0])', () => {
+    expect(
+      () =>
+        new PositionStateMachine(1, '600519', {
+          exitRatio: 0,
+        }),
+    ).toThrow('exitRatio must be in range (0, 1.0]');
+
+    expect(
+      () =>
+        new PositionStateMachine(1, '600519', {
+          exitRatio: 1.5,
+        }),
+    ).toThrow('exitRatio must be in range (0, 1.0]');
+  });
 });

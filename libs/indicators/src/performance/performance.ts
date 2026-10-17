@@ -9,10 +9,12 @@ import type {
   SharpeRatioOptions,
 } from './performance.types';
 
-const DEFAULT_ANNUAL_RISK_FREE_RATE = 0.02;
-const DEFAULT_TRADING_DAYS_PER_YEAR = 250;
-const MAX_PROFIT_LOSS_RATIO_CAP = 999.0;
-const RATIO_ROUNDING_SCALE = 10000;
+export const DEFAULT_ANNUAL_RISK_FREE_RATE = 0.02;
+export const DEFAULT_TRADING_DAYS_PER_YEAR = 250;
+export const MAX_PROFIT_LOSS_RATIO_CAP = 999.0;
+export const RATIO_ROUNDING_SCALE = 10000;
+export const CALMAR_MIN_DRAWDOWN_EPSILON = 1e-4;
+export const MAX_CALMAR_RATIO_CAP = 999.0;
 
 const COL_NAV = 'nav';
 const COL_RET = 'ret';
@@ -158,14 +160,20 @@ export function computeCalmarRatio(
   if (!Number.isFinite(maxDrawdown) || maxDrawdown <= 0) {
     return 0;
   }
-  if (!Number.isFinite(annualizedReturn)) {
+  if (!Number.isFinite(annualizedReturn) || annualizedReturn <= 0) {
     return 0;
   }
 
+  if (maxDrawdown < CALMAR_MIN_DRAWDOWN_EPSILON) {
+    return MAX_CALMAR_RATIO_CAP;
+  }
+
   const rawCalmar = annualizedReturn / maxDrawdown;
-  return Number.isFinite(rawCalmar)
-    ? Math.round(rawCalmar * RATIO_ROUNDING_SCALE) / RATIO_ROUNDING_SCALE
-    : 0;
+  if (!Number.isFinite(rawCalmar) || rawCalmar >= MAX_CALMAR_RATIO_CAP) {
+    return MAX_CALMAR_RATIO_CAP;
+  }
+
+  return Math.round(rawCalmar * RATIO_ROUNDING_SCALE) / RATIO_ROUNDING_SCALE;
 }
 
 /**

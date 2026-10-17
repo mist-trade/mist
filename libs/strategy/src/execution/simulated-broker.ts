@@ -1,14 +1,19 @@
 import type { StrategyBar } from '@app/market-data';
 import { isOneWordLimitDown, isOneWordLimitUp } from '@app/market-data';
+import { TRADING_RULES } from '@app/constants';
 import {
   DEFAULT_BROKER_INITIAL_CASH,
+  EXECUTION_RULES,
   ORDER_REJECT_REASONS,
   ORDER_SIDES,
   ORDER_STATUSES,
   ORDER_TYPES,
 } from '../strategy.constants';
+
 import type {
   BrokerAccountSnapshot,
+  BrokerExecutionOptions,
+  BrokerFeeConfig,
   CreateOrderDto,
   ExecutionBrokerPort,
   FeeDetails,
@@ -36,9 +41,19 @@ export class SimulatedBroker implements ExecutionBrokerPort {
   private readonly prevCloseMap = new Map<string, number>();
   private orderCounter = 0;
   private eventCounter = 0;
+  private readonly slippageRatio: number;
+  private readonly feeConfig?: BrokerFeeConfig;
 
-  constructor(initialCash = DEFAULT_BROKER_INITIAL_CASH) {
-    this.availableCash = initialCash;
+  constructor(options?: number | BrokerExecutionOptions) {
+    if (typeof options === 'number') {
+      this.availableCash = options;
+      this.slippageRatio = EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO;
+    } else {
+      this.availableCash = options?.initialCash ?? DEFAULT_BROKER_INITIAL_CASH;
+      this.slippageRatio =
+        options?.slippageRatio ?? EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO;
+      this.feeConfig = options?.feeConfig;
+    }
   }
 
   submitOrder(dto: CreateOrderDto): Order {
@@ -63,7 +78,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     }
 
     if (dto.side === ORDER_SIDES.BUY) {
-      const isRoundLot = dto.quantity % 100 === 0;
+      const isRoundLot = dto.quantity % TRADING_RULES.MAIN_BOARD_LOT_SIZE === 0;
       if (!isRoundLot) {
         return {
           orderId,
@@ -77,7 +92,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
           stopPrice: dto.stopPrice,
           status: ORDER_STATUSES.REJECTED,
           createdAt: new Date(),
-          rejectReason: ORDER_REJECT_REASONS.CAUSALITY_VIOLATION,
+          rejectReason: ORDER_REJECT_REASONS.INVALID_LOT_SIZE,
         };
       }
     } else {
@@ -209,7 +224,11 @@ export class SimulatedBroker implements ExecutionBrokerPort {
             order.limitPrice !== undefined
               ? Math.min(bar.open, order.limitPrice)
               : bar.open;
-          const fillPrice = applySlippage(basePrice, ORDER_SIDES.BUY);
+          const fillPrice = applySlippage(
+            basePrice,
+            ORDER_SIDES.BUY,
+            this.slippageRatio,
+          );
           const fill = this.executeFill(order, fillPrice, bar.timestamp);
           if (fill) {
             fills.push(fill);
@@ -226,7 +245,11 @@ export class SimulatedBroker implements ExecutionBrokerPort {
             continue;
           }
 
-          const fillPrice = applySlippage(bar.open, ORDER_SIDES.SELL);
+          const fillPrice = applySlippage(
+            bar.open,
+            ORDER_SIDES.SELL,
+            this.slippageRatio,
+          );
           const fill = this.executeFill(order, fillPrice, bar.timestamp);
           if (fill) {
             fills.push(fill);
@@ -292,6 +315,8 @@ export class SimulatedBroker implements ExecutionBrokerPort {
       fillPrice,
       order.quantity,
       order.securityCode,
+      this.slippageRatio,
+      this.feeConfig,
     );
     const turnover = Math.round(fillPrice * order.quantity * 100) / 100;
 

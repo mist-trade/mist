@@ -1,6 +1,6 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { Period } from '@app/shared-data';
-import { TimezoneService } from '@app/timezone';
+import { TimezoneService, formatShanghaiDateString } from '@app/timezone';
 import {
   DataFreshnessStatus,
   FreshnessValidationResult,
@@ -138,7 +138,7 @@ export class DataFreshnessValidator {
       if (!isNaN(d.getTime())) {
         return this.timezoneService
           ? this.timezoneService.formatDate(d)
-          : d.toISOString().slice(0, 10);
+          : formatShanghaiDateString(d);
       }
     }
     if (bar.time) {

@@ -2,6 +2,11 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { StrategyAlertEvent, StrategyAlertStatus } from '@app/shared-data';
 import { FindOptionsWhere, Repository } from 'typeorm';
+import {
+  DEFAULT_API_PAGE_LIMIT,
+  MAX_API_PAGE_LIMIT,
+  MIN_API_PAGE_LIMIT,
+} from '@app/constants';
 import { MarkStrategyAlertDeliveryDto } from '../dto/mark-strategy-alert-delivery.dto';
 import { QueryStrategyAlertEventDto } from '../dto/query-strategy-alert-event.dto';
 import { StrategyAlertEventVo } from '../vo/strategy-alert-event.vo';
@@ -23,9 +28,15 @@ export class StrategyAlertEventService {
       where.strategySignalId = Number(query.strategySignalId);
     }
 
+    const limit = Math.min(
+      Math.max(query.limit ?? DEFAULT_API_PAGE_LIMIT, MIN_API_PAGE_LIMIT),
+      MAX_API_PAGE_LIMIT,
+    );
+
     const events = await this.alertEventRepository.find({
       where,
       order: { createdAt: 'DESC' },
+      take: limit,
     });
     return events.map(StrategyAlertEventVo.fromEntity);
   }

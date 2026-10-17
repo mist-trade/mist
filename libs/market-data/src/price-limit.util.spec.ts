@@ -2,8 +2,12 @@ import type { StrategyBar } from './strategy-bar';
 import {
   calculatePriceLimits,
   getPriceLimitRatio,
+  isBseMarket,
+  isChiNextOrStarMarket,
+  isEtfSecurity,
   isOneWordLimitDown,
   isOneWordLimitUp,
+  isStSecurity,
 } from './price-limit.util';
 
 function makeBar(
@@ -29,12 +33,69 @@ function makeBar(
   };
 }
 
+describe('isEtfSecurity', () => {
+  it('correctly recognizes all ETF code series including 516, 517, 56x', () => {
+    expect(isEtfSecurity('510050')).toBe(true);
+    expect(isEtfSecurity('512010.SH')).toBe(true);
+    expect(isEtfSecurity('516160')).toBe(true); // 产业 ETF
+    expect(isEtfSecurity('517050')).toBe(true); // 港股通 ETF
+    expect(isEtfSecurity('560010')).toBe(true); // 56x ETF
+    expect(isEtfSecurity('563000.SH')).toBe(true); // 56x ETF
+    expect(isEtfSecurity('588000')).toBe(true); // 科创 50 ETF
+    expect(isEtfSecurity('159915')).toBe(true); // 创业板 ETF
+    expect(isEtfSecurity('600519')).toBe(false);
+    expect(isEtfSecurity('000001')).toBe(false);
+  });
+});
+
+describe('isChiNextOrStarMarket', () => {
+  it('identifies ChiNext, STAR 688, and STAR CDR 689', () => {
+    expect(isChiNextOrStarMarket('300750')).toBe(true);
+    expect(isChiNextOrStarMarket('301001.SZ')).toBe(true);
+    expect(isChiNextOrStarMarket('688981')).toBe(true);
+    expect(isChiNextOrStarMarket('689009')).toBe(true);
+    expect(isChiNextOrStarMarket('600519')).toBe(false);
+  });
+});
+
+describe('isBseMarket', () => {
+  it('identifies Beijing Stock Exchange stock prefixes', () => {
+    expect(isBseMarket('832000')).toBe(true);
+    expect(isBseMarket('430047.BJ')).toBe(true);
+    expect(isBseMarket('871981')).toBe(true);
+    expect(isBseMarket('920002')).toBe(true);
+    expect(isBseMarket('600519')).toBe(false);
+  });
+});
+
+describe('isStSecurity', () => {
+  it('identifies ST and *ST security names or symbols', () => {
+    expect(isStSecurity('*ST某某')).toBe(true);
+    expect(isStSecurity('ST平安')).toBe(true);
+    expect(isStSecurity('sst股票')).toBe(true);
+    expect(isStSecurity('贵州茅台')).toBe(false);
+  });
+});
+
 describe('getPriceLimitRatio', () => {
-  it('returns 0.20 for ChiNext and STAR market securities', () => {
+  it('returns 0.20 for ChiNext, STAR market, and STAR CDR securities', () => {
     expect(getPriceLimitRatio('300750')).toBe(0.2);
     expect(getPriceLimitRatio('301001.SZ')).toBe(0.2);
     expect(getPriceLimitRatio('688981')).toBe(0.2);
     expect(getPriceLimitRatio('688001.SH')).toBe(0.2);
+    expect(getPriceLimitRatio('689009')).toBe(0.2); // 科创板 CDR
+  });
+
+  it('returns 0.30 for Beijing Stock Exchange (BSE) securities', () => {
+    expect(getPriceLimitRatio('832000')).toBe(0.3);
+    expect(getPriceLimitRatio('430047.BJ')).toBe(0.3);
+    expect(getPriceLimitRatio('871981')).toBe(0.3);
+    expect(getPriceLimitRatio('920002')).toBe(0.3);
+  });
+
+  it('returns 0.05 for ST or *ST securities when indicated', () => {
+    expect(getPriceLimitRatio('600000', '*ST某某')).toBe(0.05);
+    expect(getPriceLimitRatio('000001', 'ST平安')).toBe(0.05);
   });
 
   it('returns 0.10 for main board securities or unspecified code', () => {

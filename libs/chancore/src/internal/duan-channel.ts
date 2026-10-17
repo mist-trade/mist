@@ -28,9 +28,11 @@ import type {
   ChanDuanChannelTwoPhaseResult,
 } from '../contracts';
 import {
+  CHAN_ZHONGSHU_UPGRADE_NINE_UNITS,
   ChannelLifecycleEngine,
   isSameChannelElement,
 } from './channel-lifecycle';
+
 import { DuanChannelLifecyclePolicy } from './duan-channel-policy';
 
 export class DuanChannelCalculator {
@@ -109,12 +111,13 @@ export class DuanChannelCalculator {
       // 3. 所有参与扩展的内容均被消耗，不进入下一次判断扩展
       const isCurrentMacro =
         current.upgradedLevel === ChannelLevel.Macro ||
-        current.duans.length >= 9;
+        current.duans.length >= CHAN_ZHONGSHU_UPGRADE_NINE_UNITS;
 
       if (!isCurrentMacro && i + 1 < channels.length) {
         const next = channels[i + 1];
         const isNextMacro =
-          next.upgradedLevel === ChannelLevel.Macro || next.duans.length >= 9;
+          next.upgradedLevel === ChannelLevel.Macro ||
+          next.duans.length >= CHAN_ZHONGSHU_UPGRADE_NINE_UNITS;
 
         if (!isNextMacro) {
           const connectingCurrent =
@@ -277,7 +280,7 @@ export class DuanChannelCalculator {
     const gg = Math.max(c1.gg, c2.gg);
     const dd = Math.min(c1.dd, c2.dd);
 
-    const isNineDuans = mergedDuans.length >= 9;
+    const isNineDuans = mergedDuans.length >= CHAN_ZHONGSHU_UPGRADE_NINE_UNITS;
     const isExpanded = c1.expanded || c2.expanded;
 
     return {

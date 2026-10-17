@@ -55,6 +55,31 @@ describe('computeMacdSeries', () => {
     expect(result.macd).toEqual([]);
     expect(result.begIndex).toBe(10);
   });
+
+  it('supports custom fast, slow, and signal periods', () => {
+    // Custom shorter periods (5, 10, 3)
+    const customResult = computeMacdSeries(close, {
+      fastPeriod: 5,
+      slowPeriod: 10,
+      signalPeriod: 3,
+    });
+
+    const expectedMinLen = 10 + 3 - 1; // 12
+    expect(customResult.begIndex).toBe(expectedMinLen - 1); // 11
+    expect(customResult.macd.length).toBe(close.length - (expectedMinLen - 1));
+    expect(customResult.signal.length).toBe(customResult.macd.length);
+    expect(customResult.histogram.length).toBe(customResult.macd.length);
+  });
+
+  it('validates custom period parameters', () => {
+    expect(() =>
+      computeMacdSeries(close, { fastPeriod: 20, slowPeriod: 10 }),
+    ).toThrow(IndicatorInputError);
+
+    expect(() => computeMacdSeries(close, { fastPeriod: -1 })).toThrow(
+      IndicatorInputError,
+    );
+  });
 });
 
 describe('computeMacdObservation', () => {

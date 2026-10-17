@@ -32,6 +32,10 @@ const forbiddenPackagePrefixes = [
 const allowedSiblingImports = new Set([
   '@app/market-data',
   '@app/market-data/*',
+  '@app/constants',
+  '@app/constants/*',
+  '@app/timezone',
+  '@app/timezone/*',
 ]);
 
 describe('Strategy domain boundary', () => {

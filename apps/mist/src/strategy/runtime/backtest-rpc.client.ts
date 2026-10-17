@@ -10,6 +10,7 @@ import {
 import {
   createRpcRequestV1,
   decodeRpcResultV1,
+  DEFAULT_INTERNAL_RPC_TIMEOUT_MS,
   type RpcResultV1,
 } from '@app/transport/rpc';
 import { firstValueFrom, timeout, TimeoutError } from 'rxjs';
@@ -48,7 +49,8 @@ export class BacktestRpcClient {
   ): Promise<SubmitBacktestRunResultV1> {
     const request = createRpcRequestV1({ runId }, correlationId);
     const timeoutMs =
-      this.config.get<number>('BACKTEST_COMMAND_TIMEOUT_MS') ?? 3_000;
+      this.config.get<number>('BACKTEST_COMMAND_TIMEOUT_MS') ??
+      DEFAULT_INTERNAL_RPC_TIMEOUT_MS;
     let raw: unknown;
     try {
       raw = await firstValueFrom(
