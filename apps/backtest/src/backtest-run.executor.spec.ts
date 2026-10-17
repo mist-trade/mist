@@ -78,6 +78,10 @@ function executor(overrides: Record<string, unknown> = {}) {
       ),
     },
     health: new HealthStateService(),
+    suiteExecutor: {
+      isMasterSuiteRun: jest.fn().mockReturnValue(false),
+      executeSuite: jest.fn().mockResolvedValue(undefined),
+    },
   };
   return {
     instance: (() => {
@@ -92,6 +96,7 @@ function executor(overrides: Record<string, unknown> = {}) {
         dependencies.dataSource as any,
         dependencies.config as any,
         dependencies.health,
+        dependencies.suiteExecutor as any,
       );
       if ((overrides as any).chanBspDetector !== undefined) {
         (inst as any).chanBspDetector = (overrides as any).chanBspDetector;
@@ -570,6 +575,142 @@ describe('BacktestRunExecutor 统一内核回放', () => {
           securityCode: '600000.SH',
         }),
       ]),
+    );
+  });
+
+  it('activates hard stop loss (-8%) and persists navSeries and trade results with HARD_STOP_LOSS exitReason', async () => {
+    const fixture = executor();
+    const run = {
+      ...fixture.current,
+      targetUniverse: ['600000.SH'],
+      period: 1440,
+      startDate: new Date('2026-01-01T00:00:00.000Z'),
+      endDate: new Date('2026-01-31T00:00:00.000Z'),
+      kind: 'rule_dsl',
+    };
+    fixture.dependencies.runRepository.findOne.mockResolvedValue(run);
+    fixture.dependencies.versionRepository.findOne.mockResolvedValue({
+      id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
+      // Bar 1 close = 10 > 5 -> 发出 ENTRY 信号
+      rule: { field: 'k.close', operator: 'gt', value: 5 },
+      signalKind: 'entry',
+    });
+    fixture.dependencies.securityRepository.find.mockResolvedValue([
+      { id: 9, code: '600000.SH', name: '浦发银行' },
+    ]);
+    fixture.dependencies.marketData.loadReplayWindow.mockResolvedValue({
+      bars: [],
+    });
+
+    const bars: StrategyBar[] = [
+      // Bar 1 (01-02): close 10.0 -> 触发 ENTRY 买入信号 (signalTime = 01-02 15:00)
+      {
+        securityId: 9,
+        securityCode: '600000.SH',
+        source: 'tdx',
+        period: 1440,
+        timestamp: new Date('2026-01-02T15:00:00.000Z'),
+        open: 10.0,
+        high: 10.0,
+        low: 10.0,
+        close: 10.0,
+        volume: '1000',
+        amount: '10000',
+        type: 'complete',
+      },
+      // Bar 2 (01-05): open 10.0 -> Next-Bar 撮合成交买入，建仓完成
+      {
+        securityId: 9,
+        securityCode: '600000.SH',
+        source: 'tdx',
+        period: 1440,
+        timestamp: new Date('2026-01-05T15:00:00.000Z'),
+        open: 10.0,
+        high: 10.0,
+        low: 10.0,
+        close: 10.0,
+        volume: '1000',
+        amount: '10000',
+        type: 'complete',
+      },
+      // Bar 3 (01-06): close 9.10 -> 跌幅 -9% 跌破 -8% 硬止损线，裁决器生成硬止损卖单
+      {
+        securityId: 9,
+        securityCode: '600000.SH',
+        source: 'tdx',
+        period: 1440,
+        timestamp: new Date('2026-01-06T15:00:00.000Z'),
+        open: 9.2,
+        high: 9.3,
+        low: 9.0,
+        close: 9.1,
+        volume: '1000',
+        amount: '9100',
+        type: 'complete',
+      },
+      // Bar 4 (01-07): open 9.0 -> Next-Bar 撮合成交卖出，出场原因 HARD_STOP_LOSS
+      {
+        securityId: 9,
+        securityCode: '600000.SH',
+        source: 'tdx',
+        period: 1440,
+        timestamp: new Date('2026-01-07T15:00:00.000Z'),
+        open: 9.0,
+        high: 9.1,
+        low: 8.9,
+        close: 9.0,
+        volume: '1000',
+        amount: '9000',
+        type: 'complete',
+      },
+    ];
+
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars,
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    const completedUpdate = completedUpdateCall(fixture);
+    expect(completedUpdate.status).toBe(BacktestRunStatus.COMPLETED);
+    // 验证 navSeries 每日净值时序落盘
+    expect(Array.isArray(completedUpdate.navSeries)).toBe(true);
+    expect((completedUpdate.navSeries as any[]).length).toBeGreaterThanOrEqual(
+      4,
+    );
+    expect((completedUpdate.navSeries as any[])[0]).toEqual(
+      expect.objectContaining({
+        date: expect.any(String),
+        totalEquity: expect.any(Number),
+      }),
+    );
+
+    // 验证交易流水记录，且 exitReason 精确记录为 HARD_STOP_LOSS
+    expect(fixture.dependencies.tradeRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        backtestRunId: 41,
+        securityCode: '600000.SH',
+        exitReason: 'HARD_STOP_LOSS',
+      }),
+    );
+  });
+
+  it('delegates master suite runs to BacktestSuiteExecutor when scenarioId is WFA or STRESS_SUITE', async () => {
+    const fixture = executor();
+    fixture.dependencies.suiteExecutor.isMasterSuiteRun.mockReturnValue(true);
+
+    await fixture.instance.execute(fixture.current.id);
+
+    expect(
+      fixture.dependencies.suiteExecutor.isMasterSuiteRun,
+    ).toHaveBeenCalled();
+    expect(
+      fixture.dependencies.suiteExecutor.executeSuite,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({ id: fixture.current.id }),
+      expect.any(Function),
     );
   });
 });

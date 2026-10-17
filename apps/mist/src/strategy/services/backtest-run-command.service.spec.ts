@@ -191,4 +191,78 @@ describe('BacktestRunCommandService chan_bsp dispatch', () => {
 
     expect(f.runRepository.save).not.toHaveBeenCalled();
   });
+
+  it('creates a WFA suite master run with suiteId and submits via RPC', async () => {
+    const f = fixture();
+    f.rpc.submit.mockResolvedValue({ ok: true });
+
+    const result = await f.service.createSuite({
+      type: 'WFA',
+      strategyVersionId: 7,
+      targetUniverse: ['600000.SH'],
+      period: Period.DAY,
+      source: DataSource.TDX,
+      startDate: '2020-01-01T00:00:00.000Z',
+      endDate: '2022-01-01T00:00:00.000Z',
+      wfaOptions: {
+        windowType: 'rolling',
+        trainDurationMonths: 12,
+        testDurationMonths: 3,
+      },
+    });
+
+    expect(f.runRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarioId: 'WFA',
+        stage: 'MASTER',
+        suiteId: expect.any(String),
+        contextSnapshot: expect.objectContaining({
+          type: 'WFA',
+          wfaOptions: expect.objectContaining({
+            windowType: 'rolling',
+          }),
+        }),
+      }),
+    );
+    expect(f.rpc.submit).toHaveBeenCalledWith(41, 'http-test-1');
+    expect(result).toEqual(
+      expect.objectContaining({
+        suiteId: expect.any(String),
+        masterRunId: 41,
+        initialStatus: 'PENDING',
+      }),
+    );
+  });
+
+  it('creates a STRESS_SUITE master run with default dates when omitted', async () => {
+    const f = fixture();
+    f.rpc.submit.mockResolvedValue({ ok: true });
+
+    const result = await f.service.createSuite({
+      type: 'STRESS_SUITE',
+      strategyVersionId: 7,
+      targetUniverse: ['600000.SH'],
+      period: Period.DAY,
+      source: DataSource.TDX,
+      stressOptions: {
+        scenarios: ['CRASH_2015'],
+      },
+    });
+
+    expect(f.runRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        scenarioId: 'STRESS_SUITE',
+        stage: 'MASTER',
+        suiteId: expect.any(String),
+      }),
+    );
+    expect(f.rpc.submit).toHaveBeenCalledTimes(1);
+    expect(result).toEqual(
+      expect.objectContaining({
+        suiteId: expect.any(String),
+        masterRunId: 41,
+        initialStatus: 'PENDING',
+      }),
+    );
+  });
 });

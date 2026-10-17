@@ -134,7 +134,7 @@ export class PositionStateMachine {
         quantity: fillQty,
         realizedPnl: tradePnl,
         returnRatio,
-        exitReason: POSITION_EXIT_REASONS.SIGNAL_EXIT,
+        exitReason: event.exitReason ?? POSITION_EXIT_REASONS.SIGNAL_EXIT,
       });
 
       this.holdingQuantity -= fillQty;
@@ -174,20 +174,7 @@ export class PositionStateMachine {
     this.holdingBars += 1;
     this.currentPrice = bar.close;
 
-    if (this.exitPolicy) {
-      const decision = this.exitPolicy.evaluate(bar, this.getSnapshot());
-      if (decision.action === EXIT_ACTIONS.EXIT) {
-        return {
-          securityId: this.securityId,
-          securityCode: this.securityCode,
-          side: ORDER_SIDES.SELL,
-          orderType: ORDER_TYPES.MARKET,
-          quantity: this.calculateExitQuantity(),
-          signalTime: bar.timestamp,
-        };
-      }
-    }
-
+    // 纯记账员定位：严禁在 onBar 内私自生成平仓订单，平仓决策权 100% 移交上层 ExecutionRiskArbiter
     return null;
   }
 

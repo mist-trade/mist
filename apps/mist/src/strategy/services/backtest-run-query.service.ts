@@ -26,10 +26,11 @@ import { SAFE_FAILURE_CODES_SET } from '@app/contracts';
 import { DEFAULT_API_PAGE_LIMIT } from '@app/constants';
 import { BacktestTradeResultPageVo } from '../vo/backtest-trade-result-page.vo';
 import { BacktestTradeResultVo } from '../vo/backtest-trade-result.vo';
+import { BacktestSuiteReportVo } from '../vo/backtest-suite-report.vo';
 
 type QueryRejection = HttpBusinessRejection<
   string,
-  { runId: number; status?: BacktestRunStatus }
+  { runId?: number; suiteId?: string; status?: BacktestRunStatus }
 >;
 
 const DEFAULT_TRADE_QUERY_LIMIT = DEFAULT_API_PAGE_LIMIT;
@@ -49,6 +50,39 @@ export class BacktestRunQueryService {
     const run = await this.runRepository.findOne({ where: { id: runId } });
     if (!run) return notFound(runId);
     return mapRun(run);
+  }
+
+  async findSuite(
+    suiteId: string,
+  ): Promise<BacktestSuiteReportVo | QueryRejection> {
+    const runs = await this.runRepository.find({
+      where: { suiteId },
+      order: { id: 'ASC' },
+    });
+    if (runs.length === 0) {
+      return new HttpBusinessRejection(
+        'BACKTEST_SUITE_NOT_FOUND',
+        'Backtest suite was not found',
+        { suiteId },
+      );
+    }
+
+    const masterRun = runs.find((r) => !r.parentRunId) ?? runs[0];
+    const childRuns = runs.filter((r) => r.id !== masterRun.id);
+
+    const type = (masterRun.scenarioId === 'WFA' ? 'WFA' : 'STRESS_SUITE') as
+      | 'WFA'
+      | 'STRESS_SUITE';
+    const contextSnapshot = masterRun.contextSnapshot as any;
+
+    return {
+      suiteId,
+      type,
+      masterRun: mapRun(masterRun),
+      childRuns: childRuns.map(mapRun),
+      wfaReport: contextSnapshot?.wfaReport ?? null,
+      stressReport: contextSnapshot?.stressReport ?? null,
+    };
   }
 
   async listRuns(query?: ListBacktestRunsQueryDto): Promise<BacktestRunVo[]> {
@@ -231,6 +265,13 @@ function mapRun(run: BacktestRun): BacktestRunVo {
     winRate: toNumberOrNull(run.winRate),
     profitLossRatio: toNumberOrNull(run.profitLossRatio),
     tradeCount: run.tradeCount ?? null,
+    navSeries: run.navSeries ?? null,
+    benchmarkCode: run.benchmarkCode ?? null,
+    parentRunId: run.parentRunId ?? null,
+    suiteId: run.suiteId ?? null,
+    stage: run.stage ?? null,
+    scenarioId: run.scenarioId ?? null,
+    contextSnapshot: run.contextSnapshot ?? null,
     createdAt: run.createdAt.toISOString(),
     updatedAt: run.updatedAt.toISOString(),
   };

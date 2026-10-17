@@ -199,4 +199,76 @@ describe('BacktestRunQueryService', () => {
       });
     });
   });
+
+  describe('findSuite', () => {
+    it('returns rejection when suite is not found', async () => {
+      runRepo.find = jest.fn().mockResolvedValue([]);
+
+      const result: any = await service.findSuite('non-existent-suite');
+      expect(result.code).toBe('BACKTEST_SUITE_NOT_FOUND');
+    });
+
+    it('assembles aggregated suite report for master and child runs', async () => {
+      const masterRun = {
+        id: 10,
+        strategyDefinitionId: 1,
+        strategyVersionId: 1,
+        targetUniverse: ['000300'],
+        period: Period.DAY,
+        source: DataSource.TDX,
+        startDate: new Date('2020-01-01T00:00:00Z'),
+        endDate: new Date('2022-01-01T00:00:00Z'),
+        status: BacktestRunStatus.COMPLETED,
+        signalCount: 10,
+        matchedSecurityCount: 1,
+        targetIssues: [],
+        suiteId: 'suite-wfa-10',
+        scenarioId: 'WFA',
+        stage: 'MASTER',
+        parentRunId: null,
+        contextSnapshot: {
+          wfaReport: {
+            totalFolds: 2,
+            windowType: 'rolling',
+          },
+        },
+        createdAt: new Date('2020-01-01T00:00:00Z'),
+        updatedAt: new Date('2020-01-01T00:00:00Z'),
+      };
+
+      const childRun = {
+        id: 11,
+        strategyDefinitionId: 1,
+        strategyVersionId: 1,
+        targetUniverse: ['000300'],
+        period: Period.DAY,
+        source: DataSource.TDX,
+        startDate: new Date('2020-01-01T00:00:00Z'),
+        endDate: new Date('2021-01-01T00:00:00Z'),
+        status: BacktestRunStatus.COMPLETED,
+        signalCount: 5,
+        matchedSecurityCount: 1,
+        targetIssues: [],
+        suiteId: 'suite-wfa-10',
+        scenarioId: 'FOLD_0_TRAIN',
+        stage: 'TRAIN',
+        parentRunId: 10,
+        createdAt: new Date('2020-01-01T00:00:00Z'),
+        updatedAt: new Date('2020-01-01T00:00:00Z'),
+      };
+
+      runRepo.find = jest.fn().mockResolvedValue([masterRun, childRun]);
+
+      const result: any = await service.findSuite('suite-wfa-10');
+      expect(result.suiteId).toBe('suite-wfa-10');
+      expect(result.type).toBe('WFA');
+      expect(result.masterRun.id).toBe(10);
+      expect(result.childRuns).toHaveLength(1);
+      expect(result.childRuns[0].id).toBe(11);
+      expect(result.wfaReport).toEqual({
+        totalFolds: 2,
+        windowType: 'rolling',
+      });
+    });
+  });
 });

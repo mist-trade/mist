@@ -1,4 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  forwardRef,
+  Inject,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import {
@@ -14,18 +20,16 @@ import {
   StrategySignalKind,
   StrategySignalSource,
   StrategyVersion,
+  type BacktestNavPoint,
   type BacktestTargetIssue,
 } from '@app/shared-data';
 import {
   compileStoredDefinitionVersion,
   DEFAULT_BROKER_INITIAL_CASH,
+  ExecutionRiskArbiter,
   HistoricalBarSource,
   mapKernelSignalToPersistencePayload,
-  ORDER_SIDES,
-  ORDER_TYPES,
-  POSITION_STATUSES,
   PositionStateMachine,
-  SIGNAL_KINDS,
   SimulatedBroker,
   StrategyEvaluationKernel,
   type CompiledStoredDefinition,
@@ -41,6 +45,7 @@ import { DataSource as TypeOrmDataSource, In, Repository } from 'typeorm';
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
 import { BacktestRunFailure } from './backtest-run-error';
 import { HealthStateService } from './health/health-state.service';
+import { BacktestSuiteExecutor } from './suite/backtest-suite.executor';
 
 const BACKTEST_CALCULATION_BATCH_SIZE = 100;
 const BACKTEST_RESULT_BATCH_SIZE = 100;
@@ -102,6 +107,9 @@ export class BacktestRunExecutor {
     private readonly dataSource: TypeOrmDataSource,
     private readonly config: ConfigService,
     private readonly health: HealthStateService,
+    @Optional()
+    @Inject(forwardRef(() => BacktestSuiteExecutor))
+    private readonly suiteExecutor?: BacktestSuiteExecutor,
   ) {}
 
   async execute(runId: number): Promise<void> {
@@ -121,7 +129,13 @@ export class BacktestRunExecutor {
 
     const startedAt = Date.now();
     try {
-      await this.replay(claimed);
+      if (this.suiteExecutor?.isMasterSuiteRun(claimed)) {
+        await this.suiteExecutor.executeSuite(claimed, async (childRunId) => {
+          await this.executeChild(childRunId);
+        });
+      } else {
+        await this.replay(claimed);
+      }
       const durationMs = Date.now() - startedAt;
       this.health.recordRunCompleted(durationMs);
       this.logger.log(
@@ -135,6 +149,24 @@ export class BacktestRunExecutor {
         `Backtest run ${runId} failed reason=${failure.code}`,
         errorTrace(error),
       );
+    }
+  }
+
+  async executeChild(runId: number): Promise<void> {
+    let claimed: BacktestRun | null;
+    try {
+      claimed = await this.claim(runId);
+    } catch (error) {
+      await this.failAndCleanup(runId, classifyFailure(error));
+      throw error;
+    }
+    if (!claimed) return;
+    try {
+      await this.replay(claimed);
+    } catch (error) {
+      const failure = classifyFailure(error);
+      await this.failAndCleanup(runId, failure);
+      throw error;
     }
   }
 
@@ -249,6 +281,7 @@ export class BacktestRunExecutor {
         () => {
           signalCount += 1;
         },
+        security.name,
       );
       if (outcome.hasBars) {
         prewarmActuals.push(outcome.prewarmActual);
@@ -285,10 +318,8 @@ export class BacktestRunExecutor {
     await this.flushResults(results);
     await this.flushTrades(trades);
 
-    const combinedNavSeries = combineDailyNavHistories(
-      allNavHistories,
-      DEFAULT_BROKER_INITIAL_CASH,
-    );
+    const { navSeries: combinedNavSeries, navPoints } =
+      combineDailyNavHistories(allNavHistories, DEFAULT_BROKER_INITIAL_CASH);
     const summary = computePerformanceSummary(combinedNavSeries, trades);
 
     const prewarmMinActual =
@@ -318,6 +349,7 @@ export class BacktestRunExecutor {
         winRate: summary.winRate,
         profitLossRatio: summary.profitLossRatio,
         tradeCount: summary.tradeCount,
+        navSeries: navPoints,
         prewarmStatus,
         prewarmMinActual,
         prewarmMinExpected,
@@ -340,6 +372,7 @@ export class BacktestRunExecutor {
     matchedCodes: Set<string>,
     budget: ReplayBudget,
     onSignal: () => void,
+    securityName?: string,
   ): Promise<{
     hasBars: boolean;
     prewarmStatus: 'full' | 'partial' | 'empty';
@@ -374,11 +407,18 @@ export class BacktestRunExecutor {
     });
 
     const broker = new SimulatedBroker(DEFAULT_BROKER_INITIAL_CASH);
+    broker.registerSecurity(securityCode, { name: securityName });
     const positionMachine = new PositionStateMachine(
       securityId,
       securityCode,
       DEFAULT_BROKER_INITIAL_CASH,
     );
+    const arbiter = new ExecutionRiskArbiter({
+      hardStopLossRatio: -0.08,
+      defaultCooldownBars: 3,
+      cashAllocationRatio: 0.995,
+      lotSize: TRADING_RULES.MAIN_BOARD_LOT_SIZE,
+    });
     let lastSeenBar: StrategyBar | null = null;
 
     const outcome = await source.drive(
@@ -416,30 +456,17 @@ export class BacktestRunExecutor {
         matchedCodes.add(securityCode);
         onSignal();
 
+        const orderDraft = arbiter.arbitrate({
+          bar,
+          signal,
+          position: positionMachine.getSnapshot(),
+          availableCash: positionMachine.getCash(),
+        });
         if (
-          positionMachine.getStatus() === POSITION_STATUSES.EMPTY &&
-          signal.signalKind === SIGNAL_KINDS.ENTRY
+          orderDraft &&
+          !broker.getOpenOrders().some((o) => o.securityCode === securityCode)
         ) {
-          const availableCash = positionMachine.getCash();
-          const lotSize = TRADING_RULES.MAIN_BOARD_LOT_SIZE;
-          const allocatableCash = availableCash * 0.995;
-          const targetQty =
-            Math.floor(allocatableCash / bar.close / lotSize) * lotSize;
-          if (targetQty >= lotSize) {
-            broker.submitOrder({
-              securityId,
-              securityCode,
-              side: ORDER_SIDES.BUY,
-              orderType: ORDER_TYPES.MARKET,
-              quantity: targetQty,
-              signalTime: signal.signalTime,
-            });
-          }
-        } else if (positionMachine.getStatus() === POSITION_STATUSES.HOLDING) {
-          const exitDraft = positionMachine.onSignal(signal);
-          if (exitDraft) {
-            broker.submitOrder(exitDraft);
-          }
+          broker.submitOrder(orderDraft);
         }
 
         if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
@@ -454,9 +481,18 @@ export class BacktestRunExecutor {
           positionMachine.onOrderFilled(fill);
         }
 
-        const orderDraft = positionMachine.onBar(bar);
-        if (orderDraft) {
-          broker.submitOrder(orderDraft);
+        positionMachine.onBar(bar);
+
+        const riskOrderDraft = arbiter.arbitrate({
+          bar,
+          position: positionMachine.getSnapshot(),
+          availableCash: positionMachine.getCash(),
+        });
+        if (
+          riskOrderDraft &&
+          !broker.getOpenOrders().some((o) => o.securityCode === securityCode)
+        ) {
+          broker.submitOrder(riskOrderDraft);
         }
 
         if (isSessionCloseBar(bar.timestamp, run.period)) {
@@ -624,12 +660,21 @@ function errorTrace(error: unknown): string | undefined {
 function combineDailyNavHistories(
   allNavHistories: readonly (readonly DailyNavSnapshot[])[],
   initialCashPerSecurity: number,
-): number[] {
+): { navSeries: number[]; navPoints: BacktestNavPoint[] } {
   if (allNavHistories.length === 0) {
-    return [];
+    return { navSeries: [], navPoints: [] };
   }
   if (allNavHistories.length === 1) {
-    return allNavHistories[0].map((s) => s.totalEquity);
+    const points: BacktestNavPoint[] = allNavHistories[0].map((s) => ({
+      date: s.date,
+      totalEquity: s.totalEquity,
+      cash: s.cash,
+      marketValue: s.marketValue,
+    }));
+    return {
+      navSeries: allNavHistories[0].map((s) => s.totalEquity),
+      navPoints: points,
+    };
   }
 
   const dateSet = new Set<string>();
@@ -651,19 +696,39 @@ function combineDailyNavHistories(
   const lastKnownEquities = new Array(allNavHistories.length).fill(
     initialCashPerSecurity,
   );
+  const lastKnownCash = new Array(allNavHistories.length).fill(
+    initialCashPerSecurity,
+  );
+  const lastKnownMarketValue = new Array(allNavHistories.length).fill(0);
 
-  const combinedSeries: number[] = [];
+  const navSeries: number[] = [];
+  const navPoints: BacktestNavPoint[] = [];
   for (const date of sortedDates) {
     let dayTotalEquity = 0;
+    let dayCash = 0;
+    let dayMarketValue = 0;
     for (let i = 0; i < allNavHistories.length; i++) {
       const snap = dateMaps[i].get(date);
       if (snap) {
         lastKnownEquities[i] = snap.totalEquity;
+        lastKnownCash[i] = snap.cash;
+        lastKnownMarketValue[i] = snap.marketValue;
       }
       dayTotalEquity += lastKnownEquities[i];
+      dayCash += lastKnownCash[i];
+      dayMarketValue += lastKnownMarketValue[i];
     }
-    combinedSeries.push(dayTotalEquity);
+    const roundedEquity = Math.round(dayTotalEquity * 100) / 100;
+    const roundedCash = Math.round(dayCash * 100) / 100;
+    const roundedMarketValue = Math.round(dayMarketValue * 100) / 100;
+    navSeries.push(roundedEquity);
+    navPoints.push({
+      date,
+      totalEquity: roundedEquity,
+      cash: roundedCash,
+      marketValue: roundedMarketValue,
+    });
   }
 
-  return combinedSeries;
+  return { navSeries, navPoints };
 }

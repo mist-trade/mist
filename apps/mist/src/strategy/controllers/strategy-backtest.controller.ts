@@ -18,7 +18,9 @@ import {
   HttpResponseMessage,
 } from '@app/transport/http';
 import { CreateBacktestRunDto } from '../dto/create-backtest-run.dto';
+import { CreateBacktestSuiteDto } from '../dto/create-backtest-suite.dto';
 import { BacktestRunIdParamDto } from '../dto/backtest-run-id-param.dto';
+import { BacktestSuiteIdParamDto } from '../dto/backtest-suite-id-param.dto';
 import { BacktestSignalResultQueryDto } from '../dto/backtest-signal-result-query.dto';
 import { BacktestTradeResultQueryDto } from '../dto/backtest-trade-result-query.dto';
 import { ListBacktestRunsQueryDto } from '../dto/list-backtest-runs-query.dto';
@@ -29,6 +31,8 @@ import {
 } from '../services/backtest-run-command.service';
 import { BacktestRunQueryService } from '../services/backtest-run-query.service';
 import { BacktestRunReceiptVo } from '../vo/backtest-run-receipt.vo';
+import { BacktestSuiteReceiptVo } from '../vo/backtest-suite-receipt.vo';
+import { BacktestSuiteReportVo } from '../vo/backtest-suite-report.vo';
 import { BacktestRunVo } from '../vo/backtest-run.vo';
 import { BacktestSignalResultPageVo } from '../vo/backtest-signal-result-page.vo';
 import { BacktestTradeResultPageVo } from '../vo/backtest-trade-result-page.vo';
@@ -84,6 +88,61 @@ export class StrategyBacktestController {
       }
       throw error;
     }
+  }
+
+  @Post('suites')
+  @HttpCode(HttpStatus.ACCEPTED)
+  @HttpResponseMessage('BACKTEST_SUITE_ACCEPTED')
+  @ApiEnvelopeResponse({ status: 202, type: BacktestSuiteReceiptVo })
+  @ApiTechnicalErrorResponse({
+    status: 400,
+    codes: ['VALIDATION_ERROR', 'NOT_FOUND'],
+  })
+  @ApiTechnicalErrorResponse({
+    status: 429,
+    codes: ['BACKTEST_QUEUE_FULL'],
+  })
+  @ApiTechnicalErrorResponse({
+    status: 503,
+    codes: ['BACKTEST_NOT_READY', 'BACKTEST_UNAVAILABLE'],
+  })
+  @ApiTechnicalErrorResponse({
+    status: 504,
+    codes: ['BACKTEST_COMMAND_TIMEOUT'],
+  })
+  async createSuite(
+    @Body() dto: CreateBacktestSuiteDto,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    try {
+      const result = await this.commandService.createSuite(dto);
+      const suiteId =
+        result instanceof HttpBusinessRejection
+          ? result.data?.suiteId
+          : result.suiteId;
+      if (suiteId) {
+        response.setHeader(
+          'Location',
+          `/v1/strategy-backtests/suites/${suiteId}`,
+        );
+      }
+      return result;
+    } catch (error) {
+      if (error instanceof BacktestCommandHttpException) {
+        response.setHeader('Location', `/v1/strategy-backtests/${error.runId}`);
+      }
+      throw error;
+    }
+  }
+
+  @Get('suites/:suiteId')
+  @ApiEnvelopeResponse({
+    status: 200,
+    type: BacktestSuiteReportVo,
+    businessErrors: [{ code: 'BACKTEST_SUITE_NOT_FOUND' }],
+  })
+  async findSuite(@Param() params: BacktestSuiteIdParamDto) {
+    return await this.queryService.findSuite(params.suiteId);
   }
 
   @Get()

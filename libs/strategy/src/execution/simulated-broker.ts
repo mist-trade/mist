@@ -1,6 +1,7 @@
 import type { StrategyBar } from '@app/market-data';
 import { isOneWordLimitDown, isOneWordLimitUp } from '@app/market-data';
 import { TRADING_RULES } from '@app/constants';
+import { formatShanghaiDateString } from '@app/timezone';
 import {
   DEFAULT_BROKER_INITIAL_CASH,
   EXECUTION_RULES,
@@ -39,10 +40,27 @@ export class SimulatedBroker implements ExecutionBrokerPort {
   private readonly pendingOrders = new Map<string, Order>();
   private readonly positionMap = new Map<string, MutablePositionSlot>();
   private readonly prevCloseMap = new Map<string, number>();
+  private readonly lastBarDateMap = new Map<string, string>();
+  private readonly lastBarCloseMap = new Map<string, number>();
+  private readonly dailyPreCloseMap = new Map<string, number>();
+  private readonly securityMetaMap = new Map<
+    string,
+    { name?: string; preClose?: number }
+  >();
   private orderCounter = 0;
   private eventCounter = 0;
   private readonly slippageRatio: number;
   private readonly feeConfig?: BrokerFeeConfig;
+
+  registerSecurity(
+    securityCode: string,
+    metadata: { name?: string; preClose?: number },
+  ): void {
+    this.securityMetaMap.set(securityCode, metadata);
+    if (metadata.preClose !== undefined && metadata.preClose > 0) {
+      this.dailyPreCloseMap.set(securityCode, metadata.preClose);
+    }
+  }
 
   constructor(options?: number | BrokerExecutionOptions) {
     if (typeof options === 'number') {
@@ -133,6 +151,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
       stopPrice: dto.stopPrice,
       status: ORDER_STATUSES.PENDING,
       createdAt: new Date(),
+      ...(dto.exitReason ? { exitReason: dto.exitReason } : {}),
     };
 
     this.pendingOrders.set(orderId, order);
@@ -155,7 +174,24 @@ export class SimulatedBroker implements ExecutionBrokerPort {
   onBar(bar: StrategyBar): readonly OrderFilledEvent[] {
     const fills: OrderFilledEvent[] = [];
     const secCode = bar.securityCode ?? '';
-    const prevClose = this.prevCloseMap.get(secCode) ?? bar.open;
+    const currentDateStr = formatShanghaiDateString(bar.timestamp);
+    const lastDateStr = this.lastBarDateMap.get(secCode);
+
+    if (lastDateStr !== undefined && lastDateStr !== currentDateStr) {
+      const prevDayFinalClose = this.lastBarCloseMap.get(secCode);
+      if (prevDayFinalClose !== undefined) {
+        this.dailyPreCloseMap.set(secCode, prevDayFinalClose);
+      }
+    }
+    this.lastBarDateMap.set(secCode, currentDateStr);
+
+    const meta = this.securityMetaMap.get(secCode);
+    const securityName = meta?.name;
+
+    if (!this.dailyPreCloseMap.has(secCode)) {
+      this.dailyPreCloseMap.set(secCode, meta?.preClose ?? bar.open);
+    }
+    const prevClose = this.dailyPreCloseMap.get(secCode) ?? bar.open;
 
     // 阶段 1：盘中触价止损单优先处理 (STOP 订单)
     for (const [orderId, order] of this.pendingOrders.entries()) {
@@ -199,7 +235,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
         }
 
         if (order.side === ORDER_SIDES.BUY) {
-          if (isOneWordLimitUp(bar, prevClose)) {
+          if (isOneWordLimitUp(bar, prevClose, securityName)) {
             // 一字涨停无法买入，直接拒单
             this.pendingOrders.set(orderId, {
               ...order,
@@ -235,7 +271,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
             this.pendingOrders.delete(orderId);
           }
         } else if (order.side === ORDER_SIDES.SELL) {
-          if (isOneWordLimitDown(bar, prevClose)) {
+          if (isOneWordLimitDown(bar, prevClose, securityName)) {
             // 一字跌停无法卖出，挂起顺延至下一周期
             this.pendingOrders.set(orderId, {
               ...order,
@@ -259,6 +295,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
       }
     }
 
+    this.lastBarCloseMap.set(secCode, bar.close);
     this.prevCloseMap.set(secCode, bar.close);
     return fills;
   }
@@ -272,6 +309,9 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     for (const pos of this.positionMap.values()) {
       pos.availableQuantity += pos.frozenQuantity;
       pos.frozenQuantity = 0;
+    }
+    for (const [code, close] of this.lastBarCloseMap.entries()) {
+      this.dailyPreCloseMap.set(code, close);
     }
   }
 
@@ -368,6 +408,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
         turnover,
         fees,
         netAmount: -totalRequired,
+        ...(order.exitReason ? { exitReason: order.exitReason } : {}),
       };
     } else {
       const pos = this.positionMap.get(order.securityCode);
@@ -398,6 +439,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
         turnover,
         fees,
         netAmount: netIncome,
+        ...(order.exitReason ? { exitReason: order.exitReason } : {}),
       };
     }
   }

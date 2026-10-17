@@ -77,4 +77,64 @@ describe('StrategyBacktestController', () => {
     });
     expect(query.listTrades).toHaveBeenCalledWith(41, queryDto);
   });
+
+  it('delegates createSuite to commandService and sets Location header', async () => {
+    const command = {
+      createSuite: jest.fn().mockResolvedValue({
+        suiteId: 'suite-abc-123',
+        masterRunId: 99,
+        initialStatus: 'PENDING',
+      }),
+    };
+    const response = { setHeader: jest.fn() };
+    const controller = new StrategyBacktestController(
+      command as any,
+      {} as any,
+    );
+
+    const dto = {
+      type: 'WFA' as const,
+      strategyVersionId: 1,
+      targetUniverse: ['000300'],
+      period: 101 as any,
+      source: 'tdx' as any,
+    };
+
+    await expect(controller.createSuite(dto, response as any)).resolves.toEqual(
+      {
+        suiteId: 'suite-abc-123',
+        masterRunId: 99,
+        initialStatus: 'PENDING',
+      },
+    );
+
+    expect(command.createSuite).toHaveBeenCalledWith(dto);
+    expect(response.setHeader).toHaveBeenCalledWith(
+      'Location',
+      '/v1/strategy-backtests/suites/suite-abc-123',
+    );
+  });
+
+  it('delegates findSuite to queryService', async () => {
+    const query = {
+      findSuite: jest.fn().mockResolvedValue({
+        suiteId: 'suite-abc-123',
+        type: 'WFA',
+        masterRun: { id: 99 },
+        childRuns: [],
+      }),
+    };
+    const controller = new StrategyBacktestController({} as any, query as any);
+
+    await expect(
+      controller.findSuite({ suiteId: 'suite-abc-123' }),
+    ).resolves.toEqual({
+      suiteId: 'suite-abc-123',
+      type: 'WFA',
+      masterRun: { id: 99 },
+      childRuns: [],
+    });
+
+    expect(query.findSuite).toHaveBeenCalledWith('suite-abc-123');
+  });
 });

@@ -3,6 +3,10 @@ import type {
   StrategyRealtimeSource,
   StrategyReplayMarketDataPort,
 } from '@app/market-data';
+import {
+  A_SHARE_DATA_MIN_BOUNDARY,
+  InvalidHistoricalDataBoundaryException,
+} from '../strategy.errors';
 import type { KernelSignal, PrewarmStatus } from './kernel.types';
 import type { StrategyEvaluationKernel } from './strategy-evaluation-kernel';
 
@@ -20,6 +24,8 @@ export interface HistoricalReplayCriteria {
   /** 回放终点（= run.endDate），闭区间。 */
   readonly endAt: Date;
   readonly requiredBars: number;
+  /** 可选显式指定回放起点，未提供时默认回落为 publicFrom */
+  readonly startDate?: Date;
 }
 
 export interface HistoricalReplaySummary {
@@ -42,11 +48,30 @@ export class HistoricalBarSource {
     private readonly criteria: HistoricalReplayCriteria,
   ) {}
 
+  public static validateBoundary(criteria: {
+    readonly startDate?: Date;
+    readonly publicFrom?: Date;
+    readonly preWarmEndAt?: Date;
+  }): void {
+    const effectiveStart =
+      criteria.startDate ?? criteria.publicFrom ?? criteria.preWarmEndAt;
+    if (
+      effectiveStart &&
+      effectiveStart.getTime() < A_SHARE_DATA_MIN_BOUNDARY.getTime()
+    ) {
+      throw new InvalidHistoricalDataBoundaryException(
+        `Invalid historical data boundary: ${effectiveStart.toISOString()} is prior to 1996-12-16T00:00:00.000Z. A-share data before 1996-12-16 lacks price limits and T+1 mechanisms, and is considered toxic for strategy evaluation.`,
+      );
+    }
+  }
+
   public async drive(
     kernel: StrategyEvaluationKernel,
     onSignal?: (signal: KernelSignal, bar: StrategyBar) => void | Promise<void>,
     onBar?: (bar: StrategyBar) => void | Promise<void>,
   ): Promise<HistoricalReplaySummary> {
+    HistoricalBarSource.validateBoundary(this.criteria);
+
     const { securityId, source, period, preWarmEndAt, endAt, requiredBars } =
       this.criteria;
 

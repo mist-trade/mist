@@ -1,5 +1,10 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { BacktestRunStatus, DataSource, Period } from '@app/shared-data';
+import {
+  BacktestRunStatus,
+  DataSource,
+  Period,
+  type BacktestNavPoint,
+} from '@app/shared-data';
 import { BacktestTargetIssueVo } from './backtest-target-issue.vo';
 
 export class BacktestRunVo {
@@ -49,6 +54,20 @@ export class BacktestRunVo {
   profitLossRatio?: number | null;
   @ApiPropertyOptional({ nullable: true })
   tradeCount?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  navSeries?: BacktestNavPoint[] | null;
+  @ApiPropertyOptional({ nullable: true })
+  benchmarkCode?: string | null;
+  @ApiPropertyOptional({ nullable: true })
+  parentRunId?: number | null;
+  @ApiPropertyOptional({ nullable: true })
+  suiteId?: string | null;
+  @ApiPropertyOptional({ nullable: true })
+  stage?: string | null;
+  @ApiPropertyOptional({ nullable: true })
+  scenarioId?: string | null;
+  @ApiPropertyOptional({ nullable: true })
+  contextSnapshot?: Record<string, unknown> | null;
   @ApiProperty()
   createdAt!: string;
   @ApiProperty()

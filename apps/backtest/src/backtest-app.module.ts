@@ -27,6 +27,7 @@ import { HealthStateService } from './health/health-state.service';
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
 import { BacktestAdmissionService } from './backtest-admission.service';
 import { BacktestRunExecutor } from './backtest-run.executor';
+import { BacktestSuiteExecutor } from './suite/backtest-suite.executor';
 import { BacktestStartupService } from './backtest-startup.service';
 
 @Module({
@@ -91,6 +92,7 @@ import { BacktestStartupService } from './backtest-startup.service';
     HealthStateService,
     BacktestMarketDataAdapter,
     BacktestRunExecutor,
+    BacktestSuiteExecutor,
     BacktestAdmissionService,
     BacktestStartupService,
   ],

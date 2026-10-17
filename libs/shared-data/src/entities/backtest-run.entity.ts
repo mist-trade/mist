@@ -18,6 +18,13 @@ import { StrategyDefinition } from './strategy-definition.entity';
 import { StrategyVersion } from './strategy-version.entity';
 import type { BacktestTargetIssue } from '../backtest-target-issue';
 
+export interface BacktestNavPoint {
+  readonly date: string;
+  readonly totalEquity: number;
+  readonly cash?: number;
+  readonly marketValue?: number;
+}
+
 @Entity({ name: 'backtest_runs' })
 export class BacktestRun {
   @PrimaryGeneratedColumn()
@@ -136,6 +143,36 @@ export class BacktestRun {
 
   @Column({ name: 'trade_count', type: 'int', default: 0 })
   tradeCount: number = 0;
+
+  @Column({ name: 'nav_series', type: 'json', nullable: true })
+  navSeries?: BacktestNavPoint[] | null;
+
+  @Column({
+    name: 'benchmark_code',
+    type: 'varchar',
+    length: 32,
+    nullable: true,
+  })
+  benchmarkCode?: string | null;
+
+  @Column({ name: 'parent_run_id', type: 'int', nullable: true })
+  parentRunId?: number | null;
+
+  @ManyToOne(() => BacktestRun, { onDelete: 'CASCADE', nullable: true })
+  @JoinColumn({ name: 'parent_run_id' })
+  parentRun?: BacktestRun | null;
+
+  @Column({ name: 'suite_id', type: 'varchar', length: 64, nullable: true })
+  suiteId?: string | null;
+
+  @Column({ type: 'varchar', length: 32, nullable: true })
+  stage?: string | null;
+
+  @Column({ name: 'scenario_id', type: 'varchar', length: 64, nullable: true })
+  scenarioId?: string | null;
+
+  @Column({ name: 'context_snapshot', type: 'json', nullable: true })
+  contextSnapshot?: Record<string, unknown> | null;
 
   @Column({
     name: 'prewarm_status',

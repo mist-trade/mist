@@ -57,4 +57,7 @@ export * from './simulation';
 export * from './kernel';
 export * from './execution';
 export * from './position';
+export * from './stress-testing';
+export * from './wfa';
 export * from './strategy.constants';
+export * from './strategy.errors';

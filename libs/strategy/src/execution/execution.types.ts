@@ -26,6 +26,7 @@ export interface Order {
   readonly status: OrderStatus;
   readonly createdAt: Date;
   readonly rejectReason?: OrderRejectReason;
+  readonly exitReason?: string;
 }
 
 export interface FeeDetails {
@@ -48,6 +49,7 @@ export interface OrderFilledEvent {
   readonly turnover: number;
   readonly fees: FeeDetails;
   readonly netAmount: number;
+  readonly exitReason?: string;
 }
 
 export interface PositionSlot {
@@ -72,6 +74,7 @@ export interface CreateOrderDto {
   readonly signalTime: Date;
   readonly limitPrice?: number;
   readonly stopPrice?: number;
+  readonly exitReason?: string;
 }
 
 /**
@@ -84,6 +87,10 @@ export interface ExecutionBrokerPort {
   settleDayClose(currentDateStr: string): void;
   getAccount(): BrokerAccountSnapshot;
   getOpenOrders(): readonly Order[];
+  registerSecurity?(
+    securityCode: string,
+    metadata: { name?: string; preClose?: number },
+  ): void;
 }
 
 export interface BrokerFeeConfig {

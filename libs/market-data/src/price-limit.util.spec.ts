@@ -118,6 +118,12 @@ describe('calculatePriceLimits', () => {
     expect(limits.limitDown).toBe(8.0);
   });
 
+  it('calculates 5% limit correctly for ST stock by securityName', () => {
+    const limits = calculatePriceLimits(10.0, '600000', '*ST某某');
+    expect(limits.limitUp).toBe(10.5);
+    expect(limits.limitDown).toBe(9.5);
+  });
+
   it('handles rounding edge cases properly', () => {
     // 10.55 * 1.1 = 11.605 -> 11.61
     // 10.55 * 0.9 = 9.495 -> 9.50
@@ -131,6 +137,16 @@ describe('isOneWordLimitUp', () => {
   it('returns true when four prices are equal and equal to or above limit up', () => {
     const bar = makeBar(11.0, 11.0, 11.0, 11.0, '600519');
     expect(isOneWordLimitUp(bar, 10.0)).toBe(true);
+  });
+
+  it('returns true for ST stock hitting 5% limit up with securityName', () => {
+    const bar = makeBar(10.5, 10.5, 10.5, 10.5, '600000');
+    expect(isOneWordLimitUp(bar, 10.0, '*ST某某')).toBe(true);
+  });
+
+  it('returns false for ST stock at 10.5 when evaluated as normal main board (without ST name)', () => {
+    const bar = makeBar(10.5, 10.5, 10.5, 10.5, '600000');
+    expect(isOneWordLimitUp(bar, 10.0)).toBe(false);
   });
 
   it('returns false when bar touched limit up but opened lower or traded below (not four prices equal)', () => {
@@ -153,6 +169,11 @@ describe('isOneWordLimitDown', () => {
   it('returns true when four prices are equal and equal to or below limit down', () => {
     const bar = makeBar(9.0, 9.0, 9.0, 9.0, '600519');
     expect(isOneWordLimitDown(bar, 10.0)).toBe(true);
+  });
+
+  it('returns true for ST stock hitting 5% limit down with securityName', () => {
+    const bar = makeBar(9.5, 9.5, 9.5, 9.5, '600000');
+    expect(isOneWordLimitDown(bar, 10.0, '*ST某某')).toBe(true);
   });
 
   it('returns false when bar touched limit down but opened higher or bounced', () => {

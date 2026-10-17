@@ -375,3 +375,17 @@ Forward-only. Completes bidirectional schema parity across live and backtest sig
 3. Adds prewarm diagnostics columns to `backtest_runs`: `prewarm_status`, `prewarm_min_actual`, `prewarm_min_expected`.
 4. Backfills `backtest_signal_results` security IDs from `securities` and definition/version/period/source from `backtest_runs`.
 
+## 028 — create_backtest_trade_results
+
+Forward-only. 创建回测交易事实表与回测运行指标扩展：
+1. `backtest_runs` 扩展量化绩效指标列（`total_return`, `annualized_return`, `max_drawdown`, `sharpe_ratio`, `calmar_ratio`, `win_rate`, `profit_loss_ratio`, `trade_count`）。
+2. 创建 `backtest_trade_results` 表，记录回测闭环交易明细流水。
+
+## 029 — add_backtest_nav_series_and_suites
+
+Forward-only. `backtest_runs` 扩展净值时序与回测套件元数据：
+1. 添加 `nav_series json NULL` 存储每日净值时序快照。
+2. 添加 `benchmark_code varchar(32) NULL` 记录对齐基准代码。
+3. 添加 `parent_run_id int NULL` 及外键关联，支持子母回测层级。
+4. 添加 `suite_id varchar(64) NULL`, `stage varchar(32) NULL`, `scenario_id varchar(64) NULL` 及复合索引 `idx_btr_suite`，支持套件批次与压力测试场景切分。
+

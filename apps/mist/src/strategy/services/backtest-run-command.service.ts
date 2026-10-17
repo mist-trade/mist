@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import {
   BadRequestException,
   HttpException,
@@ -26,7 +27,9 @@ import {
   BacktestRpcTransportError,
 } from '../runtime/backtest-rpc.client';
 import { CreateBacktestRunDto } from '../dto/create-backtest-run.dto';
+import { CreateBacktestSuiteDto } from '../dto/create-backtest-suite.dto';
 import { BacktestRunReceiptVo } from '../vo/backtest-run-receipt.vo';
+import { BacktestSuiteReceiptVo } from '../vo/backtest-suite-receipt.vo';
 
 export class BacktestCommandHttpException extends HttpException {
   constructor(
@@ -188,6 +191,166 @@ export class BacktestRunCommandService {
     } catch (error) {
       if (!(error instanceof BacktestRpcTransportError)) throw error;
       return await this.handleTransportFailure(run.id, error);
+    }
+  }
+
+  async createSuite(
+    dto: CreateBacktestSuiteDto,
+  ): Promise<
+    | BacktestSuiteReceiptVo
+    | HttpBusinessRejection<
+        string,
+        { suiteId: string; masterRunId: number; status: BacktestRunStatus }
+      >
+  > {
+    if (
+      dto.startDate &&
+      dto.endDate &&
+      new Date(dto.startDate) > new Date(dto.endDate)
+    ) {
+      throw new BadRequestException({
+        code: 'VALIDATION_ERROR',
+        message: 'startDate must not be after endDate',
+      });
+    }
+    const version = await this.versionRepository.findOne({
+      where: { id: dto.strategyVersionId },
+    });
+    if (!version) {
+      throw new NotFoundException(
+        `Strategy version ${dto.strategyVersionId} not found`,
+      );
+    }
+    const definition = await this.definitionRepository.findOne({
+      where: { id: version.strategyDefinitionId },
+    });
+    if (!definition) {
+      throw new NotFoundException(
+        `Strategy definition ${version.strategyDefinitionId} not found`,
+      );
+    }
+
+    const kind: StrategyKind = definition.kind;
+    try {
+      compileStoredDefinitionVersion({
+        kind: definition.kind,
+        rule: version.rule as Record<string, unknown>,
+        signalKind: version.signalKind,
+      });
+    } catch (error) {
+      if (error instanceof StoredDefinitionCompileError) {
+        throw new BadRequestException({
+          code: 'STRATEGY_CONFIG_INVALID',
+          message: error.message,
+        });
+      }
+      throw error;
+    }
+
+    const suiteId = randomUUID();
+    const startDate = dto.startDate
+      ? new Date(dto.startDate)
+      : new Date('2015-01-01T00:00:00.000Z');
+    const endDate = dto.endDate
+      ? new Date(dto.endDate)
+      : new Date('2024-12-31T00:00:00.000Z');
+
+    const masterRun = await this.runRepository.save(
+      this.runRepository.create({
+        strategyDefinitionId: version.strategyDefinitionId,
+        strategyVersionId: version.id,
+        targetUniverse: dto.targetUniverse,
+        targetIssues: [],
+        period: dto.period,
+        source: dto.source,
+        startDate,
+        endDate,
+        status: BacktestRunStatus.PENDING,
+        kind,
+        signalCount: 0,
+        matchedSecurityCount: 0,
+        suiteId,
+        scenarioId: dto.type,
+        stage: 'MASTER',
+        contextSnapshot: {
+          type: dto.type,
+          wfaOptions: dto.wfaOptions,
+          stressOptions: dto.stressOptions,
+        },
+      }),
+    );
+
+    const correlationId = this.requestContext.getRequestId() ?? undefined;
+    try {
+      const result = await this.rpc.submit(masterRun.id, correlationId);
+      if (result.ok) {
+        return {
+          suiteId,
+          masterRunId: masterRun.id,
+          initialStatus: 'PENDING',
+        };
+      }
+      if (result.error.code === 'run_failed') {
+        return new HttpBusinessRejection(
+          'BACKTEST_RUN_ALREADY_FAILED',
+          'Backtest run has already failed',
+          {
+            suiteId,
+            masterRunId: masterRun.id,
+            status: BacktestRunStatus.FAILED,
+          },
+        );
+      }
+      const failed = await this.markPendingFailed(
+        masterRun.id,
+        `BACKTEST_${result.error.code.toUpperCase()}`,
+      );
+      if (
+        failed.status === BacktestRunStatus.RUNNING ||
+        failed.status === BacktestRunStatus.COMPLETED ||
+        (failed.status === BacktestRunStatus.FAILED && !failed.updated)
+      ) {
+        return {
+          suiteId,
+          masterRunId: masterRun.id,
+          initialStatus: 'PENDING',
+        };
+      }
+      if (
+        failed.status === 'missing' ||
+        failed.status === BacktestRunStatus.PENDING
+      ) {
+        throw new BacktestCommandHttpException(
+          500,
+          'INTERNAL_ERROR',
+          'Internal Server Error',
+          masterRun.id,
+        );
+      }
+      if (result.error.code === 'queue_full') {
+        throw new BacktestCommandHttpException(
+          429,
+          'BACKTEST_QUEUE_FULL',
+          'Backtest queue is full',
+          masterRun.id,
+          BacktestRunStatus.FAILED,
+        );
+      }
+      throw new BacktestCommandHttpException(
+        503,
+        'BACKTEST_NOT_READY',
+        'Backtest service is not ready',
+        masterRun.id,
+        BacktestRunStatus.FAILED,
+      );
+    } catch (error) {
+      if (!(error instanceof BacktestRpcTransportError)) throw error;
+      await this.handleTransportFailure(masterRun.id, error);
+      return {
+        suiteId,
+        masterRunId: masterRun.id,
+        initialStatus: 'PENDING',
+      };
     }
   }
 

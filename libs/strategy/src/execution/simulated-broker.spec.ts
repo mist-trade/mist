@@ -140,7 +140,7 @@ describe('SimulatedBroker', () => {
     expect(broker.getAccount().positions.get('600519')?.totalQuantity).toBe(0);
   });
 
-  it('TC-3: rejects BUY orders on one-word limit up bars', () => {
+  it('TC-3: rejects BUY orders on one-word limit up bars across consecutive intraday minute bars', () => {
     // 预设前一日收盘价为 10.00
     const prevBar = createBar(
       '2026-10-15T15:00:00.000Z',
@@ -162,8 +162,8 @@ describe('SimulatedBroker', () => {
       signalTime: tSignal,
     });
 
-    // 次日一字涨停（开高低收均为 11.00，+10%）
-    const limitUpBar = createBar(
+    // 次日 09:30 一字涨停（开高低收均为 11.00，+10%）
+    const limitUpBar1 = createBar(
       '2026-10-16T09:30:00.000Z',
       11.0,
       11.0,
@@ -171,11 +171,51 @@ describe('SimulatedBroker', () => {
       11.0,
       '600519',
     );
-    const fills = broker.onBar(limitUpBar);
-
-    expect(fills).toHaveLength(0);
+    const fills1 = broker.onBar(limitUpBar1);
+    expect(fills1).toHaveLength(0);
     expect(broker.getOpenOrders()).toHaveLength(0);
     expect(broker.getAccount().positions.size).toBe(0);
+
+    // 同一交易日后续连续分钟 Bar (09:31, 09:32) 再次报买单，仍应基于前日昨收 10.00 计算涨停价 11.00 并拒绝
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-16T09:30:00.000Z'),
+    });
+    const limitUpBar2 = createBar(
+      '2026-10-16T09:31:00.000Z',
+      11.0,
+      11.0,
+      11.0,
+      11.0,
+      '600519',
+    );
+    const fills2 = broker.onBar(limitUpBar2);
+    expect(fills2).toHaveLength(0);
+    expect(broker.getOpenOrders()).toHaveLength(0);
+
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-16T09:31:00.000Z'),
+    });
+    const limitUpBar3 = createBar(
+      '2026-10-16T09:32:00.000Z',
+      11.0,
+      11.0,
+      11.0,
+      11.0,
+      '600519',
+    );
+    const fills3 = broker.onBar(limitUpBar3);
+    expect(fills3).toHaveLength(0);
+    expect(broker.getOpenOrders()).toHaveLength(0);
   });
 
   it('TC-4: blocks and postpones SELL orders on one-word limit down bars until liquidity opens', () => {
@@ -337,5 +377,69 @@ describe('SimulatedBroker', () => {
     expect(fills[0].fillPrice).toBe(10.02);
     // 佣金 10020 * 0.0002 = 2.004 -> 2.00 (免五)
     expect(fills[0].fees.commission).toBe(2.0);
+  });
+
+  it('TC-8: recognizes ST stock 5% price limits when registered via registerSecurity', () => {
+    // 注册 ST 股票元数据
+    broker.registerSecurity('600000', { name: '*ST某某', preClose: 10.0 });
+
+    // 09:30 报买单
+    const buyOrder = broker.submitOrder({
+      securityId: 2,
+      securityCode: '600000',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T09:30:00.000Z'),
+    });
+    expect(buyOrder.status).toBe('PENDING');
+
+    // 09:31 触及 5% 涨停板（10.50 四价合一），因 ST 限制比例为 5%，应被一字涨停拒单！
+    const stLimitUpBar = createBar(
+      '2026-10-15T09:31:00.000Z',
+      10.5,
+      10.5,
+      10.5,
+      10.5,
+      '600000',
+    );
+    const fills = broker.onBar(stLimitUpBar);
+    expect(fills).toHaveLength(0);
+    expect(broker.getOpenOrders()).toHaveLength(0);
+  });
+
+  it('TC-9: propagates order.exitReason into OrderFilledEvent upon fill execution', () => {
+    // 1. 买入建仓
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T09:30:00.000Z'),
+    });
+    broker.onBar(
+      createBar('2026-10-15T09:31:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+    broker.settleDayClose('2026-10-15');
+
+    // 2. 报出带有 exitReason 的卖单（如硬止损 HARD_STOP_LOSS）
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-16T09:30:00.000Z'),
+      exitReason: 'HARD_STOP_LOSS',
+    });
+
+    // 3. 次日成交
+    const fills = broker.onBar(
+      createBar('2026-10-16T09:31:00.000Z', 9.1, 9.2, 9.0, 9.15, '600519'),
+    );
+    expect(fills).toHaveLength(1);
+    expect(fills[0].side).toBe('SELL');
+    expect(fills[0].exitReason).toBe('HARD_STOP_LOSS');
   });
 });

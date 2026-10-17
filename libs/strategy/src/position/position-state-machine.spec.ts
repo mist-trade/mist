@@ -223,13 +223,19 @@ describe('PositionStateMachine', () => {
     expect(history).toHaveLength(3);
   });
 
-  it('allows injecting external custom exit policy via isomorphic plugin port', () => {
-    // 模拟未来私有仓接入的自定义出场插件
+  it('strictly adheres to pure accountant role: onBar never generates exit orders and returns null', () => {
+    // 模拟外部出场插件
     const mockPrivateExitPolicy: ExitPolicyPort = {
       id: 'plugin.exit.private_custom',
       evaluate: (bar) => {
         if (bar.close >= 13.0) {
           return { action: 'EXIT', reason: 'TAKE_PROFIT' };
+        }
+        return { action: 'HOLD', reason: 'CONTINUE' };
+      },
+      onSignal: (signal) => {
+        if (signal.signalKind === SIGNAL_KINDS.EXIT) {
+          return { action: 'EXIT', reason: 'TAKE_PROFIT_SIGNAL' };
         }
         return { action: 'HOLD', reason: 'CONTINUE' };
       },
@@ -251,16 +257,39 @@ describe('PositionStateMachine', () => {
       ),
     );
 
-    // 价格未到 13.00，保持持仓
+    // 价格未到 13.00，保持持仓，onBar 返回 null
     expect(
       customPsm.onBar(createBar('2026-10-15T10:00:00.000Z', 12.5)),
     ).toBeNull();
-    // 价格达到 13.00，外部插件平仓决策生效
+
+    // 价格即使突破 13.00，onBar 亦纯粹记账（更新 holdingBars 和 currentPrice），绝不下单
     const exitDraft = customPsm.onBar(
       createBar('2026-10-15T10:30:00.000Z', 13.2),
     );
-    expect(exitDraft).not.toBeNull();
-    expect(exitDraft?.side).toBe(ORDER_SIDES.SELL);
+    expect(exitDraft).toBeNull();
+    expect(customPsm.getSnapshot().holdingBars).toBe(2);
+    expect(customPsm.getSnapshot().currentPrice).toBe(13.2);
+
+    // 显式信号到达时，通过 onSignal 正常生成订单
+    const exitSignal: KernelSignal = {
+      definitionId: 1,
+      versionId: 1,
+      signalKind: SIGNAL_KINDS.EXIT,
+      signalTime: new Date('2026-10-15T10:30:00.000Z'),
+      triggerTime: '2026-10-15T10:30:00.000Z',
+      triggerPrice: 13.2,
+      pivotTime: null,
+      pivotPrice: null,
+      signalType: 'take_profit',
+      confidence: 0.9,
+      confidenceLevel: 'HIGH',
+      decisionTrace: {},
+      contextSnapshot: {},
+      ruleSnapshot: {},
+    };
+    const signalOrder = customPsm.onSignal(exitSignal);
+    expect(signalOrder).not.toBeNull();
+    expect(signalOrder?.side).toBe(ORDER_SIDES.SELL);
   });
 
   it('supports custom exitRatio via options and generates partial exit orders', () => {

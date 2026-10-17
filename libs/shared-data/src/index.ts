@@ -1,4 +1,5 @@
 export * from './entities';
+export type { BacktestNavPoint } from './entities/backtest-run.entity';
 export * from './enums/data-source.enum';
 export * from './enums/period.enum';
 export * from './enums/security-status.enum';

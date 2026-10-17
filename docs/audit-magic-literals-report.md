@@ -1,108 +1,108 @@
 # Mist 全仓硬编码数字与字符串（魔法值）审计盘点报告
 
-> 生成时间：2026-10-14T08:14:42.146Z
-> 扫描文件总数：417 个
-> 检出硬编码总量：2020 处（数字 397 处，字符串 1623 处）
+> 生成时间：2026-10-17T14:23:53.789Z
+> 扫描文件总数：455 个
+> 检出硬编码总量：2085 处（数字 428 处，字符串 1657 处）
 
 ## 一、高频魔法数字汇总（Top 30）
 
 | 排名 | 硬编码数值 | 出现频次 | 典型分布位置 | 建议归宿分类 |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | `3` | 37 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:640`, `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:163`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:478` | 领域常量 (*.constants.ts) |
-| 2 | `60` | 20 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101`, `apps/mist/src/visual/visual.controller.ts:94`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:256` | 领域常量 (*.constants.ts) |
-| 3 | `8` | 19 次 | `apps/backtest/src/backtest-admission.service.ts:37`, `apps/backtest/src/backtest-startup.service.ts:47`, `apps/backtest/src/health/health-state.service.ts:11` | 领域常量 (*.constants.ts) |
-| 4 | `5` | 19 次 | `apps/mist/src/collector/post-close-sync.service.ts:274`, `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165`, `apps/schedule/src/data-collection.controller.ts:105` | 领域常量 (*.constants.ts) |
+| 1 | `3` | 38 次 | `apps/backtest/src/backtest-run.executor.ts:418`, `apps/backtest/src/suite/backtest-suite.executor.ts:89`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:640` | 领域常量 (*.constants.ts) |
+| 2 | `5` | 22 次 | `apps/mist/src/collector/post-close-sync.service.ts:275`, `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165`, `apps/schedule/src/data-collection.controller.ts:107` | 领域常量 (*.constants.ts) |
+| 3 | `60` | 20 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101`, `apps/mist/src/sources/services/k-boundary-calculator.ts:54`, `apps/mist/src/sources/services/k-boundary-calculator.ts:165` | 领域常量 (*.constants.ts) |
+| 4 | `8` | 18 次 | `apps/backtest/src/backtest-admission.service.ts:37`, `apps/backtest/src/backtest-startup.service.ts:49`, `apps/backtest/src/health/health-state.service.ts:11` | 领域常量 (*.constants.ts) |
 | 5 | `1000` | 18 次 | `apps/backtest/src/health/health-state.service.ts:173`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:51`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:80` | 环境超时/系统参数 (.env / @app/config) |
-| 6 | `10` | 18 次 | `apps/mist/src/app.module.ts:158`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:133`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:141` | 领域常量 (*.constants.ts) |
-| 7 | `4` | 17 次 | `apps/mist/src/realtime/candle/candle-bucket.util.ts:107`, `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382` | 领域常量 (*.constants.ts) |
-| 8 | `500` | 16 次 | `apps/mist/src/realtime/realtime-redis.service.ts:91`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:166`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:224` | 领域常量 (*.constants.ts) |
-| 9 | `6` | 16 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:377`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `apps/mist/src/sources/tdx/tdx-source.service.ts:210` | 领域常量 (*.constants.ts) |
-| 10 | `5000` | 15 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1027`, `apps/mist/src/realtime/realtime-redis.service.ts:87`, `apps/mist/src/realtime/realtime-redis.service.ts:91` | 环境超时/系统参数 (.env / @app/config) |
-| 11 | `20` | 11 次 | `apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts:19`, `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:402` | 领域常量 (*.constants.ts) |
-| 12 | `200` | 10 次 | `apps/mist/src/collector/post-close-sync.service.ts:129`, `apps/mist/src/collector/post-close-sync.service.ts:198`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:41` | 领域常量 (*.constants.ts) |
-| 13 | `50` | 10 次 | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10`, `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27`, `apps/mist/src/strategy/services/backtest-run-query.service.ts:62` | 领域常量 (*.constants.ts) |
-| 14 | `0.5` | 10 次 | `libs/indicators/src/fibonacci/fibonacci.ts:347`, `libs/indicators/src/fibonacci/fibonacci.ts:355`, `libs/indicators/src/rpp.ts:57` | 算法比例系数 (*.constants.ts) |
-| 15 | `30` | 8 次 | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256`, `apps/signal/src/signal-registry.service.ts:144`, `libs/utils/src/services/k-boundary-calculator.ts:168` | 领域常量 (*.constants.ts) |
-| 16 | `9` | 8 次 | `libs/chancore/src/internal/duan-channel-policy.ts:393`, `libs/chancore/src/internal/duan-channel.ts:112`, `libs/chancore/src/internal/duan-channel.ts:117` | 领域常量 (*.constants.ts) |
-| 17 | `60000` | 7 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1105`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:186`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:303` | 环境超时/系统参数 (.env / @app/config) |
-| 18 | `14` | 6 次 | `apps/mist/src/indicator/indicator.service.ts:79`, `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `libs/indicators/src/adx.ts:22` | 领域常量 (*.constants.ts) |
-| 19 | `3000` | 6 次 | `apps/mist/src/realtime/realtime-redis.service.ts:88`, `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:51`, `apps/notification/src/delivery/alert-delivery-queue.service.ts:39` | 环境超时/系统参数 (.env / @app/config) |
-| 20 | `10000` | 5 次 | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:35`, `apps/mist/src/sources/tdx/tdx-source.service.ts:353`, `libs/decimal/src/decimal8.ts:163` | 环境超时/系统参数 (.env / @app/config) |
-| 21 | `11` | 5 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77` | 领域常量 (*.constants.ts) |
-| 22 | `30000` | 4 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:858`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:859`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:223` | 环境超时/系统参数 (.env / @app/config) |
-| 23 | `12` | 4 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:382`, `libs/indicators/src/macd.ts:41`, `libs/indicators/src/macd.ts:43` | 领域常量 (*.constants.ts) |
-| 24 | `15` | 4 次 | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256`, `apps/signal/src/signal-registry.service.ts:143`, `libs/utils/src/services/k-boundary-calculator.ts:176` | 领域常量 (*.constants.ts) |
-| 25 | `37` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77`, `libs/decimal/src/decimal8.ts:19` | 领域常量 (*.constants.ts) |
-| 26 | `1440` | 4 次 | `tools/strategy-dev/server.ts:311`, `tools/strategy-dev/server.ts:958`, `tools/strategy-dev/server.ts:1023` | 环境超时/系统参数 (.env / @app/config) |
-| 27 | `100000` | 3 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:84`, `tools/strategy-dev/runner.ts:70` | 环境超时/系统参数 (.env / @app/config) |
-| 28 | `-8640000000000000` | 3 次 | `libs/strategy/src/simulation/strategy-simulation.session.ts:55`, `tools/strategy-dev/runner.ts:170`, `tools/strategy-dev/server.ts:437` | 领域常量 (*.constants.ts) |
-| 29 | `400` | 3 次 | `libs/transport/src/http/http-exception.filter.ts:36`, `libs/transport/src/http/http-exception.filter.ts:77`, `libs/transport/src/http/http-openapi.decorator.ts:79` | 领域常量 (*.constants.ts) |
-| 30 | `599` | 3 次 | `libs/transport/src/http/http-exception.filter.ts:77`, `libs/transport/src/http/http-openapi.decorator.ts:79`, `libs/transport/src/http/http-openapi.decorator.ts:183` | 领域常量 (*.constants.ts) |
+| 6 | `10` | 18 次 | `apps/mist/src/app.module.ts:158`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:133`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:145` | 领域常量 (*.constants.ts) |
+| 7 | `4` | 18 次 | `apps/mist/src/realtime/candle/candle-bucket.util.ts:107`, `apps/mist/src/sources/qmt/qmt-source.service.ts:378`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383` | 领域常量 (*.constants.ts) |
+| 8 | `500` | 17 次 | `apps/mist/src/realtime/realtime-redis.service.ts:91`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:169`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:324` | 领域常量 (*.constants.ts) |
+| 9 | `5000` | 16 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1027`, `apps/mist/src/realtime/realtime-redis.service.ts:87`, `apps/mist/src/realtime/realtime-redis.service.ts:91` | 环境超时/系统参数 (.env / @app/config) |
+| 10 | `6` | 16 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:378`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `apps/mist/src/sources/services/k-boundary-calculator.ts:90` | 领域常量 (*.constants.ts) |
+| 11 | `10000` | 15 次 | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:35`, `apps/mist/src/sources/tdx/tdx-source.service.ts:355`, `libs/decimal/src/decimal8.ts:163` | 环境超时/系统参数 (.env / @app/config) |
+| 12 | `20` | 13 次 | `apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts:19`, `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:403` | 领域常量 (*.constants.ts) |
+| 13 | `50` | 10 次 | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10`, `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27`, `apps/mist/src/strategy/services/backtest-run-query.service.ts:89` | 领域常量 (*.constants.ts) |
+| 14 | `200` | 9 次 | `apps/mist/src/collector/post-close-sync.service.ts:131`, `apps/mist/src/collector/post-close-sync.service.ts:199`, `libs/transport/src/http/http-openapi.decorator.ts:37` | 领域常量 (*.constants.ts) |
+| 15 | `12` | 8 次 | `apps/backtest/src/suite/backtest-suite.executor.ts:88`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `libs/strategy/src/wfa/wfa-window-slicer.ts:15` | 领域常量 (*.constants.ts) |
+| 16 | `0.5` | 8 次 | `libs/indicators/src/classic/rpp.ts:57`, `libs/indicators/src/time-series/ts-rank.ts:36`, `libs/indicators/src/time-series/ts-rank.ts:99` | 算法比例系数 (*.constants.ts) |
+| 17 | `30` | 7 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:168`, `apps/signal/src/signal-registry.service.ts:142`, `tools/strategy-dev/runner.ts:75` | 领域常量 (*.constants.ts) |
+| 18 | `15` | 7 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:176`, `apps/signal/src/signal-registry.service.ts:141`, `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:281` | 领域常量 (*.constants.ts) |
+| 19 | `60000` | 6 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1105`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:180`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:285` | 环境超时/系统参数 (.env / @app/config) |
+| 20 | `14` | 5 次 | `apps/mist/src/indicator/indicator.service.ts:79`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `libs/indicators/src/classic/atr.ts:27` | 领域常量 (*.constants.ts) |
+| 21 | `3000` | 5 次 | `apps/mist/src/realtime/realtime-redis.service.ts:88`, `apps/notification/src/delivery/alert-delivery-queue.service.ts:39`, `apps/notification/src/oo-alert/oo-alert-queue.service.ts:32` | 环境超时/系统参数 (.env / @app/config) |
+| 22 | `11` | 5 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:169`, `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472` | 领域常量 (*.constants.ts) |
+| 23 | `37` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77`, `libs/decimal/src/decimal8.ts:19` | 领域常量 (*.constants.ts) |
+| 24 | `100000` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:84`, `libs/strategy/src/wfa/walk-forward.orchestrator.ts:29` | 环境超时/系统参数 (.env / @app/config) |
+| 25 | `0.95` | 4 次 | `libs/indicators/src/risk-performance/risk-performance.ts:452`, `libs/indicators/src/risk-performance/risk-performance.ts:454`, `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:121` | 算法比例系数 (*.constants.ts) |
+| 26 | `1440` | 4 次 | `tools/strategy-dev/server.ts:343`, `tools/strategy-dev/server.ts:1026`, `tools/strategy-dev/server.ts:1091` | 环境超时/系统参数 (.env / @app/config) |
+| 27 | `9` | 3 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:168`, `libs/chancore/src/internal/duan-channel.ts:148`, `libs/indicators/src/classic/kdj.ts:36` | 领域常量 (*.constants.ts) |
+| 28 | `503` | 3 次 | `apps/mist/src/strategy/services/backtest-run-command.service.ts:185`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:340`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:396` | 领域常量 (*.constants.ts) |
+| 29 | `-8640000000000000` | 3 次 | `libs/strategy/src/simulation/strategy-simulation.session.ts:60`, `tools/strategy-dev/runner.ts:171`, `tools/strategy-dev/server.ts:467` | 领域常量 (*.constants.ts) |
+| 30 | `400` | 3 次 | `libs/transport/src/http/http-exception.filter.ts:38`, `libs/transport/src/http/http-exception.filter.ts:79`, `libs/transport/src/http/http-openapi.decorator.ts:79` | 领域常量 (*.constants.ts) |
 
 ## 二、高频魔法字符串汇总（Top 30）
 
 | 排名 | 硬编码字符串 | 出现频次 | 语法语境类别 | 典型分布位置 | 建议归宿分类 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| 1 | `volume` | 26 次 | function-argument | `apps/mist/src/sources/east-money/east-money-source.service.ts:120`, `apps/mist/src/sources/east-money/east-money-source.service.ts:195`, `apps/mist/src/sources/qmt/qmt-source.service.ts:214` | 契约字面量 (*.constants.ts) |
+| 1 | `volume` | 23 次 | function-argument | `apps/mist/src/sources/east-money/east-money-source.service.ts:121`, `apps/mist/src/sources/east-money/east-money-source.service.ts:196`, `apps/mist/src/sources/qmt/qmt-source.service.ts:215` | 契约字面量 (*.constants.ts) |
 | 2 | `qmt` | 21 次 | comparison, function-argument, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:275`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:367`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:856` | 契约字面量 (*.constants.ts) |
 | 3 | `tdx` | 18 次 | function-argument, comparison, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:855`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:870`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:886` | 契约字面量 (*.constants.ts) |
-| 4 | `high` | 16 次 | function-argument | `libs/indicators/src/adx.ts:36`, `libs/indicators/src/adx.ts:41`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
-| 5 | `low` | 16 次 | function-argument | `libs/indicators/src/adx.ts:37`, `libs/indicators/src/adx.ts:42`, `libs/indicators/src/adx.ts:45` | 契约字面量 (*.constants.ts) |
-| 6 | `discarded` | 13 次 | object-property, function-argument, comparison | `apps/mist/src/realtime/candle/candle-finalizer.ts:277`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:926`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:929` | 契约字面量 (*.constants.ts) |
-| 7 | `amount` | 13 次 | function-argument, comparison | `apps/mist/src/sources/east-money/east-money-source.service.ts:124`, `apps/mist/src/sources/east-money/east-money-source.service.ts:197`, `apps/mist/src/sources/qmt/qmt-source.service.ts:233` | 契约字面量 (*.constants.ts) |
-| 8 | `unavailable` | 12 次 | comparison, object-property | `apps/backtest/src/health/health-state.service.ts:64`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:202`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:230` | 契约字面量 (*.constants.ts) |
-| 9 | `completed` | 12 次 | object-property, function-argument | `apps/backtest/src/observability/metrics.ts:76`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:142`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:193` | 契约字面量 (*.constants.ts) |
+| 4 | `high` | 16 次 | function-argument | `libs/indicators/src/classic/adx.ts:38`, `libs/indicators/src/classic/adx.ts:43`, `libs/indicators/src/classic/adx.ts:47` | 契约字面量 (*.constants.ts) |
+| 5 | `low` | 16 次 | function-argument | `libs/indicators/src/classic/adx.ts:39`, `libs/indicators/src/classic/adx.ts:44`, `libs/indicators/src/classic/adx.ts:47` | 契约字面量 (*.constants.ts) |
+| 6 | `discarded` | 13 次 | object-property, function-argument, comparison | `apps/mist/src/realtime/candle/candle-finalizer.ts:271`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:890`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:893` | 契约字面量 (*.constants.ts) |
+| 7 | `amount` | 13 次 | function-argument, comparison | `apps/mist/src/sources/east-money/east-money-source.service.ts:125`, `apps/mist/src/sources/east-money/east-money-source.service.ts:198`, `apps/mist/src/sources/qmt/qmt-source.service.ts:234` | 契约字面量 (*.constants.ts) |
+| 8 | `unavailable` | 12 次 | comparison, object-property | `apps/backtest/src/health/health-state.service.ts:64`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:365`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:393` | 契约字面量 (*.constants.ts) |
+| 9 | `completed` | 12 次 | object-property, function-argument | `apps/backtest/src/observability/metrics.ts:76`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:147`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:198` | 契约字面量 (*.constants.ts) |
 | 10 | `failure` | 12 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:100`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:745`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:748` | 契约字面量 (*.constants.ts) |
-| 11 | `off` | 11 次 | comparison | `apps/mist/src/app.module.ts:93`, `apps/mist/src/app.module.ts:107`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:209` | 契约字面量 (*.constants.ts) |
-| 12 | `sealed` | 10 次 | function-argument, object-property, comparison | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:919`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:920`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:996` | 契约字面量 (*.constants.ts) |
-| 13 | `BUY` | 9 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:324`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:63`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:74` | 业务状态枚举 (Enums / *.constants.ts) |
-| 14 | `queue_full` | 8 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:125`, `apps/backtest/src/backtest-admission.service.ts:145`, `apps/backtest/src/backtest-startup.service.ts:77` | 契约字面量 (*.constants.ts) |
+| 11 | `off` | 11 次 | comparison | `apps/mist/src/app.module.ts:93`, `apps/mist/src/app.module.ts:107`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:204` | 契约字面量 (*.constants.ts) |
+| 12 | `sealed` | 10 次 | function-argument, object-property, comparison | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:883`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:884`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:960` | 契约字面量 (*.constants.ts) |
+| 13 | `queue_full` | 9 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:125`, `apps/backtest/src/backtest-admission.service.ts:145`, `apps/backtest/src/backtest-startup.service.ts:79` | 契约字面量 (*.constants.ts) |
+| 14 | `up` | 9 次 | comparison | `libs/indicators/src/fibonacci/fibonacci.ts:261`, `libs/indicators/src/fibonacci/fibonacci.ts:278`, `libs/indicators/src/fibonacci/fibonacci.ts:343` | 契约字面量 (*.constants.ts) |
 | 15 | `0.1.0` | 8 次 | function-argument | `apps/backtest/src/observability/metrics.ts:16`, `apps/mist/src/realtime/observability/candle-metrics.ts:26`, `apps/mist/src/realtime/observability/startup-compensation-metrics.ts:18` | 协议键/事件名 (*.constants.ts) |
 | 16 | `success` | 8 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:98`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:695`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:755` | 契约字面量 (*.constants.ts) |
 | 17 | `chan` | 8 次 | object-property, function-argument | `apps/chan/src/health/health.controller.ts:19`, `apps/chan/src/health/health.controller.ts:20`, `apps/mist/src/main.ts:47` | 契约字面量 (*.constants.ts) |
-| 18 | `, ` | 8 次 | function-argument | `apps/mist/src/collector/collector.controller.ts:50`, `apps/mist/src/sources/k-save.helper.ts:47`, `apps/schedule/src/pre-market-inspection.service.ts:272` | 契约字面量 (*.constants.ts) |
-| 19 | `1m` | 8 次 | comparison, object-property | `apps/mist/src/collector/post-close-sync.service.ts:137`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:994`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:1010` | 契约字面量 (*.constants.ts) |
-| 20 | `text` | 8 次 | object-property | `apps/notification/src/channels/feishu.channel-adapter.ts:67`, `apps/notification/src/channels/qq.channel-adapter.ts:58`, `apps/notification/src/channels/wechat.channel-adapter.ts:52` | 契约字面量 (*.constants.ts) |
-| 21 | `TERMINAL` | 8 次 | switch-case, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:283`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:291`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:51` | 业务状态枚举 (Enums / *.constants.ts) |
-| 22 | `NEUTRAL` | 8 次 | object-property | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:77`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:87`, `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:115` | 业务状态枚举 (Enums / *.constants.ts) |
-| 23 | `ok` | 7 次 | object-property, comparison | `apps/backtest/src/health/health-state.service.ts:105`, `apps/chan/src/health/health.controller.ts:18`, `apps/mist/src/health/health.controller.ts:43` | 契约字面量 (*.constants.ts) |
-| 24 | `failed` | 7 次 | object-property, function-argument, comparison | `apps/backtest/src/observability/metrics.ts:77`, `apps/mist/src/collector/post-close-sync.service.ts:441`, `apps/notification/src/observability/oo-alert-metrics.ts:32` | 契约字面量 (*.constants.ts) |
-| 25 | `reset` | 7 次 | function-argument, comparison | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:166`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:215`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:220` | 契约字面量 (*.constants.ts) |
-| 26 | `not_ready` | 6 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:93`, `apps/backtest/src/backtest-admission.service.ts:97`, `apps/backtest/src/health/health-state.service.ts:57` | 契约字面量 (*.constants.ts) |
-| 27 | `run_failed` | 6 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:108`, `apps/backtest/src/backtest-admission.service.ts:112`, `apps/backtest/src/health/health-state.service.ts:58` | 契约字面量 (*.constants.ts) |
-| 28 | `builtin` | 6 次 | comparison | `apps/mist/src/app.module.ts:90`, `apps/mist/src/app.module.ts:104`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:296` | 契约字面量 (*.constants.ts) |
-| 29 | `QMT_BASE_URL` | 6 次 | function-argument | `apps/mist/src/collector/history-download.client.ts:47`, `apps/mist/src/sources/qmt/qmt-source.service.ts:72`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:85` | 业务状态枚举 (Enums / *.constants.ts) |
-| 30 | `TDX_BASE_URL` | 6 次 | function-argument | `apps/mist/src/collector/history-download.client.ts:49`, `apps/mist/src/sources/tdx/realtime/realtime.client.ts:93`, `apps/mist/src/sources/tdx/tdx-source.service.ts:72` | 业务状态枚举 (Enums / *.constants.ts) |
+| 18 | `, ` | 8 次 | function-argument | `apps/mist/src/collector/collector.controller.ts:50`, `apps/mist/src/sources/k-save.helper.ts:47`, `apps/mist/src/sources/services/data-source.service.ts:68` | 契约字面量 (*.constants.ts) |
+| 19 | `1m` | 8 次 | comparison, object-property | `apps/mist/src/collector/post-close-sync.service.ts:139`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:958`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:974` | 契约字面量 (*.constants.ts) |
+| 20 | `text` | 8 次 | object-property | `apps/notification/src/channels/feishu.channel-adapter.ts:69`, `apps/notification/src/channels/qq.channel-adapter.ts:60`, `apps/notification/src/channels/wechat.channel-adapter.ts:54` | 契约字面量 (*.constants.ts) |
+| 21 | `tr` | 8 次 | function-argument | `libs/indicators/src/classic/adx.ts:67`, `libs/indicators/src/classic/adx.ts:72`, `libs/indicators/src/classic/adx.ts:89` | 契约字面量 (*.constants.ts) |
+| 22 | `TERMINAL` | 8 次 | switch-case, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:283`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:291`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:51` | 业务状态枚举 (Enums / *.constants.ts) |
+| 23 | `BUY` | 8 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:324`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:63`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:74` | 业务状态枚举 (Enums / *.constants.ts) |
+| 24 | `run_failed` | 7 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:108`, `apps/backtest/src/backtest-admission.service.ts:112`, `apps/backtest/src/health/health-state.service.ts:58` | 契约字面量 (*.constants.ts) |
+| 25 | `ok` | 7 次 | object-property, comparison | `apps/backtest/src/health/health-state.service.ts:105`, `apps/chan/src/health/health.controller.ts:18`, `apps/mist/src/health/health.controller.ts:43` | 契约字面量 (*.constants.ts) |
+| 26 | `failed` | 7 次 | object-property, function-argument, comparison | `apps/backtest/src/observability/metrics.ts:77`, `apps/mist/src/collector/post-close-sync.service.ts:441`, `apps/notification/src/observability/oo-alert-metrics.ts:32` | 契约字面量 (*.constants.ts) |
+| 27 | `reset` | 7 次 | function-argument, comparison | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:171`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:220`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:225` | 契约字面量 (*.constants.ts) |
+| 28 | `not_ready` | 6 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:93`, `apps/backtest/src/backtest-admission.service.ts:97`, `apps/backtest/src/health/health-state.service.ts:57` | 契约字面量 (*.constants.ts) |
+| 29 | `builtin` | 6 次 | comparison | `apps/mist/src/app.module.ts:90`, `apps/mist/src/app.module.ts:104`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:297` | 契约字面量 (*.constants.ts) |
+| 30 | `QMT_BASE_URL` | 6 次 | function-argument | `apps/mist/src/collector/history-download.client.ts:47`, `apps/mist/src/sources/qmt/qmt-source.service.ts:73`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:88` | 业务状态枚举 (Enums / *.constants.ts) |
 
 ## 三、硬编码重灾区文件列表（Top 20）
 
 | 排名 | 文件路径 | 硬编码总数 |
 | :--- | :--- | :--- |
 | 1 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts` | 119 处 |
-| 2 | `tools/strategy-dev/server.ts` | 88 处 |
-| 3 | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts` | 70 处 |
+| 2 | `tools/strategy-dev/server.ts` | 90 处 |
+| 3 | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts` | 69 处 |
 | 4 | `apps/schedule/src/pre-market-inspection.service.ts` | 63 处 |
-| 5 | `apps/mist/src/sources/qmt/realtime/realtime.client.ts` | 55 处 |
-| 6 | `apps/mist/src/sources/tdx/realtime/realtime.client.ts` | 55 处 |
-| 7 | `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts` | 38 处 |
-| 8 | `libs/indicators/src/fibonacci/fibonacci.ts` | 36 处 |
-| 9 | `apps/backtest/src/observability/metrics.ts` | 31 处 |
-| 10 | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts` | 31 处 |
-| 11 | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts` | 31 处 |
-| 12 | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle-observation.store.ts` | 30 处 |
-| 13 | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts` | 30 处 |
-| 14 | `libs/chancore/src/internal/bi.ts` | 29 处 |
-| 15 | `apps/mist/src/sources/qmt/qmt-source.service.ts` | 27 处 |
-| 16 | `libs/indicators/src/adx.ts` | 25 处 |
-| 17 | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts` | 24 处 |
-| 18 | `libs/strategy/src/evaluation/strategy-context.builder.ts` | 24 处 |
-| 19 | `libs/utils/src/services/k-boundary-calculator.ts` | 24 处 |
-| 20 | `apps/notification/src/observability/delivery-metrics.ts` | 23 处 |
+| 5 | `apps/mist/src/sources/tdx/realtime/realtime.client.ts` | 55 处 |
+| 6 | `apps/mist/src/sources/qmt/realtime/realtime.client.ts` | 54 处 |
+| 7 | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts` | 50 处 |
+| 8 | `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts` | 38 处 |
+| 9 | `apps/mist/src/strategy/services/backtest-run-command.service.ts` | 35 处 |
+| 10 | `apps/backtest/src/observability/metrics.ts` | 31 处 |
+| 11 | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts` | 31 处 |
+| 12 | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts` | 31 处 |
+| 13 | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle-observation.store.ts` | 30 处 |
+| 14 | `libs/indicators/src/fibonacci/fibonacci.ts` | 30 处 |
+| 15 | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts` | 30 处 |
+| 16 | `libs/chancore/src/internal/bi.ts` | 28 处 |
+| 17 | `apps/mist/src/sources/qmt/qmt-source.service.ts` | 27 处 |
+| 18 | `libs/indicators/src/classic/adx.ts` | 26 处 |
+| 19 | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts` | 24 处 |
+| 20 | `apps/mist/src/sources/services/k-boundary-calculator.ts` | 24 处 |
 
 ## 四、完整明细清单
 
 <details>
-<summary>展开查看全部 2020 处详细命中文档</summary>
+<summary>展开查看全部 2085 处详细命中文档</summary>
 
 | 类型 | 数值/字符串 | 文件位置 | 上下文代码片段 |
 | :--- | :--- | :--- | :--- |
@@ -118,33 +118,36 @@
 | string | `queue_full` | `apps/backtest/src/backtest-admission.service.ts:125:33` | `this.health.recordCommand('queue_full')` |
 | string | `accepted` | `apps/backtest/src/backtest-admission.service.ts:131:31` | `this.health.recordCommand('accepted')` |
 | string | `queue_full` | `apps/backtest/src/backtest-admission.service.ts:145:41` | `code: 'queue_full'` |
-| string | `k` | `apps/backtest/src/backtest-market-data.adapter.ts:49:27` | `this.repository .createQueryBuilder('k')` |
-| string | `k.securityId` | `apps/backtest/src/backtest-market-data.adapter.ts:61:18` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.securityId = :securityId` | `apps/backtest/src/backtest-market-data.adapter.ts:62:14` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.source = :source` | `apps/backtest/src/backtest-market-data.adapter.ts:65:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.period = :period` | `apps/backtest/src/backtest-market-data.adapter.ts:66:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.timestamp >= :startAt` | `apps/backtest/src/backtest-market-data.adapter.ts:67:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.timestamp <= :endAt` | `apps/backtest/src/backtest-market-data.adapter.ts:68:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.timestamp > :afterTimestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:71:22` | `query.andWhere('k.timestamp > :afterTimestamp', { afterTimestamp: criteria.afterTimestamp, })` |
-| string | `k.timestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:76:19` | `query.orderBy('k.timestamp', 'ASC')` |
-| string | `BACKTEST_DATABASE_ERROR` | `apps/backtest/src/backtest-run.executor.ts:93:35` | `this.health.recordRunFailed('BACKTEST_DATABASE_ERROR', 0)` |
-| string | `BACKTEST_RUN_TIMEOUT_MS` | `apps/backtest/src/backtest-run.executor.ts:162:31` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS')` |
-| number | `1800000` | `apps/backtest/src/backtest-run.executor.ts:162:61` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS') ?? 1_800_000` |
-| string | `BACKTEST_MAX_BARS_PER_RUN` | `apps/backtest/src/backtest-run.executor.ts:164:31` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN')` |
-| number | `10000000` | `apps/backtest/src/backtest-run.executor.ts:164:63` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN') ?? 10_000_000` |
-| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:190:49` | `code: 'SECURITY_NOT_FOUND'` |
-| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:191:39` | `this.health.recordTargetIssue('SECURITY_NOT_FOUND')` |
-| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:229:49` | `code: 'NO_HISTORICAL_BARS'` |
-| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:230:39` | `this.health.recordTargetIssue('NO_HISTORICAL_BARS')` |
-| string | `BACKTEST_INTERRUPTED` | `apps/backtest/src/backtest-startup.service.ts:38:27` | `errorMessage: 'BACKTEST_INTERRUPTED'` |
-| string | `BACKTEST_CONCURRENCY` | `apps/backtest/src/backtest-startup.service.ts:46:49` | `this.config.get<number>('BACKTEST_CONCURRENCY')` |
-| string | `BACKTEST_QUEUE_CAPACITY` | `apps/backtest/src/backtest-startup.service.ts:47:46` | `this.config.get<number>('BACKTEST_QUEUE_CAPACITY')` |
-| number | `8` | `apps/backtest/src/backtest-startup.service.ts:47:76` | `this.config.get<number>('BACKTEST_QUEUE_CAPACITY') ?? 8` |
-| string | `BACKTEST_STARTUP_QUEUE_FULL` | `apps/backtest/src/backtest-startup.service.ts:66:23` | `errorMessage: 'BACKTEST_STARTUP_QUEUE_FULL'` |
-| string | `status = :pendingStatus` | `apps/backtest/src/backtest-startup.service.ts:68:14` | `this.runs .createQueryBuilder() .update(BacktestRun) .set({ status: BacktestRunStatus.FAILED, comple` |
-| string | `created_at <= :cutoff` | `apps/backtest/src/backtest-startup.service.ts:71:17` | `this.runs .createQueryBuilder() .update(BacktestRun) .set({ status: BacktestRunStatus.FAILED, comple` |
-| string | `id NOT IN (:...admittedIds)` | `apps/backtest/src/backtest-startup.service.ts:73:25` | `overflow.andWhere('id NOT IN (:...admittedIds)', { admittedIds })` |
-| string | `queue_full` | `apps/backtest/src/backtest-startup.service.ts:77:40` | `this.health.recordStartupFailure('queue_full', overflowResult.affected)` |
+| string | `k` | `apps/backtest/src/backtest-market-data.adapter.ts:50:27` | `this.repository .createQueryBuilder('k')` |
+| string | `k.securityId` | `apps/backtest/src/backtest-market-data.adapter.ts:62:18` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.securityId = :securityId` | `apps/backtest/src/backtest-market-data.adapter.ts:63:14` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.source = :source` | `apps/backtest/src/backtest-market-data.adapter.ts:66:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.period = :period` | `apps/backtest/src/backtest-market-data.adapter.ts:67:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.timestamp >= :startAt` | `apps/backtest/src/backtest-market-data.adapter.ts:68:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.timestamp <= :endAt` | `apps/backtest/src/backtest-market-data.adapter.ts:69:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.timestamp > :afterTimestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:72:22` | `query.andWhere('k.timestamp > :afterTimestamp', { afterTimestamp: criteria.afterTimestamp, })` |
+| string | `k.timestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:77:19` | `query.orderBy('k.timestamp', 'ASC')` |
+| string | `BACKTEST_DATABASE_ERROR` | `apps/backtest/src/backtest-run.executor.ts:120:35` | `this.health.recordRunFailed('BACKTEST_DATABASE_ERROR', 0)` |
+| string | `BACKTEST_RUN_TIMEOUT_MS` | `apps/backtest/src/backtest-run.executor.ts:216:31` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS')` |
+| number | `1800000` | `apps/backtest/src/backtest-run.executor.ts:216:61` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS') ?? 1_800_000` |
+| string | `BACKTEST_MAX_BARS_PER_RUN` | `apps/backtest/src/backtest-run.executor.ts:218:31` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN')` |
+| number | `10000000` | `apps/backtest/src/backtest-run.executor.ts:218:63` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN') ?? 10_000_000` |
+| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:244:49` | `code: 'SECURITY_NOT_FOUND'` |
+| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:245:39` | `this.health.recordTargetIssue('SECURITY_NOT_FOUND')` |
+| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:290:49` | `code: 'NO_HISTORICAL_BARS'` |
+| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:291:39` | `this.health.recordTargetIssue('NO_HISTORICAL_BARS')` |
+| number | `-0.08` | `apps/backtest/src/backtest-run.executor.ts:417:26` | `hardStopLossRatio: -0.08` |
+| number | `3` | `apps/backtest/src/backtest-run.executor.ts:418:28` | `defaultCooldownBars: 3` |
+| number | `0.995` | `apps/backtest/src/backtest-run.executor.ts:419:28` | `cashAllocationRatio: 0.995` |
+| string | `BACKTEST_INTERRUPTED` | `apps/backtest/src/backtest-startup.service.ts:39:27` | `errorMessage: 'BACKTEST_INTERRUPTED'` |
+| string | `BACKTEST_CONCURRENCY` | `apps/backtest/src/backtest-startup.service.ts:48:49` | `this.config.get<number>('BACKTEST_CONCURRENCY')` |
+| string | `BACKTEST_QUEUE_CAPACITY` | `apps/backtest/src/backtest-startup.service.ts:49:46` | `this.config.get<number>('BACKTEST_QUEUE_CAPACITY')` |
+| number | `8` | `apps/backtest/src/backtest-startup.service.ts:49:76` | `this.config.get<number>('BACKTEST_QUEUE_CAPACITY') ?? 8` |
+| string | `BACKTEST_STARTUP_QUEUE_FULL` | `apps/backtest/src/backtest-startup.service.ts:68:23` | `errorMessage: 'BACKTEST_STARTUP_QUEUE_FULL'` |
+| string | `status = :pendingStatus` | `apps/backtest/src/backtest-startup.service.ts:70:14` | `this.runs .createQueryBuilder() .update(BacktestRun) .set({ status: BacktestRunStatus.FAILED, comple` |
+| string | `created_at <= :cutoff` | `apps/backtest/src/backtest-startup.service.ts:73:17` | `this.runs .createQueryBuilder() .update(BacktestRun) .set({ status: BacktestRunStatus.FAILED, comple` |
+| string | `id NOT IN (:...admittedIds)` | `apps/backtest/src/backtest-startup.service.ts:75:25` | `overflow.andWhere('id NOT IN (:...admittedIds)', { admittedIds })` |
+| string | `queue_full` | `apps/backtest/src/backtest-startup.service.ts:79:40` | `this.health.recordStartupFailure('queue_full', overflowResult.affected)` |
 | number | `8` | `apps/backtest/src/health/health-state.service.ts:11:27` | `private queueCapacity = 8;` |
 | string | `accepted` | `apps/backtest/src/health/health-state.service.ts:55:21` | `outcome === 'accepted'` |
 | string | `queue_full` | `apps/backtest/src/health/health-state.service.ts:56:21` | `outcome === 'queue_full'` |
@@ -193,6 +196,16 @@
 | string | `Backtest run failures by reason class` | `apps/backtest/src/observability/metrics.ts:106:22` | `description: 'Backtest run failures by reason class'` |
 | string | `mist_backtest_target_issue_total` | `apps/backtest/src/observability/metrics.ts:117:30` | `meter .createObservableGauge('mist_backtest_target_issue_total', { description: 'Backtest target iss` |
 | string | `Backtest target issues by code` | `apps/backtest/src/observability/metrics.ts:118:22` | `description: 'Backtest target issues by code'` |
+| string | `WFA` | `apps/backtest/src/suite/backtest-suite.executor.ts:51:31` | `run.scenarioId === 'WFA'` |
+| string | `STRESS_SUITE` | `apps/backtest/src/suite/backtest-suite.executor.ts:51:59` | `run.scenarioId === 'STRESS_SUITE'` |
+| string | `WFA` | `apps/backtest/src/suite/backtest-suite.executor.ts:61:34` | `masterRun.scenarioId === 'WFA'` |
+| string | `STRESS_SUITE` | `apps/backtest/src/suite/backtest-suite.executor.ts:63:41` | `masterRun.scenarioId === 'STRESS_SUITE'` |
+| string | `anchored` | `apps/backtest/src/suite/backtest-suite.executor.ts:87:35` | `wfaContext.windowType === 'anchored'` |
+| number | `12` | `apps/backtest/src/suite/backtest-suite.executor.ts:88:69` | `wfaContext.trainDurationMonths ?? 12` |
+| number | `3` | `apps/backtest/src/suite/backtest-suite.executor.ts:89:67` | `wfaContext.testDurationMonths ?? 3` |
+| string | `TRAIN` | `apps/backtest/src/suite/backtest-suite.executor.ts:128:22` | `stage: 'TRAIN'` |
+| string | `TEST` | `apps/backtest/src/suite/backtest-suite.executor.ts:152:22` | `stage: 'TEST'` |
+| string | `STRESS` | `apps/backtest/src/suite/backtest-suite.executor.ts:283:22` | `stage: 'STRESS'` |
 | string | `ok` | `apps/chan/src/health/health.controller.ts:18:15` | `status: 'ok'` |
 | string | `chan` | `apps/chan/src/health/health.controller.ts:19:16` | `service: 'chan'` |
 | string | `chan` | `apps/chan/src/health/health.controller.ts:20:17` | `instance: 'chan'` |
@@ -216,7 +229,6 @@
 | string | `sha256_password` | `apps/mist/src/app.module.ts:161:30` | `authPlugins: 'sha256_password'` |
 | string | `, ` | `apps/mist/src/collector/collector.controller.ts:50:17` | `enabledSources .map((c) => c.source) .join(', ')` |
 | number | `10` | `apps/mist/src/collector/helpers/data-freshness.validator.ts:133:40` | `String(bar.date).slice(0, 10)` |
-| number | `10` | `apps/mist/src/collector/helpers/data-freshness.validator.ts:141:38` | `d.toISOString().slice(0, 10)` |
 | number | `10` | `apps/mist/src/collector/helpers/data-freshness.validator.ts:145:40` | `String(bar.time).slice(0, 10)` |
 | string | `QMT_BASE_URL` | `apps/mist/src/collector/history-download.client.ts:47:33` | `configService.get<string>('QMT_BASE_URL')` |
 | string | `TDX_BASE_URL` | `apps/mist/src/collector/history-download.client.ts:49:33` | `configService.get<string>('TDX_BASE_URL')` |
@@ -237,17 +249,17 @@
 | string | `Seconds elapsed since last successful post-close synchronization run` | `apps/mist/src/collector/observability/post-close-sync-metrics.ts:41:11` | `description: 'Seconds elapsed since last successful post-close synchronization run'` |
 | number | `1000` | `apps/mist/src/collector/observability/post-close-sync-metrics.ts:51:50` | `(now - lastSuccessTime) / 1000` |
 | number | `1000` | `apps/mist/src/collector/observability/post-close-sync-metrics.ts:80:49` | `durationMs / 1000` |
-| number | `200` | `apps/mist/src/collector/post-close-sync.service.ts:129:40` | `message.slice(0, 200)` |
-| string | `1m` | `apps/mist/src/collector/post-close-sync.service.ts:137:24` | `base === '1m'` |
-| string | `5m` | `apps/mist/src/collector/post-close-sync.service.ts:139:28` | `base === '5m'` |
-| number | `200` | `apps/mist/src/collector/post-close-sync.service.ts:198:42` | `message.slice(0, 200)` |
-| string | `all_done` | `apps/mist/src/collector/post-close-sync.service.ts:226:23` | `outcome === 'all_done'` |
-| number | `5` | `apps/mist/src/collector/post-close-sync.service.ts:274:71` | `criteria.concurrencyLimit ?? 5` |
-| string | `fulfilled` | `apps/mist/src/collector/post-close-sync.service.ts:296:28` | `res.status === 'fulfilled'` |
-| string | `UNKNOWN` | `apps/mist/src/collector/post-close-sync.service.ts:300:27` | `securityCode: 'UNKNOWN'` |
-| string | `suspended` | `apps/mist/src/collector/post-close-sync.service.ts:392:39` | `this.syncMetrics.recordTask('suspended', source, period)` |
-| string | `not_ready` | `apps/mist/src/collector/post-close-sync.service.ts:411:37` | `this.syncMetrics.recordTask('not_ready', source, period)` |
-| string | `succeeded` | `apps/mist/src/collector/post-close-sync.service.ts:427:35` | `this.syncMetrics.recordTask('succeeded', source, period)` |
+| number | `200` | `apps/mist/src/collector/post-close-sync.service.ts:131:40` | `message.slice(0, 200)` |
+| string | `1m` | `apps/mist/src/collector/post-close-sync.service.ts:139:24` | `base === '1m'` |
+| string | `5m` | `apps/mist/src/collector/post-close-sync.service.ts:141:28` | `base === '5m'` |
+| number | `200` | `apps/mist/src/collector/post-close-sync.service.ts:199:42` | `message.slice(0, 200)` |
+| string | `all_done` | `apps/mist/src/collector/post-close-sync.service.ts:227:23` | `outcome === 'all_done'` |
+| number | `5` | `apps/mist/src/collector/post-close-sync.service.ts:275:71` | `criteria.concurrencyLimit ?? 5` |
+| string | `fulfilled` | `apps/mist/src/collector/post-close-sync.service.ts:297:28` | `res.status === 'fulfilled'` |
+| string | `UNKNOWN` | `apps/mist/src/collector/post-close-sync.service.ts:301:27` | `securityCode: 'UNKNOWN'` |
+| string | `suspended` | `apps/mist/src/collector/post-close-sync.service.ts:393:39` | `this.syncMetrics.recordTask('suspended', source, period)` |
+| string | `not_ready` | `apps/mist/src/collector/post-close-sync.service.ts:412:37` | `this.syncMetrics.recordTask('not_ready', source, period)` |
+| string | `succeeded` | `apps/mist/src/collector/post-close-sync.service.ts:428:35` | `this.syncMetrics.recordTask('succeeded', source, period)` |
 | string | `failed` | `apps/mist/src/collector/post-close-sync.service.ts:441:35` | `this.syncMetrics.recordTask('failed', source, period)` |
 | string | `fulfilled` | `apps/mist/src/collector/strategies/east-money-collection.strategy.ts:119:58` | `r.status === 'fulfilled'` |
 | string | `rejected` | `apps/mist/src/collector/strategies/east-money-collection.strategy.ts:120:55` | `r.status === 'rejected'` |
@@ -309,16 +321,16 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `valid` | `apps/mist/src/realtime/candle/candle-finalizer.ts:110:31` | `candle.validity === 'valid'` |
 | string | `sealed candle record` | `apps/mist/src/realtime/candle/candle-finalizer.ts:117:11` | `assertRealtimeRedisBytes( 'sealed candle record', compactRecord, REALTIME_REDIS_RECORD_LIMITS.sealed` |
 | string | `candle manifest record` | `apps/mist/src/realtime/candle/candle-finalizer.ts:127:9` | `assertRealtimeRedisBytes( 'candle manifest record', JSON.stringify(manifest), REALTIME_REDIS_RECORD_` |
-| number | `1000` | `apps/mist/src/realtime/candle/candle-finalizer.ts:142:28` | `nowMs / 1_000` |
-| string | `valid` | `apps/mist/src/realtime/candle/candle-finalizer.ts:152:29` | `candle.validity === 'valid'` |
-| string | `valid` | `apps/mist/src/realtime/candle/candle-finalizer.ts:159:36` | `candle.validity === 'valid'` |
-| string | `closingCumulativeVolume` | `apps/mist/src/realtime/candle/candle-finalizer.ts:169:23` | `multi.hdel(wmK, 'closingCumulativeVolume')` |
-| string | `closingCumulativeAmount` | `apps/mist/src/realtime/candle/candle-finalizer.ts:172:23` | `multi.hdel(wmK, 'closingCumulativeAmount')` |
-| string | `valid` | `apps/mist/src/realtime/candle/candle-finalizer.ts:198:31` | `candle.validity === 'valid'` |
-| string | `candle manifest record` | `apps/mist/src/realtime/candle/candle-finalizer.ts:255:9` | `assertRealtimeRedisBytes( 'candle manifest record', JSON.stringify(manifest), REALTIME_REDIS_RECORD_` |
-| number | `1000` | `apps/mist/src/realtime/candle/candle-finalizer.ts:269:28` | `nowMs / 1_000` |
-| string | `discarded` | `apps/mist/src/realtime/candle/candle-finalizer.ts:277:16` | `outcome: 'discarded'` |
-| string | `provisional` | `apps/mist/src/realtime/candle/candle-finalizer.ts:344:10` | `q: 'provisional'` |
+| number | `1000` | `apps/mist/src/realtime/candle/candle-finalizer.ts:140:28` | `nowMs / 1_000` |
+| string | `valid` | `apps/mist/src/realtime/candle/candle-finalizer.ts:150:29` | `candle.validity === 'valid'` |
+| string | `valid` | `apps/mist/src/realtime/candle/candle-finalizer.ts:157:36` | `candle.validity === 'valid'` |
+| string | `closingCumulativeVolume` | `apps/mist/src/realtime/candle/candle-finalizer.ts:167:23` | `multi.hdel(wmK, 'closingCumulativeVolume')` |
+| string | `closingCumulativeAmount` | `apps/mist/src/realtime/candle/candle-finalizer.ts:170:23` | `multi.hdel(wmK, 'closingCumulativeAmount')` |
+| string | `valid` | `apps/mist/src/realtime/candle/candle-finalizer.ts:196:31` | `candle.validity === 'valid'` |
+| string | `candle manifest record` | `apps/mist/src/realtime/candle/candle-finalizer.ts:251:9` | `assertRealtimeRedisBytes( 'candle manifest record', JSON.stringify(manifest), REALTIME_REDIS_RECORD_` |
+| number | `1000` | `apps/mist/src/realtime/candle/candle-finalizer.ts:263:28` | `nowMs / 1_000` |
+| string | `discarded` | `apps/mist/src/realtime/candle/candle-finalizer.ts:271:16` | `outcome: 'discarded'` |
+| string | `provisional` | `apps/mist/src/realtime/candle/candle-finalizer.ts:335:10` | `q: 'provisional'` |
 | string | `no_event_time` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:111:61` | `this.recordSkip(snapshot.source, snapshot.securityId, 'no_event_time')` |
 | string | `no_event_time` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:112:53` | `reason: 'no_event_time'` |
 | string | `out_of_session` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:117:61` | `this.recordSkip(snapshot.source, snapshot.securityId, 'out_of_session')` |
@@ -336,76 +348,75 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `current` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:531:33` | `position: 'current'` |
 | string | `prior` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:534:33` | `position: 'prior'` |
 | string | `provisional` | `apps/mist/src/realtime/candle/open-candle-aggregator.ts:664:14` | `quality: 'provisional'` |
-| string | `off` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:209:40` | `this.mode === 'off'` |
-| string | `off` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:212:25` | `this.mode === 'off'` |
-| string | `ingest_gated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:215:39` | `trace.getActiveSpan()?.addEvent('ingest_gated', { reason })` |
-| string | `ingestGated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:216:43` | `trace.getActiveSpan()?.setAttribute('ingestGated', reason)` |
-| string | `queue_overflow` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:232:39` | `trace.getActiveSpan()?.addEvent('queue_overflow', { securityId: snapshot.securityId, })` |
-| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:235:43` | `trace.getActiveSpan()?.setAttribute('skippedReason', 'queue_overflow')` |
-| string | `queue_overflow` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:235:60` | `trace.getActiveSpan()?.setAttribute('skippedReason', 'queue_overflow')` |
-| string | `queue_overflow` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:245:9` | `this.aggregator.markInvalid( snapshot.securityId, snapshot.source, 'queue_overflow', bucket?.bucketS` |
-| string | `redis_client_unavailable` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:259:39` | `trace.getActiveSpan()?.addEvent('redis_client_unavailable', { securityId: snapshot.securityId, })` |
-| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:264:24` | `trace .getActiveSpan() ?.setAttribute('skippedReason', 'redis_client_unavailable')` |
-| string | `redis_client_unavailable` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:264:41` | `trace .getActiveSpan() ?.setAttribute('skippedReason', 'redis_client_unavailable')` |
-| string | `startup_boundary_skip` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:279:39` | `trace.getActiveSpan()?.addEvent('startup_boundary_skip', { securityId: snapshot.securityId, bucketSt` |
-| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:285:24` | `trace .getActiveSpan() ?.setAttribute('skippedReason', 'startup_boundary_skip')` |
-| string | `startup_boundary_skip` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:285:41` | `trace .getActiveSpan() ?.setAttribute('skippedReason', 'startup_boundary_skip')` |
-| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:288:24` | `trace .getActiveSpan() ?.setAttribute('bucketStartMs', snapshotBucket.bucketStartMs)` |
-| string | `quantity_missing_frame` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:302:39` | `trace.getActiveSpan()?.addEvent('quantity_missing_frame', { securityId: snapshot.securityId, source:` |
-| string | `skipped` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:324:12` | `case 'skipped': if (outcome.reason === 'late_after_grace') { this.recordCount( this.lateAfterGraceCo` |
-| string | `late_after_grace` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:325:32` | `outcome.reason === 'late_after_grace'` |
-| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:331:36` | `activeSpan?.setAttribute('skippedReason', 'late_after_grace')` |
-| string | `late_after_grace` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:331:53` | `activeSpan?.setAttribute('skippedReason', 'late_after_grace')` |
-| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:334:15` | `activeSpan?.setAttribute( 'bucketStartMs', snapshotBucket.bucketStartMs, )` |
-| string | `candidate_capacity_exceeded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:338:39` | `outcome.reason === 'candidate_capacity_exceeded'` |
-| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:345:13` | `activeSpan?.setAttribute( 'skippedReason', 'candidate_capacity_exceeded', )` |
-| string | `candidate_capacity_exceeded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:346:13` | `activeSpan?.setAttribute( 'skippedReason', 'candidate_capacity_exceeded', )` |
-| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:350:15` | `activeSpan?.setAttribute( 'bucketStartMs', snapshotBucket.bucketStartMs, )` |
-| string | `skipped` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:357:32` | `activeSpan?.addEvent('skipped', { reason: outcome.reason })` |
-| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:358:36` | `activeSpan?.setAttribute('skippedReason', outcome.reason)` |
-| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:361:15` | `activeSpan?.setAttribute( 'bucketStartMs', snapshotBucket.bucketStartMs, )` |
-| string | `out_of_session` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:365:34` | `outcome.reason === 'out_of_session'` |
-| string | `opened` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:377:12` | `case 'opened': await this.registerDueIfFirst( client, outcome.bucket, { securityId: snapshot.securit` |
-| string | `updated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:391:12` | `case 'updated': // Normally this is a local no-op. If the first registration failed, // the next acc` |
-| string | `rolled-over` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:408:12` | `case 'rolled-over': await this.registerDueIfFirst( client, outcome.opened, { securityId: snapshot.se` |
-| string | `invalidated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:422:12` | `case 'invalidated': // A first snapshot can open an already-invalid candidate (for example, // a cou` |
-| string | `due_registration_too_late` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:477:39` | `trace.getActiveSpan()?.addEvent('due_registration_too_late', { securityId: identity.securityId, buck` |
-| string | `candle manifest record` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:514:9` | `assertRealtimeRedisBytes( 'candle manifest record', JSON.stringify(manifest), REALTIME_REDIS_RECORD_` |
-| number | `1000` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:522:35` | `acceptedAt / 1_000` |
-| string | `due_registration_failed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:535:39` | `trace.getActiveSpan()?.addEvent('due_registration_failed', { securityId: identity.securityId, bucket` |
-| string | `is already expired` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:548:34` | `error.message.includes('is already expired')` |
-| string | `redis_due_registration_failed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:562:11` | `this.aggregator.markInvalid( identity.securityId, identity.source, 'redis_due_registration_failed', ` |
-| string | `ready` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:579:44` | `client.status !== 'ready'` |
-| string | `LIMIT` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:596:9` | `client.zrangebyscore( dueKey(tradingDay), 0, now, 'LIMIT', 0, REALTIME_REDIS_RANGE_BATCH_SIZE, )` |
-| string | `malformed_due_member` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:617:41` | `trace.getActiveSpan()?.addEvent('malformed_due_member', { member, })` |
-| string | `due_admission_overflow` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:640:41` | `trace.getActiveSpan()?.addEvent('due_admission_overflow', { securityId: decoded.securityId, })` |
-| string | `+inf` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:729:9` | `client.zrangebyscore( dueKey(tradingDay), 0, '+inf', 'LIMIT', 0, REALTIME_REDIS_RANGE_BATCH_SIZE, )` |
-| string | `LIMIT` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:730:9` | `client.zrangebyscore( dueKey(tradingDay), 0, '+inf', 'LIMIT', 0, REALTIME_REDIS_RANGE_BATCH_SIZE, )` |
-| string | `candle manifest record` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:744:11` | `assertRealtimeRedisBytes( 'candle manifest record', JSON.stringify(manifest), REALTIME_REDIS_RECORD_` |
-| string | `candle.due.finalize` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:871:26` | `withCandleSpan('candle.due.finalize', async (span) => { span.setAttribute('source', decoded.source);` |
-| string | `source` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:872:25` | `span.setAttribute('source', decoded.source)` |
-| string | `securityId` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:873:25` | `span.setAttribute('securityId', decoded.securityId)` |
-| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:874:25` | `span.setAttribute('bucketStartMs', decoded.bucketStartMs)` |
-| string | `already_sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:876:23` | `span.addEvent('already_sealed')` |
-| string | `finalization_horizon_exceeded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:895:23` | `span.addEvent('finalization_horizon_exceeded')` |
-| string | `hard_horizon` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:896:63` | `message: 'hard_horizon'` |
-| string | `valid` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:918:35` | `sealed.validity === 'valid'` |
-| string | `sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:919:27` | `span.addEvent('sealed')` |
-| string | `verdict` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:920:31` | `span.setAttribute('verdict', 'sealed')` |
-| string | `sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:920:42` | `span.setAttribute('verdict', 'sealed')` |
-| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:926:27` | `span.addEvent('discarded', { reason: sealed.invalidReason ?? 'invalid', })` |
-| string | `verdict` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:929:31` | `span.setAttribute('verdict', 'discarded')` |
-| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:929:42` | `span.setAttribute('verdict', 'discarded')` |
-| string | `discardReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:931:15` | `span.setAttribute( 'discardReason', sealed.invalidReason ?? 'invalid', )` |
-| string | `valid` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:943:33` | `sealed.validity === 'valid'` |
-| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:958:21` | `span.addEvent('discarded', { reason })` |
-| string | `verdict` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:959:25` | `span.setAttribute('verdict', 'discarded')` |
-| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:959:36` | `span.setAttribute('verdict', 'discarded')` |
-| string | `discardReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:960:25` | `span.setAttribute('discardReason', reason)` |
-| string | `1m` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:994:15` | `period: '1m'` |
-| string | `sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:996:16` | `outcome: 'sealed'` |
-| string | `1m` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:1010:15` | `period: '1m'` |
-| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:1012:16` | `outcome: 'discarded'` |
+| string | `off` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:204:40` | `this.mode === 'off'` |
+| string | `off` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:207:25` | `this.mode === 'off'` |
+| string | `ingest_gated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:210:39` | `trace.getActiveSpan()?.addEvent('ingest_gated', { reason })` |
+| string | `ingestGated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:211:43` | `trace.getActiveSpan()?.setAttribute('ingestGated', reason)` |
+| string | `queue_overflow` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:226:39` | `trace.getActiveSpan()?.addEvent('queue_overflow', { securityId: snapshot.securityId, })` |
+| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:229:43` | `trace.getActiveSpan()?.setAttribute('skippedReason', 'queue_overflow')` |
+| string | `queue_overflow` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:229:60` | `trace.getActiveSpan()?.setAttribute('skippedReason', 'queue_overflow')` |
+| string | `queue_overflow` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:239:9` | `this.aggregator.markInvalid( snapshot.securityId, snapshot.source, 'queue_overflow', bucket?.bucketS` |
+| string | `redis_client_unavailable` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:253:39` | `trace.getActiveSpan()?.addEvent('redis_client_unavailable', { securityId: snapshot.securityId, })` |
+| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:258:24` | `trace .getActiveSpan() ?.setAttribute('skippedReason', 'redis_client_unavailable')` |
+| string | `redis_client_unavailable` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:258:41` | `trace .getActiveSpan() ?.setAttribute('skippedReason', 'redis_client_unavailable')` |
+| string | `startup_boundary_skip` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:273:39` | `trace.getActiveSpan()?.addEvent('startup_boundary_skip', { securityId: snapshot.securityId, bucketSt` |
+| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:279:24` | `trace .getActiveSpan() ?.setAttribute('skippedReason', 'startup_boundary_skip')` |
+| string | `startup_boundary_skip` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:279:41` | `trace .getActiveSpan() ?.setAttribute('skippedReason', 'startup_boundary_skip')` |
+| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:282:24` | `trace .getActiveSpan() ?.setAttribute('bucketStartMs', snapshotBucket.bucketStartMs)` |
+| string | `quantity_missing_frame` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:296:39` | `trace.getActiveSpan()?.addEvent('quantity_missing_frame', { securityId: snapshot.securityId, source:` |
+| string | `skipped` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:318:12` | `case 'skipped': if (outcome.reason === 'late_after_grace') { this.recordCount( this.lateAfterGraceCo` |
+| string | `late_after_grace` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:319:32` | `outcome.reason === 'late_after_grace'` |
+| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:325:36` | `activeSpan?.setAttribute('skippedReason', 'late_after_grace')` |
+| string | `late_after_grace` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:325:53` | `activeSpan?.setAttribute('skippedReason', 'late_after_grace')` |
+| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:328:15` | `activeSpan?.setAttribute( 'bucketStartMs', snapshotBucket.bucketStartMs, )` |
+| string | `candidate_capacity_exceeded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:332:39` | `outcome.reason === 'candidate_capacity_exceeded'` |
+| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:339:13` | `activeSpan?.setAttribute( 'skippedReason', 'candidate_capacity_exceeded', )` |
+| string | `candidate_capacity_exceeded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:340:13` | `activeSpan?.setAttribute( 'skippedReason', 'candidate_capacity_exceeded', )` |
+| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:344:15` | `activeSpan?.setAttribute( 'bucketStartMs', snapshotBucket.bucketStartMs, )` |
+| string | `skipped` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:351:32` | `activeSpan?.addEvent('skipped', { reason: outcome.reason })` |
+| string | `skippedReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:352:36` | `activeSpan?.setAttribute('skippedReason', outcome.reason)` |
+| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:355:15` | `activeSpan?.setAttribute( 'bucketStartMs', snapshotBucket.bucketStartMs, )` |
+| string | `out_of_session` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:359:34` | `outcome.reason === 'out_of_session'` |
+| string | `opened` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:371:12` | `case 'opened': await this.registerDueIfFirst( client, outcome.bucket, { securityId: snapshot.securit` |
+| string | `updated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:385:12` | `case 'updated': // Normally this is a local no-op. If the first registration failed, // the next acc` |
+| string | `rolled-over` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:402:12` | `case 'rolled-over': await this.registerDueIfFirst( client, outcome.opened, { securityId: snapshot.se` |
+| string | `invalidated` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:416:12` | `case 'invalidated': // A first snapshot can open an already-invalid candidate (for example, // a cou` |
+| string | `due_registration_too_late` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:471:39` | `trace.getActiveSpan()?.addEvent('due_registration_too_late', { securityId: identity.securityId, buck` |
+| string | `candle manifest record` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:508:9` | `assertRealtimeRedisBytes( 'candle manifest record', JSON.stringify(manifest), REALTIME_REDIS_RECORD_` |
+| number | `1000` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:516:35` | `acceptedAt / 1_000` |
+| string | `due_registration_failed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:529:39` | `trace.getActiveSpan()?.addEvent('due_registration_failed', { securityId: identity.securityId, bucket` |
+| string | `redis_due_registration_failed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:544:11` | `this.aggregator.markInvalid( identity.securityId, identity.source, 'redis_due_registration_failed', ` |
+| string | `ready` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:561:44` | `client.status !== 'ready'` |
+| string | `LIMIT` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:578:9` | `client.zrangebyscore( dueKey(tradingDay), 0, now, 'LIMIT', 0, REALTIME_REDIS_RANGE_BATCH_SIZE, )` |
+| string | `malformed_due_member` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:596:41` | `trace.getActiveSpan()?.addEvent('malformed_due_member', { member, })` |
+| string | `due_admission_overflow` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:616:41` | `trace.getActiveSpan()?.addEvent('due_admission_overflow', { securityId: decoded.securityId, })` |
+| string | `+inf` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:704:9` | `client.zrangebyscore( dueKey(tradingDay), 0, '+inf', 'LIMIT', 0, REALTIME_REDIS_RANGE_BATCH_SIZE, )` |
+| string | `LIMIT` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:705:9` | `client.zrangebyscore( dueKey(tradingDay), 0, '+inf', 'LIMIT', 0, REALTIME_REDIS_RANGE_BATCH_SIZE, )` |
+| string | `candle manifest record` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:719:11` | `assertRealtimeRedisBytes( 'candle manifest record', JSON.stringify(manifest), REALTIME_REDIS_RECORD_` |
+| string | `candle.due.finalize` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:835:26` | `withCandleSpan('candle.due.finalize', async (span) => { span.setAttribute('source', decoded.source);` |
+| string | `source` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:836:25` | `span.setAttribute('source', decoded.source)` |
+| string | `securityId` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:837:25` | `span.setAttribute('securityId', decoded.securityId)` |
+| string | `bucketStartMs` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:838:25` | `span.setAttribute('bucketStartMs', decoded.bucketStartMs)` |
+| string | `already_sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:840:23` | `span.addEvent('already_sealed')` |
+| string | `finalization_horizon_exceeded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:859:23` | `span.addEvent('finalization_horizon_exceeded')` |
+| string | `hard_horizon` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:860:63` | `message: 'hard_horizon'` |
+| string | `valid` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:882:35` | `sealed.validity === 'valid'` |
+| string | `sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:883:27` | `span.addEvent('sealed')` |
+| string | `verdict` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:884:31` | `span.setAttribute('verdict', 'sealed')` |
+| string | `sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:884:42` | `span.setAttribute('verdict', 'sealed')` |
+| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:890:27` | `span.addEvent('discarded', { reason: sealed.invalidReason ?? 'invalid', })` |
+| string | `verdict` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:893:31` | `span.setAttribute('verdict', 'discarded')` |
+| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:893:42` | `span.setAttribute('verdict', 'discarded')` |
+| string | `discardReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:895:15` | `span.setAttribute( 'discardReason', sealed.invalidReason ?? 'invalid', )` |
+| string | `valid` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:907:33` | `sealed.validity === 'valid'` |
+| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:922:21` | `span.addEvent('discarded', { reason })` |
+| string | `verdict` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:923:25` | `span.setAttribute('verdict', 'discarded')` |
+| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:923:36` | `span.setAttribute('verdict', 'discarded')` |
+| string | `discardReason` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:924:25` | `span.setAttribute('discardReason', reason)` |
+| string | `1m` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:958:15` | `period: '1m'` |
+| string | `sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:960:16` | `outcome: 'sealed'` |
+| string | `1m` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:974:15` | `period: '1m'` |
+| string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:976:16` | `outcome: 'discarded'` |
 | string | `harness.initialize` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:212:18` | `operation: 'harness.initialize'` |
 | string | `HIL_INITIALIZATION_FAILED` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:214:15` | `reason: 'HIL_INITIALIZATION_FAILED'` |
 | string | `syncSubscriptions.cleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:219:39` | `recordOperation(operations, 'syncSubscriptions.cleanup', () => client.syncSubscriptions([]), )` |
@@ -574,7 +585,7 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `mist_realtime_allowlist_effective_total` | `apps/mist/src/realtime/observability/subscription-lifecycle-metrics.ts:131:28` | `meter .createObservableGauge('mist_realtime_allowlist_effective_total', { description: 'Effective (p` |
 | string | `Effective (provider-converged) allowlist entries per source` | `apps/mist/src/realtime/observability/subscription-lifecycle-metrics.ts:133:9` | `description: 'Effective (provider-converged) allowlist entries per source'` |
 | string | `mist-backend` | `apps/mist/src/realtime/observability/tracer.ts:5:19` | `trace.getTracer('mist-backend')` |
-| string | `off` | `apps/mist/src/realtime/realtime-ingress.module.ts:107:19` | `mode === 'off'` |
+| string | `off` | `apps/mist/src/realtime/realtime-ingress.module.ts:111:19` | `mode === 'off'` |
 | string | `realtime.native_snapshot` | `apps/mist/src/realtime/realtime-native-map.decoder.ts:45:24` | `parsed['type'] !== 'realtime.native_snapshot'` |
 | string | `tdx` | `apps/mist/src/realtime/realtime-native-map.decoder.ts:65:27` | `expectedProvider === 'tdx'` |
 | string | `MIST_REALTIME_REDIS_URL` | `apps/mist/src/realtime/realtime-redis.service.ts:50:40` | `this.config.get<string>('MIST_REALTIME_REDIS_URL')` |
@@ -601,8 +612,8 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `security.status = :status` | `apps/mist/src/realtime/realtime-security-allowlist.service.ts:77:17` | `this.assignments .createQueryBuilder('assignment') .select('source_config.format_code', 'formatCode'` |
 | string | `source_config.format_code` | `apps/mist/src/realtime/realtime-security-allowlist.service.ts:78:16` | `this.assignments .createQueryBuilder('assignment') .select('source_config.format_code', 'formatCode'` |
 | number | `5` | `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165:28` | `requested.length > 5` |
-| string | `trading_day_rollover` | `apps/mist/src/realtime/realtime-snapshot-ingress.service.ts:46:39` | `trace.getActiveSpan()?.addEvent('trading_day_rollover', { securityId: snapshot.securityId, tradingDa` |
-| string | `product_sink_failed` | `apps/mist/src/realtime/realtime-snapshot-ingress.service.ts:66:39` | `trace.getActiveSpan()?.addEvent('product_sink_failed', { securityId: snapshot.securityId, source: sn` |
+| string | `trading_day_rollover` | `apps/mist/src/realtime/realtime-snapshot-ingress.service.ts:48:39` | `trace.getActiveSpan()?.addEvent('trading_day_rollover', { securityId: snapshot.securityId, tradingDa` |
+| string | `product_sink_failed` | `apps/mist/src/realtime/realtime-snapshot-ingress.service.ts:68:39` | `trace.getActiveSpan()?.addEvent('product_sink_failed', { securityId: snapshot.securityId, source: sn` |
 | string | `1m` | `apps/mist/src/realtime/strategy-trigger/realtime-strategy-startup-compensation.service.ts:145:17` | `period: '1m'` |
 | string | `sealed` | `apps/mist/src/realtime/strategy-trigger/realtime-strategy-startup-compensation.service.ts:147:18` | `outcome: 'sealed'` |
 | string | `closed` | `apps/mist/src/realtime/strategy-trigger/realtime-strategy-startup-compensation.service.ts:158:29` | `watermark.outcome === 'closed'` |
@@ -642,37 +653,37 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `qmt_reconciliation_required` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle-observation.store.ts:321:16` | `reason === 'qmt_reconciliation_required'` |
 | string | `qmt_journal_unhealthy` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle-observation.store.ts:322:16` | `reason === 'qmt_journal_unhealthy'` |
 | string | `source_capacity_blocked` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle-observation.store.ts:323:16` | `reason === 'source_capacity_blocked'` |
-| string | `REALTIME_RECONCILE_INTERVAL_MS` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:129:23` | `this.config.get('REALTIME_RECONCILE_INTERVAL_MS')` |
-| string | `realtime-subscription-reconcile` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:136:32` | `this.scheduler.addInterval('realtime-subscription-reconcile', interval)` |
-| string | `incremental` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:144:26` | `this.enqueue(source, 'incremental', 'intraday_activation')` |
-| string | `intraday_activation` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:144:41` | `this.enqueue(source, 'incremental', 'intraday_activation')` |
-| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:166:28` | `this.enqueue(source, 'reset', 'weekday_0915')` |
-| string | `weekday_0915` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:166:37` | `this.enqueue(source, 'reset', 'weekday_0915')` |
-| string | `realtime-subscription-reconcile` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:173:37` | `this.scheduler.deleteInterval('realtime-subscription-reconcile')` |
-| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:215:30` | `this.enqueue(source, 'reset', 'auto_reconcile_enabled')` |
-| string | `auto_reconcile_enabled` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:215:39` | `this.enqueue(source, 'reset', 'auto_reconcile_enabled')` |
-| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:220:28` | `this.enqueue(source, 'reset', 'scheduled_reconcile')` |
-| string | `scheduled_reconcile` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:220:37` | `this.enqueue(source, 'reset', 'scheduled_reconcile')` |
-| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:235:38` | `this.enqueue(observation.source, 'reset', 'accepted_ready')` |
-| string | `accepted_ready` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:235:47` | `this.enqueue(observation.source, 'reset', 'accepted_ready')` |
-| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:327:20` | `policy === 'reset'` |
-| string | `assignment` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:386:27` | `this.assignmentRepository .createQueryBuilder('assignment')` |
-| string | `source_config.formatCode` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:387:15` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `providerSymbol` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:387:43` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `security.id` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:388:18` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `securityId` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:388:33` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `security.status` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:389:18` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `securityStatus` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:389:37` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `assignment.security` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:390:18` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `security` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:390:41` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `assignment.sourceConfig` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:391:18` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `source_config` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:391:45` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `security.type IN (:...types)` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:392:14` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `source_config.source = :source` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:395:17` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `source_config.enabled = :enabled` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:396:17` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `source_config.formatCode` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:397:16` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
-| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:436:22` | `current === 'reset'` |
-| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:436:46` | `incoming === 'reset'` |
+| string | `REALTIME_RECONCILE_INTERVAL_MS` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:134:23` | `this.config.get('REALTIME_RECONCILE_INTERVAL_MS')` |
+| string | `realtime-subscription-reconcile` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:141:32` | `this.scheduler.addInterval('realtime-subscription-reconcile', interval)` |
+| string | `incremental` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:149:26` | `this.enqueue(source, 'incremental', 'intraday_activation')` |
+| string | `intraday_activation` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:149:41` | `this.enqueue(source, 'incremental', 'intraday_activation')` |
+| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:171:28` | `this.enqueue(source, 'reset', 'weekday_0915')` |
+| string | `weekday_0915` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:171:37` | `this.enqueue(source, 'reset', 'weekday_0915')` |
+| string | `realtime-subscription-reconcile` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:178:37` | `this.scheduler.deleteInterval('realtime-subscription-reconcile')` |
+| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:220:30` | `this.enqueue(source, 'reset', 'auto_reconcile_enabled')` |
+| string | `auto_reconcile_enabled` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:220:39` | `this.enqueue(source, 'reset', 'auto_reconcile_enabled')` |
+| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:225:28` | `this.enqueue(source, 'reset', 'scheduled_reconcile')` |
+| string | `scheduled_reconcile` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:225:37` | `this.enqueue(source, 'reset', 'scheduled_reconcile')` |
+| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:240:38` | `this.enqueue(observation.source, 'reset', 'accepted_ready')` |
+| string | `accepted_ready` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:240:47` | `this.enqueue(observation.source, 'reset', 'accepted_ready')` |
+| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:332:20` | `policy === 'reset'` |
+| string | `assignment` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:395:27` | `this.assignmentRepository .createQueryBuilder('assignment')` |
+| string | `source_config.formatCode` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:396:15` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `providerSymbol` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:396:43` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `security.id` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:397:18` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `securityId` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:397:33` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `security.status` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:398:18` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `securityStatus` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:398:37` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `assignment.security` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:399:18` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `security` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:399:41` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `assignment.sourceConfig` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:400:18` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `source_config` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:400:45` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `security.type IN (:...types)` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:401:14` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `source_config.source = :source` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:404:17` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `source_config.enabled = :enabled` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:405:17` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `source_config.formatCode` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:406:16` | `this.assignmentRepository .createQueryBuilder('assignment') .select('source_config.formatCode', 'pro` |
+| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:445:22` | `current === 'reset'` |
+| string | `reset` | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:445:46` | `incoming === 'reset'` |
 | string | `new` | `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:72:29` | `dto.mode === 'new'` |
 | number | `20` | `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89:34` | `query.limit ?? 20` |
 | string | `source_not_realtime` | `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:176:9` | `this.sourceConfigNotEligible( sourceConfigId, 'source_not_realtime', )` |
@@ -725,46 +736,46 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `active_security.status = :active` | `apps/mist/src/security/security.service.ts:317:16` | `manager .getRepository(RealtimeSubscriptionAssignment) .createQueryBuilder('realtime_assignment') .i` |
 | string | `active_source_config.source = :source` | `apps/mist/src/security/security.service.ts:320:19` | `manager .getRepository(RealtimeSubscriptionAssignment) .createQueryBuilder('realtime_assignment') .i` |
 | string | `pessimistic_write` | `apps/mist/src/security/security.service.ts:354:23` | `mode: 'pessimistic_write'` |
-| string | `AKTOOLS_BASE_URL` | `apps/mist/src/sources/east-money/east-money-source.service.ts:55:40` | `this.configService.get<string>('AKTOOLS_BASE_URL')` |
-| string | `/api/public/index_zh_a_hist_min_em` | `apps/mist/src/sources/east-money/east-money-source.service.ts:86:7` | `this.axios.get<EfMinuteVo[]>( '/api/public/index_zh_a_hist_min_em', { params: { symbol: code, period` |
-| string | `yyyy-MM-dd HH:mm:ss` | `apps/mist/src/sources/east-money/east-money-source.service.ts:94:13` | `formatInTimeZone( startDate, MARKET_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss', )` |
-| string | `yyyy-MM-dd HH:mm:ss` | `apps/mist/src/sources/east-money/east-money-source.service.ts:99:13` | `formatInTimeZone( endDate, MARKET_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss', )` |
-| string | `volume` | `apps/mist/src/sources/east-money/east-money-source.service.ts:120:62` | `normalizeEastMoneyQuantity(item['成交量'], 'volume')` |
-| string | `amount` | `apps/mist/src/sources/east-money/east-money-source.service.ts:124:57` | `normalizeEastMoneyQuantity(item['成交额'] ?? null, 'amount')` |
-| string | `/api/public/stock_zh_index_daily_em` | `apps/mist/src/sources/east-money/east-money-source.service.ts:169:7` | `this.axios.get<EfDailyVo[]>( '/api/public/stock_zh_index_daily_em', { params: { symbol: code, start_` |
-| string | `yyyyMMdd` | `apps/mist/src/sources/east-money/east-money-source.service.ts:173:69` | `formatInTimeZone(startDate, MARKET_TIME_ZONE, 'yyyyMMdd')` |
-| string | `yyyyMMdd` | `apps/mist/src/sources/east-money/east-money-source.service.ts:174:65` | `formatInTimeZone(endDate, MARKET_TIME_ZONE, 'yyyyMMdd')` |
-| string | `T00:00:00Z` | `apps/mist/src/sources/east-money/east-money-source.service.ts:190:41` | `item.date + 'T00:00:00Z'` |
-| string | `volume` | `apps/mist/src/sources/east-money/east-money-source.service.ts:195:57` | `normalizeEastMoneyQuantity(item.volume, 'volume')` |
-| string | `amount` | `apps/mist/src/sources/east-money/east-money-source.service.ts:197:59` | `normalizeEastMoneyQuantity(item.amount ?? null, 'amount')` |
+| string | `AKTOOLS_BASE_URL` | `apps/mist/src/sources/east-money/east-money-source.service.ts:56:40` | `this.configService.get<string>('AKTOOLS_BASE_URL')` |
+| string | `/api/public/index_zh_a_hist_min_em` | `apps/mist/src/sources/east-money/east-money-source.service.ts:87:7` | `this.axios.get<EfMinuteVo[]>( '/api/public/index_zh_a_hist_min_em', { params: { symbol: code, period` |
+| string | `yyyy-MM-dd HH:mm:ss` | `apps/mist/src/sources/east-money/east-money-source.service.ts:95:13` | `formatInTimeZone( startDate, MARKET_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss', )` |
+| string | `yyyy-MM-dd HH:mm:ss` | `apps/mist/src/sources/east-money/east-money-source.service.ts:100:13` | `formatInTimeZone( endDate, MARKET_TIME_ZONE, 'yyyy-MM-dd HH:mm:ss', )` |
+| string | `volume` | `apps/mist/src/sources/east-money/east-money-source.service.ts:121:62` | `normalizeEastMoneyQuantity(item['成交量'], 'volume')` |
+| string | `amount` | `apps/mist/src/sources/east-money/east-money-source.service.ts:125:57` | `normalizeEastMoneyQuantity(item['成交额'] ?? null, 'amount')` |
+| string | `/api/public/stock_zh_index_daily_em` | `apps/mist/src/sources/east-money/east-money-source.service.ts:170:7` | `this.axios.get<EfDailyVo[]>( '/api/public/stock_zh_index_daily_em', { params: { symbol: code, start_` |
+| string | `yyyyMMdd` | `apps/mist/src/sources/east-money/east-money-source.service.ts:174:69` | `formatInTimeZone(startDate, MARKET_TIME_ZONE, 'yyyyMMdd')` |
+| string | `yyyyMMdd` | `apps/mist/src/sources/east-money/east-money-source.service.ts:175:65` | `formatInTimeZone(endDate, MARKET_TIME_ZONE, 'yyyyMMdd')` |
+| string | `T00:00:00Z` | `apps/mist/src/sources/east-money/east-money-source.service.ts:191:41` | `item.date + 'T00:00:00Z'` |
+| string | `volume` | `apps/mist/src/sources/east-money/east-money-source.service.ts:196:57` | `normalizeEastMoneyQuantity(item.volume, 'volume')` |
+| string | `amount` | `apps/mist/src/sources/east-money/east-money-source.service.ts:198:59` | `normalizeEastMoneyQuantity(item.amount ?? null, 'amount')` |
 | string | `, ` | `apps/mist/src/sources/k-save.helper.ts:47:97` | `invalidFields.join(', ')` |
-| string | `QMT_BASE_URL` | `apps/mist/src/sources/qmt/qmt-source.service.ts:72:38` | `this.configService.get<string>('QMT_BASE_URL')` |
-| string | `/v1/bars/query` | `apps/mist/src/sources/qmt/qmt-source.service.ts:88:9` | `this.axios.post<QmtEnvelope<QmtBarsResponseData>>( '/v1/bars/query', { fields: QMT_DEFAULT_FIELDS, s` |
-| string | `QMT bars query failed` | `apps/mist/src/sources/qmt/qmt-source.service.ts:104:43` | `this.throwEnvelopeError(envelope, 'QMT bars query failed')` |
-| string | `volume` | `apps/mist/src/sources/qmt/qmt-source.service.ts:214:56` | `this.readDecimal(symbolData, ['volume'], rowKey, 'volume')` |
-| string | `amount` | `apps/mist/src/sources/qmt/qmt-source.service.ts:233:69` | `this.readDecimal(symbolData, ['amount'], rowKey, 'amount')` |
-| string | `preClose` | `apps/mist/src/sources/qmt/qmt-source.service.ts:254:34` | `this.assignNumber(extension, 'preClose', symbolData, ['preClose'], rowKey)` |
-| string | `openInterest` | `apps/mist/src/sources/qmt/qmt-source.service.ts:257:7` | `this.assignNumber( extension, 'openInterest', symbolData, ['openInterest'], rowKey, )` |
-| string | `suspendFlag` | `apps/mist/src/sources/qmt/qmt-source.service.ts:264:7` | `this.assignNumber( extension, 'suspendFlag', symbolData, ['suspendFlag'], rowKey, )` |
-| string | `settle` | `apps/mist/src/sources/qmt/qmt-source.service.ts:271:7` | `this.assignNumber( extension, 'settle', symbolData, ['settle', 'settlementPrice', 'settelementPrice'` |
-| number | `4` | `apps/mist/src/sources/qmt/qmt-source.service.ts:377:26` | `text.slice(0, 4)` |
-| number | `4` | `apps/mist/src/sources/qmt/qmt-source.service.ts:377:43` | `text.slice(4, 6)` |
-| number | `6` | `apps/mist/src/sources/qmt/qmt-source.service.ts:377:46` | `text.slice(4, 6)` |
-| number | `6` | `apps/mist/src/sources/qmt/qmt-source.service.ts:377:63` | `text.slice(6, 8)` |
-| number | `8` | `apps/mist/src/sources/qmt/qmt-source.service.ts:377:66` | `text.slice(6, 8)` |
-| number | `4` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:26` | `text.slice(0, 4)` |
-| number | `4` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:43` | `text.slice(4, 6)` |
-| number | `6` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:46` | `text.slice(4, 6)` |
-| number | `6` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:63` | `text.slice(6, 8)` |
-| number | `8` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:66` | `text.slice(6, 8)` |
-| number | `8` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:83` | `text.slice(8, 10)` |
-| number | `10` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:86` | `text.slice(8, 10)` |
-| number | `10` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:104` | `text.slice(10, 12)` |
-| number | `12` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:108` | `text.slice(10, 12)` |
-| number | `12` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:126` | `text.slice(12, 14)` |
-| number | `14` | `apps/mist/src/sources/qmt/qmt-source.service.ts:382:130` | `text.slice(12, 14)` |
-| string | `T` | `apps/mist/src/sources/qmt/qmt-source.service.ts:386:41` | `text.replace(' ', 'T')` |
-| string | `+08:00` | `apps/mist/src/sources/qmt/qmt-source.service.ts:386:48` | `text.replace(' ', 'T') + '+08:00'` |
+| string | `QMT_BASE_URL` | `apps/mist/src/sources/qmt/qmt-source.service.ts:73:38` | `this.configService.get<string>('QMT_BASE_URL')` |
+| string | `/v1/bars/query` | `apps/mist/src/sources/qmt/qmt-source.service.ts:89:9` | `this.axios.post<QmtEnvelope<QmtBarsResponseData>>( '/v1/bars/query', { fields: QMT_DEFAULT_FIELDS, s` |
+| string | `QMT bars query failed` | `apps/mist/src/sources/qmt/qmt-source.service.ts:105:43` | `this.throwEnvelopeError(envelope, 'QMT bars query failed')` |
+| string | `volume` | `apps/mist/src/sources/qmt/qmt-source.service.ts:215:56` | `this.readDecimal(symbolData, ['volume'], rowKey, 'volume')` |
+| string | `amount` | `apps/mist/src/sources/qmt/qmt-source.service.ts:234:69` | `this.readDecimal(symbolData, ['amount'], rowKey, 'amount')` |
+| string | `preClose` | `apps/mist/src/sources/qmt/qmt-source.service.ts:255:34` | `this.assignNumber(extension, 'preClose', symbolData, ['preClose'], rowKey)` |
+| string | `openInterest` | `apps/mist/src/sources/qmt/qmt-source.service.ts:258:7` | `this.assignNumber( extension, 'openInterest', symbolData, ['openInterest'], rowKey, )` |
+| string | `suspendFlag` | `apps/mist/src/sources/qmt/qmt-source.service.ts:265:7` | `this.assignNumber( extension, 'suspendFlag', symbolData, ['suspendFlag'], rowKey, )` |
+| string | `settle` | `apps/mist/src/sources/qmt/qmt-source.service.ts:272:7` | `this.assignNumber( extension, 'settle', symbolData, ['settle', 'settlementPrice', 'settelementPrice'` |
+| number | `4` | `apps/mist/src/sources/qmt/qmt-source.service.ts:378:26` | `text.slice(0, 4)` |
+| number | `4` | `apps/mist/src/sources/qmt/qmt-source.service.ts:378:43` | `text.slice(4, 6)` |
+| number | `6` | `apps/mist/src/sources/qmt/qmt-source.service.ts:378:46` | `text.slice(4, 6)` |
+| number | `6` | `apps/mist/src/sources/qmt/qmt-source.service.ts:378:63` | `text.slice(6, 8)` |
+| number | `8` | `apps/mist/src/sources/qmt/qmt-source.service.ts:378:66` | `text.slice(6, 8)` |
+| number | `4` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:26` | `text.slice(0, 4)` |
+| number | `4` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:43` | `text.slice(4, 6)` |
+| number | `6` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:46` | `text.slice(4, 6)` |
+| number | `6` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:63` | `text.slice(6, 8)` |
+| number | `8` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:66` | `text.slice(6, 8)` |
+| number | `8` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:83` | `text.slice(8, 10)` |
+| number | `10` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:86` | `text.slice(8, 10)` |
+| number | `10` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:104` | `text.slice(10, 12)` |
+| number | `12` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:108` | `text.slice(10, 12)` |
+| number | `12` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:126` | `text.slice(12, 14)` |
+| number | `14` | `apps/mist/src/sources/qmt/qmt-source.service.ts:383:130` | `text.slice(12, 14)` |
+| string | `T` | `apps/mist/src/sources/qmt/qmt-source.service.ts:387:41` | `text.replace(' ', 'T')` |
+| string | `+08:00` | `apps/mist/src/sources/qmt/qmt-source.service.ts:387:48` | `text.replace(' ', 'T') + '+08:00'` |
 | string | `lastPrice` | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:15:64` | `requiredFiniteNumber(input.native['lastPrice'], 'lastPrice')` |
 | string | `qmt` | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:23:13` | `source: 'qmt'` |
 | string | `latest-state` | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:32:14` | `level: 'latest-state'` |
@@ -790,61 +801,87 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `1000` | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:147:19` | `value * 1_000` |
 | number | `3` | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts:163:92` | `fraction.padEnd(3, '0')` |
 | string | `QMT_REALTIME_ALLOWLIST` | `apps/mist/src/sources/qmt/realtime/realtime-allowlist.resolver.ts:16:50` | `this.shared.initialize(DataSource.QMT, 'QMT_REALTIME_ALLOWLIST')` |
-| string | `QMT_BASE_URL` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:85:40` | `config.get<string>('QMT_BASE_URL')` |
-| string | `QMT_WS_CLIENT_ID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:87:26` | `config.get<string>('QMT_WS_CLIENT_ID')` |
-| string | `ws` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:88:46` | `baseUrl.replace(/^http/, 'ws')` |
-| string | `QMT_WS_RECONNECT_DELAY_MS` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:90:7` | `config.get<number>( 'QMT_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )` |
-| string | `QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:94:7` | `config.get<number>( 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, ` |
-| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:123:36` | `localFailure(unauthorized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:140:34` | `localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:154:34` | `localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `QMT_SUBSCRIPTION_CONTROL_NOT_READY` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:179:30` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_NOT_READY')` |
-| string | `QMT_SUBSCRIPTION_CONTROL_BUSY` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:184:30` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_BUSY')` |
-| string | `QMT_SUBSCRIPTION_CONTROL_TIMEOUT` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:191:38` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT')` |
-| string | `QMT_SUBSCRIPTION_CONTROL_SEND_FAILED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:202:38` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_SEND_FAILED')` |
-| string | `ping` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:221:47` | `type: 'ping'` |
-| number | `30000` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:223:10` | `setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type` |
-| string | `QMT_REALTIME_WS_ERROR` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:233:27` | `this.store.setError('QMT_REALTIME_WS_ERROR', error.message)` |
-| string | `decodeError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:272:9` | `this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'QMT_REALTIME` |
-| string | `realtime.ready` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:278:29` | `message['type'] === 'realtime.ready'` |
-| string | `realtime.native_snapshot` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:286:29` | `message['type'] === 'realtime.native_snapshot'` |
-| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:294:31` | `message['provider'] !== 'qmt'` |
-| string | `builtin` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:296:24` | `data['mode'] !== 'builtin'` |
-| string | `QMT` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:298:26` | `data['source'] !== 'QMT'` |
-| string | `latest-state` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:299:27` | `data['quality'] !== 'latest-state'` |
-| string | `contractMismatch` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:306:9` | `this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )` |
-| string | `QMT_REALTIME_READY_CONTRACT_MISMATCH` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:308:9` | `this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )` |
-| string | `candle.snapshot.process` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:332:20` | `withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'qmt'); const reje` |
-| string | `source` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:333:25` | `span.setAttribute('source', 'qmt')` |
-| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:333:35` | `span.setAttribute('source', 'qmt')` |
-| string | `rejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:335:23` | `span.addEvent('rejected', { reason })` |
-| string | `transport_not_ready` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:342:16` | `reject('transport_not_ready', null)` |
-| string | `validationError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:344:11` | `this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )` |
-| string | `QMT_REALTIME_READY_REQUIRED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:346:11` | `this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )` |
-| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:352:59` | `decodeRealtimeNativeMapMessage(message, 'qmt')` |
-| string | `symbol` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:371:27` | `span.setAttribute('symbol', providerSymbol)` |
-| string | `capturedAt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:372:27` | `span.setAttribute('capturedAt', decoded.data.capturedAt)` |
-| string | `symbol_invalid` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:374:18` | `reject('symbol_invalid', providerSymbol)` |
-| string | `validationError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:376:13` | `this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )` |
-| string | `QMT_REALTIME_NATIVE_INVALID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:378:13` | `this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )` |
-| string | `not_authorized` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:384:18` | `reject('not_authorized', providerSymbol)` |
-| string | `symbolNotAuthorized` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:386:13` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
-| string | `QMT_REALTIME_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:388:13` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
-| number | `20` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:402:23` | `Object.keys(nativeRecord) .sort() .slice(0, 20)` |
-| string | `converter_error` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:413:18` | `reject('converter_error', providerSymbol)` |
-| string | `converterError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:415:13` | `this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )` |
-| string | `QMT_REALTIME_CONVERTER_FAILED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:417:13` | `this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )` |
-| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:431:31` | `message['provider'] !== 'qmt'` |
-| string | `controlResponseRejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:437:9` | `this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
-| string | `QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:439:9` | `this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
-| string | `controlResponseRejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:446:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON` |
-| string | `QMT_SUBSCRIPTION_CONTROL_RESPONSE_INVALID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:448:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON` |
-| string | `QMT_SUBSCRIPTION_CONTROL_DISCONNECTED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:463:36` | `localFailure(pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_DISCONNECTED')` |
-| string | `success` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:473:19` | `keys[0] === 'success'` |
-| string | `failure` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:474:19` | `keys[0] !== 'failure'` |
-| number | `3` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:478:57` | `failureKeys.length !== 3` |
-| number | `3` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:484:29` | `failureKeys.length === 3` |
-| string | `subscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:485:40` | `failure['subscriptionState'] !== 'subscribed'` |
+| string | `QMT_BASE_URL` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:88:40` | `config.get<string>('QMT_BASE_URL')` |
+| string | `QMT_WS_CLIENT_ID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:90:26` | `config.get<string>('QMT_WS_CLIENT_ID')` |
+| string | `ws` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:91:46` | `baseUrl.replace(/^http/, 'ws')` |
+| string | `QMT_WS_RECONNECT_DELAY_MS` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:93:7` | `config.get<number>( 'QMT_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )` |
+| string | `QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:97:7` | `config.get<number>( 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, ` |
+| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:126:36` | `localFailure(unauthorized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:143:34` | `localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:157:34` | `localFailure(normalized, 'QMT_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `QMT_SUBSCRIPTION_CONTROL_NOT_READY` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:182:30` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_NOT_READY')` |
+| string | `QMT_SUBSCRIPTION_CONTROL_BUSY` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:187:30` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_BUSY')` |
+| string | `QMT_SUBSCRIPTION_CONTROL_TIMEOUT` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:194:38` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_TIMEOUT')` |
+| string | `QMT_SUBSCRIPTION_CONTROL_SEND_FAILED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:203:38` | `localFailure(symbol, 'QMT_SUBSCRIPTION_CONTROL_SEND_FAILED')` |
+| string | `ping` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:222:47` | `type: 'ping'` |
+| string | `QMT_REALTIME_WS_ERROR` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:234:27` | `this.store.setError('QMT_REALTIME_WS_ERROR', error.message)` |
+| string | `decodeError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:273:9` | `this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'QMT_REALTIME` |
+| string | `realtime.ready` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:279:29` | `message['type'] === 'realtime.ready'` |
+| string | `realtime.native_snapshot` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:287:29` | `message['type'] === 'realtime.native_snapshot'` |
+| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:295:31` | `message['provider'] !== 'qmt'` |
+| string | `builtin` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:297:24` | `data['mode'] !== 'builtin'` |
+| string | `QMT` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:299:26` | `data['source'] !== 'QMT'` |
+| string | `latest-state` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:300:27` | `data['quality'] !== 'latest-state'` |
+| string | `contractMismatch` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:307:9` | `this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )` |
+| string | `QMT_REALTIME_READY_CONTRACT_MISMATCH` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:309:9` | `this.store.recordReject( 'contractMismatch', null, 'QMT_REALTIME_READY_CONTRACT_MISMATCH', )` |
+| string | `candle.snapshot.process` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:333:20` | `withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'qmt'); const reje` |
+| string | `source` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:334:25` | `span.setAttribute('source', 'qmt')` |
+| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:334:35` | `span.setAttribute('source', 'qmt')` |
+| string | `rejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:336:23` | `span.addEvent('rejected', { reason })` |
+| string | `transport_not_ready` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:343:16` | `reject('transport_not_ready', null)` |
+| string | `validationError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:345:11` | `this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )` |
+| string | `QMT_REALTIME_READY_REQUIRED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:347:11` | `this.store.recordReject( 'validationError', null, 'QMT_REALTIME_READY_REQUIRED', )` |
+| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:353:59` | `decodeRealtimeNativeMapMessage(message, 'qmt')` |
+| string | `symbol` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:372:27` | `span.setAttribute('symbol', providerSymbol)` |
+| string | `capturedAt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:373:27` | `span.setAttribute('capturedAt', decoded.data.capturedAt)` |
+| string | `symbol_invalid` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:375:18` | `reject('symbol_invalid', providerSymbol)` |
+| string | `validationError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:377:13` | `this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )` |
+| string | `QMT_REALTIME_NATIVE_INVALID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:379:13` | `this.store.recordReject( 'validationError', providerSymbol, 'QMT_REALTIME_NATIVE_INVALID', )` |
+| string | `not_authorized` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:385:18` | `reject('not_authorized', providerSymbol)` |
+| string | `symbolNotAuthorized` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:387:13` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
+| string | `QMT_REALTIME_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:389:13` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'QMT_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
+| number | `20` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:403:23` | `Object.keys(nativeRecord) .sort() .slice(0, 20)` |
+| string | `converter_error` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:414:18` | `reject('converter_error', providerSymbol)` |
+| string | `converterError` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:416:13` | `this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )` |
+| string | `QMT_REALTIME_CONVERTER_FAILED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:418:13` | `this.store.recordReject( 'converterError', providerSymbol, 'QMT_REALTIME_CONVERTER_FAILED', )` |
+| string | `qmt` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:432:31` | `message['provider'] !== 'qmt'` |
+| string | `controlResponseRejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:438:9` | `this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
+| string | `QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:440:9` | `this.store.recordReject( 'controlResponseRejected', null, 'QMT_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
+| string | `controlResponseRejected` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:447:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON` |
+| string | `QMT_SUBSCRIPTION_CONTROL_RESPONSE_INVALID` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:449:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_RESPON` |
+| string | `QMT_SUBSCRIPTION_CONTROL_DISCONNECTED` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:464:36` | `localFailure(pending.symbol, 'QMT_SUBSCRIPTION_CONTROL_DISCONNECTED')` |
+| string | `success` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:474:19` | `keys[0] === 'success'` |
+| string | `failure` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:475:19` | `keys[0] !== 'failure'` |
+| number | `3` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:479:57` | `failureKeys.length !== 3` |
+| number | `3` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:485:29` | `failureKeys.length === 3` |
+| string | `subscribed` | `apps/mist/src/sources/qmt/realtime/realtime.client.ts:486:40` | `failure['subscriptionState'] !== 'subscribed'` |
+| string | `DEFAULT_DATA_SOURCE` | `apps/mist/src/sources/services/data-source.service.ts:11:55` | `this.configService.get<string>('DEFAULT_DATA_SOURCE')` |
+| string | `, ` | `apps/mist/src/sources/services/data-source.service.ts:68:34` | `enumValues.join(', ')` |
+| string | `, ` | `apps/mist/src/sources/services/data-source.service.ts:69:45` | `Object.keys(DataSource).join(', ')` |
+| number | `60` | `apps/mist/src/sources/services/k-boundary-calculator.ts:54:52` | `marketTime.getHours() * 60` |
+| number | `6` | `apps/mist/src/sources/services/k-boundary-calculator.ts:90:57` | `marketDate.dayOfWeek + 6` |
+| number | `7` | `apps/mist/src/sources/services/k-boundary-calculator.ts:90:62` | `(marketDate.dayOfWeek + 6) % 7` |
+| number | `7` | `apps/mist/src/sources/services/k-boundary-calculator.ts:94:41` | `this.addMarketDays(startDate, 7)` |
+| number | `3` | `apps/mist/src/sources/services/k-boundary-calculator.ts:115:58` | `marketDate.month / 3` |
+| number | `3` | `apps/mist/src/sources/services/k-boundary-calculator.ts:115:63` | `Math.floor(marketDate.month / 3) * 3` |
+| number | `3` | `apps/mist/src/sources/services/k-boundary-calculator.ts:123:24` | `startMonth + 3` |
+| number | `6` | `apps/mist/src/sources/services/k-boundary-calculator.ts:131:47` | `marketDate.month < 6` |
+| number | `6` | `apps/mist/src/sources/services/k-boundary-calculator.ts:131:55` | `marketDate.month < 6 ? 0 : 6` |
+| number | `6` | `apps/mist/src/sources/services/k-boundary-calculator.ts:139:24` | `startMonth + 6` |
+| number | `60` | `apps/mist/src/sources/services/k-boundary-calculator.ts:165:34` | `hours * 60` |
+| number | `9` | `apps/mist/src/sources/services/k-boundary-calculator.ts:168:26` | `9 * 60` |
+| number | `60` | `apps/mist/src/sources/services/k-boundary-calculator.ts:168:30` | `9 * 60` |
+| number | `30` | `apps/mist/src/sources/services/k-boundary-calculator.ts:168:35` | `9 * 60 + 30` |
+| number | `11` | `apps/mist/src/sources/services/k-boundary-calculator.ts:169:24` | `11 * 60` |
+| number | `60` | `apps/mist/src/sources/services/k-boundary-calculator.ts:169:29` | `11 * 60` |
+| number | `31` | `apps/mist/src/sources/services/k-boundary-calculator.ts:169:34` | `11 * 60 + 31` |
+| number | `13` | `apps/mist/src/sources/services/k-boundary-calculator.ts:175:28` | `13 * 60` |
+| number | `60` | `apps/mist/src/sources/services/k-boundary-calculator.ts:175:33` | `13 * 60` |
+| number | `15` | `apps/mist/src/sources/services/k-boundary-calculator.ts:176:26` | `15 * 60` |
+| number | `60` | `apps/mist/src/sources/services/k-boundary-calculator.ts:176:31` | `15 * 60` |
+| number | `60` | `apps/mist/src/sources/services/k-boundary-calculator.ts:228:45` | `totalMinutes / 60` |
+| number | `60` | `apps/mist/src/sources/services/k-boundary-calculator.ts:229:36` | `totalMinutes % 60` |
+| number | `4` | `apps/mist/src/sources/services/k-boundary-calculator.ts:231:47` | `normalizedDate.year.toString().padStart(4, '0')` |
 | string | `tdx` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:28:13` | `source: 'tdx'` |
 | string | `Volume` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:34:59` | `readTdxNativeQuantity(input.native, 'Volume', 100)` |
 | string | `Amount` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:35:59` | `readTdxNativeQuantity(input.native, 'Amount', 10_000)` |
@@ -857,90 +894,91 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `unexpected_key` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:103:7` | `quantityError( exactField, 'unexpected_key', `TDX native quantity must use exact key ${exactField}, ` |
 | string | `Volume` | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:116:15` | `field === 'Volume'` |
 | string | `TDX_REALTIME_ALLOWLIST` | `apps/mist/src/sources/tdx/realtime/realtime-allowlist.resolver.ts:16:50` | `this.shared.initialize(DataSource.TDX, 'TDX_REALTIME_ALLOWLIST')` |
-| string | `TDX_BASE_URL` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:93:40` | `config.get<string>('TDX_BASE_URL')` |
-| string | `TDX_WS_CLIENT_ID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:95:26` | `config.get<string>('TDX_WS_CLIENT_ID')` |
-| string | `ws` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:96:46` | `baseUrl.replace(/^http/, 'ws')` |
-| string | `TDX_WS_RECONNECT_DELAY_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:98:7` | `config.get<number>( 'TDX_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )` |
-| string | `TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:102:7` | `config.get<number>( 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, ` |
-| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:131:36` | `localFailure(unauthorized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:148:34` | `localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:162:34` | `localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
-| string | `TDX_SUBSCRIPTION_CONTROL_NOT_READY` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:187:30` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_NOT_READY')` |
-| string | `TDX_SUBSCRIPTION_CONTROL_BUSY` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:192:30` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_BUSY')` |
-| string | `TDX_SUBSCRIPTION_CONTROL_TIMEOUT` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:199:38` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT')` |
-| string | `TDX_SUBSCRIPTION_CONTROL_SEND_FAILED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:210:38` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_SEND_FAILED')` |
-| string | `ping` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:229:47` | `type: 'ping'` |
-| number | `30000` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:231:10` | `setInterval(() => { if (this.ws?.readyState === WebSocket.OPEN) { this.ws.send(JSON.stringify({ type` |
-| string | `TDX_REALTIME_WS_ERROR` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:241:27` | `this.store.setError('TDX_REALTIME_WS_ERROR', error.message)` |
-| string | `decodeError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:280:9` | `this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'TDX_REALTIME` |
-| string | `realtime.ready` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:286:29` | `message['type'] === 'realtime.ready'` |
-| string | `realtime.native_snapshot` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:294:29` | `message['type'] === 'realtime.native_snapshot'` |
-| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:302:31` | `message['provider'] !== 'tdx'` |
-| string | `builtin` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:304:24` | `data['mode'] !== 'builtin'` |
-| string | `TDX` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:306:26` | `data['source'] !== 'TDX'` |
-| string | `latest-state` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:307:27` | `data['quality'] !== 'latest-state'` |
-| string | `contractMismatch` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:314:9` | `this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )` |
-| string | `TDX_REALTIME_READY_CONTRACT_MISMATCH` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:316:9` | `this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )` |
-| string | `candle.snapshot.process` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:340:20` | `withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'tdx'); const reje` |
-| string | `source` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:341:25` | `span.setAttribute('source', 'tdx')` |
-| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:341:35` | `span.setAttribute('source', 'tdx')` |
-| string | `rejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:343:23` | `span.addEvent('rejected', { reason })` |
-| string | `transport_not_ready` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:350:16` | `reject('transport_not_ready', null)` |
-| string | `validationError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:352:11` | `this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )` |
-| string | `TDX_REALTIME_READY_REQUIRED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:354:11` | `this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )` |
-| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:360:59` | `decodeRealtimeNativeMapMessage(message, 'tdx')` |
-| string | `symbol` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:377:25` | `span.setAttribute('symbol', providerSymbol)` |
-| string | `capturedAt` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:378:25` | `span.setAttribute('capturedAt', decoded.data.capturedAt)` |
-| string | `symbol_invalid` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:380:16` | `reject('symbol_invalid', providerSymbol)` |
-| string | `validationError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:382:11` | `this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )` |
-| string | `TDX_REALTIME_NATIVE_INVALID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:384:11` | `this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )` |
-| string | `not_authorized` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:390:16` | `reject('not_authorized', providerSymbol)` |
-| string | `symbolNotAuthorized` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:392:11` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
-| string | `TDX_REALTIME_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:394:11` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
-| number | `20` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:408:21` | `Object.keys(nativeRecord) .sort() .slice(0, 20)` |
-| string | `converter_error` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:420:16` | `reject('converter_error', providerSymbol)` |
-| string | `converterError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:422:11` | `this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )` |
-| string | `TDX_REALTIME_CONVERTER_FAILED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:424:11` | `this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )` |
-| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:435:31` | `message['provider'] !== 'tdx'` |
-| string | `controlResponseRejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:441:9` | `this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
-| string | `TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:443:9` | `this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
-| string | `controlResponseRejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:450:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON` |
-| string | `TDX_SUBSCRIPTION_CONTROL_RESPONSE_INVALID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:452:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON` |
-| string | `TDX_SUBSCRIPTION_CONTROL_DISCONNECTED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:467:36` | `localFailure(pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_DISCONNECTED')` |
-| string | `success` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:477:19` | `keys[0] === 'success'` |
-| string | `failure` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:478:19` | `keys[0] !== 'failure'` |
-| number | `3` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:482:57` | `failureKeys.length !== 3` |
-| number | `3` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:488:29` | `failureKeys.length === 3` |
-| string | `subscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:489:40` | `failure['subscriptionState'] !== 'subscribed'` |
-| string | `TDX_BASE_URL` | `apps/mist/src/sources/tdx/tdx-source.service.ts:72:38` | `this.configService.get<string>('TDX_BASE_URL')` |
-| string | `/v1/bars/query` | `apps/mist/src/sources/tdx/tdx-source.service.ts:101:9` | `this.axios.post<TdxEnvelope<TdxBarsResponseData>>( '/v1/bars/query', { symbols: [formatCode], period` |
-| string | `front` | `apps/mist/src/sources/tdx/tdx-source.service.ts:108:25` | `dividendType: 'front'` |
-| string | `TDX bars query failed` | `apps/mist/src/sources/tdx/tdx-source.service.ts:115:43` | `this.throwEnvelopeError(envelope, 'TDX bars query failed')` |
-| string | `volume` | `apps/mist/src/sources/tdx/tdx-source.service.ts:132:55` | `normalizeTdxBarQuantity(bar.volume, 'volume')` |
-| string | `amount` | `apps/mist/src/sources/tdx/tdx-source.service.ts:133:55` | `normalizeTdxBarQuantity(bar.amount, 'amount')` |
-| string | `/v1/reference/dividend-factors/query` | `apps/mist/src/sources/tdx/tdx-source.service.ts:159:9` | `this.axios.post< TdxEnvelope<TdxDividendFactorsResponseData> >('/v1/reference/dividend-factors/query` |
-| string | `yyyyMMdd` | `apps/mist/src/sources/tdx/tdx-source.service.ts:161:66` | `formatInTimeZone(startDate, MARKET_TIME_ZONE, 'yyyyMMdd')` |
-| string | `yyyyMMdd` | `apps/mist/src/sources/tdx/tdx-source.service.ts:162:62` | `formatInTimeZone(endDate, MARKET_TIME_ZONE, 'yyyyMMdd')` |
-| number | `4` | `apps/mist/src/sources/tdx/tdx-source.service.ts:210:31` | `date.slice(0, 4)` |
-| number | `4` | `apps/mist/src/sources/tdx/tdx-source.service.ts:210:48` | `date.slice(4, 6)` |
-| number | `6` | `apps/mist/src/sources/tdx/tdx-source.service.ts:210:51` | `date.slice(4, 6)` |
-| number | `6` | `apps/mist/src/sources/tdx/tdx-source.service.ts:210:68` | `date.slice(6, 8)` |
-| number | `8` | `apps/mist/src/sources/tdx/tdx-source.service.ts:210:71` | `date.slice(6, 8)` |
-| string | `amount` | `apps/mist/src/sources/tdx/tdx-source.service.ts:349:21` | `fieldName === 'amount'` |
-| number | `10000` | `apps/mist/src/sources/tdx/tdx-source.service.ts:353:20` | `Decimal8.parseCanonical(normalized) .scaleByUnit(10_000)` |
-| string | `Location` | `apps/mist/src/strategy/controllers/strategy-backtest.controller.ts:77:28` | `response.setHeader('Location', `/v1/strategy-backtests/${runId}`)` |
-| string | `Location` | `apps/mist/src/strategy/controllers/strategy-backtest.controller.ts:81:28` | `response.setHeader('Location', `/v1/strategy-backtests/${error.runId}`)` |
+| string | `TDX_BASE_URL` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:97:40` | `config.get<string>('TDX_BASE_URL')` |
+| string | `TDX_WS_CLIENT_ID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:99:26` | `config.get<string>('TDX_WS_CLIENT_ID')` |
+| string | `ws` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:100:46` | `baseUrl.replace(/^http/, 'ws')` |
+| string | `TDX_WS_RECONNECT_DELAY_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:102:7` | `config.get<number>( 'TDX_WS_RECONNECT_DELAY_MS', DEFAULT_WS_RECONNECT_DELAY_MS, )` |
+| string | `TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:106:7` | `config.get<number>( 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT_MS', DEFAULT_SUBSCRIPTION_CONTROL_TIMEOUT_MS, ` |
+| string | `TDX_WS_HEARTBEAT_INTERVAL_MS` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:110:7` | `config.get<number>( 'TDX_WS_HEARTBEAT_INTERVAL_MS', DEFAULT_WS_HEARTBEAT_INTERVAL_MS, )` |
+| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:139:36` | `localFailure(unauthorized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:156:34` | `localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:170:34` | `localFailure(normalized, 'TDX_SUBSCRIPTION_SYMBOL_NOT_AUTHORIZED')` |
+| string | `TDX_SUBSCRIPTION_CONTROL_NOT_READY` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:195:30` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_NOT_READY')` |
+| string | `TDX_SUBSCRIPTION_CONTROL_BUSY` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:200:30` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_BUSY')` |
+| string | `TDX_SUBSCRIPTION_CONTROL_TIMEOUT` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:207:38` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_TIMEOUT')` |
+| string | `TDX_SUBSCRIPTION_CONTROL_SEND_FAILED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:216:38` | `localFailure(symbol, 'TDX_SUBSCRIPTION_CONTROL_SEND_FAILED')` |
+| string | `ping` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:235:47` | `type: 'ping'` |
+| string | `TDX_REALTIME_WS_ERROR` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:247:27` | `this.store.setError('TDX_REALTIME_WS_ERROR', error.message)` |
+| string | `decodeError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:286:9` | `this.store.recordReject( 'decodeError', null, error instanceof Error ? error.message : 'TDX_REALTIME` |
+| string | `realtime.ready` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:292:29` | `message['type'] === 'realtime.ready'` |
+| string | `realtime.native_snapshot` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:300:29` | `message['type'] === 'realtime.native_snapshot'` |
+| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:308:31` | `message['provider'] !== 'tdx'` |
+| string | `builtin` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:310:24` | `data['mode'] !== 'builtin'` |
+| string | `TDX` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:312:26` | `data['source'] !== 'TDX'` |
+| string | `latest-state` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:313:27` | `data['quality'] !== 'latest-state'` |
+| string | `contractMismatch` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:320:9` | `this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )` |
+| string | `TDX_REALTIME_READY_CONTRACT_MISMATCH` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:322:9` | `this.store.recordReject( 'contractMismatch', null, 'TDX_REALTIME_READY_CONTRACT_MISMATCH', )` |
+| string | `candle.snapshot.process` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:346:20` | `withCandleSpan('candle.snapshot.process', (span) => { span.setAttribute('source', 'tdx'); const reje` |
+| string | `source` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:347:25` | `span.setAttribute('source', 'tdx')` |
+| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:347:35` | `span.setAttribute('source', 'tdx')` |
+| string | `rejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:349:23` | `span.addEvent('rejected', { reason })` |
+| string | `transport_not_ready` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:356:16` | `reject('transport_not_ready', null)` |
+| string | `validationError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:358:11` | `this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )` |
+| string | `TDX_REALTIME_READY_REQUIRED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:360:11` | `this.store.recordReject( 'validationError', null, 'TDX_REALTIME_READY_REQUIRED', )` |
+| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:366:59` | `decodeRealtimeNativeMapMessage(message, 'tdx')` |
+| string | `symbol` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:383:25` | `span.setAttribute('symbol', providerSymbol)` |
+| string | `capturedAt` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:384:25` | `span.setAttribute('capturedAt', decoded.data.capturedAt)` |
+| string | `symbol_invalid` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:386:16` | `reject('symbol_invalid', providerSymbol)` |
+| string | `validationError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:388:11` | `this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )` |
+| string | `TDX_REALTIME_NATIVE_INVALID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:390:11` | `this.store.recordReject( 'validationError', providerSymbol, 'TDX_REALTIME_NATIVE_INVALID', )` |
+| string | `not_authorized` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:396:16` | `reject('not_authorized', providerSymbol)` |
+| string | `symbolNotAuthorized` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:398:11` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
+| string | `TDX_REALTIME_SYMBOL_NOT_AUTHORIZED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:400:11` | `this.store.recordReject( 'symbolNotAuthorized', providerSymbol, 'TDX_REALTIME_SYMBOL_NOT_AUTHORIZED'` |
+| number | `20` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:414:21` | `Object.keys(nativeRecord) .sort() .slice(0, 20)` |
+| string | `converter_error` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:426:16` | `reject('converter_error', providerSymbol)` |
+| string | `converterError` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:428:11` | `this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )` |
+| string | `TDX_REALTIME_CONVERTER_FAILED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:430:11` | `this.store.recordReject( 'converterError', providerSymbol, 'TDX_REALTIME_CONVERTER_FAILED', )` |
+| string | `tdx` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:441:31` | `message['provider'] !== 'tdx'` |
+| string | `controlResponseRejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:447:9` | `this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
+| string | `TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:449:9` | `this.store.recordReject( 'controlResponseRejected', null, 'TDX_SUBSCRIPTION_CONTROL_RESPONSE_REJECTE` |
+| string | `controlResponseRejected` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:456:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON` |
+| string | `TDX_SUBSCRIPTION_CONTROL_RESPONSE_INVALID` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:458:9` | `this.store.recordReject( 'controlResponseRejected', pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_RESPON` |
+| string | `TDX_SUBSCRIPTION_CONTROL_DISCONNECTED` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:473:36` | `localFailure(pending.symbol, 'TDX_SUBSCRIPTION_CONTROL_DISCONNECTED')` |
+| string | `success` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:483:19` | `keys[0] === 'success'` |
+| string | `failure` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:484:19` | `keys[0] !== 'failure'` |
+| number | `3` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:488:57` | `failureKeys.length !== 3` |
+| number | `3` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:494:29` | `failureKeys.length === 3` |
+| string | `subscribed` | `apps/mist/src/sources/tdx/realtime/realtime.client.ts:495:40` | `failure['subscriptionState'] !== 'subscribed'` |
+| string | `TDX_BASE_URL` | `apps/mist/src/sources/tdx/tdx-source.service.ts:74:38` | `this.configService.get<string>('TDX_BASE_URL')` |
+| string | `/v1/bars/query` | `apps/mist/src/sources/tdx/tdx-source.service.ts:103:9` | `this.axios.post<TdxEnvelope<TdxBarsResponseData>>( '/v1/bars/query', { symbols: [formatCode], period` |
+| string | `front` | `apps/mist/src/sources/tdx/tdx-source.service.ts:110:25` | `dividendType: 'front'` |
+| string | `TDX bars query failed` | `apps/mist/src/sources/tdx/tdx-source.service.ts:117:43` | `this.throwEnvelopeError(envelope, 'TDX bars query failed')` |
+| string | `volume` | `apps/mist/src/sources/tdx/tdx-source.service.ts:134:55` | `normalizeTdxBarQuantity(bar.volume, 'volume')` |
+| string | `amount` | `apps/mist/src/sources/tdx/tdx-source.service.ts:135:55` | `normalizeTdxBarQuantity(bar.amount, 'amount')` |
+| string | `/v1/reference/dividend-factors/query` | `apps/mist/src/sources/tdx/tdx-source.service.ts:161:9` | `this.axios.post< TdxEnvelope<TdxDividendFactorsResponseData> >('/v1/reference/dividend-factors/query` |
+| string | `yyyyMMdd` | `apps/mist/src/sources/tdx/tdx-source.service.ts:163:66` | `formatInTimeZone(startDate, MARKET_TIME_ZONE, 'yyyyMMdd')` |
+| string | `yyyyMMdd` | `apps/mist/src/sources/tdx/tdx-source.service.ts:164:62` | `formatInTimeZone(endDate, MARKET_TIME_ZONE, 'yyyyMMdd')` |
+| number | `4` | `apps/mist/src/sources/tdx/tdx-source.service.ts:212:31` | `date.slice(0, 4)` |
+| number | `4` | `apps/mist/src/sources/tdx/tdx-source.service.ts:212:48` | `date.slice(4, 6)` |
+| number | `6` | `apps/mist/src/sources/tdx/tdx-source.service.ts:212:51` | `date.slice(4, 6)` |
+| number | `6` | `apps/mist/src/sources/tdx/tdx-source.service.ts:212:68` | `date.slice(6, 8)` |
+| number | `8` | `apps/mist/src/sources/tdx/tdx-source.service.ts:212:71` | `date.slice(6, 8)` |
+| string | `amount` | `apps/mist/src/sources/tdx/tdx-source.service.ts:351:21` | `fieldName === 'amount'` |
+| number | `10000` | `apps/mist/src/sources/tdx/tdx-source.service.ts:355:20` | `Decimal8.parseCanonical(normalized) .scaleByUnit(10_000)` |
+| string | `Location` | `apps/mist/src/strategy/controllers/strategy-backtest.controller.ts:83:28` | `response.setHeader('Location', `/v1/strategy-backtests/${runId}`)` |
+| string | `Location` | `apps/mist/src/strategy/controllers/strategy-backtest.controller.ts:87:28` | `response.setHeader('Location', `/v1/strategy-backtests/${error.runId}`)` |
+| string | `Location` | `apps/mist/src/strategy/controllers/strategy-backtest.controller.ts:125:11` | `response.setHeader( 'Location', `/v1/strategy-backtests/suites/${suiteId}`, )` |
+| string | `Location` | `apps/mist/src/strategy/controllers/strategy-backtest.controller.ts:132:28` | `response.setHeader('Location', `/v1/strategy-backtests/${error.runId}`)` |
 | number | `50` | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10:11` | `@Type(() => Number) @IsOptional() @IsInt() @Min(1) @Max(100) limit = 50;` |
 | number | `50` | `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27:11` | `@ApiPropertyOptional({ description: 'Maximum number of runs to return (1-100)', default: 50, maximum` |
-| string | `BACKTEST_COMMAND_TIMEOUT_MS` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:51:31` | `this.config.get<number>('BACKTEST_COMMAND_TIMEOUT_MS')` |
-| number | `3000` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:51:65` | `this.config.get<number>('BACKTEST_COMMAND_TIMEOUT_MS') ?? 3_000` |
-| string | `ECONNREFUSED` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:86:14` | `code === 'ECONNREFUSED'` |
-| string | `ECONNRESET` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:87:14` | `code === 'ECONNRESET'` |
-| string | `EHOSTUNREACH` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:88:14` | `code === 'EHOSTUNREACH'` |
-| string | `ENETUNREACH` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:89:14` | `code === 'ENETUNREACH'` |
-| string | `BACKTEST_STARTUP_UNAVAILABLE` | `apps/mist/src/strategy/runtime/backtest-startup-compensation.service.ts:48:38` | `this.failPending(cutoff, 'BACKTEST_STARTUP_UNAVAILABLE')` |
-| string | `timeout` | `apps/mist/src/strategy/runtime/backtest-startup-compensation.service.ts:66:72` | `error.kind === 'timeout'` |
-| string | `BACKTEST_HEALTH_URL` | `apps/mist/src/strategy/runtime/backtest-startup-compensation.service.ts:75:41` | `this.config.get<string>('BACKTEST_HEALTH_URL')` |
+| string | `BACKTEST_COMMAND_TIMEOUT_MS` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:52:31` | `this.config.get<number>('BACKTEST_COMMAND_TIMEOUT_MS')` |
+| string | `ECONNREFUSED` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:88:14` | `code === 'ECONNREFUSED'` |
+| string | `ECONNRESET` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:89:14` | `code === 'ECONNRESET'` |
+| string | `EHOSTUNREACH` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:90:14` | `code === 'EHOSTUNREACH'` |
+| string | `ENETUNREACH` | `apps/mist/src/strategy/runtime/backtest-rpc.client.ts:91:14` | `code === 'ENETUNREACH'` |
+| string | `BACKTEST_STARTUP_UNAVAILABLE` | `apps/mist/src/strategy/runtime/backtest-startup-compensation.service.ts:49:38` | `this.failPending(cutoff, 'BACKTEST_STARTUP_UNAVAILABLE')` |
+| string | `timeout` | `apps/mist/src/strategy/runtime/backtest-startup-compensation.service.ts:67:72` | `error.kind === 'timeout'` |
+| string | `BACKTEST_HEALTH_URL` | `apps/mist/src/strategy/runtime/backtest-startup-compensation.service.ts:76:41` | `this.config.get<string>('BACKTEST_HEALTH_URL')` |
 | string | `STRATEGY_RUNTIME_REFRESH_FAILED` | `apps/mist/src/strategy/runtime/signal-registry-rpc.client.ts:61:9` | `refreshException( BadGatewayException, 'STRATEGY_RUNTIME_REFRESH_FAILED', 'Strategy runtime refresh ` |
 | string | `Strategy runtime refresh failed` | `apps/mist/src/strategy/runtime/signal-registry-rpc.client.ts:62:9` | `refreshException( BadGatewayException, 'STRATEGY_RUNTIME_REFRESH_FAILED', 'Strategy runtime refresh ` |
 | string | `STRATEGY_RUNTIME_REFRESH_TIMEOUT` | `apps/mist/src/strategy/runtime/signal-registry-rpc.client.ts:77:7` | `refreshException( GatewayTimeoutException, 'STRATEGY_RUNTIME_REFRESH_TIMEOUT', 'Strategy runtime ref` |
@@ -954,44 +992,58 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `ECONNRESET` | `apps/mist/src/strategy/runtime/signal-registry-rpc.client.ts:124:14` | `code === 'ECONNRESET'` |
 | string | `EHOSTUNREACH` | `apps/mist/src/strategy/runtime/signal-registry-rpc.client.ts:125:14` | `code === 'EHOSTUNREACH'` |
 | string | `ENETUNREACH` | `apps/mist/src/strategy/runtime/signal-registry-rpc.client.ts:126:14` | `code === 'ENETUNREACH'` |
-| string | `base64url` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:18:48` | `Buffer.from(payload, 'utf8').toString('base64url')` |
-| number | `512` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:27:20` | `value.length > 512` |
-| string | `=` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:28:20` | `value.includes('=')` |
-| string | `base64url` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:35:44` | `Buffer.from(value, 'base64url')` |
-| string | `VALIDATION_ERROR` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:82:15` | `code: 'VALIDATION_ERROR'` |
-| string | `startDate must not be after endDate` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:83:18` | `message: 'startDate must not be after endDate'` |
-| string | `STRATEGY_CONFIG_INVALID` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:115:17` | `code: 'STRATEGY_CONFIG_INVALID'` |
-| string | `run_failed` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:143:33` | `result.error.code === 'run_failed'` |
-| string | `missing` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:162:27` | `failed.status === 'missing'` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:166:11` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', run.id, )` |
-| string | `queue_full` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:172:33` | `result.error.code === 'queue_full'` |
-| number | `429` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:174:11` | `new BacktestCommandHttpException( 429, 'BACKTEST_QUEUE_FULL', 'Backtest queue is full', run.id, Back` |
-| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:182:9` | `new BacktestCommandHttpException( 503, 'BACKTEST_NOT_READY', 'Backtest service is not ready', run.id` |
-| string | `timeout` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:200:22` | `error.kind === 'timeout'` |
-| string | `unavailable` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:202:26` | `error.kind === 'unavailable'` |
-| string | `timeout` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:206:24` | `error.kind === 'timeout'` |
-| number | `504` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:209:11` | `new BacktestCommandHttpException( 504, 'BACKTEST_COMMAND_TIMEOUT', 'Backtest command timed out', run` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:224:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
-| string | `unavailable` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:230:24` | `error.kind === 'unavailable'` |
-| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:233:11` | `new BacktestCommandHttpException( 503, 'BACKTEST_UNAVAILABLE', 'Backtest service is unavailable', ru` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:248:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:257:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, BacktestRun` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:272:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, BacktestRun` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:280:7` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
-| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:312:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
-| string | `PENDING` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:322:34` | `initialStatus: 'PENDING'` |
-| number | `50` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:62:53` | `query?.limit ?? 50` |
-| string | `run` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:64:27` | `this.runRepository .createQueryBuilder('run')` |
-| string | `run.id` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:65:16` | `this.runRepository .createQueryBuilder('run') .orderBy('run.id', 'DESC')` |
-| string | `run.strategyDefinitionId = :strategyDefinitionId` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:69:21` | `builder.where('run.strategyDefinitionId = :strategyDefinitionId', { strategyDefinitionId: query.stra` |
-| string | `VALIDATION_ERROR` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:108:17` | `code: 'VALIDATION_ERROR'` |
-| string | `Request validation failed` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:109:20` | `message: 'Request validation failed'` |
-| number | `50` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:114:34` | `query.limit ?? 50` |
-| string | `result` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:116:27` | `this.resultRepository .createQueryBuilder('result')` |
-| string | `result.backtestRunId = :runId` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:131:14` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
-| string | `result.signalTime` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:132:16` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
-| string | `result.id` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:133:19` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
-| string | `(result.signalTime > :signalTime OR (result.signalTime = :signalTime AND result.id > :id))` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:137:9` | `builder.andWhere( '(result.signalTime > :signalTime OR (result.signalTime = :signalTime AND result.i` |
+| string | `base64url` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:20:48` | `Buffer.from(payload, 'utf8').toString('base64url')` |
+| number | `512` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:29:20` | `value.length > 512` |
+| string | `=` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:30:20` | `value.includes('=')` |
+| string | `base64url` | `apps/mist/src/strategy/services/backtest-result-cursor.ts:37:44` | `Buffer.from(value, 'base64url')` |
+| string | `VALIDATION_ERROR` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:85:15` | `code: 'VALIDATION_ERROR'` |
+| string | `startDate must not be after endDate` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:86:18` | `message: 'startDate must not be after endDate'` |
+| string | `STRATEGY_CONFIG_INVALID` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:118:17` | `code: 'STRATEGY_CONFIG_INVALID'` |
+| string | `run_failed` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:146:33` | `result.error.code === 'run_failed'` |
+| string | `missing` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:165:27` | `failed.status === 'missing'` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:169:11` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', run.id, )` |
+| string | `queue_full` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:175:33` | `result.error.code === 'queue_full'` |
+| number | `429` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:177:11` | `new BacktestCommandHttpException( 429, 'BACKTEST_QUEUE_FULL', 'Backtest queue is full', run.id, Back` |
+| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:185:9` | `new BacktestCommandHttpException( 503, 'BACKTEST_NOT_READY', 'Backtest service is not ready', run.id` |
+| string | `VALIDATION_ERROR` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:212:15` | `code: 'VALIDATION_ERROR'` |
+| string | `startDate must not be after endDate` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:213:18` | `message: 'startDate must not be after endDate'` |
+| string | `STRATEGY_CONFIG_INVALID` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:243:17` | `code: 'STRATEGY_CONFIG_INVALID'` |
+| string | `MASTER` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:274:16` | `stage: 'MASTER'` |
+| string | `PENDING` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:290:26` | `initialStatus: 'PENDING'` |
+| string | `run_failed` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:293:33` | `result.error.code === 'run_failed'` |
+| string | `PENDING` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:316:26` | `initialStatus: 'PENDING'` |
+| string | `missing` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:320:27` | `failed.status === 'missing'` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:324:11` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', masterRun.id, )` |
+| string | `queue_full` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:330:33` | `result.error.code === 'queue_full'` |
+| number | `429` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:332:11` | `new BacktestCommandHttpException( 429, 'BACKTEST_QUEUE_FULL', 'Backtest queue is full', masterRun.id` |
+| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:340:9` | `new BacktestCommandHttpException( 503, 'BACKTEST_NOT_READY', 'Backtest service is not ready', master` |
+| string | `PENDING` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:352:24` | `initialStatus: 'PENDING'` |
+| string | `timeout` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:363:22` | `error.kind === 'timeout'` |
+| string | `unavailable` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:365:26` | `error.kind === 'unavailable'` |
+| string | `timeout` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:369:24` | `error.kind === 'timeout'` |
+| number | `504` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:372:11` | `new BacktestCommandHttpException( 504, 'BACKTEST_COMMAND_TIMEOUT', 'Backtest command timed out', run` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:387:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
+| string | `unavailable` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:393:24` | `error.kind === 'unavailable'` |
+| number | `503` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:396:11` | `new BacktestCommandHttpException( 503, 'BACKTEST_UNAVAILABLE', 'Backtest service is unavailable', ru` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:411:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:420:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, BacktestRun` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:435:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, BacktestRun` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:443:7` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
+| number | `500` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:475:9` | `new BacktestCommandHttpException( 500, 'INTERNAL_ERROR', 'Internal Server Error', runId, )` |
+| string | `PENDING` | `apps/mist/src/strategy/services/backtest-run-command.service.ts:485:34` | `initialStatus: 'PENDING'` |
+| string | `WFA` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:73:44` | `masterRun.scenarioId === 'WFA'` |
+| number | `50` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:89:53` | `query?.limit ?? 50` |
+| string | `run` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:91:27` | `this.runRepository .createQueryBuilder('run')` |
+| string | `run.id` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:92:16` | `this.runRepository .createQueryBuilder('run') .orderBy('run.id', 'DESC')` |
+| string | `run.strategyDefinitionId = :strategyDefinitionId` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:96:21` | `builder.where('run.strategyDefinitionId = :strategyDefinitionId', { strategyDefinitionId: query.stra` |
+| string | `VALIDATION_ERROR` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:135:17` | `code: 'VALIDATION_ERROR'` |
+| string | `Request validation failed` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:136:20` | `message: 'Request validation failed'` |
+| number | `50` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:141:34` | `query.limit ?? 50` |
+| string | `result` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:143:27` | `this.resultRepository .createQueryBuilder('result')` |
+| string | `result.backtestRunId = :runId` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:158:14` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
+| string | `result.signalTime` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:159:16` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
+| string | `result.id` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:160:19` | `this.resultRepository .createQueryBuilder('result') .select([ 'result.id', 'result.backtestRunId', '` |
+| string | `(result.signalTime > :signalTime OR (result.signalTime = :signalTime AND result.id > :id))` | `apps/mist/src/strategy/services/backtest-run-query.service.ts:164:9` | `builder.andWhere( '(result.signalTime > :signalTime OR (result.signalTime = :signalTime AND result.i` |
 | string | `CHAN_BSP_KIND_RETIRED` | `apps/mist/src/strategy/services/strategy-definition.service.ts:42:15` | `code: 'CHAN_BSP_KIND_RETIRED'` |
 | string | `chan_bsp kind is retired; create a decision_flow definition instead` | `apps/mist/src/strategy/services/strategy-definition.service.ts:44:11` | `message: 'chan_bsp kind is retired; create a decision_flow definition instead'` |
 | string | `CHAN_BSP_KIND_RETIRED` | `apps/mist/src/strategy/services/strategy-definition.service.ts:123:19` | `code: 'CHAN_BSP_KIND_RETIRED'` |
@@ -1003,47 +1055,47 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `24` | `apps/mist/src/visual/visual.controller.ts:94:43` | `60 * 24` |
 | number | `3600` | `apps/mist/src/visual/visual.controller.ts:94:48` | `60 * 24 * 3600` |
 | number | `1000` | `apps/mist/src/visual/visual.controller.ts:94:55` | `60 * 24 * 3600 * 1000` |
-| string | `NOTIFICATION_HTTP_TIMEOUT_MS` | `apps/notification/src/channels/feishu.channel-adapter.ts:55:31` | `this.config.get<number>('NOTIFICATION_HTTP_TIMEOUT_MS')` |
-| string | `permanent_failure` | `apps/notification/src/channels/feishu.channel-adapter.ts:60:17` | `status: 'permanent_failure'` |
-| string | `FEISHU_WEBHOOK_MISSING` | `apps/notification/src/channels/feishu.channel-adapter.ts:62:20` | `errorCode: 'FEISHU_WEBHOOK_MISSING'` |
-| string | `text` | `apps/notification/src/channels/feishu.channel-adapter.ts:67:17` | `msg_type: 'text'` |
-| number | `1000` | `apps/notification/src/channels/feishu.channel-adapter.ts:72:61` | `Date.now() / 1000` |
-| string | `sha256` | `apps/notification/src/channels/feishu.channel-adapter.ts:77:31` | `createHmac('sha256', stringToSign)` |
-| string | `sent` | `apps/notification/src/channels/feishu.channel-adapter.ts:97:26` | `status: 'sent'` |
-| string | `transient_failure` | `apps/notification/src/channels/feishu.channel-adapter.ts:106:17` | `status: 'transient_failure'` |
-| string | `NOTIFICATION_QQ_BASE_URL` | `apps/notification/src/channels/qq.channel-adapter.ts:33:31` | `this.config.get<string>('NOTIFICATION_QQ_BASE_URL')` |
-| string | `NOTIFICATION_QQ_TARGET` | `apps/notification/src/channels/qq.channel-adapter.ts:36:31` | `this.config.get<string>('NOTIFICATION_QQ_TARGET')` |
-| string | `NOTIFICATION_QQ_MESSAGE_TYPE` | `apps/notification/src/channels/qq.channel-adapter.ts:39:31` | `this.config.get<string>('NOTIFICATION_QQ_MESSAGE_TYPE')` |
-| string | `NOTIFICATION_QQ_ACCESS_TOKEN` | `apps/notification/src/channels/qq.channel-adapter.ts:40:43` | `this.config.get<string>('NOTIFICATION_QQ_ACCESS_TOKEN')` |
-| string | `NOTIFICATION_HTTP_TIMEOUT_MS` | `apps/notification/src/channels/qq.channel-adapter.ts:42:31` | `this.config.get<number>('NOTIFICATION_HTTP_TIMEOUT_MS')` |
-| string | `permanent_failure` | `apps/notification/src/channels/qq.channel-adapter.ts:47:17` | `status: 'permanent_failure'` |
-| string | `QQ adapter not configured (NOTIFICATION_QQ_BASE_URL/TARGET missing)` | `apps/notification/src/channels/qq.channel-adapter.ts:49:11` | `error: 'QQ adapter not configured (NOTIFICATION_QQ_BASE_URL/TARGET missing)'` |
-| string | `QQ_NOT_CONFIGURED` | `apps/notification/src/channels/qq.channel-adapter.ts:50:20` | `errorCode: 'QQ_NOT_CONFIGURED'` |
-| string | `private` | `apps/notification/src/channels/qq.channel-adapter.ts:54:41` | `messageType === 'private'` |
-| string | `text` | `apps/notification/src/channels/qq.channel-adapter.ts:58:25` | `type: 'text'` |
-| string | `ok` | `apps/notification/src/channels/qq.channel-adapter.ts:74:27` | `json.status === 'ok'` |
-| string | `sent` | `apps/notification/src/channels/qq.channel-adapter.ts:77:19` | `status: 'sent'` |
-| string | `transient_failure` | `apps/notification/src/channels/qq.channel-adapter.ts:85:17` | `status: 'transient_failure'` |
-| string | `transient_failure` | `apps/notification/src/channels/qq.channel-adapter.ts:90:17` | `status: 'transient_failure'` |
-| string | `NOTIFICATION_HTTP_TIMEOUT_MS` | `apps/notification/src/channels/wechat.channel-adapter.ts:40:31` | `this.config.get<number>('NOTIFICATION_HTTP_TIMEOUT_MS')` |
-| string | `permanent_failure` | `apps/notification/src/channels/wechat.channel-adapter.ts:45:17` | `status: 'permanent_failure'` |
-| string | `WECOM_WEBHOOK_MISSING` | `apps/notification/src/channels/wechat.channel-adapter.ts:47:20` | `errorCode: 'WECOM_WEBHOOK_MISSING'` |
-| string | `text` | `apps/notification/src/channels/wechat.channel-adapter.ts:52:16` | `msgtype: 'text'` |
-| string | `sent` | `apps/notification/src/channels/wechat.channel-adapter.ts:65:26` | `status: 'sent'` |
-| string | `transient_failure` | `apps/notification/src/channels/wechat.channel-adapter.ts:74:17` | `status: 'transient_failure'` |
-| string | `transient_failure` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:115:17` | `status: 'transient_failure'` |
-| string | `sent` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:121:27` | `result.status === 'sent'` |
-| string | `permanent_failure` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:138:40` | `result.status === 'permanent_failure'` |
-| string | `transient_failure` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:151:27` | `result.status === 'transient_failure'` |
-| string | `qq` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:201:19` | `channel === 'qq'` |
-| string | `feishu` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:202:19` | `channel === 'feishu'` |
+| string | `NOTIFICATION_HTTP_TIMEOUT_MS` | `apps/notification/src/channels/feishu.channel-adapter.ts:57:31` | `this.config.get<number>('NOTIFICATION_HTTP_TIMEOUT_MS')` |
+| string | `permanent_failure` | `apps/notification/src/channels/feishu.channel-adapter.ts:62:17` | `status: 'permanent_failure'` |
+| string | `FEISHU_WEBHOOK_MISSING` | `apps/notification/src/channels/feishu.channel-adapter.ts:64:20` | `errorCode: 'FEISHU_WEBHOOK_MISSING'` |
+| string | `text` | `apps/notification/src/channels/feishu.channel-adapter.ts:69:17` | `msg_type: 'text'` |
+| number | `1000` | `apps/notification/src/channels/feishu.channel-adapter.ts:74:61` | `Date.now() / 1000` |
+| string | `sha256` | `apps/notification/src/channels/feishu.channel-adapter.ts:79:31` | `createHmac('sha256', stringToSign)` |
+| string | `sent` | `apps/notification/src/channels/feishu.channel-adapter.ts:99:26` | `status: 'sent'` |
+| string | `transient_failure` | `apps/notification/src/channels/feishu.channel-adapter.ts:108:17` | `status: 'transient_failure'` |
+| string | `NOTIFICATION_QQ_BASE_URL` | `apps/notification/src/channels/qq.channel-adapter.ts:35:31` | `this.config.get<string>('NOTIFICATION_QQ_BASE_URL')` |
+| string | `NOTIFICATION_QQ_TARGET` | `apps/notification/src/channels/qq.channel-adapter.ts:38:31` | `this.config.get<string>('NOTIFICATION_QQ_TARGET')` |
+| string | `NOTIFICATION_QQ_MESSAGE_TYPE` | `apps/notification/src/channels/qq.channel-adapter.ts:41:31` | `this.config.get<string>('NOTIFICATION_QQ_MESSAGE_TYPE')` |
+| string | `NOTIFICATION_QQ_ACCESS_TOKEN` | `apps/notification/src/channels/qq.channel-adapter.ts:42:43` | `this.config.get<string>('NOTIFICATION_QQ_ACCESS_TOKEN')` |
+| string | `NOTIFICATION_HTTP_TIMEOUT_MS` | `apps/notification/src/channels/qq.channel-adapter.ts:44:31` | `this.config.get<number>('NOTIFICATION_HTTP_TIMEOUT_MS')` |
+| string | `permanent_failure` | `apps/notification/src/channels/qq.channel-adapter.ts:49:17` | `status: 'permanent_failure'` |
+| string | `QQ adapter not configured (NOTIFICATION_QQ_BASE_URL/TARGET missing)` | `apps/notification/src/channels/qq.channel-adapter.ts:51:11` | `error: 'QQ adapter not configured (NOTIFICATION_QQ_BASE_URL/TARGET missing)'` |
+| string | `QQ_NOT_CONFIGURED` | `apps/notification/src/channels/qq.channel-adapter.ts:52:20` | `errorCode: 'QQ_NOT_CONFIGURED'` |
+| string | `private` | `apps/notification/src/channels/qq.channel-adapter.ts:56:41` | `messageType === 'private'` |
+| string | `text` | `apps/notification/src/channels/qq.channel-adapter.ts:60:25` | `type: 'text'` |
+| string | `ok` | `apps/notification/src/channels/qq.channel-adapter.ts:76:27` | `json.status === 'ok'` |
+| string | `sent` | `apps/notification/src/channels/qq.channel-adapter.ts:79:19` | `status: 'sent'` |
+| string | `transient_failure` | `apps/notification/src/channels/qq.channel-adapter.ts:87:17` | `status: 'transient_failure'` |
+| string | `transient_failure` | `apps/notification/src/channels/qq.channel-adapter.ts:92:17` | `status: 'transient_failure'` |
+| string | `NOTIFICATION_HTTP_TIMEOUT_MS` | `apps/notification/src/channels/wechat.channel-adapter.ts:42:31` | `this.config.get<number>('NOTIFICATION_HTTP_TIMEOUT_MS')` |
+| string | `permanent_failure` | `apps/notification/src/channels/wechat.channel-adapter.ts:47:17` | `status: 'permanent_failure'` |
+| string | `WECOM_WEBHOOK_MISSING` | `apps/notification/src/channels/wechat.channel-adapter.ts:49:20` | `errorCode: 'WECOM_WEBHOOK_MISSING'` |
+| string | `text` | `apps/notification/src/channels/wechat.channel-adapter.ts:54:16` | `msgtype: 'text'` |
+| string | `sent` | `apps/notification/src/channels/wechat.channel-adapter.ts:67:26` | `status: 'sent'` |
+| string | `transient_failure` | `apps/notification/src/channels/wechat.channel-adapter.ts:76:17` | `status: 'transient_failure'` |
+| string | `transient_failure` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:117:17` | `status: 'transient_failure'` |
+| string | `sent` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:123:27` | `result.status === 'sent'` |
+| string | `permanent_failure` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:140:40` | `result.status === 'permanent_failure'` |
+| string | `transient_failure` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:153:27` | `result.status === 'transient_failure'` |
+| string | `qq` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:203:19` | `channel === 'qq'` |
+| string | `feishu` | `apps/notification/src/delivery/alert-channel-delivery.service.ts:204:19` | `channel === 'feishu'` |
 | string | `MIST_REALTIME_REDIS_URL` | `apps/notification/src/delivery/alert-delivery-queue.service.ts:34:30` | `config.get<string>('MIST_REALTIME_REDIS_URL')` |
 | number | `5000` | `apps/notification/src/delivery/alert-delivery-queue.service.ts:38:25` | `connectTimeout: 5_000` |
 | number | `3000` | `apps/notification/src/delivery/alert-delivery-queue.service.ts:39:25` | `commandTimeout: 3_000` |
 | string | `waiting` | `apps/notification/src/delivery/alert-delivery-queue.service.ts:101:45` | `this.queue.getJobCounts('waiting', 'active', 'delayed')` |
 | string | `active` | `apps/notification/src/delivery/alert-delivery-queue.service.ts:101:56` | `this.queue.getJobCounts('waiting', 'active', 'delayed')` |
 | string | `delayed` | `apps/notification/src/delivery/alert-delivery-queue.service.ts:101:66` | `this.queue.getJobCounts('waiting', 'active', 'delayed')` |
-| string | ` \| ` | `apps/notification/src/delivery/notification-envelope.ts:112:60` | `xs.filter(Boolean).join(' \| ')` |
+| string | ` \| ` | `apps/notification/src/delivery/notification-envelope.ts:113:60` | `xs.filter(Boolean).join(' \| ')` |
 | string | `ok` | `apps/notification/src/health/health.controller.ts:9:15` | `status: 'ok'` |
 | string | `notification` | `apps/notification/src/health/health.controller.ts:10:16` | `service: 'notification'` |
 | string | `notification` | `apps/notification/src/health/health.controller.ts:11:17` | `instance: 'notification'` |
@@ -1077,14 +1129,14 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `OO health-alert deliveries by status (sent/failed) and channel (process-local)` | `apps/notification/src/observability/oo-alert-metrics.ts:24:9` | `description: 'OO health-alert deliveries by status (sent/failed) and channel (process-local)'` |
 | string | `sent` | `apps/notification/src/observability/oo-alert-metrics.ts:29:41` | `status: 'sent'` |
 | string | `failed` | `apps/notification/src/observability/oo-alert-metrics.ts:32:41` | `status: 'failed'` |
-| string | `NOTIFICATION_CHANNELS` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:48:34` | `configService.get<string>('NOTIFICATION_CHANNELS')` |
-| string | `qq` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:53:35` | `channels.has('qq')` |
-| string | `OO_ALERT_FEISHU_WEBHOOK` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:58:35` | `configService.get<string>('OO_ALERT_FEISHU_WEBHOOK')` |
-| string | `NOTIFICATION_FEISHU_WEBHOOK` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:59:35` | `configService.get<string>('NOTIFICATION_FEISHU_WEBHOOK')` |
-| string | `sent` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:105:29` | `result.status === 'sent'` |
-| string | `permanent_failure` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:109:29` | `result.status === 'permanent_failure'` |
-| string | `feishu` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:114:23` | `channel === 'feishu'` |
-| string | `FEISHU_WEBHOOK_MISSING` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:114:56` | `result.errorCode === 'FEISHU_WEBHOOK_MISSING'` |
+| string | `NOTIFICATION_CHANNELS` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:50:34` | `configService.get<string>('NOTIFICATION_CHANNELS')` |
+| string | `qq` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:55:35` | `channels.has('qq')` |
+| string | `OO_ALERT_FEISHU_WEBHOOK` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:60:35` | `configService.get<string>('OO_ALERT_FEISHU_WEBHOOK')` |
+| string | `NOTIFICATION_FEISHU_WEBHOOK` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:61:35` | `configService.get<string>('NOTIFICATION_FEISHU_WEBHOOK')` |
+| string | `sent` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:107:29` | `result.status === 'sent'` |
+| string | `permanent_failure` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:111:29` | `result.status === 'permanent_failure'` |
+| string | `feishu` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:116:23` | `channel === 'feishu'` |
+| string | `FEISHU_WEBHOOK_MISSING` | `apps/notification/src/oo-alert/oo-alert-delivery.worker.ts:116:56` | `result.errorCode === 'FEISHU_WEBHOOK_MISSING'` |
 | string | `MIST_REALTIME_REDIS_URL` | `apps/notification/src/oo-alert/oo-alert-queue.service.ts:27:30` | `config.get<string>('MIST_REALTIME_REDIS_URL')` |
 | number | `5000` | `apps/notification/src/oo-alert/oo-alert-queue.service.ts:31:25` | `connectTimeout: 5_000` |
 | number | `3000` | `apps/notification/src/oo-alert/oo-alert-queue.service.ts:32:25` | `commandTimeout: 3_000` |
@@ -1097,77 +1149,77 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `delayed` | `apps/notification/src/oo-alert/oo-alert-queue.service.ts:55:66` | `this.queue.getJobCounts('waiting', 'active', 'delayed')` |
 | string | `OO_ALERT_RECEIVER_TOKEN` | `apps/notification/src/oo-alert/oo-alert-receiver.controller.ts:44:46` | `this.config.get<string>('OO_ALERT_RECEIVER_TOKEN')` |
 | number | `512` | `apps/notification/src/oo-alert/oo-alert-receiver.controller.ts:81:46` | `JSON.stringify(body).slice(0, 512)` |
-| number | `5` | `apps/schedule/src/data-collection.controller.ts:105:26` | `now.getDay() === 5` |
-| string | `nightly_2230` | `apps/schedule/src/data-collection.controller.ts:119:17` | `window: 'nightly_2230'` |
-| number | `5` | `apps/schedule/src/data-collection.controller.ts:160:41` | `previousTradingDay.getDay() === 5` |
-| string | `morning_0630` | `apps/schedule/src/data-collection.controller.ts:168:17` | `window: 'morning_0630'` |
+| number | `5` | `apps/schedule/src/data-collection.controller.ts:107:26` | `now.getDay() === 5` |
+| string | `nightly_2230` | `apps/schedule/src/data-collection.controller.ts:121:17` | `window: 'nightly_2230'` |
+| number | `5` | `apps/schedule/src/data-collection.controller.ts:162:41` | `previousTradingDay.getDay() === 5` |
+| string | `morning_0630` | `apps/schedule/src/data-collection.controller.ts:170:17` | `window: 'morning_0630'` |
 | string | `ok` | `apps/schedule/src/health/health.controller.ts:18:15` | `status: 'ok'` |
 | string | `schedule` | `apps/schedule/src/health/health.controller.ts:19:16` | `service: 'schedule'` |
 | string | `schedule` | `apps/schedule/src/health/health.controller.ts:20:17` | `instance: 'schedule'` |
 | number | `8003` | `apps/schedule/src/main.ts:8:40` | `process.env.PORT ?? 8003` |
-| string | `TDX_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:126:38` | `this.configService.get<string>('TDX_BASE_URL')` |
-| string | `QMT_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:129:38` | `this.configService.get<string>('QMT_BASE_URL')` |
-| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:138:37` | `AbortSignal.timeout(5000)` |
-| string | `QMT Journal reconciliation required (control plane locked)` | `apps/schedule/src/pre-market-inspection.service.ts:147:13` | `errors.push( 'QMT Journal reconciliation required (control plane locked)', )` |
-| string | `1. 首选：重启 QMT 终端 (XtItClient.exe，需人工登录)——bridge 重注册携带新 startedAt 后自动解锁，无需手工文件` | `apps/schedule/src/pre-market-inspection.service.ts:150:13` | `remediation.push( '1. 首选：重启 QMT 终端 (XtItClient.exe，需人工登录)——bridge 重注册携带新 startedAt 后自动解锁，无需手工文件', '2` |
-| string | `2. 备选（终端无法重启）：手工生成 F:\quant\MistAPI\datasource\state\context-rebuild-observation.json，字段必须严格为 schemaVersion=1 / observation=qmt_context_rebuilt / affectedJournalSequence=journal 当前 record_sequence / recoveryMode=terminal_process_restarted / operatorEvidenceDigest=64位小写hex / observationTime=RFC3339；格式错误会导致 qmt-datasource 启动 crash loop` | `apps/schedule/src/pre-market-inspection.service.ts:151:13` | `remediation.push( '1. 首选：重启 QMT 终端 (XtItClient.exe，需人工登录)——bridge 重注册携带新 startedAt 后自动解锁，无需手工文件', '2` |
-| string | `3. 验证：GET http://qmt-datasource:9002/health → subscriptions.reconciliationRequired=false` | `apps/schedule/src/pre-market-inspection.service.ts:152:13` | `remediation.push( '1. 首选：重启 QMT 终端 (XtItClient.exe，需人工登录)——bridge 重注册携带新 startedAt 后自动解锁，无需手工文件', '2` |
-| string | `QMT Journal is corrupted or unreadable` | `apps/schedule/src/pre-market-inspection.service.ts:156:23` | `errors.push('QMT Journal is corrupted or unreadable')` |
-| string | `degraded` | `apps/schedule/src/pre-market-inspection.service.ts:162:39` | `startupRecon['phase'] === 'degraded'` |
+| string | `TDX_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:128:38` | `this.configService.get<string>('TDX_BASE_URL')` |
+| string | `QMT_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:131:38` | `this.configService.get<string>('QMT_BASE_URL')` |
+| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:140:37` | `AbortSignal.timeout(5000)` |
+| string | `QMT Journal reconciliation required (control plane locked)` | `apps/schedule/src/pre-market-inspection.service.ts:149:13` | `errors.push( 'QMT Journal reconciliation required (control plane locked)', )` |
+| string | `1. 首选：重启 QMT 终端 (XtItClient.exe，需人工登录)——bridge 重注册携带新 startedAt 后自动解锁，无需手工文件` | `apps/schedule/src/pre-market-inspection.service.ts:152:13` | `remediation.push( '1. 首选：重启 QMT 终端 (XtItClient.exe，需人工登录)——bridge 重注册携带新 startedAt 后自动解锁，无需手工文件', '2` |
+| string | `2. 备选（终端无法重启）：手工生成 F:\quant\MistAPI\datasource\state\context-rebuild-observation.json，字段必须严格为 schemaVersion=1 / observation=qmt_context_rebuilt / affectedJournalSequence=journal 当前 record_sequence / recoveryMode=terminal_process_restarted / operatorEvidenceDigest=64位小写hex / observationTime=RFC3339；格式错误会导致 qmt-datasource 启动 crash loop` | `apps/schedule/src/pre-market-inspection.service.ts:153:13` | `remediation.push( '1. 首选：重启 QMT 终端 (XtItClient.exe，需人工登录)——bridge 重注册携带新 startedAt 后自动解锁，无需手工文件', '2` |
+| string | `3. 验证：GET http://qmt-datasource:9002/health → subscriptions.reconciliationRequired=false` | `apps/schedule/src/pre-market-inspection.service.ts:154:13` | `remediation.push( '1. 首选：重启 QMT 终端 (XtItClient.exe，需人工登录)——bridge 重注册携带新 startedAt 后自动解锁，无需手工文件', '2` |
+| string | `QMT Journal is corrupted or unreadable` | `apps/schedule/src/pre-market-inspection.service.ts:158:23` | `errors.push('QMT Journal is corrupted or unreadable')` |
+| string | `degraded` | `apps/schedule/src/pre-market-inspection.service.ts:164:39` | `startupRecon['phase'] === 'degraded'` |
 | number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:177:37` | `AbortSignal.timeout(5000)` |
-| string | `TDX & QMT 数据源就绪，Journal 对账健康` | `apps/schedule/src/pre-market-inspection.service.ts:199:16` | `summary: 'TDX & QMT 数据源就绪，Journal 对账健康'` |
-| string | `未获取到前一交易日（首日或日历初始化），跳过 K 线校验` | `apps/schedule/src/pre-market-inspection.service.ts:212:18` | `summary: '未获取到前一交易日（首日或日历初始化），跳过 K 线校验'` |
-| string | `当前无 ACTIVE 订阅标的，K 线基线无需校验` | `apps/schedule/src/pre-market-inspection.service.ts:238:18` | `summary: '当前无 ACTIVE 订阅标的，K 线基线无需校验'` |
-| number | `10` | `apps/schedule/src/pre-market-inspection.service.ts:270:40` | `missingItems.slice(0, 10)` |
-| string | `, ` | `apps/schedule/src/pre-market-inspection.service.ts:272:45` | `[...missingTargets].join(', ')` |
-| string | `, ` | `apps/schedule/src/pre-market-inspection.service.ts:303:13` | `Object.entries(bySource) .map(([s, c]) => `${s}: ${c} 标的`) .join(', ')` |
-| string | `TDX_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:318:38` | `this.configService.get<string>('TDX_BASE_URL')` |
-| string | `QMT_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:321:38` | `this.configService.get<string>('QMT_BASE_URL')` |
-| string | `TDX Bridge TCP 未就绪 (bridge_ready=0)` | `apps/schedule/src/pre-market-inspection.service.ts:337:23` | `errors.push('TDX Bridge TCP 未就绪 (bridge_ready=0)')` |
-| string | `QMT Bridge TCP 未就绪 (bridge_ready=0)` | `apps/schedule/src/pre-market-inspection.service.ts:354:23` | `errors.push('QMT Bridge TCP 未就绪 (bridge_ready=0)')` |
-| string | `实时行情 Bridge / WS 链路异常` | `apps/schedule/src/pre-market-inspection.service.ts:364:18` | `summary: '实时行情 Bridge / WS 链路异常'` |
-| string | `TDX / QMT Bridge TCP 与 WebSocket 就绪` | `apps/schedule/src/pre-market-inspection.service.ts:374:16` | `summary: 'TDX / QMT Bridge TCP 与 WebSocket 就绪'` |
-| string | `SELECT 1` | `apps/schedule/src/pre-market-inspection.service.ts:386:37` | `this.securityRepo.query('SELECT 1')` |
-| string | `SIGNAL_HEALTH_URL` | `apps/schedule/src/pre-market-inspection.service.ts:395:38` | `this.configService.get<string>('SIGNAL_HEALTH_URL')` |
-| string | `底层基础设施或服务异常` | `apps/schedule/src/pre-market-inspection.service.ts:420:18` | `summary: '底层基础设施或服务异常'` |
-| string | `MySQL 与 Signal 运行正常` | `apps/schedule/src/pre-market-inspection.service.ts:430:16` | `summary: 'MySQL 与 Signal 运行正常'` |
-| string | `BACKEND_HEALTH_URL` | `apps/schedule/src/pre-market-inspection.service.ts:439:38` | `this.configService.get<string>('BACKEND_HEALTH_URL')` |
-| string | `SIGNAL_HEALTH_URL` | `apps/schedule/src/pre-market-inspection.service.ts:442:38` | `this.configService.get<string>('SIGNAL_HEALTH_URL')` |
-| string | `TDX_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:445:38` | `this.configService.get<string>('TDX_BASE_URL')` |
-| string | `QMT_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:448:38` | `this.configService.get<string>('QMT_BASE_URL')` |
-| string | `OO_ALERT_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:451:38` | `this.configService.get<string>('OO_ALERT_FEISHU_WEBHOOK')` |
-| string | `NOTIFICATION_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:452:38` | `this.configService.get<string>('NOTIFICATION_FEISHU_WEBHOOK')` |
-| string | `飞书告警 Webhook 未配置 (NOTIFICATION_FEISHU_WEBHOOK 缺失)` | `apps/schedule/src/pre-market-inspection.service.ts:467:19` | `errors.push('飞书告警 Webhook 未配置 (NOTIFICATION_FEISHU_WEBHOOK 缺失)')` |
-| string | `在 .env 中配置有效飞书群机器人 Webhook: NOTIFICATION_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:469:9` | `remediation.push( '在 .env 中配置有效飞书群机器人 Webhook: NOTIFICATION_FEISHU_WEBHOOK', )` |
-| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:476:37` | `AbortSignal.timeout(5000)` |
-| string | `on` | `apps/schedule/src/pre-market-inspection.service.ts:493:26` | `prodMode !== 'on'` |
-| string | `在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\MistDocker\.env -Key REALTIME_PRODUCTIZATION_MODE -Value on; docker compose up -d --force-recreate mist-backend` | `apps/schedule/src/pre-market-inspection.service.ts:496:13` | `remediation.push( '在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\\MistDocker\\.env -Key REALTIME_PROD` |
-| string | `on` | `apps/schedule/src/pre-market-inspection.service.ts:499:27` | `stratMode !== 'on'` |
-| string | `在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\MistDocker\.env -Key REALTIME_STRATEGY_MODE -Value on; docker compose up -d --force-recreate mist-backend` | `apps/schedule/src/pre-market-inspection.service.ts:502:13` | `remediation.push( '在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\\MistDocker\\.env -Key REALTIME_STRA` |
-| string | `Backend Realtime Redis 处于不可用状态` | `apps/schedule/src/pre-market-inspection.service.ts:506:23` | `errors.push('Backend Realtime Redis 处于不可用状态')` |
-| string | `检查 mist-realtime-redis 容器状态及 MIST_REALTIME_REDIS_URL 配置` | `apps/schedule/src/pre-market-inspection.service.ts:508:13` | `remediation.push( '检查 mist-realtime-redis 容器状态及 MIST_REALTIME_REDIS_URL 配置', )` |
-| string | `Backend 订阅生命周期自动对账处于禁用状态 (autoReconcile=false)` | `apps/schedule/src/pre-market-inspection.service.ts:513:13` | `errors.push( 'Backend 订阅生命周期自动对账处于禁用状态 (autoReconcile=false)', )` |
-| string | `在 MySQL 中执行: INSERT INTO runtime_configs (config_key, config_value) VALUES ('realtime_subscription_auto_reconcile', 'true') ON DUPLICATE KEY UPDATE config_value='true';` | `apps/schedule/src/pre-market-inspection.service.ts:516:13` | `remediation.push( "在 MySQL 中执行: INSERT INTO runtime_configs (config_key, config_value) VALUES ('real` |
-| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:530:37` | `AbortSignal.timeout(5000)` |
-| string | `on` | `apps/schedule/src/pre-market-inspection.service.ts:541:30` | `realtimeMode !== 'on'` |
-| string | `在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\MistDocker\.env -Key REALTIME_STRATEGY_MODE -Value on; docker compose up -d --force-recreate mist-signal` | `apps/schedule/src/pre-market-inspection.service.ts:544:13` | `remediation.push( '在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\\MistDocker\\.env -Key REALTIME_STRA` |
-| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:558:37` | `AbortSignal.timeout(5000)` |
-| string | `builtin` | `apps/schedule/src/pre-market-inspection.service.ts:564:22` | `mode !== 'builtin'` |
-| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:575:37` | `AbortSignal.timeout(5000)` |
-| string | `builtin` | `apps/schedule/src/pre-market-inspection.service.ts:581:22` | `mode !== 'builtin'` |
-| string | `OO_ALERT_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:613:38` | `this.configService.get<string>('OO_ALERT_FEISHU_WEBHOOK')` |
-| string | `NOTIFICATION_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:614:38` | `this.configService.get<string>('NOTIFICATION_FEISHU_WEBHOOK')` |
-| string | `OO_ALERT_FEISHU_SECRET` | `apps/schedule/src/pre-market-inspection.service.ts:619:38` | `this.configService.get<string>('OO_ALERT_FEISHU_SECRET')` |
-| string | `NOTIFICATION_FEISHU_SECRET` | `apps/schedule/src/pre-market-inspection.service.ts:620:38` | `this.configService.get<string>('NOTIFICATION_FEISHU_SECRET')` |
-| string | `PASSED` | `apps/schedule/src/pre-market-inspection.service.ts:633:47` | `report.overallStatus === 'PASSED'` |
-| string | `全系统就绪，距离 09:15 订阅重置还有 10 分钟，距离 09:30 开盘还有 25 分钟。` | `apps/schedule/src/pre-market-inspection.service.ts:649:9` | `rows.push( '全系统就绪，距离 09:15 订阅重置还有 10 分钟，距离 09:30 开盘还有 25 分钟。', )` |
-| string | `————` | `apps/schedule/src/pre-market-inspection.service.ts:652:17` | `rows.push('————', '⚠️ 故障详情与排查指引：')` |
-| string | `⚠️ 故障详情与排查指引：` | `apps/schedule/src/pre-market-inspection.service.ts:652:25` | `rows.push('————', '⚠️ 故障详情与排查指引：')` |
-| string | `text` | `apps/schedule/src/pre-market-inspection.service.ts:669:35` | `tag: 'text'` |
-| string | `text` | `apps/schedule/src/pre-market-inspection.service.ts:672:33` | `tag: 'text'` |
-| string | `post` | `apps/schedule/src/pre-market-inspection.service.ts:687:19` | `msg_type: 'post'` |
-| number | `1000` | `apps/schedule/src/pre-market-inspection.service.ts:694:58` | `Date.now() / 1000` |
-| string | `sha256` | `apps/schedule/src/pre-market-inspection.service.ts:696:33` | `createHmac('sha256', stringToSign)` |
+| string | `TDX & QMT 数据源就绪，Journal 对账健康` | `apps/schedule/src/pre-market-inspection.service.ts:197:16` | `summary: 'TDX & QMT 数据源就绪，Journal 对账健康'` |
+| string | `未获取到前一交易日（首日或日历初始化），跳过 K 线校验` | `apps/schedule/src/pre-market-inspection.service.ts:210:18` | `summary: '未获取到前一交易日（首日或日历初始化），跳过 K 线校验'` |
+| string | `当前无 ACTIVE 订阅标的，K 线基线无需校验` | `apps/schedule/src/pre-market-inspection.service.ts:236:18` | `summary: '当前无 ACTIVE 订阅标的，K 线基线无需校验'` |
+| number | `10` | `apps/schedule/src/pre-market-inspection.service.ts:268:40` | `missingItems.slice(0, 10)` |
+| string | `, ` | `apps/schedule/src/pre-market-inspection.service.ts:270:45` | `[...missingTargets].join(', ')` |
+| string | `, ` | `apps/schedule/src/pre-market-inspection.service.ts:301:13` | `Object.entries(bySource) .map(([s, c]) => `${s}: ${c} 标的`) .join(', ')` |
+| string | `TDX_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:316:38` | `this.configService.get<string>('TDX_BASE_URL')` |
+| string | `QMT_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:319:38` | `this.configService.get<string>('QMT_BASE_URL')` |
+| string | `TDX Bridge TCP 未就绪 (bridge_ready=0)` | `apps/schedule/src/pre-market-inspection.service.ts:335:23` | `errors.push('TDX Bridge TCP 未就绪 (bridge_ready=0)')` |
+| string | `QMT Bridge TCP 未就绪 (bridge_ready=0)` | `apps/schedule/src/pre-market-inspection.service.ts:352:23` | `errors.push('QMT Bridge TCP 未就绪 (bridge_ready=0)')` |
+| string | `实时行情 Bridge / WS 链路异常` | `apps/schedule/src/pre-market-inspection.service.ts:362:18` | `summary: '实时行情 Bridge / WS 链路异常'` |
+| string | `TDX / QMT Bridge TCP 与 WebSocket 就绪` | `apps/schedule/src/pre-market-inspection.service.ts:372:16` | `summary: 'TDX / QMT Bridge TCP 与 WebSocket 就绪'` |
+| string | `SELECT 1` | `apps/schedule/src/pre-market-inspection.service.ts:384:37` | `this.securityRepo.query('SELECT 1')` |
+| string | `SIGNAL_HEALTH_URL` | `apps/schedule/src/pre-market-inspection.service.ts:391:38` | `this.configService.get<string>('SIGNAL_HEALTH_URL')` |
+| string | `底层基础设施或服务异常` | `apps/schedule/src/pre-market-inspection.service.ts:414:18` | `summary: '底层基础设施或服务异常'` |
+| string | `MySQL 与 Signal 运行正常` | `apps/schedule/src/pre-market-inspection.service.ts:424:16` | `summary: 'MySQL 与 Signal 运行正常'` |
+| string | `BACKEND_HEALTH_URL` | `apps/schedule/src/pre-market-inspection.service.ts:433:38` | `this.configService.get<string>('BACKEND_HEALTH_URL')` |
+| string | `SIGNAL_HEALTH_URL` | `apps/schedule/src/pre-market-inspection.service.ts:436:38` | `this.configService.get<string>('SIGNAL_HEALTH_URL')` |
+| string | `TDX_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:439:38` | `this.configService.get<string>('TDX_BASE_URL')` |
+| string | `QMT_BASE_URL` | `apps/schedule/src/pre-market-inspection.service.ts:442:38` | `this.configService.get<string>('QMT_BASE_URL')` |
+| string | `OO_ALERT_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:445:38` | `this.configService.get<string>('OO_ALERT_FEISHU_WEBHOOK')` |
+| string | `NOTIFICATION_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:446:38` | `this.configService.get<string>('NOTIFICATION_FEISHU_WEBHOOK')` |
+| string | `飞书告警 Webhook 未配置 (NOTIFICATION_FEISHU_WEBHOOK 缺失)` | `apps/schedule/src/pre-market-inspection.service.ts:461:19` | `errors.push('飞书告警 Webhook 未配置 (NOTIFICATION_FEISHU_WEBHOOK 缺失)')` |
+| string | `在 .env 中配置有效飞书群机器人 Webhook: NOTIFICATION_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:463:9` | `remediation.push( '在 .env 中配置有效飞书群机器人 Webhook: NOTIFICATION_FEISHU_WEBHOOK', )` |
+| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:470:37` | `AbortSignal.timeout(5000)` |
+| string | `on` | `apps/schedule/src/pre-market-inspection.service.ts:487:26` | `prodMode !== 'on'` |
+| string | `在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\MistDocker\.env -Key REALTIME_PRODUCTIZATION_MODE -Value on; docker compose up -d --force-recreate mist-backend` | `apps/schedule/src/pre-market-inspection.service.ts:490:13` | `remediation.push( '在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\\MistDocker\\.env -Key REALTIME_PROD` |
+| string | `on` | `apps/schedule/src/pre-market-inspection.service.ts:493:27` | `stratMode !== 'on'` |
+| string | `在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\MistDocker\.env -Key REALTIME_STRATEGY_MODE -Value on; docker compose up -d --force-recreate mist-backend` | `apps/schedule/src/pre-market-inspection.service.ts:496:13` | `remediation.push( '在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\\MistDocker\\.env -Key REALTIME_STRA` |
+| string | `Backend Realtime Redis 处于不可用状态` | `apps/schedule/src/pre-market-inspection.service.ts:500:23` | `errors.push('Backend Realtime Redis 处于不可用状态')` |
+| string | `检查 mist-realtime-redis 容器状态及 MIST_REALTIME_REDIS_URL 配置` | `apps/schedule/src/pre-market-inspection.service.ts:502:13` | `remediation.push( '检查 mist-realtime-redis 容器状态及 MIST_REALTIME_REDIS_URL 配置', )` |
+| string | `Backend 订阅生命周期自动对账处于禁用状态 (autoReconcile=false)` | `apps/schedule/src/pre-market-inspection.service.ts:507:13` | `errors.push( 'Backend 订阅生命周期自动对账处于禁用状态 (autoReconcile=false)', )` |
+| string | `在 MySQL 中执行: INSERT INTO runtime_configs (config_key, config_value) VALUES ('realtime_subscription_auto_reconcile', 'true') ON DUPLICATE KEY UPDATE config_value='true';` | `apps/schedule/src/pre-market-inspection.service.ts:510:13` | `remediation.push( "在 MySQL 中执行: INSERT INTO runtime_configs (config_key, config_value) VALUES ('real` |
+| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:522:37` | `AbortSignal.timeout(5000)` |
+| string | `on` | `apps/schedule/src/pre-market-inspection.service.ts:533:30` | `realtimeMode !== 'on'` |
+| string | `在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\MistDocker\.env -Key REALTIME_STRATEGY_MODE -Value on; docker compose up -d --force-recreate mist-signal` | `apps/schedule/src/pre-market-inspection.service.ts:536:13` | `remediation.push( '在 Windows 宿主机执行: Set-DockerEnvValue -Path F:\\MistDocker\\.env -Key REALTIME_STRA` |
+| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:548:37` | `AbortSignal.timeout(5000)` |
+| string | `builtin` | `apps/schedule/src/pre-market-inspection.service.ts:554:22` | `mode !== 'builtin'` |
+| number | `5000` | `apps/schedule/src/pre-market-inspection.service.ts:565:37` | `AbortSignal.timeout(5000)` |
+| string | `builtin` | `apps/schedule/src/pre-market-inspection.service.ts:571:22` | `mode !== 'builtin'` |
+| string | `OO_ALERT_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:603:38` | `this.configService.get<string>('OO_ALERT_FEISHU_WEBHOOK')` |
+| string | `NOTIFICATION_FEISHU_WEBHOOK` | `apps/schedule/src/pre-market-inspection.service.ts:604:38` | `this.configService.get<string>('NOTIFICATION_FEISHU_WEBHOOK')` |
+| string | `OO_ALERT_FEISHU_SECRET` | `apps/schedule/src/pre-market-inspection.service.ts:609:38` | `this.configService.get<string>('OO_ALERT_FEISHU_SECRET')` |
+| string | `NOTIFICATION_FEISHU_SECRET` | `apps/schedule/src/pre-market-inspection.service.ts:610:38` | `this.configService.get<string>('NOTIFICATION_FEISHU_SECRET')` |
+| string | `PASSED` | `apps/schedule/src/pre-market-inspection.service.ts:623:47` | `report.overallStatus === 'PASSED'` |
+| string | `全系统就绪，距离 09:15 订阅重置还有 10 分钟，距离 09:30 开盘还有 25 分钟。` | `apps/schedule/src/pre-market-inspection.service.ts:639:9` | `rows.push( '全系统就绪，距离 09:15 订阅重置还有 10 分钟，距离 09:30 开盘还有 25 分钟。', )` |
+| string | `————` | `apps/schedule/src/pre-market-inspection.service.ts:642:17` | `rows.push('————', '⚠️ 故障详情与排查指引：')` |
+| string | `⚠️ 故障详情与排查指引：` | `apps/schedule/src/pre-market-inspection.service.ts:642:25` | `rows.push('————', '⚠️ 故障详情与排查指引：')` |
+| string | `text` | `apps/schedule/src/pre-market-inspection.service.ts:659:35` | `tag: 'text'` |
+| string | `text` | `apps/schedule/src/pre-market-inspection.service.ts:662:33` | `tag: 'text'` |
+| string | `post` | `apps/schedule/src/pre-market-inspection.service.ts:677:19` | `msg_type: 'post'` |
+| number | `1000` | `apps/schedule/src/pre-market-inspection.service.ts:684:58` | `Date.now() / 1000` |
+| string | `sha256` | `apps/schedule/src/pre-market-inspection.service.ts:686:33` | `createHmac('sha256', stringToSign)` |
 | string | `off` | `apps/signal/src/health/health-state.service.ts:26:34` | `this.realtimeMode === 'off'` |
 | string | `off` | `apps/signal/src/health/health-state.service.ts:35:34` | `this.realtimeMode === 'off'` |
 | string | `off` | `apps/signal/src/health/health-state.service.ts:46:34` | `this.realtimeMode === 'off'` |
@@ -1201,25 +1253,21 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `Total jobs failed in signal evaluation queue` | `apps/signal/src/observability/metrics.ts:49:22` | `description: 'Total jobs failed in signal evaluation queue'` |
 | number | `1000` | `apps/signal/src/observability/runtime-observability.service.ts:40:49` | `entry.duration / 1_000` |
 | string | `failed` | `apps/signal/src/realtime/candle-finalized-bullmq.worker.ts:79:46` | `diagnostics.lastPersistenceOutcome === 'failed'` |
-| string | `trading_day_validation:before` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:97:43` | `this.assertWithinDeadline(deadlineAt, 'trading_day_validation:before')` |
-| string | `expired_trading_day` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:101:24` | `completed('expired_trading_day')` |
-| string | `trading_day_validation:after` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:106:43` | `this.assertWithinDeadline(deadlineAt, 'trading_day_validation:after')` |
-| string | `out_of_order_trigger_discarded` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:125:24` | `completed('out_of_order_trigger_discarded')` |
-| string | `sealed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:129:27` | `payload.outcome === 'sealed'` |
-| string | `redis_observation` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:130:43` | `this.runStage(deadlineAt, 'redis_observation', () => this.resolveSealed(trigger, payload.triggerPric` |
-| string | `completed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:142:20` | `outcome: 'completed'` |
-| string | `analysis_evaluation` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:165:9` | `this.runStage( deadlineAt, 'analysis_evaluation', () => this.evaluation.evaluate(bar, executionPlans` |
-| string | `on` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:170:27` | `this.mode === 'on'` |
-| string | `persistence` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:177:15` | `this.runStage( deadlineAt, 'persistence', async (): Promise<LiveStrategyPersistenceOutcome> => { con` |
-| string | `completed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:193:16` | `outcome: 'completed'` |
-| string | `sealed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:233:33` | `observation.outcome !== 'sealed'` |
-| string | `tdx` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:253:24` | `source !== 'tdx'` |
-| string | `qmt` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:253:44` | `source !== 'qmt'` |
-| number | `5` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256:22` | `[1, 5, 15, 30, 60]` |
-| number | `15` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256:25` | `[1, 5, 15, 30, 60]` |
-| number | `30` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256:29` | `[1, 5, 15, 30, 60]` |
-| number | `60` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:256:33` | `[1, 5, 15, 30, 60]` |
-| string | `SET SESSION innodb_lock_wait_timeout = 3` | `apps/signal/src/realtime/live-strategy-persistence.service.ts:40:29` | `manager.query('SET SESSION innodb_lock_wait_timeout = 3')` |
+| string | `trading_day_validation:before` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:102:43` | `this.assertWithinDeadline(deadlineAt, 'trading_day_validation:before')` |
+| string | `expired_trading_day` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:106:24` | `completed('expired_trading_day')` |
+| string | `trading_day_validation:after` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:111:43` | `this.assertWithinDeadline(deadlineAt, 'trading_day_validation:after')` |
+| string | `out_of_order_trigger_discarded` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:130:24` | `completed('out_of_order_trigger_discarded')` |
+| string | `sealed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:134:27` | `payload.outcome === 'sealed'` |
+| string | `redis_observation` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:135:43` | `this.runStage(deadlineAt, 'redis_observation', () => this.resolveSealed(trigger, payload.triggerPric` |
+| string | `completed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:147:20` | `outcome: 'completed'` |
+| string | `analysis_evaluation` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:170:9` | `this.runStage( deadlineAt, 'analysis_evaluation', () => this.evaluation.evaluate(bar, executionPlans` |
+| string | `on` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:175:27` | `this.mode === 'on'` |
+| string | `persistence` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:182:15` | `this.runStage( deadlineAt, 'persistence', async (): Promise<LiveStrategyPersistenceOutcome> => { con` |
+| string | `completed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:198:16` | `outcome: 'completed'` |
+| string | `sealed` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:238:33` | `observation.outcome !== 'sealed'` |
+| string | `tdx` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:258:24` | `source !== 'tdx'` |
+| string | `qmt` | `apps/signal/src/realtime/candle-finalized-job.processor.ts:258:44` | `source !== 'qmt'` |
+| string | `SET SESSION innodb_lock_wait_timeout = 3` | `apps/signal/src/realtime/live-strategy-persistence.service.ts:41:29` | `manager.query('SET SESSION innodb_lock_wait_timeout = 3')` |
 | string | `MIST_REALTIME_REDIS_URL` | `apps/signal/src/realtime/notification/bullmq-strategy-alert-delivery-handoff.service.ts:35:30` | `config.get<string>('MIST_REALTIME_REDIS_URL')` |
 | number | `5000` | `apps/signal/src/realtime/notification/bullmq-strategy-alert-delivery-handoff.service.ts:39:25` | `connectTimeout: 5_000` |
 | number | `3000` | `apps/signal/src/realtime/notification/bullmq-strategy-alert-delivery-handoff.service.ts:40:25` | `commandTimeout: 3_000` |
@@ -1229,33 +1277,30 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `10` | `apps/signal/src/realtime/signal-realtime-redis.service.ts:40:17` | `times > 10` |
 | number | `500` | `apps/signal/src/realtime/signal-realtime-redis.service.ts:40:46` | `times * 500` |
 | number | `5000` | `apps/signal/src/realtime/signal-realtime-redis.service.ts:40:51` | `Math.min(times * 500, 5_000)` |
-| string | `discarded` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:48:29` | `trigger.outcome === 'discarded'` |
-| string | `discarded` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:50:18` | `outcome: 'discarded'` |
-| string | `sealed` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:67:16` | `outcome: 'sealed'` |
-| string | `sealed` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:119:20` | `outcome: 'sealed'` |
-| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:186:61` | `Math.floor(position.minuteOffset / period) * period * 60_000` |
-| string | `volume` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:215:34` | `sumQuantity(ordered, 'volume')` |
-| string | `amount` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:216:34` | `sumQuantity(ordered, 'amount')` |
-| number | `4` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:28` | `tradingDay.slice(0, 4)` |
-| number | `4` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:51` | `tradingDay.slice(4, 6)` |
-| number | `6` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:54` | `tradingDay.slice(4, 6)` |
-| number | `6` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:77` | `tradingDay.slice(6, 8)` |
-| number | `8` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:260:80` | `tradingDay.slice(6, 8)` |
-| string | `h23` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:282:16` | `hourCycle: 'h23'` |
-| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:303:35` | `trigger.timestamp.getTime() % 60_000` |
-| number | `800` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:316:29` | `criteria.requiredBars > 800` |
-| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:317:35` | `criteria.anchorAt.getTime() % 60_000` |
-| string | `tdx` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:324:21` | `source === 'tdx'` |
+| string | `discarded` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:50:29` | `trigger.outcome === 'discarded'` |
+| string | `discarded` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:52:18` | `outcome: 'discarded'` |
+| string | `sealed` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:69:16` | `outcome: 'sealed'` |
+| string | `sealed` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:121:20` | `outcome: 'sealed'` |
+| string | `complete` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:158:11` | `type: 'complete'` |
+| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:180:61` | `Math.floor(position.minuteOffset / period) * period * 60_000` |
+| string | `volume` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:210:34` | `sumQuantity(ordered, 'volume')` |
+| string | `amount` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:211:34` | `sumQuantity(ordered, 'amount')` |
+| number | `4` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:255:28` | `tradingDay.slice(0, 4)` |
+| number | `4` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:255:51` | `tradingDay.slice(4, 6)` |
+| number | `6` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:255:54` | `tradingDay.slice(4, 6)` |
+| number | `6` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:255:77` | `tradingDay.slice(6, 8)` |
+| number | `8` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:255:80` | `tradingDay.slice(6, 8)` |
+| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:285:35` | `trigger.timestamp.getTime() % 60_000` |
+| number | `800` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:298:29` | `criteria.requiredBars > 800` |
+| number | `60000` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:299:35` | `criteria.anchorAt.getTime() % 60_000` |
+| string | `tdx` | `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:306:21` | `source === 'tdx'` |
 | string | `off` | `apps/signal/src/signal-app.module.ts:100:16` | `mode === 'off'` |
-| string | `chan_bsp` | `apps/signal/src/signal-registry.service.ts:74:49` | `compiled.executionPlan.sourceKind === 'chan_bsp'` |
-| number | `5` | `apps/signal/src/signal-registry.service.ts:142:26` | `period === 5` |
-| number | `15` | `apps/signal/src/signal-registry.service.ts:143:26` | `period === 15` |
-| number | `30` | `apps/signal/src/signal-registry.service.ts:144:26` | `period === 30` |
-| number | `60` | `apps/signal/src/signal-registry.service.ts:145:26` | `period === 60` |
-| string | `decision_flow` | `apps/signal/src/signal-registry.service.ts:309:11` | `kind: 'decision_flow'` |
-| string | `queue_full` | `libs/backtest/src/contracts/backtest-run-submit.contract.ts:37:15` | `value !== 'queue_full'` |
-| string | `not_ready` | `libs/backtest/src/contracts/backtest-run-submit.contract.ts:38:15` | `value !== 'not_ready'` |
-| string | `run_failed` | `libs/backtest/src/contracts/backtest-run-submit.contract.ts:39:15` | `value !== 'run_failed'` |
+| string | `chan_bsp` | `apps/signal/src/signal-registry.service.ts:72:49` | `compiled.executionPlan.sourceKind === 'chan_bsp'` |
+| number | `5` | `apps/signal/src/signal-registry.service.ts:140:26` | `period === 5` |
+| number | `15` | `apps/signal/src/signal-registry.service.ts:141:26` | `period === 15` |
+| number | `30` | `apps/signal/src/signal-registry.service.ts:142:26` | `period === 30` |
+| number | `60` | `apps/signal/src/signal-registry.service.ts:143:26` | `period === 60` |
+| string | `decision_flow` | `apps/signal/src/signal-registry.service.ts:307:11` | `kind: 'decision_flow'` |
 | number | `10001` | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465:9` | `10_001 + index * 37` |
 | number | `37` | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465:26` | `index * 37` |
 | number | `5` | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465:40` | `index % 5` |
@@ -1282,52 +1327,76 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `3` | `libs/chancore/src/internal/bi-channel.ts:360:36` | `channel.bis.length >= 3` |
 | number | `4` | `libs/chancore/src/internal/bi-channel.ts:362:65` | `channel.type === ChannelType.UnComplete ? 4 : 5` |
 | number | `5` | `libs/chancore/src/internal/bi-channel.ts:362:69` | `channel.type === ChannelType.UnComplete ? 4 : 5` |
-| string | `candidate` | `libs/chancore/src/internal/bi.ts:371:55` | `this.assertPhaseATimeStackCompleteBi(candidate, 'candidate')` |
-| string | `stack tail` | `libs/chancore/src/internal/bi.ts:375:56` | `this.assertPhaseATimeStackCompleteBi(previous, 'stack tail')` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:380:30` | `stack.length >= 3` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:381:44` | `stack.length - 3` |
-| string | `first` | `libs/chancore/src/internal/bi.ts:384:53` | `this.assertPhaseATimeStackCompleteBi(first, 'first')` |
-| string | `middle` | `libs/chancore/src/internal/bi.ts:385:54` | `this.assertPhaseATimeStackCompleteBi(middle, 'middle')` |
-| string | `third` | `libs/chancore/src/internal/bi.ts:386:53` | `this.assertPhaseATimeStackCompleteBi(third, 'third')` |
-| string | `merged Bi` | `libs/chancore/src/internal/bi.ts:398:54` | `this.assertPhaseATimeStackCompleteBi(merged, 'merged Bi')` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:406:37` | `stack.length - 3` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:406:40` | `stack.splice(stack.length - 3, 3, replacement)` |
-| string | `bi1` | `libs/chancore/src/internal/bi.ts:489:32` | `this.assertCompleteBi(bi1, 'bi1')` |
-| string | `bi2` | `libs/chancore/src/internal/bi.ts:490:32` | `this.assertCompleteBi(bi2, 'bi2')` |
-| string | `bi1` | `libs/chancore/src/internal/bi.ts:516:32` | `this.assertCompleteBi(bi1, 'bi1')` |
-| string | `bi2` | `libs/chancore/src/internal/bi.ts:517:32` | `this.assertCompleteBi(bi2, 'bi2')` |
-| string | `bi3` | `libs/chancore/src/internal/bi.ts:518:32` | `this.assertCompleteBi(bi3, 'bi3')` |
-| string | `up-down-up` | `libs/chancore/src/internal/bi.ts:525:12` | `case 'up-down-up': { return ( bi1.startFenxing.low <= bi2.endFenxing.low && bi2.startFenxing.high <=` |
-| string | `down-up-down` | `libs/chancore/src/internal/bi.ts:531:12` | `case 'down-up-down': return ( bi1.startFenxing.high >= bi2.endFenxing.high && bi2.startFenxing.low >` |
-| string | `bi1` | `libs/chancore/src/internal/bi.ts:545:32` | `this.assertCompleteBi(bi1, 'bi1')` |
-| string | `bi2` | `libs/chancore/src/internal/bi.ts:546:32` | `this.assertCompleteBi(bi2, 'bi2')` |
-| string | `bi1` | `libs/chancore/src/internal/bi.ts:577:32` | `this.assertCompleteBi(bi1, 'bi1')` |
-| string | `bi3` | `libs/chancore/src/internal/bi.ts:578:32` | `this.assertCompleteBi(bi3, 'bi3')` |
-| number | `3` | `libs/chancore/src/internal/bi.ts:686:28` | `betweenCount >= 3` |
-| string | `none` | `libs/chancore/src/internal/bi.ts:802:45` | `type: 'none'` |
-| string | `none` | `libs/chancore/src/internal/bi.ts:806:45` | `type: 'none'` |
-| string | `a_contains_b` | `libs/chancore/src/internal/bi.ts:812:46` | `type: 'a_contains_b'` |
-| string | `b_contains_a` | `libs/chancore/src/internal/bi.ts:814:46` | `type: 'b_contains_a'` |
-| string | `a_contains_b` | `libs/chancore/src/internal/bi.ts:819:46` | `type: 'a_contains_b'` |
-| string | `b_contains_a` | `libs/chancore/src/internal/bi.ts:821:46` | `type: 'b_contains_a'` |
-| string | `none` | `libs/chancore/src/internal/bi.ts:825:43` | `type: 'none'` |
+| string | `candidate` | `libs/chancore/src/internal/bi.ts:377:55` | `this.assertPhaseATimeStackCompleteBi(candidate, 'candidate')` |
+| string | `stack tail` | `libs/chancore/src/internal/bi.ts:381:56` | `this.assertPhaseATimeStackCompleteBi(previous, 'stack tail')` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:386:30` | `stack.length >= 3` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:387:44` | `stack.length - 3` |
+| string | `first` | `libs/chancore/src/internal/bi.ts:390:53` | `this.assertPhaseATimeStackCompleteBi(first, 'first')` |
+| string | `middle` | `libs/chancore/src/internal/bi.ts:391:54` | `this.assertPhaseATimeStackCompleteBi(middle, 'middle')` |
+| string | `third` | `libs/chancore/src/internal/bi.ts:392:53` | `this.assertPhaseATimeStackCompleteBi(third, 'third')` |
+| string | `merged Bi` | `libs/chancore/src/internal/bi.ts:404:54` | `this.assertPhaseATimeStackCompleteBi(merged, 'merged Bi')` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:412:37` | `stack.length - 3` |
+| number | `3` | `libs/chancore/src/internal/bi.ts:412:40` | `stack.splice(stack.length - 3, 3, replacement)` |
+| string | `bi1` | `libs/chancore/src/internal/bi.ts:495:32` | `this.assertCompleteBi(bi1, 'bi1')` |
+| string | `bi2` | `libs/chancore/src/internal/bi.ts:496:32` | `this.assertCompleteBi(bi2, 'bi2')` |
+| string | `bi1` | `libs/chancore/src/internal/bi.ts:522:32` | `this.assertCompleteBi(bi1, 'bi1')` |
+| string | `bi2` | `libs/chancore/src/internal/bi.ts:523:32` | `this.assertCompleteBi(bi2, 'bi2')` |
+| string | `bi3` | `libs/chancore/src/internal/bi.ts:524:32` | `this.assertCompleteBi(bi3, 'bi3')` |
+| string | `up-down-up` | `libs/chancore/src/internal/bi.ts:531:12` | `case 'up-down-up': { return ( bi1.startFenxing.low <= bi2.endFenxing.low && bi2.startFenxing.high <=` |
+| string | `down-up-down` | `libs/chancore/src/internal/bi.ts:537:12` | `case 'down-up-down': return ( bi1.startFenxing.high >= bi2.endFenxing.high && bi2.startFenxing.low >` |
+| string | `bi1` | `libs/chancore/src/internal/bi.ts:551:32` | `this.assertCompleteBi(bi1, 'bi1')` |
+| string | `bi2` | `libs/chancore/src/internal/bi.ts:552:32` | `this.assertCompleteBi(bi2, 'bi2')` |
+| string | `bi1` | `libs/chancore/src/internal/bi.ts:583:32` | `this.assertCompleteBi(bi1, 'bi1')` |
+| string | `bi3` | `libs/chancore/src/internal/bi.ts:584:32` | `this.assertCompleteBi(bi3, 'bi3')` |
+| string | `none` | `libs/chancore/src/internal/bi.ts:807:45` | `type: 'none'` |
+| string | `none` | `libs/chancore/src/internal/bi.ts:811:45` | `type: 'none'` |
+| string | `a_contains_b` | `libs/chancore/src/internal/bi.ts:817:46` | `type: 'a_contains_b'` |
+| string | `b_contains_a` | `libs/chancore/src/internal/bi.ts:819:46` | `type: 'b_contains_a'` |
+| string | `a_contains_b` | `libs/chancore/src/internal/bi.ts:824:46` | `type: 'a_contains_b'` |
+| string | `b_contains_a` | `libs/chancore/src/internal/bi.ts:826:46` | `type: 'b_contains_a'` |
+| string | `none` | `libs/chancore/src/internal/bi.ts:830:43` | `type: 'none'` |
 | number | `3` | `libs/chancore/src/internal/channel-lifecycle.ts:68:22` | `items.length < 3` |
-| number | `9` | `libs/chancore/src/internal/duan-channel-policy.ts:393:49` | `internalDuans.length >= 9` |
-| number | `4` | `libs/chancore/src/internal/duan-channel-policy.ts:394:60` | `internalDuans.length >= 4` |
-| number | `9` | `libs/chancore/src/internal/duan-channel.ts:112:33` | `current.duans.length >= 9` |
-| number | `9` | `libs/chancore/src/internal/duan-channel.ts:117:77` | `next.duans.length >= 9` |
-| number | `9` | `libs/chancore/src/internal/duan-channel.ts:145:38` | `cand.duans.length >= 9` |
-| number | `9` | `libs/chancore/src/internal/duan-channel.ts:280:47` | `mergedDuans.length >= 9` |
-| number | `3` | `libs/chancore/src/internal/duan-channel.ts:335:32` | `channel.duans.length < 3` |
+| number | `9` | `libs/chancore/src/internal/duan-channel.ts:148:38` | `cand.duans.length >= 9` |
+| number | `3` | `libs/chancore/src/internal/duan-channel.ts:338:32` | `channel.duans.length < 3` |
 | number | `5` | `libs/chancore/src/internal/duan.ts:50:24` | `reverseStart + 5` |
 | number | `3` | `libs/chancore/src/internal/duan.ts:52:37` | `reverseStart + 3` |
 | number | `5` | `libs/chancore/src/internal/duan.ts:53:37` | `reverseStart + 5` |
 | number | `5` | `libs/chancore/src/internal/duan.ts:69:24` | `reverseStart + 5` |
 | number | `3` | `libs/chancore/src/internal/duan.ts:71:37` | `reverseStart + 3` |
 | number | `5` | `libs/chancore/src/internal/duan.ts:72:37` | `reverseStart + 5` |
-| number | `3` | `libs/chancore/src/internal/duan.ts:96:22` | `bis.length < 3` |
-| number | `3` | `libs/chancore/src/internal/duan.ts:100:33` | `bis.length - 3` |
-| number | `3` | `libs/chancore/src/internal/duan.ts:115:39` | `bis.length - 3` |
+| number | `3` | `libs/chancore/src/internal/duan.ts:118:39` | `bis.length - 3` |
+| string | `queue_full` | `libs/contracts/src/backtest/backtest-run-submit.contract.ts:39:15` | `value !== 'queue_full'` |
+| string | `not_ready` | `libs/contracts/src/backtest/backtest-run-submit.contract.ts:40:15` | `value !== 'not_ready'` |
+| string | `run_failed` | `libs/contracts/src/backtest/backtest-run-submit.contract.ts:41:15` | `value !== 'run_failed'` |
+| number | `4` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:62:47` | `tradingDay.slice(0, 4)` |
+| number | `4` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:62:70` | `tradingDay.slice(4, 6)` |
+| number | `6` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:62:73` | `tradingDay.slice(4, 6)` |
+| number | `6` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:62:96` | `tradingDay.slice(6, 8)` |
+| number | `8` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:62:99` | `tradingDay.slice(6, 8)` |
+| number | `24` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:67:30` | `24 * 60` |
+| number | `60` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:67:35` | `24 * 60` |
+| number | `60000` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:67:40` | `24 * 60 * 60_000` |
+| number | `1000` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:67:50` | `(start + 24 * 60 * 60_000) / 1_000` |
+| string | `due member` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:79:5` | `assertRealtimeRedisBytes( 'due member', member, REALTIME_REDIS_RECORD_LIMITS.dueMember, )` |
+| string | `due member` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:92:5` | `assertRealtimeRedisBytes( 'due member', member, REALTIME_REDIS_RECORD_LIMITS.dueMember, )` |
+| number | `3` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:97:24` | `parts.length !== 3` |
+| string | `provisional` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:129:17` | `value.q !== 'provisional'` |
+| string | `tdx` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:182:17` | `value !== 'tdx'` |
+| string | `qmt` | `libs/contracts/src/realtime/realtime-candle-redis.contract.ts:182:36` | `value !== 'qmt'` |
+| string | `tdx` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:69:24` | `input.source !== 'tdx'` |
+| string | `qmt` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:69:50` | `input.source !== 'qmt'` |
+| string | `1m` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:72:24` | `input.period !== '1m'` |
+| string | `sealed` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:82:25` | `input.outcome === 'sealed'` |
+| string | `1m` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:95:15` | `period: '1m'` |
+| string | `sealed` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:97:16` | `outcome: 'sealed'` |
+| string | `discarded` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:101:25` | `input.outcome === 'discarded'` |
+| string | `1m` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:111:15` | `period: '1m'` |
+| string | `discarded` | `libs/contracts/src/signal/candle-finalized-trigger.contract.ts:113:16` | `outcome: 'discarded'` |
+| string | `upserted` | `libs/contracts/src/signal/signal-registry-refresh.contract.ts:51:23` | `value.action !== 'upserted'` |
+| string | `removed` | `libs/contracts/src/signal/signal-registry-refresh.contract.ts:51:54` | `value.action !== 'removed'` |
+| string | `qq` | `libs/contracts/src/signal/strategy-alert-delivery.contract.ts:110:23` | `input.channel !== 'qq'` |
+| string | `wechat` | `libs/contracts/src/signal/strategy-alert-delivery.contract.ts:111:23` | `input.channel !== 'wechat'` |
+| string | `feishu` | `libs/contracts/src/signal/strategy-alert-delivery.contract.ts:112:23` | `input.channel !== 'feishu'` |
 | number | `37` | `libs/decimal/src/decimal8.ts:19:22` | `value.length > 37` |
 | number | `28` | `libs/decimal/src/decimal8.ts:30:24` | `integer.length > 28` |
 | number | `37` | `libs/decimal/src/decimal8.ts:49:24` | `value.length > 37` |
@@ -1336,155 +1405,188 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `8` | `libs/decimal/src/decimal8.ts:113:61` | `places > 8` |
 | number | `8` | `libs/decimal/src/decimal8.ts:116:34` | `8 - places` |
 | number | `10000` | `libs/decimal/src/decimal8.ts:163:18` | `factor === 10_000` |
-| string | `v` | `libs/indicators/src/adx.ts:9:23` | `pl.Series('v', arr as any)` |
-| string | `tail` | `libs/indicators/src/adx.ts:13:32` | `pl.Series('tail', tail as any)` |
-| number | `14` | `libs/indicators/src/adx.ts:22:20` | `period: number = 14` |
-| string | `high` | `libs/indicators/src/adx.ts:36:21` | `pl.Series('high', high as any)` |
-| string | `low` | `libs/indicators/src/adx.ts:37:20` | `pl.Series('low', low as any)` |
-| string | `high` | `libs/indicators/src/adx.ts:41:27` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/adx.ts:42:26` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/adx.ts:45:22` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/adx.ts:45:41` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/adx.ts:46:22` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/adx.ts:47:22` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/adx.ts:51:25` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/adx.ts:52:39` | `pl.col('low')` |
-| string | `tr` | `libs/indicators/src/adx.ts:65:18` | `trExpr.alias('tr')` |
-| string | `plusDm` | `libs/indicators/src/adx.ts:66:18` | `plusDm.alias('plusDm')` |
-| string | `minusDm` | `libs/indicators/src/adx.ts:67:19` | `minusDm.alias('minusDm')` |
-| string | `tr` | `libs/indicators/src/adx.ts:70:33` | `selected.getColumn('tr')` |
-| string | `plusDm` | `libs/indicators/src/adx.ts:71:34` | `selected.getColumn('plusDm')` |
-| string | `minusDm` | `libs/indicators/src/adx.ts:72:34` | `selected.getColumn('minusDm')` |
-| string | `pdm` | `libs/indicators/src/adx.ts:84:22` | `pl.col('pdm')` |
-| string | `tr` | `libs/indicators/src/adx.ts:84:40` | `pl.col('tr')` |
-| string | `mdm` | `libs/indicators/src/adx.ts:85:22` | `pl.col('mdm')` |
-| string | `tr` | `libs/indicators/src/adx.ts:85:40` | `pl.col('tr')` |
-| string | `dx` | `libs/indicators/src/adx.ts:95:26` | `dxExpr.alias('dx')` |
-| string | `dx` | `libs/indicators/src/adx.ts:96:16` | `diDf .select(dxExpr.alias('dx')) .getColumn('dx')` |
-| string | `v` | `libs/indicators/src/atr.ts:14:23` | `pl.Series('v', arr as any)` |
-| string | `tail` | `libs/indicators/src/atr.ts:18:32` | `pl.Series('tail', tail as any)` |
-| number | `14` | `libs/indicators/src/atr.ts:27:20` | `period: number = 14` |
-| string | `high` | `libs/indicators/src/atr.ts:49:21` | `pl.Series('high', high as any)` |
-| string | `low` | `libs/indicators/src/atr.ts:50:20` | `pl.Series('low', low as any)` |
-| string | `high` | `libs/indicators/src/atr.ts:54:22` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/atr.ts:54:41` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/atr.ts:55:22` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/atr.ts:56:22` | `pl.col('low')` |
-| string | `tr` | `libs/indicators/src/atr.ts:62:26` | `trExpr.alias('tr')` |
-| string | `tr` | `libs/indicators/src/atr.ts:63:16` | `df .select(trExpr.alias('tr')) .getColumn('tr')` |
-| number | `14` | `libs/indicators/src/atr.ts:80:20` | `period: number = 14` |
-| string | `price` | `libs/indicators/src/bollinger.ts:57:23` | `pl.Series('price', prices as any)` |
-| string | `mean` | `libs/indicators/src/bollinger.ts:66:28` | `pl.col('mean')` |
-| string | `std` | `libs/indicators/src/bollinger.ts:66:47` | `pl.col('std')` |
-| string | `mean` | `libs/indicators/src/bollinger.ts:67:28` | `pl.col('mean')` |
-| string | `std` | `libs/indicators/src/bollinger.ts:67:47` | `pl.col('std')` |
-| string | `mean` | `libs/indicators/src/bollinger.ts:69:18` | `pl.col('mean')` |
-| string | `mean` | `libs/indicators/src/bollinger.ts:70:47` | `pl.col('mean')` |
-| string | `mean` | `libs/indicators/src/bollinger.ts:74:12` | `pl.col('mean')` |
-| string | `upper` | `libs/indicators/src/bollinger.ts:75:21` | `upperExpr.alias('upper')` |
-| string | `lower` | `libs/indicators/src/bollinger.ts:76:21` | `lowerExpr.alias('lower')` |
-| string | `bandwidth` | `libs/indicators/src/bollinger.ts:77:18` | `bwExpr.alias('bandwidth')` |
-| string | `mean` | `libs/indicators/src/bollinger.ts:82:42` | `calculated.getColumn('mean')` |
-| string | `upper` | `libs/indicators/src/bollinger.ts:83:41` | `calculated.getColumn('upper')` |
-| string | `lower` | `libs/indicators/src/bollinger.ts:84:41` | `calculated.getColumn('lower')` |
-| string | `bandwidth` | `libs/indicators/src/bollinger.ts:85:38` | `calculated.getColumn('bandwidth')` |
-| number | `13` | `libs/indicators/src/dual-ma.ts:19:46` | `params?.shortPeriod ?? 13` |
-| number | `60` | `libs/indicators/src/dual-ma.ts:20:44` | `params?.longPeriod ?? 60` |
+| string | `v` | `libs/indicators/src/classic/adx.ts:9:23` | `pl.Series('v', arr as any)` |
+| string | `tail` | `libs/indicators/src/classic/adx.ts:13:32` | `pl.Series('tail', tail as any)` |
+| string | `high` | `libs/indicators/src/classic/adx.ts:38:21` | `pl.Series('high', high as any)` |
+| string | `low` | `libs/indicators/src/classic/adx.ts:39:20` | `pl.Series('low', low as any)` |
+| string | `high` | `libs/indicators/src/classic/adx.ts:43:27` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/classic/adx.ts:44:26` | `pl.col('low')` |
+| string | `high` | `libs/indicators/src/classic/adx.ts:47:22` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/classic/adx.ts:47:41` | `pl.col('low')` |
+| string | `high` | `libs/indicators/src/classic/adx.ts:48:22` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/classic/adx.ts:49:22` | `pl.col('low')` |
+| string | `high` | `libs/indicators/src/classic/adx.ts:53:25` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/classic/adx.ts:54:39` | `pl.col('low')` |
+| string | `tr` | `libs/indicators/src/classic/adx.ts:67:18` | `trExpr.alias('tr')` |
+| string | `plusDm` | `libs/indicators/src/classic/adx.ts:68:18` | `plusDm.alias('plusDm')` |
+| string | `minusDm` | `libs/indicators/src/classic/adx.ts:69:19` | `minusDm.alias('minusDm')` |
+| string | `tr` | `libs/indicators/src/classic/adx.ts:72:33` | `selected.getColumn('tr')` |
+| string | `plusDm` | `libs/indicators/src/classic/adx.ts:73:34` | `selected.getColumn('plusDm')` |
+| string | `minusDm` | `libs/indicators/src/classic/adx.ts:74:34` | `selected.getColumn('minusDm')` |
+| string | `tr` | `libs/indicators/src/classic/adx.ts:89:18` | `pl.col('tr')` |
+| string | `pdm` | `libs/indicators/src/classic/adx.ts:90:18` | `pl.col('pdm')` |
+| string | `tr` | `libs/indicators/src/classic/adx.ts:90:36` | `pl.col('tr')` |
+| string | `tr` | `libs/indicators/src/classic/adx.ts:93:18` | `pl.col('tr')` |
+| string | `mdm` | `libs/indicators/src/classic/adx.ts:94:18` | `pl.col('mdm')` |
+| string | `tr` | `libs/indicators/src/classic/adx.ts:94:36` | `pl.col('tr')` |
+| string | `dx` | `libs/indicators/src/classic/adx.ts:105:26` | `dxExpr.alias('dx')` |
+| string | `dx` | `libs/indicators/src/classic/adx.ts:106:16` | `diDf .select(dxExpr.alias('dx')) .getColumn('dx')` |
+| string | `v` | `libs/indicators/src/classic/atr.ts:14:23` | `pl.Series('v', arr as any)` |
+| string | `tail` | `libs/indicators/src/classic/atr.ts:18:32` | `pl.Series('tail', tail as any)` |
+| number | `14` | `libs/indicators/src/classic/atr.ts:27:20` | `period: number = 14` |
+| string | `high` | `libs/indicators/src/classic/atr.ts:49:21` | `pl.Series('high', high as any)` |
+| string | `low` | `libs/indicators/src/classic/atr.ts:50:20` | `pl.Series('low', low as any)` |
+| string | `high` | `libs/indicators/src/classic/atr.ts:54:22` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/classic/atr.ts:54:41` | `pl.col('low')` |
+| string | `high` | `libs/indicators/src/classic/atr.ts:55:22` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/classic/atr.ts:56:22` | `pl.col('low')` |
+| string | `tr` | `libs/indicators/src/classic/atr.ts:62:26` | `trExpr.alias('tr')` |
+| string | `tr` | `libs/indicators/src/classic/atr.ts:63:16` | `df .select(trExpr.alias('tr')) .getColumn('tr')` |
+| number | `14` | `libs/indicators/src/classic/atr.ts:80:20` | `period: number = 14` |
+| string | `price` | `libs/indicators/src/classic/bollinger.ts:65:23` | `pl.Series('price', prices as any)` |
+| string | `mean` | `libs/indicators/src/classic/bollinger.ts:75:28` | `pl.col('mean')` |
+| string | `std` | `libs/indicators/src/classic/bollinger.ts:75:47` | `pl.col('std')` |
+| string | `mean` | `libs/indicators/src/classic/bollinger.ts:76:28` | `pl.col('mean')` |
+| string | `std` | `libs/indicators/src/classic/bollinger.ts:76:47` | `pl.col('std')` |
+| string | `mean` | `libs/indicators/src/classic/bollinger.ts:78:18` | `pl.col('mean')` |
+| string | `mean` | `libs/indicators/src/classic/bollinger.ts:79:47` | `pl.col('mean')` |
+| string | `mean` | `libs/indicators/src/classic/bollinger.ts:83:12` | `pl.col('mean')` |
+| string | `upper` | `libs/indicators/src/classic/bollinger.ts:84:21` | `upperExpr.alias('upper')` |
+| string | `lower` | `libs/indicators/src/classic/bollinger.ts:85:21` | `lowerExpr.alias('lower')` |
+| string | `bandwidth` | `libs/indicators/src/classic/bollinger.ts:86:18` | `bwExpr.alias('bandwidth')` |
+| string | `mean` | `libs/indicators/src/classic/bollinger.ts:89:42` | `calculated.getColumn('mean')` |
+| string | `upper` | `libs/indicators/src/classic/bollinger.ts:90:41` | `calculated.getColumn('upper')` |
+| string | `lower` | `libs/indicators/src/classic/bollinger.ts:91:41` | `calculated.getColumn('lower')` |
+| string | `bandwidth` | `libs/indicators/src/classic/bollinger.ts:92:38` | `calculated.getColumn('bandwidth')` |
+| number | `13` | `libs/indicators/src/classic/dual-ma.ts:19:46` | `params?.shortPeriod ?? 13` |
+| number | `60` | `libs/indicators/src/classic/dual-ma.ts:20:44` | `params?.longPeriod ?? 60` |
+| number | `9` | `libs/indicators/src/classic/kdj.ts:36:36` | `params?.period ?? 9` |
+| number | `3` | `libs/indicators/src/classic/kdj.ts:37:44` | `params?.kSmoothing ?? 3` |
+| number | `3` | `libs/indicators/src/classic/kdj.ts:38:44` | `params?.dSmoothing ?? 3` |
+| string | `high` | `libs/indicators/src/classic/kdj.ts:51:21` | `pl.Series('high', high as any)` |
+| string | `low` | `libs/indicators/src/classic/kdj.ts:52:20` | `pl.Series('low', low as any)` |
+| string | `low` | `libs/indicators/src/classic/kdj.ts:55:23` | `pl.col('low')` |
+| string | `high` | `libs/indicators/src/classic/kdj.ts:56:24` | `pl.col('high')` |
+| number | `50` | `libs/indicators/src/classic/kdj.ts:60:18` | `pl.lit(50)` |
+| string | `fk` | `libs/indicators/src/classic/kdj.ts:64:29` | `fastKExpr.alias('fk')` |
+| string | `fk` | `libs/indicators/src/classic/kdj.ts:65:16` | `df .select(fastKExpr.alias('fk')) .getColumn('fk')` |
+| string | `middle` | `libs/indicators/src/classic/keltner.ts:74:34` | `pl.Series('middle', middle as any)` |
+| string | `atr` | `libs/indicators/src/classic/keltner.ts:75:31` | `pl.Series('atr', atrArr as any)` |
+| string | `middle` | `libs/indicators/src/classic/keltner.ts:82:28` | `pl.col('middle')` |
+| string | `atr` | `libs/indicators/src/classic/keltner.ts:82:49` | `pl.col('atr')` |
+| string | `middle` | `libs/indicators/src/classic/keltner.ts:83:28` | `pl.col('middle')` |
+| string | `atr` | `libs/indicators/src/classic/keltner.ts:83:49` | `pl.col('atr')` |
+| string | `middle` | `libs/indicators/src/classic/keltner.ts:86:12` | `pl.col('middle')` |
+| string | `upper` | `libs/indicators/src/classic/keltner.ts:87:21` | `upperExpr.alias('upper')` |
+| string | `lower` | `libs/indicators/src/classic/keltner.ts:88:21` | `lowerExpr.alias('lower')` |
+| string | `upper` | `libs/indicators/src/classic/keltner.ts:91:38` | `calculated.getColumn('upper')` |
+| string | `lower` | `libs/indicators/src/classic/keltner.ts:92:38` | `calculated.getColumn('lower')` |
+| string | `v` | `libs/indicators/src/classic/macd.ts:32:23` | `pl.Series('v', arr as any)` |
+| string | `tail` | `libs/indicators/src/classic/macd.ts:36:32` | `pl.Series('tail', tail as any)` |
+| string | `volume` | `libs/indicators/src/classic/obv.ts:43:23` | `pl.Series('volume', volumes as any)` |
+| string | `volume` | `libs/indicators/src/classic/obv.ts:54:32` | `pl.col('volume')` |
+| string | `obv` | `libs/indicators/src/classic/obv.ts:55:61` | `signedVolExpr.cumSum().alias('obv')` |
+| string | `obv` | `libs/indicators/src/classic/obv.ts:57:39` | `calculated.getColumn('obv')` |
+| number | `20` | `libs/indicators/src/classic/rpp.ts:22:20` | `window: number = 20` |
+| string | `high` | `libs/indicators/src/classic/rpp.ts:45:21` | `pl.Series('high', highs as any)` |
+| string | `low` | `libs/indicators/src/classic/rpp.ts:46:20` | `pl.Series('low', lows as any)` |
+| string | `low` | `libs/indicators/src/classic/rpp.ts:50:25` | `pl.col('low')` |
+| string | `high` | `libs/indicators/src/classic/rpp.ts:51:26` | `pl.col('high')` |
+| number | `0.5` | `libs/indicators/src/classic/rpp.ts:57:23` | `pl.lit(0.5)` |
+| string | `rpp` | `libs/indicators/src/classic/rpp.ts:59:46` | `rppExpr.alias('rpp')` |
+| string | `rpp` | `libs/indicators/src/classic/rpp.ts:61:39` | `calculated.getColumn('rpp')` |
+| number | `20` | `libs/indicators/src/classic/rpp.ts:76:20` | `window: number = 20` |
+| string | `v` | `libs/indicators/src/classic/rsi.ts:9:23` | `pl.Series('v', arr as any)` |
+| string | `tail` | `libs/indicators/src/classic/rsi.ts:13:32` | `pl.Series('tail', tail as any)` |
+| number | `14` | `libs/indicators/src/classic/rsi.ts:20:20` | `period: number = 14` |
+| string | `ignore` | `libs/indicators/src/classic/rsi.ts:32:40` | `pl.col('close').diff(1, 'ignore')` |
+| string | `gain` | `libs/indicators/src/classic/rsi.ts:36:43` | `gainExpr.alias('gain')` |
+| string | `loss` | `libs/indicators/src/classic/rsi.ts:36:67` | `lossExpr.alias('loss')` |
+| string | `gain` | `libs/indicators/src/classic/rsi.ts:38:34` | `diffDf.getColumn('gain')` |
+| string | `loss` | `libs/indicators/src/classic/rsi.ts:39:35` | `diffDf.getColumn('loss')` |
+| string | `gain` | `libs/indicators/src/classic/rsi.ts:48:21` | `pl.col('gain')` |
+| string | `loss` | `libs/indicators/src/classic/rsi.ts:48:40` | `pl.col('loss')` |
+| string | `loss` | `libs/indicators/src/classic/rsi.ts:50:18` | `pl.col('loss')` |
+| string | `rsi` | `libs/indicators/src/classic/rsi.ts:55:27` | `rsiExpr.alias('rsi')` |
+| string | `rsi` | `libs/indicators/src/classic/rsi.ts:56:16` | `rsiDf .select(rsiExpr.alias('rsi')) .getColumn('rsi')` |
+| number | `5` | `libs/indicators/src/classic/volume.ts:33:45` | `[5, 10, 20]` |
+| number | `10` | `libs/indicators/src/classic/volume.ts:33:48` | `[5, 10, 20]` |
+| number | `20` | `libs/indicators/src/classic/volume.ts:33:52` | `[5, 10, 20]` |
+| string | `volume` | `libs/indicators/src/classic/volume.ts:47:23` | `pl.Series('volume', volumes as any)` |
+| string | `volume` | `libs/indicators/src/classic/volume.ts:61:31` | `pl.col('volume')` |
+| string | `volume` | `libs/indicators/src/classic/volume.ts:64:18` | `pl.col('volume')` |
+| string | `volume` | `libs/indicators/src/classic/volume.ts:68:12` | `pl.col('volume')` |
+| string | `vma5` | `libs/indicators/src/classic/volume.ts:69:12` | `pl.col('vma5')` |
+| string | `vma10` | `libs/indicators/src/classic/volume.ts:70:12` | `pl.col('vma10')` |
+| string | `vma20` | `libs/indicators/src/classic/volume.ts:71:12` | `pl.col('vma20')` |
+| string | `ratio` | `libs/indicators/src/classic/volume.ts:72:21` | `ratioExpr.alias('ratio')` |
+| string | `volume` | `libs/indicators/src/classic/volume.ts:76:39` | `calculated.getColumn('volume')` |
+| string | `vma5` | `libs/indicators/src/classic/volume.ts:77:40` | `calculated.getColumn('vma5')` |
+| string | `vma10` | `libs/indicators/src/classic/volume.ts:78:41` | `calculated.getColumn('vma10')` |
+| string | `vma20` | `libs/indicators/src/classic/volume.ts:79:41` | `calculated.getColumn('vma20')` |
+| string | `ratio` | `libs/indicators/src/classic/volume.ts:80:41` | `calculated.getColumn('ratio')` |
+| number | `5` | `libs/indicators/src/classic/volume.ts:99:45` | `[5, 10, 20]` |
+| number | `10` | `libs/indicators/src/classic/volume.ts:99:48` | `[5, 10, 20]` |
+| number | `20` | `libs/indicators/src/classic/volume.ts:99:52` | `[5, 10, 20]` |
+| string | `price` | `libs/indicators/src/classic/vpci.ts:71:29` | `pl.Series('price', prices as any)` |
+| string | `volume` | `libs/indicators/src/classic/vpci.ts:72:29` | `pl.Series('volume', volumes as any)` |
+| string | `price` | `libs/indicators/src/classic/vpci.ts:79:25` | `pl.col('price')` |
+| string | `volume` | `libs/indicators/src/classic/vpci.ts:79:45` | `pl.col('volume')` |
+| string | `pv` | `libs/indicators/src/classic/vpci.ts:80:47` | `pvExpr.alias('pv')` |
+| string | `pv` | `libs/indicators/src/classic/vpci.ts:83:29` | `pl.col('pv')` |
+| string | `volume` | `libs/indicators/src/classic/vpci.ts:84:28` | `pl.col('volume')` |
+| string | `price` | `libs/indicators/src/classic/vpci.ts:85:27` | `pl.col('price')` |
+| string | `pv` | `libs/indicators/src/classic/vpci.ts:92:28` | `pl.col('pv')` |
+| string | `volume` | `libs/indicators/src/classic/vpci.ts:93:27` | `pl.col('volume')` |
+| string | `price` | `libs/indicators/src/classic/vpci.ts:94:26` | `pl.col('price')` |
+| string | `volume` | `libs/indicators/src/classic/vpci.ts:121:27` | `pl.col('volume')` |
+| string | `volume` | `libs/indicators/src/classic/vpci.ts:122:26` | `pl.col('volume')` |
+| string | `vpc` | `libs/indicators/src/classic/vpci.ts:133:19` | `vpcExpr.alias('vpc')` |
+| string | `vpr` | `libs/indicators/src/classic/vpci.ts:134:19` | `vprExpr.alias('vpr')` |
+| string | `vpci` | `libs/indicators/src/classic/vpci.ts:135:20` | `vpciExpr.alias('vpci')` |
+| string | `vpci` | `libs/indicators/src/classic/vpci.ts:139:29` | `pl.col('vpci')` |
+| string | `signalLine` | `libs/indicators/src/classic/vpci.ts:140:53` | `signalExpr.alias('signalLine')` |
+| string | `vpc` | `libs/indicators/src/classic/vpci.ts:142:35` | `stage2.getColumn('vpc')` |
+| string | `vpr` | `libs/indicators/src/classic/vpci.ts:143:35` | `stage2.getColumn('vpr')` |
+| string | `vpci` | `libs/indicators/src/classic/vpci.ts:144:36` | `stage2.getColumn('vpci')` |
+| string | `signalLine` | `libs/indicators/src/classic/vpci.ts:145:38` | `stage2.getColumn('signalLine')` |
 | number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:23:20` | `10 ** precision` |
 | number | `1000000` | `libs/indicators/src/fibonacci/fibonacci.ts:26:29` | `value * 1e6` |
 | number | `1000000` | `libs/indicators/src/fibonacci/fibonacci.ts:26:36` | `Math.round(value * 1e6) / 1e6` |
-| string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:69:21` | `pl.Series('high', highs as any)` |
-| string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:70:20` | `pl.Series('low', lows as any)` |
-| string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:74:28` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:75:27` | `pl.col('low')` |
-| string | `rHigh` | `libs/indicators/src/fibonacci/fibonacci.ts:88:21` | `rHighExpr.alias('rHigh')` |
-| string | `rLow` | `libs/indicators/src/fibonacci/fibonacci.ts:89:20` | `rLowExpr.alias('rLow')` |
-| string | `diff` | `libs/indicators/src/fibonacci/fibonacci.ts:90:20` | `diffExpr.alias('diff')` |
-| string | `ratio` | `libs/indicators/src/fibonacci/fibonacci.ts:91:21` | `ratioExpr.alias('ratio')` |
-| string | `rHigh` | `libs/indicators/src/fibonacci/fibonacci.ts:107:38` | `computedDf.getColumn('rHigh')` |
-| string | `rLow` | `libs/indicators/src/fibonacci/fibonacci.ts:108:37` | `computedDf.getColumn('rLow')` |
-| string | `diff` | `libs/indicators/src/fibonacci/fibonacci.ts:109:37` | `computedDf.getColumn('diff')` |
-| string | `ratio` | `libs/indicators/src/fibonacci/fibonacci.ts:110:38` | `computedDf.getColumn('ratio')` |
-| number | `50` | `libs/indicators/src/fibonacci/fibonacci.ts:145:36` | `params?.period ?? 50` |
-| string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:178:21` | `pl.Series('high', trailingHigh as any)` |
-| string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:179:20` | `pl.Series('low', trailingLow as any)` |
-| string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:182:29` | `df.getColumn('high')` |
-| string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:183:28` | `df.getColumn('low')` |
-| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:253:21` | `direction !== 'up'` |
-| string | `down` | `libs/indicators/src/fibonacci/fibonacci.ts:253:43` | `direction !== 'down'` |
-| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:270:21` | `direction === 'up'` |
-| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:273:35` | `ratio.toFixed(3)` |
+| string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:74:21` | `pl.Series('high', highs as any)` |
+| string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:75:20` | `pl.Series('low', lows as any)` |
+| string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:79:28` | `pl.col('high')` |
+| string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:80:27` | `pl.col('low')` |
+| string | `rHigh` | `libs/indicators/src/fibonacci/fibonacci.ts:93:21` | `rHighExpr.alias('rHigh')` |
+| string | `rLow` | `libs/indicators/src/fibonacci/fibonacci.ts:94:20` | `rLowExpr.alias('rLow')` |
+| string | `diff` | `libs/indicators/src/fibonacci/fibonacci.ts:95:20` | `diffExpr.alias('diff')` |
+| string | `ratio` | `libs/indicators/src/fibonacci/fibonacci.ts:96:21` | `ratioExpr.alias('ratio')` |
+| string | `rHigh` | `libs/indicators/src/fibonacci/fibonacci.ts:112:38` | `computedDf.getColumn('rHigh')` |
+| string | `rLow` | `libs/indicators/src/fibonacci/fibonacci.ts:113:37` | `computedDf.getColumn('rLow')` |
+| string | `diff` | `libs/indicators/src/fibonacci/fibonacci.ts:114:37` | `computedDf.getColumn('diff')` |
+| string | `ratio` | `libs/indicators/src/fibonacci/fibonacci.ts:115:38` | `computedDf.getColumn('ratio')` |
+| string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:186:21` | `pl.Series('high', trailingHigh as any)` |
+| string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:187:20` | `pl.Series('low', trailingLow as any)` |
+| string | `high` | `libs/indicators/src/fibonacci/fibonacci.ts:190:29` | `df.getColumn('high')` |
+| string | `low` | `libs/indicators/src/fibonacci/fibonacci.ts:191:28` | `df.getColumn('low')` |
+| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:261:21` | `direction !== 'up'` |
+| string | `down` | `libs/indicators/src/fibonacci/fibonacci.ts:261:43` | `direction !== 'down'` |
+| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:278:21` | `direction === 'up'` |
 | number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:281:35` | `ratio.toFixed(3)` |
 | number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:289:35` | `ratio.toFixed(3)` |
 | number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:297:35` | `ratio.toFixed(3)` |
-| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:335:21` | `direction === 'up'` |
-| number | `4` | `libs/indicators/src/fibonacci/fibonacci.ts:341:43` | `options?.precision ?? 4` |
-| number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:343:27` | `10 ** precision` |
-| number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:343:46` | `10 ** precision` |
-| number | `0.008` | `libs/indicators/src/fibonacci/fibonacci.ts:345:48` | `options?.toleranceRatio ?? 0.008` |
-| number | `0.5` | `libs/indicators/src/fibonacci/fibonacci.ts:347:25` | `0.5 - tolerance` |
-| number | `0.618` | `libs/indicators/src/fibonacci/fibonacci.ts:348:25` | `0.618 + tolerance` |
-| number | `0.382` | `libs/indicators/src/fibonacci/fibonacci.ts:353:33` | `retracementRatio < 0.382` |
-| number | `0.5` | `libs/indicators/src/fibonacci/fibonacci.ts:355:33` | `0.5 - tolerance` |
-| string | `up` | `libs/indicators/src/force.ts:29:34` | `unit.trend.toLowerCase() === 'up'` |
-| string | `up` | `libs/indicators/src/force.ts:42:34` | `direction === 'up'` |
-| string | `up` | `libs/indicators/src/force.ts:95:44` | `directions[unitIndex] === 'up'` |
-| number | `9` | `libs/indicators/src/kdj.ts:36:36` | `params?.period ?? 9` |
-| number | `3` | `libs/indicators/src/kdj.ts:37:44` | `params?.kSmoothing ?? 3` |
-| number | `3` | `libs/indicators/src/kdj.ts:38:44` | `params?.dSmoothing ?? 3` |
-| string | `high` | `libs/indicators/src/kdj.ts:51:21` | `pl.Series('high', high as any)` |
-| string | `low` | `libs/indicators/src/kdj.ts:52:20` | `pl.Series('low', low as any)` |
-| string | `low` | `libs/indicators/src/kdj.ts:55:23` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/kdj.ts:56:24` | `pl.col('high')` |
-| number | `50` | `libs/indicators/src/kdj.ts:60:18` | `pl.lit(50)` |
-| string | `fk` | `libs/indicators/src/kdj.ts:64:29` | `fastKExpr.alias('fk')` |
-| string | `fk` | `libs/indicators/src/kdj.ts:65:16` | `df .select(fastKExpr.alias('fk')) .getColumn('fk')` |
-| string | `middle` | `libs/indicators/src/keltner.ts:72:34` | `pl.Series('middle', middle as any)` |
-| string | `atr` | `libs/indicators/src/keltner.ts:73:31` | `pl.Series('atr', atrArr as any)` |
-| string | `middle` | `libs/indicators/src/keltner.ts:80:28` | `pl.col('middle')` |
-| string | `atr` | `libs/indicators/src/keltner.ts:80:49` | `pl.col('atr')` |
-| string | `middle` | `libs/indicators/src/keltner.ts:81:28` | `pl.col('middle')` |
-| string | `atr` | `libs/indicators/src/keltner.ts:81:49` | `pl.col('atr')` |
-| string | `middle` | `libs/indicators/src/keltner.ts:84:12` | `pl.col('middle')` |
-| string | `upper` | `libs/indicators/src/keltner.ts:85:21` | `upperExpr.alias('upper')` |
-| string | `lower` | `libs/indicators/src/keltner.ts:86:21` | `lowerExpr.alias('lower')` |
-| string | `upper` | `libs/indicators/src/keltner.ts:89:38` | `calculated.getColumn('upper')` |
-| string | `lower` | `libs/indicators/src/keltner.ts:90:38` | `calculated.getColumn('lower')` |
-| string | `v` | `libs/indicators/src/macd.ts:22:23` | `pl.Series('v', arr as any)` |
-| string | `tail` | `libs/indicators/src/macd.ts:26:32` | `pl.Series('tail', tail as any)` |
-| number | `34` | `libs/indicators/src/macd.ts:32:23` | `closes.length < 34` |
-| number | `12` | `libs/indicators/src/macd.ts:41:45` | `computePolarsEma(closes, 12)` |
-| number | `26` | `libs/indicators/src/macd.ts:42:45` | `computePolarsEma(closes, 26)` |
-| number | `26` | `libs/indicators/src/macd.ts:43:38` | `26 - 12` |
-| number | `12` | `libs/indicators/src/macd.ts:43:43` | `26 - 12` |
-| number | `9` | `libs/indicators/src/macd.ts:50:44` | `computePolarsEma(dif, 9)` |
-| number | `8` | `libs/indicators/src/macd.ts:51:26` | `dif.slice(8)` |
-| string | `volume` | `libs/indicators/src/obv.ts:43:23` | `pl.Series('volume', volumes as any)` |
-| string | `volume` | `libs/indicators/src/obv.ts:54:32` | `pl.col('volume')` |
-| string | `obv` | `libs/indicators/src/obv.ts:55:61` | `signedVolExpr.cumSum().alias('obv')` |
-| string | `obv` | `libs/indicators/src/obv.ts:57:39` | `calculated.getColumn('obv')` |
-| number | `20` | `libs/indicators/src/rpp.ts:22:20` | `window: number = 20` |
-| string | `high` | `libs/indicators/src/rpp.ts:45:21` | `pl.Series('high', highs as any)` |
-| string | `low` | `libs/indicators/src/rpp.ts:46:20` | `pl.Series('low', lows as any)` |
-| string | `low` | `libs/indicators/src/rpp.ts:50:25` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/rpp.ts:51:26` | `pl.col('high')` |
-| number | `0.5` | `libs/indicators/src/rpp.ts:57:23` | `pl.lit(0.5)` |
-| string | `rpp` | `libs/indicators/src/rpp.ts:59:46` | `rppExpr.alias('rpp')` |
-| string | `rpp` | `libs/indicators/src/rpp.ts:61:39` | `calculated.getColumn('rpp')` |
-| number | `20` | `libs/indicators/src/rpp.ts:76:20` | `window: number = 20` |
-| string | `v` | `libs/indicators/src/rsi.ts:9:23` | `pl.Series('v', arr as any)` |
-| string | `tail` | `libs/indicators/src/rsi.ts:13:32` | `pl.Series('tail', tail as any)` |
-| number | `14` | `libs/indicators/src/rsi.ts:20:20` | `period: number = 14` |
-| string | `ignore` | `libs/indicators/src/rsi.ts:32:40` | `pl.col('close').diff(1, 'ignore')` |
-| string | `gain` | `libs/indicators/src/rsi.ts:36:43` | `gainExpr.alias('gain')` |
-| string | `loss` | `libs/indicators/src/rsi.ts:36:67` | `lossExpr.alias('loss')` |
-| string | `gain` | `libs/indicators/src/rsi.ts:38:34` | `diffDf.getColumn('gain')` |
-| string | `loss` | `libs/indicators/src/rsi.ts:39:35` | `diffDf.getColumn('loss')` |
-| string | `gain` | `libs/indicators/src/rsi.ts:48:21` | `pl.col('gain')` |
-| string | `loss` | `libs/indicators/src/rsi.ts:48:40` | `pl.col('loss')` |
-| string | `loss` | `libs/indicators/src/rsi.ts:50:18` | `pl.col('loss')` |
-| string | `rsi` | `libs/indicators/src/rsi.ts:55:27` | `rsiExpr.alias('rsi')` |
-| string | `rsi` | `libs/indicators/src/rsi.ts:56:16` | `rsiDf .select(rsiExpr.alias('rsi')) .getColumn('rsi')` |
+| number | `3` | `libs/indicators/src/fibonacci/fibonacci.ts:305:35` | `ratio.toFixed(3)` |
+| string | `up` | `libs/indicators/src/fibonacci/fibonacci.ts:343:21` | `direction === 'up'` |
+| number | `4` | `libs/indicators/src/fibonacci/fibonacci.ts:349:43` | `options?.precision ?? 4` |
+| number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:351:27` | `10 ** precision` |
+| number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:351:46` | `10 ** precision` |
+| string | `up` | `libs/indicators/src/force/force.ts:29:34` | `unit.trend.toLowerCase() === 'up'` |
+| string | `up` | `libs/indicators/src/force/force.ts:42:34` | `direction === 'up'` |
+| string | `up` | `libs/indicators/src/force/force.ts:95:44` | `directions[unitIndex] === 'up'` |
+| number | `0.95` | `libs/indicators/src/risk-performance/risk-performance.ts:452:45` | `computeValueAtRisk(returns, 0.95)` |
+| number | `0.99` | `libs/indicators/src/risk-performance/risk-performance.ts:453:45` | `computeValueAtRisk(returns, 0.99)` |
+| number | `0.95` | `libs/indicators/src/risk-performance/risk-performance.ts:454:49` | `computeConditionalVaR(returns, 0.95)` |
+| number | `0.99` | `libs/indicators/src/risk-performance/risk-performance.ts:455:49` | `computeConditionalVaR(returns, 0.99)` |
 | string | `computeRollingCorrSeries` | `libs/indicators/src/time-series/rolling-corr.ts:16:29` | `assertValidWindow(window, 'computeRollingCorrSeries')` |
 | string | `computeRollingCorrSeries` | `libs/indicators/src/time-series/rolling-corr.ts:20:5` | `assertMatchingLengths( seriesX.length, seriesY.length, 'computeRollingCorrSeries', )` |
 | string | `computeRollingCorrObservation` | `libs/indicators/src/time-series/rolling-corr.ts:95:29` | `assertValidWindow(window, 'computeRollingCorrObservation')` |
@@ -1515,120 +1617,31 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `computeTsRankObservation` | `libs/indicators/src/time-series/ts-rank.ts:87:29` | `assertValidWindow(window, 'computeTsRankObservation')` |
 | number | `0.5` | `libs/indicators/src/time-series/ts-rank.ts:99:24` | `normalize ? 0.5 : 1` |
 | string | `trailing` | `libs/indicators/src/time-series/ts-rank.ts:102:23` | `pl.Series('trailing', trailing as any)` |
-| number | `5` | `libs/indicators/src/volume.ts:33:45` | `[5, 10, 20]` |
-| number | `10` | `libs/indicators/src/volume.ts:33:48` | `[5, 10, 20]` |
-| number | `20` | `libs/indicators/src/volume.ts:33:52` | `[5, 10, 20]` |
-| string | `volume` | `libs/indicators/src/volume.ts:47:23` | `pl.Series('volume', volumes as any)` |
-| string | `vma5` | `libs/indicators/src/volume.ts:60:18` | `pl.col('vma5')` |
-| string | `volume` | `libs/indicators/src/volume.ts:61:18` | `pl.col('volume')` |
-| string | `vma5` | `libs/indicators/src/volume.ts:61:39` | `pl.col('vma5')` |
-| string | `volume` | `libs/indicators/src/volume.ts:65:12` | `pl.col('volume')` |
-| string | `vma5` | `libs/indicators/src/volume.ts:66:12` | `pl.col('vma5')` |
-| string | `vma10` | `libs/indicators/src/volume.ts:67:12` | `pl.col('vma10')` |
-| string | `vma20` | `libs/indicators/src/volume.ts:68:12` | `pl.col('vma20')` |
-| string | `ratio` | `libs/indicators/src/volume.ts:69:21` | `ratioExpr.alias('ratio')` |
-| string | `volume` | `libs/indicators/src/volume.ts:73:39` | `calculated.getColumn('volume')` |
-| string | `vma5` | `libs/indicators/src/volume.ts:74:40` | `calculated.getColumn('vma5')` |
-| string | `vma10` | `libs/indicators/src/volume.ts:75:41` | `calculated.getColumn('vma10')` |
-| string | `vma20` | `libs/indicators/src/volume.ts:76:41` | `calculated.getColumn('vma20')` |
-| string | `ratio` | `libs/indicators/src/volume.ts:77:41` | `calculated.getColumn('ratio')` |
-| number | `5` | `libs/indicators/src/volume.ts:96:45` | `[5, 10, 20]` |
-| number | `10` | `libs/indicators/src/volume.ts:96:48` | `[5, 10, 20]` |
-| number | `20` | `libs/indicators/src/volume.ts:96:52` | `[5, 10, 20]` |
-| string | `price` | `libs/indicators/src/vpci.ts:71:29` | `pl.Series('price', prices as any)` |
-| string | `volume` | `libs/indicators/src/vpci.ts:72:29` | `pl.Series('volume', volumes as any)` |
-| string | `price` | `libs/indicators/src/vpci.ts:79:25` | `pl.col('price')` |
-| string | `volume` | `libs/indicators/src/vpci.ts:79:45` | `pl.col('volume')` |
-| string | `pv` | `libs/indicators/src/vpci.ts:80:47` | `pvExpr.alias('pv')` |
-| string | `pv` | `libs/indicators/src/vpci.ts:83:29` | `pl.col('pv')` |
-| string | `volume` | `libs/indicators/src/vpci.ts:84:28` | `pl.col('volume')` |
-| string | `price` | `libs/indicators/src/vpci.ts:85:27` | `pl.col('price')` |
-| string | `pv` | `libs/indicators/src/vpci.ts:92:28` | `pl.col('pv')` |
-| string | `volume` | `libs/indicators/src/vpci.ts:93:27` | `pl.col('volume')` |
-| string | `price` | `libs/indicators/src/vpci.ts:94:26` | `pl.col('price')` |
-| string | `volume` | `libs/indicators/src/vpci.ts:121:27` | `pl.col('volume')` |
-| string | `volume` | `libs/indicators/src/vpci.ts:122:26` | `pl.col('volume')` |
-| string | `vpc` | `libs/indicators/src/vpci.ts:133:19` | `vpcExpr.alias('vpc')` |
-| string | `vpr` | `libs/indicators/src/vpci.ts:134:19` | `vprExpr.alias('vpr')` |
-| string | `vpci` | `libs/indicators/src/vpci.ts:135:20` | `vpciExpr.alias('vpci')` |
-| string | `vpci` | `libs/indicators/src/vpci.ts:139:29` | `pl.col('vpci')` |
-| string | `signalLine` | `libs/indicators/src/vpci.ts:140:53` | `signalExpr.alias('signalLine')` |
-| string | `vpc` | `libs/indicators/src/vpci.ts:142:35` | `stage2.getColumn('vpc')` |
-| string | `vpr` | `libs/indicators/src/vpci.ts:143:35` | `stage2.getColumn('vpr')` |
-| string | `vpci` | `libs/indicators/src/vpci.ts:144:36` | `stage2.getColumn('vpci')` |
-| string | `signalLine` | `libs/indicators/src/vpci.ts:145:38` | `stage2.getColumn('signalLine')` |
-| string | `volume` | `libs/indicators/src/vwap.ts:57:23` | `pl.Series('volume', volumes as any)` |
-| string | `volume` | `libs/indicators/src/vwap.ts:60:45` | `pl.col('volume')` |
-| string | `volume` | `libs/indicators/src/vwap.ts:65:16` | `pl.col('volume')` |
-| string | `volume` | `libs/indicators/src/vwap.ts:66:16` | `pl.col('volume')` |
-| string | `vwap` | `libs/indicators/src/vwap.ts:73:47` | `vwapExpr.alias('vwap')` |
-| string | `vwap` | `libs/indicators/src/vwap.ts:75:40` | `calculated.getColumn('vwap')` |
 | number | `21` | `libs/market-data/src/k-price-projector.ts:30:30` | `trimmed.length > 21` |
-| string | `complete` | `libs/market-data/src/k-strategy-bar-mapper.ts:30:11` | `type: 'complete'` |
-| string | `ef` | `libs/market-data/src/market-data-pipeline.ts:147:54` | `source === 'ef'` |
-| string | `tdx` | `libs/market-data/src/market-data-pipeline.ts:148:47` | `source === 'tdx'` |
-| string | `qmt` | `libs/market-data/src/market-data-pipeline.ts:149:47` | `source === 'qmt'` |
-| string | `volume` | `libs/market-data/src/projection/strategy-series-imputer.ts:208:11` | `imputeQuantity( bars, start, 'volume', bar.volume, volumeAnchors, offset, )` |
-| string | `amount` | `libs/market-data/src/projection/strategy-series-imputer.ts:216:11` | `imputeQuantity( bars, start, 'amount', bar.amount, amountAnchors, offset, )` |
-| string | `observed` | `libs/market-data/src/projection/strategy-series-imputer.ts:237:61` | `resolution: 'observed'` |
-| string | `backfilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:250:19` | `resolution: 'backfilled'` |
-| string | `forwardFilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:264:19` | `resolution: 'forwardFilled'` |
-| string | `unavailable` | `libs/market-data/src/projection/strategy-series-imputer.ts:270:17` | `resolution: 'unavailable'` |
-| string | `observed` | `libs/market-data/src/projection/strategy-series-imputer.ts:283:61` | `resolution: 'observed'` |
-| string | `backfilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:290:19` | `resolution: 'backfilled'` |
-| string | `forwardFilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:298:19` | `resolution: 'forwardFilled'` |
-| string | `unavailable` | `libs/market-data/src/projection/strategy-series-imputer.ts:301:60` | `resolution: 'unavailable'` |
-| string | `observed` | `libs/market-data/src/projection/strategy-series-imputer.ts:312:61` | `resolution: 'observed'` |
-| string | `forwardFilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:318:19` | `resolution: 'forwardFilled'` |
-| string | `unavailable` | `libs/market-data/src/projection/strategy-series-imputer.ts:324:17` | `resolution: 'unavailable'` |
-| string | `observed` | `libs/market-data/src/projection/strategy-series-imputer.ts:334:61` | `resolution: 'observed'` |
-| string | `forwardFilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:340:19` | `resolution: 'forwardFilled'` |
-| string | `unavailable` | `libs/market-data/src/projection/strategy-series-imputer.ts:343:60` | `resolution: 'unavailable'` |
-| number | `64` | `libs/observability/src/metric-utils.ts:34:48` | `trimmed.length > 64` |
-| number | `4` | `libs/realtime/src/realtime-candle-redis.contract.ts:61:47` | `tradingDay.slice(0, 4)` |
-| number | `4` | `libs/realtime/src/realtime-candle-redis.contract.ts:61:70` | `tradingDay.slice(4, 6)` |
-| number | `6` | `libs/realtime/src/realtime-candle-redis.contract.ts:61:73` | `tradingDay.slice(4, 6)` |
-| number | `6` | `libs/realtime/src/realtime-candle-redis.contract.ts:61:96` | `tradingDay.slice(6, 8)` |
-| number | `8` | `libs/realtime/src/realtime-candle-redis.contract.ts:61:99` | `tradingDay.slice(6, 8)` |
-| number | `24` | `libs/realtime/src/realtime-candle-redis.contract.ts:66:30` | `24 * 60` |
-| number | `60` | `libs/realtime/src/realtime-candle-redis.contract.ts:66:35` | `24 * 60` |
-| number | `60000` | `libs/realtime/src/realtime-candle-redis.contract.ts:66:40` | `24 * 60 * 60_000` |
-| number | `1000` | `libs/realtime/src/realtime-candle-redis.contract.ts:66:50` | `(start + 24 * 60 * 60_000) / 1_000` |
-| string | `due member` | `libs/realtime/src/realtime-candle-redis.contract.ts:78:5` | `assertRealtimeRedisBytes( 'due member', member, REALTIME_REDIS_RECORD_LIMITS.dueMember, )` |
-| string | `due member` | `libs/realtime/src/realtime-candle-redis.contract.ts:91:5` | `assertRealtimeRedisBytes( 'due member', member, REALTIME_REDIS_RECORD_LIMITS.dueMember, )` |
-| number | `3` | `libs/realtime/src/realtime-candle-redis.contract.ts:96:24` | `parts.length !== 3` |
-| string | `provisional` | `libs/realtime/src/realtime-candle-redis.contract.ts:128:17` | `value.q !== 'provisional'` |
-| string | `tdx` | `libs/realtime/src/realtime-candle-redis.contract.ts:181:17` | `value !== 'tdx'` |
-| string | `qmt` | `libs/realtime/src/realtime-candle-redis.contract.ts:181:36` | `value !== 'qmt'` |
+| string | `complete` | `libs/market-data/src/k-strategy-bar-mapper.ts:96:11` | `type: 'complete'` |
+| string | `ef` | `libs/market-data/src/market-data-pipeline.ts:141:54` | `source === 'ef'` |
+| string | `tdx` | `libs/market-data/src/market-data-pipeline.ts:142:47` | `source === 'tdx'` |
+| string | `qmt` | `libs/market-data/src/market-data-pipeline.ts:143:47` | `source === 'qmt'` |
+| string | `volume` | `libs/market-data/src/projection/strategy-series-imputer.ts:203:11` | `imputeQuantity( bars, start, 'volume', bar.volume, volumeAnchors, offset, )` |
+| string | `amount` | `libs/market-data/src/projection/strategy-series-imputer.ts:211:11` | `imputeQuantity( bars, start, 'amount', bar.amount, amountAnchors, offset, )` |
+| string | `observed` | `libs/market-data/src/projection/strategy-series-imputer.ts:232:61` | `resolution: 'observed'` |
+| string | `backfilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:245:19` | `resolution: 'backfilled'` |
+| string | `forwardFilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:259:19` | `resolution: 'forwardFilled'` |
+| string | `unavailable` | `libs/market-data/src/projection/strategy-series-imputer.ts:265:17` | `resolution: 'unavailable'` |
+| string | `observed` | `libs/market-data/src/projection/strategy-series-imputer.ts:278:61` | `resolution: 'observed'` |
+| string | `backfilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:285:19` | `resolution: 'backfilled'` |
+| string | `forwardFilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:293:19` | `resolution: 'forwardFilled'` |
+| string | `unavailable` | `libs/market-data/src/projection/strategy-series-imputer.ts:296:60` | `resolution: 'unavailable'` |
+| string | `observed` | `libs/market-data/src/projection/strategy-series-imputer.ts:307:61` | `resolution: 'observed'` |
+| string | `forwardFilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:313:19` | `resolution: 'forwardFilled'` |
+| string | `unavailable` | `libs/market-data/src/projection/strategy-series-imputer.ts:319:17` | `resolution: 'unavailable'` |
+| string | `observed` | `libs/market-data/src/projection/strategy-series-imputer.ts:329:61` | `resolution: 'observed'` |
+| string | `forwardFilled` | `libs/market-data/src/projection/strategy-series-imputer.ts:335:19` | `resolution: 'forwardFilled'` |
+| string | `unavailable` | `libs/market-data/src/projection/strategy-series-imputer.ts:338:60` | `resolution: 'unavailable'` |
 | string | `ER_DUP_ENTRY` | `libs/shared-data/src/utils/mysql-unique-conflict.util.ts:23:23` | `driver.code !== 'ER_DUP_ENTRY'` |
 | number | `1062` | `libs/shared-data/src/utils/mysql-unique-conflict.util.ts:23:58` | `driver.errno !== 1062` |
-| string | `tdx` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:68:24` | `input.source !== 'tdx'` |
-| string | `qmt` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:68:50` | `input.source !== 'qmt'` |
-| string | `1m` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:71:24` | `input.period !== '1m'` |
-| string | `sealed` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:81:25` | `input.outcome === 'sealed'` |
-| string | `1m` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:94:15` | `period: '1m'` |
-| string | `sealed` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:96:16` | `outcome: 'sealed'` |
-| string | `discarded` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:100:25` | `input.outcome === 'discarded'` |
-| string | `1m` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:110:15` | `period: '1m'` |
-| string | `discarded` | `libs/signal/src/contracts/candle-finalized-trigger.contract.ts:112:16` | `outcome: 'discarded'` |
-| string | `upserted` | `libs/signal/src/contracts/signal-registry-refresh.contract.ts:49:23` | `value.action !== 'upserted'` |
-| string | `removed` | `libs/signal/src/contracts/signal-registry-refresh.contract.ts:49:54` | `value.action !== 'removed'` |
-| string | `qq` | `libs/signal/src/contracts/strategy-alert-delivery.contract.ts:112:23` | `input.channel !== 'qq'` |
-| string | `wechat` | `libs/signal/src/contracts/strategy-alert-delivery.contract.ts:113:23` | `input.channel !== 'wechat'` |
-| string | `feishu` | `libs/signal/src/contracts/strategy-alert-delivery.contract.ts:114:23` | `input.channel !== 'feishu'` |
-| string | `tdx` | `libs/signal/src/runtime/realtime-kernel-pool.ts:197:18` | `source !== 'tdx'` |
-| string | `qmt` | `libs/signal/src/runtime/realtime-kernel-pool.ts:197:38` | `source !== 'qmt'` |
-| number | `60000` | `libs/signal/src/runtime/realtime-period.builder.ts:43:66` | `slotOffset * 60_000` |
-| string | ` ` | `libs/signal/src/runtime/realtime-period.builder.ts:89:34` | `key.split('\u0000')` |
-| number | `3` | `libs/signal/src/runtime/realtime-period.builder.ts:89:53` | `key.split('\u0000').slice(0, 3)` |
-| string | ` ` | `libs/signal/src/runtime/realtime-period.builder.ts:89:61` | `key.split('\u0000').slice(0, 3).join('\u0000')` |
-| string | `volume` | `libs/signal/src/runtime/realtime-period.builder.ts:118:31` | `sumQuantity(bars, 'volume')` |
-| string | `amount` | `libs/signal/src/runtime/realtime-period.builder.ts:119:31` | `sumQuantity(bars, 'amount')` |
-| number | `60000` | `libs/signal/src/runtime/realtime-period.builder.ts:139:54` | `timestampMs % 60_000` |
-| string | `h23` | `libs/signal/src/runtime/realtime-period.builder.ts:149:16` | `hourCycle: 'h23'` |
-| string | `discarded` | `libs/signal/src/runtime/realtime-period.builder.ts:188:27` | `trigger.outcome === 'discarded'` |
-| string | `complete` | `libs/signal/src/runtime/realtime-period.builder.ts:200:24` | `sealedBar.type !== 'complete'` |
-| string | `exit` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:130:47` | `signal.signalKind === 'exit'` |
+| string | `exit` | `libs/signal/src/runtime/realtime-strategy-evaluation.service.ts:115:47` | `signal.signalKind === 'exit'` |
+| string | `duan` | `libs/strategy/src/analysis/chan-derivation.ts:72:15` | `units === 'duan'` |
 | number | `3` | `libs/strategy/src/analysis/chan-fenxing-trigger.ts:30:38` | `orderedK.length < 3` |
 | string | `KDJ(9,3,3)` | `libs/strategy/src/analysis/strategy-kdj.ts:21:5` | `requireExactStrategyBars( bars, STRATEGY_KDJ_CALCULATION_BAR_COUNT, 'KDJ(9,3,3)', )` |
 | string | `MACD(12,26,9)` | `libs/strategy/src/analysis/strategy-macd.ts:21:5` | `requireExactStrategyBars( bars, STRATEGY_MACD_CALCULATION_BAR_COUNT, 'MACD(12,26,9)', )` |
@@ -1748,13 +1761,20 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `ne` | `libs/strategy/src/evaluation/strategy-rule.evaluator.ts:128:10` | `case 'ne': return current !== 0;` |
 | string | `crossesAbove` | `libs/strategy/src/evaluation/strategy-rule.evaluator.ts:130:10` | `case 'crossesAbove': if (previous === undefined) throw new Error('crossover has no prior value'); re` |
 | string | `crossesBelow` | `libs/strategy/src/evaluation/strategy-rule.evaluator.ts:134:10` | `case 'crossesBelow': if (previous === undefined) throw new Error('crossover has no prior value'); re` |
-| string | `..` | `libs/strategy/src/factor/external-plugin-loader.ts:144:53` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
-| string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:144:59` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
-| string | `../../../../..` | `libs/strategy/src/factor/external-plugin-loader.ts:149:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
-| string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:150:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
-| number | `5` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:184:64` | `[5, 10, 20]` |
-| number | `10` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:184:67` | `[5, 10, 20]` |
-| number | `20` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:184:71` | `[5, 10, 20]` |
+| number | `-0.08` | `libs/strategy/src/execution/execution-risk-arbiter.ts:70:60` | `options?.hardStopLossRatio ?? -0.08` |
+| number | `3` | `libs/strategy/src/execution/execution-risk-arbiter.ts:71:64` | `options?.defaultCooldownBars ?? 3` |
+| number | `0.995` | `libs/strategy/src/execution/execution-risk-arbiter.ts:72:64` | `options?.cashAllocationRatio ?? 0.995` |
+| string | `SYSTEMIC_RISK_MELTDOWN` | `libs/strategy/src/execution/execution-risk-arbiter.ts:138:23` | `exitReason: 'SYSTEMIC_RISK_MELTDOWN'` |
+| string | `HARD_STOP_LOSS` | `libs/strategy/src/execution/execution-risk-arbiter.ts:161:23` | `exitReason: 'HARD_STOP_LOSS'` |
+| number | `0.5` | `libs/strategy/src/execution/execution-risk-arbiter.ts:209:40` | `this.cashAllocationRatio * 0.5` |
+| string | `..` | `libs/strategy/src/factor/external-plugin-loader.ts:147:53` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
+| string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:147:59` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
+| string | `../../../../..` | `libs/strategy/src/factor/external-plugin-loader.ts:152:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
+| string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:153:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
+| string | `require` | `libs/strategy/src/factor/external-plugin-loader.ts:248:18` | `eval('require')` |
+| number | `5` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:222:64` | `[5, 10, 20]` |
+| number | `10` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:222:67` | `[5, 10, 20]` |
+| number | `20` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:222:71` | `[5, 10, 20]` |
 | string | `有效行情数据为空，未形成缠论K线` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:133:17` | `reason: '有效行情数据为空，未形成缠论K线'` |
 | string | `未检测到满足条件的缠论买卖点` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:147:17` | `reason: '未检测到满足条件的缠论买卖点'` |
 | string | `缠论买卖点已在先前批次发射，无需重复触发` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:191:19` | `reason: '缠论买卖点已在先前批次发射，无需重复触发'` |
@@ -1764,19 +1784,19 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `当前最新K线未确立有效分型扳机(笔内延伸或包含)` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:213:19` | `reason: '当前最新K线未确立有效分型扳机(笔内延伸或包含)'` |
 | string | `检测到买点结构，但最新确立分型为顶分型而非底分型` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:220:19` | `reason: '检测到买点结构，但最新确立分型为顶分型而非底分型'` |
 | string | `检测到卖点结构，但最新确立分型为底分型而非顶分型` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:227:19` | `reason: '检测到卖点结构，但最新确立分型为底分型而非顶分型'` |
-| string | `_buy` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:417:39` | `event.type.endsWith('_buy')` |
-| string | `first_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:422:31` | `event.type.startsWith('first_')` |
-| string | `second_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:423:31` | `event.type.startsWith('second_')` |
-| string | `third_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:425:31` | `event.type.startsWith('third_')` |
-| number | `50` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:63:11` | `typeof rawParams?.period === 'number' && rawParams.period > 0 ? rawParams.period : 50` |
-| number | `0.008` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:67:11` | `typeof rawParams?.toleranceRatio === 'number' ? rawParams.toleranceRatio : 0.008` |
-| string | `pullback` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:102:23` | `direction === 'pullback'` |
-| string | `both` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:102:51` | `direction === 'both'` |
-| string | `rebound` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:124:23` | `direction === 'rebound'` |
-| string | `both` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:124:50` | `direction === 'both'` |
-| number | `0.5` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:126:26` | `obs.diff === 0 ? 0.5 : (obs.close - obs.low) / obs.diff` |
-| number | `0.5` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:128:25` | `0.5 - toleranceRatio` |
-| number | `0.618` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:129:25` | `0.618 + toleranceRatio` |
+| string | `_buy` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:394:39` | `event.type.endsWith('_buy')` |
+| string | `first_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:399:31` | `event.type.startsWith('first_')` |
+| string | `second_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:400:31` | `event.type.startsWith('second_')` |
+| string | `third_` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:402:31` | `event.type.startsWith('third_')` |
+| string | `有效行情数据为空，未形成缠论K线` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:103:17` | `reason: '有效行情数据为空，未形成缠论K线'` |
+| string | `up` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:147:42` | `swingDirection === 'up'` |
+| string | `up` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:163:26` | `swingDirection === 'up'` |
+| string | `pullback` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:164:22` | `direction === 'pullback'` |
+| string | `both` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:164:50` | `direction === 'both'` |
+| string | `down` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:189:26` | `swingDirection === 'down'` |
+| string | `rebound` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:190:22` | `direction === 'rebound'` |
+| string | `both` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:190:49` | `direction === 'both'` |
+| string | `up` | `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:222:37` | `swingDirection === 'up'` |
 | number | `8` | `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:44:66` | `typeof rawParams?.minRoe === 'number' ? rawParams.minRoe : 8.0` |
 | number | `70` | `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:48:11` | `typeof rawParams?.maxDebtRatio === 'number' ? rawParams.maxDebtRatio : 70.0` |
 | string | `roe` | `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:67:9` | `context.featureProvider.getFeature( 'roe', context.securityCode, )` |
@@ -1788,14 +1808,6 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `0.9` | `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:107:21` | `confidence: 0.9` |
 | string | `SELL` | `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:120:15` | `action: 'SELL'` |
 | number | `0.95` | `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:121:19` | `confidence: 0.95` |
-| number | `200` | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:41:42` | `config.timeoutMs ?? 200` |
-| string | `NEUTRAL` | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:77:19` | `action: 'NEUTRAL'` |
-| string | `NEUTRAL` | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:87:19` | `action: 'NEUTRAL'` |
-| string | `外置HTTP因子服务返回格式不合法，自动弃权` | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:89:19` | `reason: '外置HTTP因子服务返回格式不合法，自动弃权'` |
-| string | `BUY` | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:94:25` | `data.action === 'BUY'` |
-| string | `SELL` | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:94:50` | `data.action === 'SELL'` |
-| string | `AbortError` | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:113:39` | `err?.name === 'AbortError'` |
-| string | `NEUTRAL` | `libs/strategy/src/factor/plugins/http-proxy.plugin.ts:115:17` | `action: 'NEUTRAL'` |
 | string | `NEUTRAL` | `libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts:55:17` | `action: 'NEUTRAL'` |
 | string | `未提供有效的规则计划(plan)或规则定义(rule)` | `libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts:57:17` | `reason: '未提供有效的规则计划(plan)或规则定义(rule)'` |
 | string | `unavailable` | `libs/strategy/src/factor/plugins/legacy-rule-dsl.plugin.ts:63:28` | `outcome.status === 'unavailable'` |
@@ -1815,6 +1827,16 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `SELL` | `libs/strategy/src/factor/plugins/northbound-capital.plugin.ts:85:17` | `action: 'SELL'` |
 | number | `0.85` | `libs/strategy/src/factor/plugins/northbound-capital.plugin.ts:86:21` | `confidence: 0.85` |
 | string | `NEUTRAL` | `libs/strategy/src/factor/plugins/northbound-capital.plugin.ts:96:15` | `action: 'NEUTRAL'` |
+| string | `tdx` | `libs/strategy/src/kernel/adapters/realtime-kernel-pool.ts:217:18` | `source !== 'tdx'` |
+| string | `qmt` | `libs/strategy/src/kernel/adapters/realtime-kernel-pool.ts:217:38` | `source !== 'qmt'` |
+| number | `60000` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:43:66` | `slotOffset * 60_000` |
+| string | ` ` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:89:34` | `key.split('\u0000')` |
+| number | `3` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:89:53` | `key.split('\u0000').slice(0, 3)` |
+| string | ` ` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:89:61` | `key.split('\u0000').slice(0, 3).join('\u0000')` |
+| string | `volume` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:118:31` | `sumQuantity(bars, 'volume')` |
+| string | `amount` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:119:31` | `sumQuantity(bars, 'amount')` |
+| string | `discarded` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:172:27` | `trigger.outcome === 'discarded'` |
+| string | `complete` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:184:24` | `sealedBar.type !== 'complete'` |
 | string | `volumeFeatures` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:163:22` | `attributes.set('volumeFeatures', vf)` |
 | string | `SIGNAL_EMITTED` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:190:31` | `decision.status !== 'SIGNAL_EMITTED'` |
 | string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:191:31` | `decision.action !== 'BUY'` |
@@ -1825,20 +1847,20 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `forwardFillWithinTradingDay` | `libs/strategy/src/rules/strategy-field.catalog.ts:51:20` | `missingPolicy: 'forwardFillWithinTradingDay'` |
 | string | `finiteNumber` | `libs/strategy/src/rules/strategy-field.catalog.ts:56:16` | `valueType: 'finiteNumber'` |
 | string | `finiteNumber` | `libs/strategy/src/rules/strategy-field.catalog.ts:63:16` | `valueType: 'finiteNumber'` |
-| string | `create` | `libs/strategy/src/rules/strategy-rule.compiler.ts:38:48` | `compileStrategyRule(rule, signalKind, 'create')` |
-| string | `stored` | `libs/strategy/src/rules/strategy-rule.compiler.ts:45:48` | `compileStrategyRule(rule, signalKind, 'stored')` |
-| string | `stored` | `libs/strategy/src/rules/strategy-rule.compiler.ts:52:48` | `compileStrategyRule(rule, signalKind, 'stored')` |
-| string | `all` | `libs/strategy/src/rules/strategy-rule.compiler.ts:97:41` | `keys[0] === 'all'` |
-| string | `condition` | `libs/strategy/src/rules/strategy-rule.compiler.ts:188:11` | `kind: 'condition'` |
-| string | `finiteNumber` | `libs/strategy/src/rules/strategy-rule.compiler.ts:207:29` | `catalog.valueType === 'finiteNumber'` |
-| string | `barType` | `libs/strategy/src/rules/strategy-rule.compiler.ts:213:29` | `catalog.valueType === 'barType'` |
-| string | `complete` | `libs/strategy/src/rules/strategy-rule.compiler.ts:214:19` | `value !== 'complete'` |
-| string | `incomplete` | `libs/strategy/src/rules/strategy-rule.compiler.ts:214:43` | `value !== 'incomplete'` |
-| string | `create` | `libs/strategy/src/rules/strategy-rule.compiler.ts:224:25` | `decimalBoundary === 'create'` |
-| string | `entry` | `libs/strategy/src/rules/strategy-rule.compiler.ts:232:17` | `value !== 'entry'` |
-| string | `exit` | `libs/strategy/src/rules/strategy-rule.compiler.ts:232:38` | `value !== 'exit'` |
-| string | `crossesAbove` | `libs/strategy/src/rules/strategy-rule.compiler.ts:238:23` | `operator === 'crossesAbove'` |
-| string | `crossesBelow` | `libs/strategy/src/rules/strategy-rule.compiler.ts:238:54` | `operator === 'crossesBelow'` |
+| string | `create` | `libs/strategy/src/rules/strategy-rule.compiler.ts:42:48` | `compileStrategyRule(rule, signalKind, 'create')` |
+| string | `stored` | `libs/strategy/src/rules/strategy-rule.compiler.ts:49:48` | `compileStrategyRule(rule, signalKind, 'stored')` |
+| string | `stored` | `libs/strategy/src/rules/strategy-rule.compiler.ts:56:48` | `compileStrategyRule(rule, signalKind, 'stored')` |
+| string | `all` | `libs/strategy/src/rules/strategy-rule.compiler.ts:101:41` | `keys[0] === 'all'` |
+| string | `condition` | `libs/strategy/src/rules/strategy-rule.compiler.ts:192:11` | `kind: 'condition'` |
+| string | `finiteNumber` | `libs/strategy/src/rules/strategy-rule.compiler.ts:211:29` | `catalog.valueType === 'finiteNumber'` |
+| string | `barType` | `libs/strategy/src/rules/strategy-rule.compiler.ts:217:29` | `catalog.valueType === 'barType'` |
+| string | `complete` | `libs/strategy/src/rules/strategy-rule.compiler.ts:218:19` | `value !== 'complete'` |
+| string | `incomplete` | `libs/strategy/src/rules/strategy-rule.compiler.ts:218:43` | `value !== 'incomplete'` |
+| string | `create` | `libs/strategy/src/rules/strategy-rule.compiler.ts:228:25` | `decimalBoundary === 'create'` |
+| string | `entry` | `libs/strategy/src/rules/strategy-rule.compiler.ts:236:17` | `value !== 'entry'` |
+| string | `exit` | `libs/strategy/src/rules/strategy-rule.compiler.ts:236:38` | `value !== 'exit'` |
+| string | `crossesAbove` | `libs/strategy/src/rules/strategy-rule.compiler.ts:242:23` | `operator === 'crossesAbove'` |
+| string | `crossesBelow` | `libs/strategy/src/rules/strategy-rule.compiler.ts:242:54` | `operator === 'crossesBelow'` |
 | string | `entry` | `libs/strategy/src/simulation/kernel-signal-mapper.ts:14:39` | `signal.signalKind === 'entry'` |
 | number | `60` | `libs/strategy/src/simulation/standard-simulation-flows.ts:29:57` | `options?.requiredBarCount ?? 60` |
 | string | `both` | `libs/strategy/src/simulation/standard-simulation-flows.ts:33:19` | `direction === 'both'` |
@@ -1858,50 +1880,117 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `TERMINAL` | `libs/strategy/src/simulation/standard-simulation-flows.ts:60:13` | `type: 'TERMINAL'` |
 | string | `ABORT` | `libs/strategy/src/simulation/standard-simulation-flows.ts:61:15` | `action: 'ABORT'` |
 | string | `未满足缠论买卖点形态确认条件` | `libs/strategy/src/simulation/standard-simulation-flows.ts:62:15` | `reason: '未满足缠论买卖点形态确认条件'` |
-| number | `250` | `libs/strategy/src/simulation/strategy-simulation.session.ts:37:21` | `private speedMs = 250;` |
-| number | `-8640000000000000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:55:18` | `new Date(-8640000000000000)` |
-| number | `600` | `libs/strategy/src/simulation/strategy-simulation.session.ts:77:52` | `config.windowBudget ?? 600` |
-| string | `play` | `libs/strategy/src/simulation/strategy-simulation.session.ts:134:12` | `case 'play': this.play(); return this.getCurrentFrame();` |
-| string | `step_next` | `libs/strategy/src/simulation/strategy-simulation.session.ts:140:12` | `case 'step_next': this.pause(); return this.stepNext();` |
-| string | `step_prev` | `libs/strategy/src/simulation/strategy-simulation.session.ts:143:12` | `case 'step_prev': this.pause(); return this.stepPrev();` |
-| string | `seek` | `libs/strategy/src/simulation/strategy-simulation.session.ts:146:12` | `case 'seek': this.pause(); return this.seek(command.param ?? 0);` |
-| string | `set_speed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:149:12` | `case 'set_speed': if ( typeof command.param === 'number' && command.param >= 20 && command.param <= ` |
-| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:152:28` | `command.param >= 20` |
-| number | `5000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:153:28` | `command.param <= 5000` |
-| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:156:31` | `this.status === 'playing'` |
-| string | `paused` | `libs/strategy/src/simulation/strategy-simulation.session.ts:180:20` | `this.setStatus('paused')` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:223:22` | `this.setStatus('completed')` |
-| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:258:25` | `this.cursor % 20` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:312:20` | `this.setStatus('completed')` |
-| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:326:20` | `this.setStatus('playing')` |
-| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:335:26` | `this.setStatus('completed')` |
-| number | `10000` | `libs/timezone/src/timezone.service.ts:62:16` | `timeout: 10000` |
-| string | `T` | `libs/timezone/src/timezone.service.ts:88:47` | `normalized.replace(' ', 'T')` |
-| string | `+08:00` | `libs/timezone/src/timezone.service.ts:88:54` | `normalized.replace(' ', 'T') + '+08:00'` |
-| string | `yyyy-MM-dd` | `libs/timezone/src/timezone.service.ts:117:25` | `format(date, 'yyyy-MM-dd')` |
-| number | `10` | `libs/timezone/src/timezone.service.ts:136:23` | `maxLookbackDays = 10` |
-| string | `yyyy-MM-dd` | `libs/timezone/src/timezone.service.ts:157:34` | `format(date, 'yyyy-MM-dd')` |
-| string | `http://www.szse.cn/api/report/exchange/onepersistenthour/monthList` | `libs/timezone/src/timezone.service.ts:190:9` | `this.axios.get<SzseTradingDayResponse>( 'http://www.szse.cn/api/report/exchange/onepersistenthour/mo` |
-| string | `yyyy-MM` | `libs/timezone/src/timezone.service.ts:193:37` | `format(date, 'yyyy-MM')` |
-| string | `yyyy-MM-dd` | `libs/timezone/src/timezone.service.ts:209:44` | `format(date, 'yyyy-MM-dd')` |
-| number | `6` | `libs/timezone/src/timezone.service.ts:233:33` | `day === 6` |
-| number | `60` | `libs/timezone/src/trading-session.util.ts:28:43` | `zoned.getHours() * 60` |
-| number | `6` | `libs/timezone/src/trading-session.util.ts:42:28` | `day === 6` |
-| number | `60` | `libs/timezone/src/trading-session.util.ts:43:41` | `shanghai.getHours() * 60` |
-| number | `4` | `libs/timezone/src/trading-session.util.ts:60:45` | `zoned.getFullYear().toString().padStart(4, '0')` |
+| number | `250` | `libs/strategy/src/simulation/strategy-simulation.session.ts:42:21` | `private speedMs = 250;` |
+| number | `-8640000000000000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:60:18` | `new Date(-8640000000000000)` |
+| number | `600` | `libs/strategy/src/simulation/strategy-simulation.session.ts:85:52` | `config.windowBudget ?? 600` |
+| string | `play` | `libs/strategy/src/simulation/strategy-simulation.session.ts:142:12` | `case 'play': this.play(); return this.getCurrentFrame();` |
+| string | `step_next` | `libs/strategy/src/simulation/strategy-simulation.session.ts:148:12` | `case 'step_next': this.pause(); return this.stepNext();` |
+| string | `step_prev` | `libs/strategy/src/simulation/strategy-simulation.session.ts:151:12` | `case 'step_prev': this.pause(); return this.stepPrev();` |
+| string | `seek` | `libs/strategy/src/simulation/strategy-simulation.session.ts:154:12` | `case 'seek': this.pause(); return this.seek(command.param ?? 0);` |
+| string | `set_speed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:157:12` | `case 'set_speed': if ( typeof command.param === 'number' && command.param >= 20 && command.param <= ` |
+| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:160:28` | `command.param >= 20` |
+| number | `5000` | `libs/strategy/src/simulation/strategy-simulation.session.ts:161:28` | `command.param <= 5000` |
+| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:164:31` | `this.status === 'playing'` |
+| string | `paused` | `libs/strategy/src/simulation/strategy-simulation.session.ts:188:20` | `this.setStatus('paused')` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:231:22` | `this.setStatus('completed')` |
+| number | `20` | `libs/strategy/src/simulation/strategy-simulation.session.ts:266:25` | `this.cursor % 20` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:310:20` | `this.setStatus('completed')` |
+| string | `playing` | `libs/strategy/src/simulation/strategy-simulation.session.ts:324:20` | `this.setStatus('playing')` |
+| string | `completed` | `libs/strategy/src/simulation/strategy-simulation.session.ts:333:26` | `this.setStatus('completed')` |
+| string | `FAILED` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:93:24` | `riskGrade: 'FAILED'` |
+| string | `FAILED` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:101:62` | `o.survivalAssessment.riskGrade !== 'FAILED'` |
+| string | `CRITICAL` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:105:44` | `o.survivalAssessment.riskGrade === 'CRITICAL'` |
+| string | `FAILED` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:106:44` | `o.survivalAssessment.riskGrade === 'FAILED'` |
+| number | `10000` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:162:62` | `Math.min(...returns) * 10000` |
+| number | `10000` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:162:71` | `Math.round(Math.min(...returns) * 10000) / 10000` |
+| number | `0.35` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:174:30` | `metrics.maxDrawdown >= 0.35` |
+| number | `-0.07` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:175:24` | `metrics.var99 <= -0.07` |
+| number | `-0.3` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:176:30` | `metrics.totalReturn <= -0.3` |
+| number | `0.18` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:180:30` | `metrics.maxDrawdown >= 0.18` |
+| number | `-0.04` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:181:24` | `metrics.var95 <= -0.04` |
+| number | `45` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:182:40` | `metrics.maxUnderwaterDuration >= 45` |
+| string | `EXCELLENT` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:214:24` | `overallRating: 'EXCELLENT'` |
+| number | `10000` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:250:15` | `(successfulOutcomes.reduce( (acc, o) => acc + o.metrics.sharpeRatio, 0, ) / successfulOutcomes.lengt` |
+| number | `10000` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:251:15` | `Math.round( (successfulOutcomes.reduce( (acc, o) => acc + o.metrics.sharpeRatio, 0, ) / successfulOu` |
+| number | `10000` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:262:15` | `(successfulOutcomes.reduce( (acc, o) => acc + o.metrics.totalReturn, 0, ) / successfulOutcomes.lengt` |
+| number | `10000` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:263:15` | `Math.round( (successfulOutcomes.reduce( (acc, o) => acc + o.metrics.totalReturn, 0, ) / successfulOu` |
+| number | `20` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:274:30` | `failedCount * 20` |
+| number | `0.5` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:276:32` | `worstCaseDrawdown >= 0.5` |
+| number | `35` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:277:18` | `score -= 35` |
+| number | `0.35` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:278:39` | `worstCaseDrawdown >= 0.35` |
+| number | `25` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:279:18` | `score -= 25` |
+| number | `0.2` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:280:39` | `worstCaseDrawdown >= 0.2` |
+| number | `15` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:281:18` | `score -= 15` |
+| number | `0.1` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:282:39` | `worstCaseDrawdown >= 0.1` |
+| number | `5` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:283:18` | `score -= 5` |
+| number | `20` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:287:18` | `score -= 20` |
+| number | `50` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:288:43` | `maxUnderwaterDuration >= 50` |
+| number | `10` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:289:18` | `score -= 10` |
+| number | `25` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:290:43` | `maxUnderwaterDuration >= 25` |
+| number | `5` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:291:18` | `score -= 5` |
+| number | `5000` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:294:35` | `totalLiquidityPenalty > 5000` |
+| number | `15` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:295:18` | `score -= 15` |
+| number | `5` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:297:18` | `score -= 5` |
+| number | `-0.095` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:300:31` | `worstDailyReturn <= -0.095` |
+| number | `15` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:301:18` | `score -= 15` |
+| number | `-0.05` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:302:38` | `worstDailyReturn <= -0.05` |
+| number | `5` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:303:18` | `score -= 5` |
+| number | `50` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:310:30` | `overallHealthScore < 50` |
+| number | `70` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:312:37` | `overallHealthScore < 70` |
+| number | `85` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:314:37` | `overallHealthScore < 85` |
+| string | `策略发生穿仓破产，必须立即检查仓位管理与硬止损强制平仓机制。` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:321:9` | `keyRecommendations.push( '策略发生穿仓破产，必须立即检查仓位管理与硬止损强制平仓机制。', )` |
+| number | `0.25` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:324:30` | `worstCaseDrawdown >= 0.25` |
+| string | `最坏回撤超过 25%，建议在统一动作裁决器中强化系统性雪崩 (SYSTEMIC_CRUNCH) 紧急清仓门禁。` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:326:9` | `keyRecommendations.push( '最坏回撤超过 25%，建议在统一动作裁决器中强化系统性雪崩 (SYSTEMIC_CRUNCH) 紧急清仓门禁。', )` |
+| number | `50` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:329:34` | `maxUnderwaterDuration >= 50` |
+| string | `最大回撤潜伏期超过 50 个交易日，建议引入止损后冷静期或震荡休眠机制，避免单边阴跌频繁假突破磨损。` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:331:9` | `keyRecommendations.push( '最大回撤潜伏期超过 50 个交易日，建议引入止损后冷静期或震荡休眠机制，避免单边阴跌频繁假突破磨损。', )` |
+| string | `存在跌停流动性冻结导致的顺延滑点损失，建议引入大盘微观流动性恶化预警，在右侧二卖确认时尽早出场。` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:336:9` | `keyRecommendations.push( '存在跌停流动性冻结导致的顺延滑点损失，建议引入大盘微观流动性恶化预警，在右侧二卖确认时尽早出场。', )` |
+| number | `-0.07` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:339:29` | `worstDailyReturn <= -0.07` |
+| string | `存在极端单日断崖式跌幅，建议在持仓端控制单日敞口，防范隔夜跳空与突发跌停。` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:341:9` | `keyRecommendations.push( '存在极端单日断崖式跌幅，建议在持仓端控制单日敞口，防范隔夜跳空与突发跌停。', )` |
+| string | `策略在五大历史极端压力测试中表现稳健，具备优异的极端行情生存能力与风控纪律。` | `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:347:9` | `keyRecommendations.push( '策略在五大历史极端压力测试中表现稳健，具备优异的极端行情生存能力与风控纪律。', )` |
+| number | `100000` | `libs/strategy/src/wfa/walk-forward.orchestrator.ts:29:54` | `options.initialCapital ?? 100000` |
+| number | `10000` | `libs/strategy/src/wfa/walk-forward.orchestrator.ts:68:64` | `(totalOverfitting / foldResults.length) * 10000` |
+| number | `10000` | `libs/strategy/src/wfa/walk-forward.orchestrator.ts:68:73` | `Math.round((totalOverfitting / foldResults.length) * 10000) / 10000` |
+| number | `10000` | `libs/strategy/src/wfa/wfa-stitcher.ts:140:27` | `psi * 10000` |
+| number | `10000` | `libs/strategy/src/wfa/wfa-stitcher.ts:140:36` | `Math.round(psi * 10000) / 10000` |
+| number | `12` | `libs/strategy/src/wfa/wfa-window-slicer.ts:15:54` | `targetMonth / 12` |
+| number | `12` | `libs/strategy/src/wfa/wfa-window-slicer.ts:16:43` | `targetMonth % 12` |
+| number | `12` | `libs/strategy/src/wfa/wfa-window-slicer.ts:16:49` | `(targetMonth % 12) + 12` |
+| number | `12` | `libs/strategy/src/wfa/wfa-window-slicer.ts:16:55` | `((targetMonth % 12) + 12) % 12` |
+| number | `12` | `libs/strategy/src/wfa/wfa-window-slicer.ts:52:54` | `options.trainDurationMonths ?? 12` |
+| number | `3` | `libs/strategy/src/wfa/wfa-window-slicer.ts:53:52` | `options.testDurationMonths ?? 3` |
+| string | `anchored` | `libs/strategy/src/wfa/wfa-window-slicer.ts:72:32` | `options.windowType === 'anchored'` |
+| string | `rolling` | `libs/strategy/src/wfa/wfa-window-slicer.ts:100:32` | `options.windowType === 'rolling'` |
+| number | `10000` | `libs/timezone/src/timezone.service.ts:55:18` | `timeout: 10000` |
+| string | `T` | `libs/timezone/src/timezone.service.ts:81:47` | `normalized.replace(' ', 'T')` |
+| string | `+08:00` | `libs/timezone/src/timezone.service.ts:81:54` | `normalized.replace(' ', 'T') + '+08:00'` |
+| string | `yyyy-MM-dd` | `libs/timezone/src/timezone.service.ts:110:25` | `format(date, 'yyyy-MM-dd')` |
+| number | `10` | `libs/timezone/src/timezone.service.ts:129:23` | `maxLookbackDays = 10` |
+| string | `yyyy-MM-dd` | `libs/timezone/src/timezone.service.ts:150:34` | `format(date, 'yyyy-MM-dd')` |
+| string | `http://www.szse.cn/api/report/exchange/onepersistenthour/monthList` | `libs/timezone/src/timezone.service.ts:183:9` | `this.axios.get<SzseTradingDayResponse>( 'http://www.szse.cn/api/report/exchange/onepersistenthour/mo` |
+| string | `yyyy-MM` | `libs/timezone/src/timezone.service.ts:186:37` | `format(date, 'yyyy-MM')` |
+| string | `yyyy-MM-dd` | `libs/timezone/src/timezone.service.ts:202:44` | `format(date, 'yyyy-MM-dd')` |
+| number | `6` | `libs/timezone/src/timezone.service.ts:226:33` | `day === 6` |
+| number | `60` | `libs/timezone/src/trading-session.util.ts:29:43` | `zoned.getHours() * 60` |
+| number | `6` | `libs/timezone/src/trading-session.util.ts:43:28` | `day === 6` |
+| number | `60` | `libs/timezone/src/trading-session.util.ts:44:41` | `shanghai.getHours() * 60` |
+| number | `4` | `libs/timezone/src/trading-session.util.ts:61:45` | `zoned.getFullYear().toString().padStart(4, '0')` |
+| number | `4` | `libs/timezone/src/trading-session.util.ts:78:56` | `zoned.getFullYear().toString().padStart(4, '0')` |
+| number | `4` | `libs/timezone/src/trading-session.util.ts:95:56` | `zoned.getFullYear().toString().padStart(4, '0')` |
+| number | `15` | `libs/timezone/src/trading-session.util.ts:113:31` | `zoned.getHours() === 15` |
+| number | `60` | `libs/timezone/src/trading-session.util.ts:134:24` | `hour * 60` |
 | number | `500` | `libs/transport/src/http/http-code.ts:35:41` | `status >= 500` |
 | number | `500` | `libs/transport/src/http/http-code.ts:42:16` | `status >= 500` |
-| number | `400` | `libs/transport/src/http/http-exception.filter.ts:36:18` | `status === 400` |
-| string | `VALIDATION_ERROR` | `libs/transport/src/http/http-exception.filter.ts:37:24` | `explicitCode === 'VALIDATION_ERROR'` |
-| string | `X-Request-Id` | `libs/transport/src/http/http-exception.filter.ts:63:24` | `response.setHeader('X-Request-Id', requestId)` |
-| number | `500` | `libs/transport/src/http/http-exception.filter.ts:69:49` | `return 500;` |
-| number | `400` | `libs/transport/src/http/http-exception.filter.ts:77:50` | `status >= 400` |
-| number | `599` | `libs/transport/src/http/http-exception.filter.ts:77:67` | `status <= 599` |
-| number | `500` | `libs/transport/src/http/http-exception.filter.ts:92:19` | `status >= 500` |
-| number | `500` | `libs/transport/src/http/http-exception.filter.ts:114:18` | `status < 500` |
-| number | `8` | `libs/transport/src/http/http-exception.filter.ts:144:62` | `traces.length < 8` |
+| number | `400` | `libs/transport/src/http/http-exception.filter.ts:38:18` | `status === 400` |
+| string | `VALIDATION_ERROR` | `libs/transport/src/http/http-exception.filter.ts:39:24` | `explicitCode === 'VALIDATION_ERROR'` |
+| string | `X-Request-Id` | `libs/transport/src/http/http-exception.filter.ts:65:24` | `response.setHeader('X-Request-Id', requestId)` |
+| number | `500` | `libs/transport/src/http/http-exception.filter.ts:71:49` | `return 500;` |
+| number | `400` | `libs/transport/src/http/http-exception.filter.ts:79:50` | `status >= 400` |
+| number | `599` | `libs/transport/src/http/http-exception.filter.ts:79:67` | `status <= 599` |
+| number | `500` | `libs/transport/src/http/http-exception.filter.ts:94:19` | `status >= 500` |
+| number | `500` | `libs/transport/src/http/http-exception.filter.ts:116:18` | `status < 500` |
+| number | `8` | `libs/transport/src/http/http-exception.filter.ts:142:62` | `traces.length < 8` |
 | string | `
-Caused by: ` | `libs/transport/src/http/http-exception.filter.ts:151:22` | `traces.join('\nCaused by: ')` |
+Caused by: ` | `libs/transport/src/http/http-exception.filter.ts:149:22` | `traces.join('\nCaused by: ')` |
 | number | `200` | `libs/transport/src/http/http-openapi.decorator.ts:37:60` | `options.status !== 200` |
 | number | `204` | `libs/transport/src/http/http-openapi.decorator.ts:43:26` | `options.status === 204` |
 | number | `400` | `libs/transport/src/http/http-openapi.decorator.ts:79:24` | `options.status < 400` |
@@ -1922,47 +2011,22 @@ Caused by: ` | `libs/transport/src/http/http-exception.filter.ts:151:22` | `trac
 | string | `?` | `libs/transport/src/http/http-response.interceptor.ts:95:29` | `request.url?.split('?')` |
 | string | `VALIDATION_ERROR` | `libs/transport/src/http/http-validation-error.factory.ts:54:15` | `code: 'VALIDATION_ERROR'` |
 | string | `Request validation failed` | `libs/transport/src/http/http-validation-error.factory.ts:55:18` | `message: 'Request validation failed'` |
-| string | `RPC request` | `libs/transport/src/rpc/rpc-decoder.ts:14:56` | `exactRecord(value, ['meta', 'data'], 'RPC request')` |
-| string | `RPC request data` | `libs/transport/src/rpc/rpc-decoder.ts:18:55` | `runDomainDecoder(dataDecoder, request.data, 'RPC request data')` |
-| string | `RPC success` | `libs/transport/src/rpc/rpc-decoder.ts:35:63` | `exactRecord(value, ['ok', 'meta', 'data'], 'RPC success')` |
-| string | `RPC success data` | `libs/transport/src/rpc/rpc-decoder.ts:44:9` | `runDomainDecoder( successDataDecoder, result.data, 'RPC success data', )` |
-| string | `RPC rejection` | `libs/transport/src/rpc/rpc-decoder.ts:49:62` | `exactRecord(value, ['ok', 'meta', 'error'], 'RPC rejection')` |
-| string | `RPC rejection error` | `libs/transport/src/rpc/rpc-decoder.ts:56:5` | `recordWithAllowedKeys( result.error, ['code'], ['data'], 'RPC rejection error', )` |
-| string | `RPC error code` | `libs/transport/src/rpc/rpc-decoder.ts:58:63` | `runDomainDecoder(errorCodeDecoder, error.code, 'RPC error code')` |
-| string | `RPC error data` | `libs/transport/src/rpc/rpc-decoder.ts:73:15` | `runDomainDecoder( errorDataDecoder as RpcDomainDecoder<TErrorData>, error.data, 'RPC error data', )` |
-| string | `RPC meta` | `libs/transport/src/rpc/rpc-decoder.ts:82:54` | `exactRecord(value, ['correlationId'], 'RPC meta')` |
-| string | `RPC request validation failed` | `libs/transport/src/rpc/rpc-envelope.ts:103:11` | `super('RPC request validation failed')` |
+| string | `RPC request` | `libs/transport/src/rpc/rpc-decoder.ts:15:56` | `exactRecord(value, ['meta', 'data'], 'RPC request')` |
+| string | `RPC request data` | `libs/transport/src/rpc/rpc-decoder.ts:19:55` | `runDomainDecoder(dataDecoder, request.data, 'RPC request data')` |
+| string | `RPC success` | `libs/transport/src/rpc/rpc-decoder.ts:36:63` | `exactRecord(value, ['ok', 'meta', 'data'], 'RPC success')` |
+| string | `RPC success data` | `libs/transport/src/rpc/rpc-decoder.ts:45:9` | `runDomainDecoder( successDataDecoder, result.data, 'RPC success data', )` |
+| string | `RPC rejection` | `libs/transport/src/rpc/rpc-decoder.ts:50:62` | `exactRecord(value, ['ok', 'meta', 'error'], 'RPC rejection')` |
+| string | `RPC rejection error` | `libs/transport/src/rpc/rpc-decoder.ts:57:5` | `recordWithAllowedKeys( result.error, ['code'], ['data'], 'RPC rejection error', )` |
+| string | `RPC error code` | `libs/transport/src/rpc/rpc-decoder.ts:59:63` | `runDomainDecoder(errorCodeDecoder, error.code, 'RPC error code')` |
+| string | `RPC error data` | `libs/transport/src/rpc/rpc-decoder.ts:74:15` | `runDomainDecoder( errorDataDecoder as RpcDomainDecoder<TErrorData>, error.data, 'RPC error data', )` |
+| string | `RPC meta` | `libs/transport/src/rpc/rpc-decoder.ts:83:54` | `exactRecord(value, ['correlationId'], 'RPC meta')` |
+| string | `RPC request validation failed` | `libs/transport/src/rpc/rpc-envelope.ts:106:11` | `super('RPC request validation failed')` |
 | number | `8` | `libs/transport/src/rpc/rpc-exception.filter.ts:84:62` | `traces.length < 8` |
 | string | `
 Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.join('\nCaused by: ')` |
-| string | `DEFAULT_DATA_SOURCE` | `libs/utils/src/services/data-source.service.ts:11:55` | `this.configService.get<string>('DEFAULT_DATA_SOURCE')` |
-| string | `, ` | `libs/utils/src/services/data-source.service.ts:68:34` | `enumValues.join(', ')` |
-| string | `, ` | `libs/utils/src/services/data-source.service.ts:69:45` | `Object.keys(DataSource).join(', ')` |
-| number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:54:52` | `marketTime.getHours() * 60` |
-| number | `6` | `libs/utils/src/services/k-boundary-calculator.ts:90:57` | `marketDate.dayOfWeek + 6` |
-| number | `7` | `libs/utils/src/services/k-boundary-calculator.ts:90:62` | `(marketDate.dayOfWeek + 6) % 7` |
-| number | `7` | `libs/utils/src/services/k-boundary-calculator.ts:94:41` | `this.addMarketDays(startDate, 7)` |
-| number | `3` | `libs/utils/src/services/k-boundary-calculator.ts:115:58` | `marketDate.month / 3` |
-| number | `3` | `libs/utils/src/services/k-boundary-calculator.ts:115:63` | `Math.floor(marketDate.month / 3) * 3` |
-| number | `3` | `libs/utils/src/services/k-boundary-calculator.ts:123:24` | `startMonth + 3` |
-| number | `6` | `libs/utils/src/services/k-boundary-calculator.ts:131:47` | `marketDate.month < 6` |
-| number | `6` | `libs/utils/src/services/k-boundary-calculator.ts:131:55` | `marketDate.month < 6 ? 0 : 6` |
-| number | `6` | `libs/utils/src/services/k-boundary-calculator.ts:139:24` | `startMonth + 6` |
-| number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:165:34` | `hours * 60` |
-| number | `9` | `libs/utils/src/services/k-boundary-calculator.ts:168:26` | `9 * 60` |
-| number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:168:30` | `9 * 60` |
-| number | `30` | `libs/utils/src/services/k-boundary-calculator.ts:168:35` | `9 * 60 + 30` |
-| number | `11` | `libs/utils/src/services/k-boundary-calculator.ts:169:24` | `11 * 60` |
-| number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:169:29` | `11 * 60` |
-| number | `31` | `libs/utils/src/services/k-boundary-calculator.ts:169:34` | `11 * 60 + 31` |
-| number | `13` | `libs/utils/src/services/k-boundary-calculator.ts:175:28` | `13 * 60` |
-| number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:175:33` | `13 * 60` |
-| number | `15` | `libs/utils/src/services/k-boundary-calculator.ts:176:26` | `15 * 60` |
-| number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:176:31` | `15 * 60` |
-| number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:228:45` | `totalMinutes / 60` |
-| number | `60` | `libs/utils/src/services/k-boundary-calculator.ts:229:36` | `totalMinutes % 60` |
-| number | `4` | `libs/utils/src/services/k-boundary-calculator.ts:231:47` | `normalizedDate.year.toString().padStart(4, '0')` |
+| string | `[object Object]` | `libs/utils/src/error.util.ts:26:20` | `str !== '[object Object]'` |
 | number | `10000` | `libs/utils/src/utils.service.ts:15:34` | `config.timeout \|\| 10000` |
+| string | `duan` | `libs/visual-command/src/adapters/chan-swing.util.ts:25:17` | `units === 'duan'` |
 | number | `3` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:46:36` | `klines.length < 3` |
 | string | `line` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:103:17` | `type: 'line'` |
 | string | `chan_bi` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:104:18` | `layer: 'chan_bi'` |
@@ -1980,24 +2044,23 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | number | `3` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:337:27` | `duans.length >= 3` |
 | string | `text` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:364:19` | `type: 'text'` |
 | string | `chan_bsp_duan` | `libs/visual-command/src/adapters/chan-visual.adapter.ts:365:20` | `layer: 'chan_bsp_duan'` |
-| number | `50` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:37:38` | `options.period ?? 50` |
-| string | `0.236` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:80:18` | `upper: '0.236'` |
-| string | `0.382` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:80:34` | `lower: '0.382'` |
-| string | `0.382` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:81:18` | `upper: '0.382'` |
-| string | `0.5` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:81:34` | `lower: '0.5'` |
-| string | `0.5` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:82:18` | `upper: '0.5'` |
-| string | `0.618` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:82:32` | `lower: '0.618'` |
-| string | `0.618` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:83:18` | `upper: '0.618'` |
-| string | `0.786` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:83:34` | `lower: '0.786'` |
-| string | `0.786` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:84:18` | `upper: '0.786'` |
-| string | `band` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:99:19` | `type: 'band'` |
-| string | `fibonacci` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:100:20` | `layer: 'fibonacci'` |
-| string | `line` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:123:15` | `type: 'line'` |
-| string | `fibonacci` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:124:16` | `layer: 'fibonacci'` |
-| number | `1.5` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:133:55` | `ratioStr === '0' \|\| ratioStr === '1' ? 1.5 : 1` |
-| string | `text` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:140:17` | `type: 'text'` |
-| string | `fibonacci` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:141:18` | `layer: 'fibonacci'` |
-| string | `above` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:147:21` | `position: 'above'` |
+| string | `0.236` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:72:18` | `upper: '0.236'` |
+| string | `0.382` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:72:34` | `lower: '0.382'` |
+| string | `0.382` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:73:18` | `upper: '0.382'` |
+| string | `0.5` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:73:34` | `lower: '0.5'` |
+| string | `0.5` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:74:18` | `upper: '0.5'` |
+| string | `0.618` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:74:32` | `lower: '0.618'` |
+| string | `0.618` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:75:18` | `upper: '0.618'` |
+| string | `0.786` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:75:34` | `lower: '0.786'` |
+| string | `0.786` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:76:18` | `upper: '0.786'` |
+| string | `band` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:91:19` | `type: 'band'` |
+| string | `fibonacci` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:92:20` | `layer: 'fibonacci'` |
+| string | `line` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:115:15` | `type: 'line'` |
+| string | `fibonacci` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:116:16` | `layer: 'fibonacci'` |
+| number | `1.5` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:125:55` | `ratioStr === '0' \|\| ratioStr === '1' ? 1.5 : 1` |
+| string | `text` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:132:17` | `type: 'text'` |
+| string | `fibonacci` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:133:18` | `layer: 'fibonacci'` |
+| string | `above` | `libs/visual-command/src/adapters/fibonacci-visual.adapter.ts:139:21` | `position: 'above'` |
 | string | `chan_zs` | `libs/visual-command/src/visual-command.service.ts:46:20` | `layerSet.has('chan_zs')` |
 | string | `chan_zs_bi` | `libs/visual-command/src/visual-command.service.ts:47:20` | `layerSet.has('chan_zs_bi')` |
 | string | `chan_zs_duan` | `libs/visual-command/src/visual-command.service.ts:48:20` | `layerSet.has('chan_zs_duan')` |
@@ -2026,118 +2089,120 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `.json` | `tools/strategy-dev/provider.ts:198:28` | `f.replace('.json', '')` |
 | string | `meta.json` | `tools/strategy-dev/provider.ts:220:53` | `path.join(baseDir, ent.name, 'meta.json')` |
 | string | `k.json` | `tools/strategy-dev/provider.ts:228:49` | `path.join(baseDir, ent.name, 'k.json')` |
-| string | `case` | `tools/strategy-dev/runner.ts:57:26` | `getArg('case')` |
-| string | `caseKey` | `tools/strategy-dev/runner.ts:57:44` | `getArg('caseKey')` |
-| string | `code` | `tools/strategy-dev/runner.ts:58:23` | `getArg('code')` |
-| string | `period` | `tools/strategy-dev/runner.ts:59:25` | `getArg('period')` |
-| string | `subPeriod` | `tools/strategy-dev/runner.ts:60:28` | `getArg('subPeriod')` |
-| string | `sub` | `tools/strategy-dev/runner.ts:60:51` | `getArg('sub')` |
-| string | `parentPeriod` | `tools/strategy-dev/runner.ts:61:31` | `getArg('parentPeriod')` |
-| string | `parent` | `tools/strategy-dev/runner.ts:61:57` | `getArg('parent')` |
-| string | `capital` | `tools/strategy-dev/runner.ts:62:36` | `getArg('capital')` |
-| number | `100000` | `tools/strategy-dev/runner.ts:70:50` | `Number(initialCapitalStr) \|\| 100000` |
-| number | `30` | `tools/strategy-dev/runner.ts:74:51` | `fallback = 30` |
-| string | `complete` | `tools/strategy-dev/runner.ts:110:11` | `type: 'complete'` |
-| number | `30` | `tools/strategy-dev/runner.ts:136:51` | `resolvePeriod(options.period, 30)` |
-| number | `10` | `tools/strategy-dev/runner.ts:156:58` | `klines[0]?.time.toISOString().substring(0, 10)` |
-| number | `10` | `tools/strategy-dev/runner.ts:156:126` | `klines[klines.length - 1]?.time.toISOString().substring(0, 10)` |
-| number | `-8640000000000000` | `tools/strategy-dev/runner.ts:170:26` | `new Date(-8640000000000000)` |
-| number | `60` | `tools/strategy-dev/runner.ts:177:27` | `requiredBarCount: 60` |
-| number | `19` | `tools/strategy-dev/runner.ts:214:61` | `s.signalTime.replace('T', ' ').substring(0, 19)` |
-| number | `19` | `tools/strategy-dev/runner.ts:215:60` | `s.pivotTime.replace('T', ' ').substring(0, 19)` |
-| number | `99.9` | `tools/strategy-dev/runner.ts:286:65` | `grossProfit > 0 ? 99.9 : 0` |
-| string | `Forbidden: Strategy simulation suite is strictly restricted to local development environment and disabled in production.` | `tools/strategy-dev/server.ts:74:11` | `error: 'Forbidden: Strategy simulation suite is strictly restricted to local development environment` |
-| string | `complete` | `tools/strategy-dev/server.ts:197:11` | `type: 'complete'` |
-| string | `上证指数 30m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:289:19` | `strategyName: '上证指数 30m 缠论策略树决策流回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:291:13` | `status: 'completed'` |
-| string | `qmt` | `tools/strategy-dev/server.ts:292:13` | `source: 'qmt'` |
-| number | `30` | `tools/strategy-dev/server.ts:294:13` | `period: 30` |
-| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:295:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
-| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:296:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
-| number | `51` | `tools/strategy-dev/server.ts:297:18` | `signalCount: 51` |
-| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:299:16` | `startedAt: '2026-09-25T05:00:00.000Z'` |
-| string | `2026-09-25T05:00:02.000Z` | `tools/strategy-dev/server.ts:300:18` | `completedAt: '2026-09-25T05:00:02.000Z'` |
-| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:301:16` | `createdAt: '2026-09-25T05:00:00.000Z'` |
-| string | `上证指数 日线 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:306:19` | `strategyName: '上证指数 日线 缠论策略树决策流回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:308:13` | `status: 'completed'` |
-| string | `qmt` | `tools/strategy-dev/server.ts:309:13` | `source: 'qmt'` |
-| number | `1440` | `tools/strategy-dev/server.ts:311:13` | `period: 1440` |
-| string | `2024-01-01T16:00:00.000Z` | `tools/strategy-dev/server.ts:312:16` | `startDate: '2024-01-01T16:00:00.000Z'` |
-| string | `2026-09-23T16:00:00.000Z` | `tools/strategy-dev/server.ts:313:14` | `endDate: '2026-09-23T16:00:00.000Z'` |
-| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:316:16` | `startedAt: '2026-09-25T04:50:00.000Z'` |
-| string | `2026-09-25T04:50:01.000Z` | `tools/strategy-dev/server.ts:317:18` | `completedAt: '2026-09-25T04:50:01.000Z'` |
-| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:318:16` | `createdAt: '2026-09-25T04:50:00.000Z'` |
-| number | `3` | `tools/strategy-dev/server.ts:321:9` | `id: 3` |
-| string | `上证指数 5m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:323:19` | `strategyName: '上证指数 5m 缠论策略树决策流回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:325:13` | `status: 'completed'` |
-| string | `qmt` | `tools/strategy-dev/server.ts:326:13` | `source: 'qmt'` |
-| number | `5` | `tools/strategy-dev/server.ts:328:13` | `period: 5` |
-| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:329:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
-| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:330:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
-| number | `4` | `tools/strategy-dev/server.ts:331:18` | `signalCount: 4` |
-| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:333:16` | `startedAt: '2026-09-25T04:45:00.000Z'` |
-| string | `2026-09-25T04:45:01.000Z` | `tools/strategy-dev/server.ts:334:18` | `completedAt: '2026-09-25T04:45:01.000Z'` |
-| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:335:16` | `createdAt: '2026-09-25T04:45:00.000Z'` |
-| number | `200` | `tools/strategy-dev/server.ts:430:51` | `startIndex - 200` |
-| number | `-8640000000000000` | `tools/strategy-dev/server.ts:437:16` | `new Date(-8640000000000000)` |
-| number | `60` | `tools/strategy-dev/server.ts:450:27` | `requiredBarCount: 60` |
-| string | `/v1/indicators/k` | `tools/strategy-dev/server.ts:488:24` | `pathname.endsWith('/v1/indicators/k')` |
-| string | `/indicators/k` | `tools/strategy-dev/server.ts:489:25` | `pathname.endsWith('/indicators/k')` |
-| string | `/v1/chan/merge-k` | `tools/strategy-dev/server.ts:551:25` | `pathname.endsWith('/v1/chan/merge-k')` |
-| number | `200` | `tools/strategy-dev/server.ts:579:25` | `sendJson(res, [], 200)` |
-| string | `/v1/visual/commands` | `tools/strategy-dev/server.ts:585:25` | `pathname.endsWith('/v1/visual/commands')` |
-| string | `/v1/simulation/` | `tools/strategy-dev/server.ts:645:25` | `pathname.includes('/v1/simulation/')` |
-| string | `/v1/simulation/start` | `tools/strategy-dev/server.ts:652:25` | `pathname.endsWith('/v1/simulation/start')` |
-| string | `/v1/simulation/stream` | `tools/strategy-dev/server.ts:737:25` | `pathname.endsWith('/v1/simulation/stream')` |
-| number | `404` | `tools/strategy-dev/server.ts:742:21` | `res.writeHead(404, { 'Content-Type': 'text/plain' })` |
-| number | `200` | `tools/strategy-dev/server.ts:747:19` | `res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform',` |
-| string | `no-cache, no-transform` | `tools/strategy-dev/server.ts:749:24` | `'Cache-Control': 'no-cache, no-transform'` |
-| string | `no` | `tools/strategy-dev/server.ts:752:28` | `'X-Accel-Buffering': 'no'` |
+| string | `case` | `tools/strategy-dev/runner.ts:58:26` | `getArg('case')` |
+| string | `caseKey` | `tools/strategy-dev/runner.ts:58:44` | `getArg('caseKey')` |
+| string | `code` | `tools/strategy-dev/runner.ts:59:23` | `getArg('code')` |
+| string | `period` | `tools/strategy-dev/runner.ts:60:25` | `getArg('period')` |
+| string | `subPeriod` | `tools/strategy-dev/runner.ts:61:28` | `getArg('subPeriod')` |
+| string | `sub` | `tools/strategy-dev/runner.ts:61:51` | `getArg('sub')` |
+| string | `parentPeriod` | `tools/strategy-dev/runner.ts:62:31` | `getArg('parentPeriod')` |
+| string | `parent` | `tools/strategy-dev/runner.ts:62:57` | `getArg('parent')` |
+| string | `capital` | `tools/strategy-dev/runner.ts:63:36` | `getArg('capital')` |
+| number | `100000` | `tools/strategy-dev/runner.ts:71:50` | `Number(initialCapitalStr) \|\| 100000` |
+| number | `30` | `tools/strategy-dev/runner.ts:75:51` | `fallback = 30` |
+| string | `complete` | `tools/strategy-dev/runner.ts:111:11` | `type: 'complete'` |
+| number | `30` | `tools/strategy-dev/runner.ts:137:51` | `resolvePeriod(options.period, 30)` |
+| number | `10` | `tools/strategy-dev/runner.ts:157:58` | `klines[0]?.time.toISOString().substring(0, 10)` |
+| number | `10` | `tools/strategy-dev/runner.ts:157:126` | `klines[klines.length - 1]?.time.toISOString().substring(0, 10)` |
+| number | `-8640000000000000` | `tools/strategy-dev/runner.ts:171:26` | `new Date(-8640000000000000)` |
+| number | `60` | `tools/strategy-dev/runner.ts:178:27` | `requiredBarCount: 60` |
+| number | `19` | `tools/strategy-dev/runner.ts:215:61` | `s.signalTime.replace('T', ' ').substring(0, 19)` |
+| number | `19` | `tools/strategy-dev/runner.ts:216:60` | `s.pivotTime.replace('T', ' ').substring(0, 19)` |
+| number | `99.9` | `tools/strategy-dev/runner.ts:287:65` | `grossProfit > 0 ? 99.9 : 0` |
+| string | `Forbidden: Strategy simulation suite is strictly restricted to local development environment and disabled in production.` | `tools/strategy-dev/server.ts:80:11` | `error: 'Forbidden: Strategy simulation suite is strictly restricted to local development environment` |
+| string | `.json` | `tools/strategy-dev/server.ts:168:39` | `file.endsWith('.json')` |
+| string | `latest-dump.json` | `tools/strategy-dev/server.ts:168:60` | `file !== 'latest-dump.json'` |
+| string | `complete` | `tools/strategy-dev/server.ts:229:11` | `type: 'complete'` |
+| string | `上证指数 30m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:321:19` | `strategyName: '上证指数 30m 缠论策略树决策流回测'` |
+| string | `completed` | `tools/strategy-dev/server.ts:323:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:324:13` | `source: 'qmt'` |
+| number | `30` | `tools/strategy-dev/server.ts:326:13` | `period: 30` |
+| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:327:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
+| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:328:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
+| number | `51` | `tools/strategy-dev/server.ts:329:18` | `signalCount: 51` |
+| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:331:16` | `startedAt: '2026-09-25T05:00:00.000Z'` |
+| string | `2026-09-25T05:00:02.000Z` | `tools/strategy-dev/server.ts:332:18` | `completedAt: '2026-09-25T05:00:02.000Z'` |
+| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:333:16` | `createdAt: '2026-09-25T05:00:00.000Z'` |
+| string | `上证指数 日线 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:338:19` | `strategyName: '上证指数 日线 缠论策略树决策流回测'` |
+| string | `completed` | `tools/strategy-dev/server.ts:340:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:341:13` | `source: 'qmt'` |
+| number | `1440` | `tools/strategy-dev/server.ts:343:13` | `period: 1440` |
+| string | `2024-01-01T16:00:00.000Z` | `tools/strategy-dev/server.ts:344:16` | `startDate: '2024-01-01T16:00:00.000Z'` |
+| string | `2026-09-23T16:00:00.000Z` | `tools/strategy-dev/server.ts:345:14` | `endDate: '2026-09-23T16:00:00.000Z'` |
+| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:348:16` | `startedAt: '2026-09-25T04:50:00.000Z'` |
+| string | `2026-09-25T04:50:01.000Z` | `tools/strategy-dev/server.ts:349:18` | `completedAt: '2026-09-25T04:50:01.000Z'` |
+| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:350:16` | `createdAt: '2026-09-25T04:50:00.000Z'` |
+| number | `3` | `tools/strategy-dev/server.ts:353:9` | `id: 3` |
+| string | `上证指数 5m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:355:19` | `strategyName: '上证指数 5m 缠论策略树决策流回测'` |
+| string | `completed` | `tools/strategy-dev/server.ts:357:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:358:13` | `source: 'qmt'` |
+| number | `5` | `tools/strategy-dev/server.ts:360:13` | `period: 5` |
+| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:361:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
+| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:362:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
+| number | `4` | `tools/strategy-dev/server.ts:363:18` | `signalCount: 4` |
+| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:365:16` | `startedAt: '2026-09-25T04:45:00.000Z'` |
+| string | `2026-09-25T04:45:01.000Z` | `tools/strategy-dev/server.ts:366:18` | `completedAt: '2026-09-25T04:45:01.000Z'` |
+| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:367:16` | `createdAt: '2026-09-25T04:45:00.000Z'` |
+| number | `200` | `tools/strategy-dev/server.ts:460:51` | `startIndex - 200` |
+| number | `-8640000000000000` | `tools/strategy-dev/server.ts:467:16` | `new Date(-8640000000000000)` |
+| number | `60` | `tools/strategy-dev/server.ts:480:27` | `requiredBarCount: 60` |
+| string | `/v1/indicators/k` | `tools/strategy-dev/server.ts:518:24` | `pathname.endsWith('/v1/indicators/k')` |
+| string | `/indicators/k` | `tools/strategy-dev/server.ts:519:25` | `pathname.endsWith('/indicators/k')` |
+| string | `/v1/chan/merge-k` | `tools/strategy-dev/server.ts:581:25` | `pathname.endsWith('/v1/chan/merge-k')` |
+| number | `200` | `tools/strategy-dev/server.ts:609:25` | `sendJson(res, [], 200)` |
+| string | `/v1/visual/commands` | `tools/strategy-dev/server.ts:615:25` | `pathname.endsWith('/v1/visual/commands')` |
+| string | `/v1/simulation/` | `tools/strategy-dev/server.ts:675:25` | `pathname.includes('/v1/simulation/')` |
+| string | `/v1/simulation/start` | `tools/strategy-dev/server.ts:682:25` | `pathname.endsWith('/v1/simulation/start')` |
+| string | `/v1/simulation/stream` | `tools/strategy-dev/server.ts:802:25` | `pathname.endsWith('/v1/simulation/stream')` |
+| number | `404` | `tools/strategy-dev/server.ts:807:21` | `res.writeHead(404, { 'Content-Type': 'text/plain' })` |
+| number | `200` | `tools/strategy-dev/server.ts:812:19` | `res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform',` |
+| string | `no-cache, no-transform` | `tools/strategy-dev/server.ts:814:24` | `'Cache-Control': 'no-cache, no-transform'` |
+| string | `no` | `tools/strategy-dev/server.ts:817:28` | `'X-Accel-Buffering': 'no'` |
 | string | `: stream-connected
 
-` | `tools/strategy-dev/server.ts:754:15` | `res.write(': stream-connected\n\n')` |
+` | `tools/strategy-dev/server.ts:819:15` | `res.write(': stream-connected\n\n')` |
 | string | `: ping
 
-` | `tools/strategy-dev/server.ts:785:19` | `res.write(': ping\n\n')` |
-| string | `/v1/simulation/control` | `tools/strategy-dev/server.ts:804:25` | `pathname.endsWith('/v1/simulation/control')` |
-| string | `/v1/simulation/stop` | `tools/strategy-dev/server.ts:840:25` | `pathname.endsWith('/v1/simulation/stop')` |
-| string | `completed` | `tools/strategy-dev/server.ts:853:64` | `status: 'completed'` |
-| string | `/v1/simulation/dump` | `tools/strategy-dev/server.ts:867:25` | `pathname.endsWith('/v1/simulation/dump')` |
-| string | `No active simulation session found` | `tools/strategy-dev/server.ts:877:30` | `error: 'No active simulation session found'` |
-| number | `404` | `tools/strategy-dev/server.ts:877:70` | `sendJson(res, { error: 'No active simulation session found' }, 404)` |
-| string | `../../.data/simulation-dumps` | `tools/strategy-dev/server.ts:922:49` | `path.resolve(__dirname, '../../.data/simulation-dumps')` |
-| string | `latest-dump.json` | `tools/strategy-dev/server.ts:927:30` | `path.join(dumpDir, 'latest-dump.json')` |
-| number | `500` | `tools/strategy-dev/server.ts:943:45` | `sendJson(res, { error: err.message }, 500)` |
-| string | `/v1/strategies` | `tools/strategy-dev/server.ts:949:25` | `pathname.endsWith('/v1/strategies')` |
-| string | `缠论标准策略树` | `tools/strategy-dev/server.ts:953:15` | `name: '缠论标准策略树'` |
-| string | `基于策略树决策流与标准缠论买卖点` | `tools/strategy-dev/server.ts:954:22` | `description: '基于策略树决策流与标准缠论买卖点'` |
-| string | `decision_flow` | `tools/strategy-dev/server.ts:955:15` | `kind: 'decision_flow'` |
-| string | `active` | `tools/strategy-dev/server.ts:956:17` | `status: 'active'` |
-| number | `5` | `tools/strategy-dev/server.ts:958:22` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `15` | `tools/strategy-dev/server.ts:958:25` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `30` | `tools/strategy-dev/server.ts:958:29` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `60` | `tools/strategy-dev/server.ts:958:33` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `1440` | `tools/strategy-dev/server.ts:958:37` | `[1, 5, 15, 30, 60, 1440]` |
-| string | `entry` | `tools/strategy-dev/server.ts:975:21` | `signalKind: 'entry'` |
-| string | `active` | `tools/strategy-dev/server.ts:976:17` | `status: 'active'` |
-| string | `标准决策流版本 (集成标准缠论)` | `tools/strategy-dev/server.ts:977:22` | `description: '标准决策流版本 (集成标准缠论)'` |
-| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:996:25` | `pathname.endsWith('/v1/strategy-backtests')` |
-| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:1001:25` | `pathname.endsWith('/v1/strategy-backtests')` |
-| string | `000001` | `tools/strategy-dev/server.ts:1023:37` | `symbol === '000001'` |
-| number | `1440` | `tools/strategy-dev/server.ts:1023:78` | `period === 1440` |
-| string | `m` | `tools/strategy-dev/server.ts:1023:101` | `period + 'm'` |
-| string | `completed` | `tools/strategy-dev/server.ts:1025:17` | `status: 'completed'` |
-| number | `1000` | `tools/strategy-dev/server.ts:1033:42` | `Date.now() - 1000` |
-| string | `completed` | `tools/strategy-dev/server.ts:1045:19` | `status: 'completed'` |
-| string | `回测任务执行完成` | `tools/strategy-dev/server.ts:1046:20` | `message: '回测任务执行完成'` |
-| number | `202` | `tools/strategy-dev/server.ts:1050:9` | `sendJson( res, { runId: newRun.id, status: 'completed', message: '回测任务执行完成', pollUrl: `/v1/strategy-` |
-| number | `500` | `tools/strategy-dev/server.ts:1054:45` | `sendJson(res, { error: err.message }, 500)` |
-| number | `30` | `tools/strategy-dev/server.ts:1077:31` | `matchedRun?.period \|\| 30` |
-| string | `HIGH` | `tools/strategy-dev/server.ts:1108:26` | `confidenceLevel: 'HIGH'` |
-| string | `Not Found` | `tools/strategy-dev/server.ts:1163:26` | `error: 'Not Found'` |
-| number | `404` | `tools/strategy-dev/server.ts:1163:57` | `sendJson(res, { error: 'Not Found', path: pathname }, 404)` |
-| string | `0.0.0.0` | `tools/strategy-dev/server.ts:1166:21` | `server.listen(PORT, '0.0.0.0', () => { console.log( `\n🚀 [Mist Dev Server] 本地开发服务已就绪: http://localh` |
-| number | `1440` | `tools/strategy-dev/server.ts:1197:46` | `run.period === 1440` |
+` | `tools/strategy-dev/server.ts:850:19` | `res.write(': ping\n\n')` |
+| string | `/v1/simulation/control` | `tools/strategy-dev/server.ts:869:25` | `pathname.endsWith('/v1/simulation/control')` |
+| string | `/v1/simulation/stop` | `tools/strategy-dev/server.ts:905:25` | `pathname.endsWith('/v1/simulation/stop')` |
+| string | `completed` | `tools/strategy-dev/server.ts:918:64` | `status: 'completed'` |
+| string | `/v1/simulation/dump` | `tools/strategy-dev/server.ts:932:25` | `pathname.endsWith('/v1/simulation/dump')` |
+| string | `No active simulation session found` | `tools/strategy-dev/server.ts:942:30` | `error: 'No active simulation session found'` |
+| number | `404` | `tools/strategy-dev/server.ts:942:70` | `sendJson(res, { error: 'No active simulation session found' }, 404)` |
+| string | `../../.data/simulation-dumps` | `tools/strategy-dev/server.ts:987:49` | `path.resolve(__dirname, '../../.data/simulation-dumps')` |
+| string | `latest-dump.json` | `tools/strategy-dev/server.ts:992:30` | `path.join(dumpDir, 'latest-dump.json')` |
+| number | `500` | `tools/strategy-dev/server.ts:1011:45` | `sendJson(res, { error: err.message }, 500)` |
+| string | `/v1/strategies` | `tools/strategy-dev/server.ts:1017:25` | `pathname.endsWith('/v1/strategies')` |
+| string | `缠论标准策略树` | `tools/strategy-dev/server.ts:1021:15` | `name: '缠论标准策略树'` |
+| string | `基于策略树决策流与标准缠论买卖点` | `tools/strategy-dev/server.ts:1022:22` | `description: '基于策略树决策流与标准缠论买卖点'` |
+| string | `decision_flow` | `tools/strategy-dev/server.ts:1023:15` | `kind: 'decision_flow'` |
+| string | `active` | `tools/strategy-dev/server.ts:1024:17` | `status: 'active'` |
+| number | `5` | `tools/strategy-dev/server.ts:1026:22` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `15` | `tools/strategy-dev/server.ts:1026:25` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `30` | `tools/strategy-dev/server.ts:1026:29` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `60` | `tools/strategy-dev/server.ts:1026:33` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `1440` | `tools/strategy-dev/server.ts:1026:37` | `[1, 5, 15, 30, 60, 1440]` |
+| string | `entry` | `tools/strategy-dev/server.ts:1043:21` | `signalKind: 'entry'` |
+| string | `active` | `tools/strategy-dev/server.ts:1044:17` | `status: 'active'` |
+| string | `标准决策流版本 (集成标准缠论)` | `tools/strategy-dev/server.ts:1045:22` | `description: '标准决策流版本 (集成标准缠论)'` |
+| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:1064:25` | `pathname.endsWith('/v1/strategy-backtests')` |
+| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:1069:25` | `pathname.endsWith('/v1/strategy-backtests')` |
+| string | `000001` | `tools/strategy-dev/server.ts:1091:37` | `symbol === '000001'` |
+| number | `1440` | `tools/strategy-dev/server.ts:1091:78` | `period === 1440` |
+| string | `m` | `tools/strategy-dev/server.ts:1091:101` | `period + 'm'` |
+| string | `completed` | `tools/strategy-dev/server.ts:1093:17` | `status: 'completed'` |
+| number | `1000` | `tools/strategy-dev/server.ts:1101:42` | `Date.now() - 1000` |
+| string | `completed` | `tools/strategy-dev/server.ts:1113:19` | `status: 'completed'` |
+| string | `回测任务执行完成` | `tools/strategy-dev/server.ts:1114:20` | `message: '回测任务执行完成'` |
+| number | `202` | `tools/strategy-dev/server.ts:1118:9` | `sendJson( res, { runId: newRun.id, status: 'completed', message: '回测任务执行完成', pollUrl: `/v1/strategy-` |
+| number | `500` | `tools/strategy-dev/server.ts:1122:45` | `sendJson(res, { error: err.message }, 500)` |
+| number | `30` | `tools/strategy-dev/server.ts:1145:31` | `matchedRun?.period \|\| 30` |
+| string | `HIGH` | `tools/strategy-dev/server.ts:1176:26` | `confidenceLevel: 'HIGH'` |
+| string | `Not Found` | `tools/strategy-dev/server.ts:1231:26` | `error: 'Not Found'` |
+| number | `404` | `tools/strategy-dev/server.ts:1231:57` | `sendJson(res, { error: 'Not Found', path: pathname }, 404)` |
+| string | `0.0.0.0` | `tools/strategy-dev/server.ts:1234:21` | `server.listen(PORT, '0.0.0.0', () => { console.log( `\n🚀 [Mist Dev Server] 本地开发服务已就绪: http://localh` |
+| number | `1440` | `tools/strategy-dev/server.ts:1265:46` | `run.period === 1440` |
 | string | `code` | `tools/strategy-dev/sync.ts:35:26` | `getArg('code')` |
 | string | `periods` | `tools/strategy-dev/sync.ts:37:28` | `getArg('periods')` |
 | string | `period` | `tools/strategy-dev/sync.ts:37:49` | `getArg('period')` |
