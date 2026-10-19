@@ -18,7 +18,6 @@ import { ChanVisualAdapter } from '../../libs/visual-command/src/adapters/chan-v
 import {
   StrategySimulationSession,
   SIMULATION_LOCAL_FIXTURE_IDENTITY,
-  createTacticsDecisionFlow,
   type SimulationFrame,
   type SimulationSignal,
 } from '../../libs/strategy/src/simulation';
@@ -26,6 +25,20 @@ import {
   StrategyEvaluationKernel,
   type KernelSignal,
 } from '../../libs/strategy/src/kernel';
+import { SimulatedBroker } from '../../libs/strategy/src/execution/simulated-broker';
+import { PositionStateMachine } from '../../libs/strategy/src/position/position-state-machine';
+import { ExecutionRiskArbiter } from '../../libs/strategy/src/execution/execution-risk-arbiter';
+import { formatShanghaiDateString } from '@app/timezone';
+import { computePerformanceSummary } from '@app/indicators';
+import { StressTestingSuiteOrchestrator } from '../../libs/strategy/src/stress-testing';
+import { InMemoryFactorPluginRegistry } from '../../libs/strategy/src/factor/factor-plugin-registry';
+import { ensureStandardPluginsRegistered } from '../../libs/strategy/src/factor/standard-plugins';
+import { ExternalFactorPluginLoader } from '../../libs/strategy/src/factor/external-plugin-loader';
+import {
+  ORDER_SIDES,
+  ORDER_TYPES,
+} from '../../libs/strategy/src/strategy.constants';
+import type { DecisionFlowNode } from '../../libs/strategy/src/decision-flow/decision-flow.types';
 import { compileStoredDefinitionVersion } from '../../libs/strategy/src/decision-flow/stored-definition-compiler';
 import { mapKernelSignalToSimulationSignal } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
 import { loadCanonicalKlines, PERIOD_NAME_MAP } from './provider';
@@ -208,9 +221,11 @@ function toStrategyBar(
   period: number,
   securityId = DEFAULT_DEV_SECURITY_ID,
   source: StrategyMarketSource = DEFAULT_DEV_MARKET_SOURCE,
+  securityCode = DEFAULT_DEV_SECURITY_CODE,
 ): StrategyBar {
   return Object.freeze({
     securityId,
+    securityCode: rawK.symbol || securityCode,
     source,
     period,
     timestamp: new Date(rawK.time || rawK.timestamp),
@@ -318,7 +333,7 @@ const mockRuns: DevBacktestRun[] = [
   {
     id: 1,
     strategyDefinitionId: 1,
-    strategyName: '上证指数 30m 缠论策略树决策流回测',
+    strategyName: '上证指数 30m 缠论形态增强买卖点回测 (无止损止盈)',
     strategyVersionId: 1,
     status: 'completed',
     source: 'qmt',
@@ -335,15 +350,15 @@ const mockRuns: DevBacktestRun[] = [
   {
     id: 2,
     strategyDefinitionId: 1,
-    strategyName: '上证指数 日线 缠论策略树决策流回测',
+    strategyName: '上证指数 日线 缠论形态增强买卖点回测 (无止损止盈)',
     strategyVersionId: 1,
     status: 'completed',
     source: 'qmt',
     targetUniverse: ['000001'],
     period: 1440,
-    startDate: '2024-01-01T16:00:00.000Z',
-    endDate: '2026-09-23T16:00:00.000Z',
-    signalCount: 2,
+    startDate: '2015-01-01T00:00:00.000Z',
+    endDate: '2026-10-13T16:00:00.000Z',
+    signalCount: 10,
     matchedSecurityCount: 1,
     startedAt: '2026-09-25T04:50:00.000Z',
     completedAt: '2026-09-25T04:50:01.000Z',
@@ -352,7 +367,7 @@ const mockRuns: DevBacktestRun[] = [
   {
     id: 3,
     strategyDefinitionId: 1,
-    strategyName: '上证指数 5m 缠论策略树决策流回测',
+    strategyName: '上证指数 5m 缠论形态增强买卖点回测 (无止损止盈)',
     strategyVersionId: 1,
     status: 'completed',
     source: 'qmt',
@@ -383,6 +398,9 @@ function getBacktestCacheKey(options: {
   startDate?: string | Date;
   endDate?: string | Date;
   filterFenxingContainment?: boolean;
+  mode?: string;
+  pluginId?: string;
+  enableStopLoss?: boolean;
 }): string {
   const start = isValidDate(options.startDate)
     ? options.startDate.toISOString()
@@ -390,64 +408,291 @@ function getBacktestCacheKey(options: {
   const end = isValidDate(options.endDate)
     ? options.endDate.toISOString()
     : options.endDate || '';
-  return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${start}:${end}`;
+  return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${options.mode || ''}:${options.pluginId || ''}:${Boolean(options.enableStopLoss)}:${start}:${end}`;
 }
 
-// 全量执行仿真并获取回测结果的统一纯净胶水（统一内核 push 驱动）
-async function runUnifiedSimulationBacktest(options: {
+/**
+ * 构造自定义决策流树：支持单因子消融与复合决策流
+ */
+function createCustomDecisionFlow(
+  mode?: string,
+  pluginId?: string,
+): DecisionFlowNode {
+  if (mode === 'single' && pluginId) {
+    const params: Record<string, unknown> = {};
+    if (pluginId === 'plugin.regime.shanghai-index') {
+      params.mode = 'dual_speed';
+    }
+    if (pluginId === 'plugin.chan.bsp') {
+      params.units = 'bi';
+      params.direction = 'both';
+      params.points = { first: true, second: true, third: true };
+      params.requiredBarCount = 60;
+      params.deduplicate = true;
+    }
+    return {
+      id: `guard_${pluginId.replace(/\./g, '_')}`,
+      type: 'GUARD',
+      name: `因子插件评估门禁: ${pluginId}`,
+      pluginId,
+      params,
+      requiredAction: 'BOTH',
+      minConfidence: 0.5,
+      onPass: {
+        id: `term_${pluginId.replace(/\./g, '_')}_pass`,
+        type: 'TERMINAL',
+        action: 'INHERIT',
+        signalTag: pluginId,
+        reason: `${pluginId} 触发买卖决策`,
+      },
+      onFail: {
+        id: `term_${pluginId.replace(/\./g, '_')}_fail`,
+        type: 'TERMINAL',
+        action: 'ABORT',
+        reason: '未满足因子确认条件',
+      },
+    };
+  }
+
+  if (mode === 'composite') {
+    return {
+      id: 'guard_regime_shanghai',
+      type: 'GUARD',
+      name: '上证宏观大周期滤网',
+      pluginId: 'plugin.regime.shanghai-index',
+      params: { mode: 'dual_speed' },
+      requiredAction: 'BUY',
+      minConfidence: 0.6,
+      onPass: {
+        id: 'guard_volatility_squeeze',
+        type: 'GUARD',
+        name: '波动率放量爆发确认',
+        pluginId: 'plugin.tactics.volatility-squeeze-fire',
+        params: { minVolumeTsRank: 0.65, minEntityAtrRatio: 0.65 },
+        requiredAction: 'BUY',
+        minConfidence: 0.5,
+        onPass: {
+          id: 'term_tactics_fire_buy',
+          type: 'TERMINAL',
+          action: 'BUY',
+          signalTag: 'TACTICS_FIRE_BUY',
+          reason: '宏观牛市叠加放量挤压释放买点',
+        },
+        onFail: {
+          id: 'guard_fallback_chan_bsp',
+          type: 'GUARD',
+          name: '缠论形态共振确认',
+          pluginId: 'plugin.chan.bsp',
+          params: { units: 'bi', direction: 'both' },
+          requiredAction: 'BOTH',
+          minConfidence: 0.5,
+          onPass: {
+            id: 'term_chan_pass',
+            type: 'TERMINAL',
+            action: 'INHERIT',
+            signalTag: 'COMPOSITE_CHAN_SIGNAL',
+            reason: '宏观顺势下缠论形态结构确立',
+          },
+          onFail: {
+            id: 'term_composite_abort',
+            type: 'TERMINAL',
+            action: 'ABORT',
+            reason: '未满足复合策略触发条件',
+          },
+        },
+      },
+      onFail: {
+        id: 'guard_regime_sell_check',
+        type: 'GUARD',
+        name: '上证宏观走熊清仓门禁',
+        pluginId: 'plugin.regime.shanghai-index',
+        params: { mode: 'dual_speed' },
+        requiredAction: 'SELL',
+        minConfidence: 0.6,
+        onPass: {
+          id: 'term_regime_defend_sell',
+          type: 'TERMINAL',
+          action: 'SELL',
+          signalTag: 'REGIME_DEFEND_SELL',
+          reason: '上证指数宏观走熊清仓防守',
+        },
+        onFail: {
+          id: 'term_regime_neutral_abort',
+          type: 'TERMINAL',
+          action: 'ABORT',
+          reason: '上证指数震荡纠缠，维持观望',
+        },
+      },
+    };
+  }
+
+  return createEnhancedChanDecisionFlow();
+}
+
+/**
+ * 构造标准缠论买卖点与私有量价/动量共振增强决策流树：
+ * 1. 以缠论原典形态买卖点 (plugin.chan.bsp) 为不可动摇的第一基石；
+ * 2. 缠论形态触发时，经私有 VPCI (plugin.tactics.volume-price-confirmation) 增强置信度；
+ *    若 VPCI 未共振，原典买卖点依然 100% 完整通过 (CHAN_BSP)，绝不拦截原典；
+ * 3. 缠论形态未出现时，由私有放量挤压 (plugin.tactics.volatility-squeeze-fire) 捕捉额外爆发买点；
+ * 4. 彻底去除硬止损与硬止盈，出入场 100% 遵照形态与战术信号。
+ */
+function createEnhancedChanDecisionFlow(): DecisionFlowNode {
+  return {
+    id: 'guard_chan_bsp_primary',
+    type: 'GUARD',
+    name: '缠论标准形态买卖点主门禁',
+    pluginId: 'plugin.chan.bsp',
+    params: {
+      units: 'bi',
+      direction: 'both',
+      points: { first: true, second: true, third: true },
+      requiredBarCount: 60,
+      deduplicate: true,
+    },
+    requiredAction: 'BOTH',
+    minConfidence: 0.5,
+    onPass: {
+      id: 'guard_vpci_enhancer',
+      type: 'GUARD',
+      name: 'VPCI量价共振增强校验',
+      pluginId: 'plugin.tactics.volume-price-confirmation',
+      params: {},
+      requiredAction: 'BOTH',
+      minConfidence: 0.5,
+      onPass: {
+        id: 'term_chan_bsp_enhanced',
+        type: 'TERMINAL',
+        action: 'INHERIT',
+        signalTag: 'ENHANCED_CHAN_BSP',
+        reason: '缠论形态结构确立且通过私有量价共振增强确认',
+      },
+      onFail: {
+        id: 'term_chan_bsp_standard',
+        type: 'TERMINAL',
+        action: 'INHERIT',
+        signalTag: 'CHAN_BSP',
+        reason: '缠论原典形态买卖点确立',
+      },
+    },
+    onFail: {
+      id: 'guard_tactics_squeeze_fire',
+      type: 'GUARD',
+      name: '私有波动率挤压放量战术买点增强',
+      pluginId: 'plugin.tactics.volatility-squeeze-fire',
+      params: { minVolumeTsRank: 0.7, minEntityAtrRatio: 0.7 },
+      requiredAction: 'BUY',
+      minConfidence: 0.5,
+      onPass: {
+        id: 'term_tactics_fire_buy',
+        type: 'TERMINAL',
+        action: 'BUY',
+        signalTag: 'TACTICS_FIRE_BUY',
+        reason: '私有波动率蓄能挤压释放爆发买点',
+      },
+      onFail: {
+        id: 'term_abort',
+        type: 'TERMINAL',
+        action: 'ABORT',
+        reason: '未满足缠论形态或私有增强买卖点触发条件',
+      },
+    },
+  };
+}
+
+interface RunBacktestOptions {
   code: string;
   period: number;
   startDate?: string | Date;
   endDate?: string | Date;
   filterFenxingContainment?: boolean;
-}) {
+  mode?: 'single' | 'composite';
+  pluginId?: string;
+  initialCash?: number;
+  runStressSuite?: boolean;
+  enableStopLoss?: boolean;
+}
+
+// 全量执行仿真并获取回测结果的统一纯净胶水（统一内核 push 驱动 + Next-Bar 因果撮合 + Polars 绩效）
+async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   const cacheKey = getBacktestCacheKey(options);
   const cachedSignals = backtestSignalsCache.get(cacheKey);
-  if (cachedSignals) {
+  if (
+    cachedSignals &&
+    !options.runStressSuite &&
+    !options.mode &&
+    !options.pluginId
+  ) {
     return {
       signals: cachedSignals,
       kernel: null,
+      navSeries: [],
+      closedTrades: [],
+      performance: null,
+      stressReport: null,
     };
   }
 
-  // 优先尝试读取磁盘预计算回测信号快照（加速大数据集冷启动）
-  const diskSignalPath = path.resolve(
-    __dirname,
-    `data/signals/${options.code}_${options.period}m_full.json`,
-  );
-  if (fs.existsSync(diskSignalPath)) {
-    try {
-      const fileRaw = JSON.parse(fs.readFileSync(diskSignalPath, 'utf-8'));
-      if (Array.isArray(fileRaw)) {
-        let filtered = fileRaw;
-        if (options.startDate) {
-          const startMs = new Date(options.startDate).getTime();
-          filtered = filtered.filter(
-            (s) => new Date(s.signalTime).getTime() >= startMs,
-          );
+  // 优先尝试读取磁盘预计算回测信号快照（加速标准策略冷启动，单因子/复合模式除外）
+  if (!options.mode && !options.pluginId) {
+    const diskSignalPath = path.resolve(
+      __dirname,
+      `data/signals/${options.code}_${options.period}m_full.json`,
+    );
+    if (fs.existsSync(diskSignalPath)) {
+      try {
+        const fileRaw = JSON.parse(fs.readFileSync(diskSignalPath, 'utf-8'));
+        if (Array.isArray(fileRaw)) {
+          let filtered = fileRaw;
+          if (options.startDate) {
+            const startMs = new Date(options.startDate).getTime();
+            filtered = filtered.filter(
+              (s) => new Date(s.signalTime).getTime() >= startMs,
+            );
+          }
+          if (options.endDate) {
+            const endMs = new Date(options.endDate).getTime();
+            filtered = filtered.filter(
+              (s) => new Date(s.signalTime).getTime() <= endMs,
+            );
+          }
+          backtestSignalsCache.set(cacheKey, filtered);
+          return {
+            signals: filtered,
+            kernel: null,
+            navSeries: [],
+            closedTrades: [],
+            performance: null,
+            stressReport: null,
+          };
         }
-        if (options.endDate) {
-          const endMs = new Date(options.endDate).getTime();
-          filtered = filtered.filter(
-            (s) => new Date(s.signalTime).getTime() <= endMs,
-          );
-        }
-        backtestSignalsCache.set(cacheKey, filtered);
-        return {
-          signals: filtered,
-          kernel: null,
-        };
+      } catch {
+        // 容错降级
       }
-    } catch {
-      // 容错降级
     }
   }
 
+  const initialCash = options.initialCash ?? 1_000_000;
   const fullKlines = loadCanonicalKlines({
     code: options.code,
     period: options.period,
   });
-  let bars = fullKlines.map((k) => toStrategyBar(k, options.period));
+  let bars = fullKlines.map((k) =>
+    toStrategyBar(
+      k,
+      options.period,
+      DEFAULT_DEV_SECURITY_ID,
+      DEFAULT_DEV_MARKET_SOURCE,
+      options.code,
+    ),
+  );
+
+  // A 股防数据中毒门禁 (A_SHARE_DATA_MIN_BOUNDARY: 1996-12-16)
+  const MIN_A_SHARE_DATE = new Date('1996-12-16T00:00:00.000Z');
+  bars = bars.filter(
+    (b) => b.timestamp.getTime() >= MIN_A_SHARE_DATE.getTime(),
+  );
+
   if (options.endDate) {
     const endMs = new Date(options.endDate).getTime();
     bars = bars.filter((bar) => bar.timestamp.getTime() <= endMs);
@@ -456,12 +701,19 @@ async function runUnifiedSimulationBacktest(options: {
     const startMs = new Date(options.startDate).getTime();
     const startIndex = bars.findIndex((b) => b.timestamp.getTime() >= startMs);
     if (startIndex > 0) {
-      // 预留充足的预热 K 线（200 根），确保技术指标与缠论窗口充分收敛，避免无意义遍历更早历史
-      const prewarmCut = Math.max(0, startIndex - 200);
+      // 预留充足的预热 K 线（300 根），确保技术指标与缠论窗口充分收敛
+      const prewarmCut = Math.max(0, startIndex - 300);
       bars = bars.slice(prewarmCut);
     }
   }
-  const flow = createTacticsDecisionFlow();
+
+  // 1. 初始化插件注册表并动态加载外部插件
+  const registry = new InMemoryFactorPluginRegistry();
+  ensureStandardPluginsRegistered(registry);
+  ExternalFactorPluginLoader.registerExternalPlugins(registry);
+
+  // 2. 构造对应决策流树
+  const flow = createCustomDecisionFlow(options.mode, options.pluginId);
   const publicFrom = options.startDate
     ? new Date(options.startDate)
     : new Date(-8640000000000000);
@@ -471,34 +723,207 @@ async function runUnifiedSimulationBacktest(options: {
     securityCode: options.code,
     period: options.period,
     publicFrom,
+    registry,
     plans: [
       {
         definitionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,
         versionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
         flow,
         ruleSnapshot: Object.freeze({}),
-        requiredBarCount: 60,
+        requiredBarCount: 300,
       },
     ],
   });
 
-  const collected: SimulationSignal[] = [];
-  for (const bar of bars) {
-    const signals: readonly KernelSignal[] = await kernel.push(bar);
-    for (const signal of signals) {
-      collected.push(
-        mapKernelSignalToSimulationSignal(signal, {
-          securityCode: options.code,
-          period: options.period,
-        }),
+  // 3. 初始化因果经纪商与持仓状态机
+  const broker = new SimulatedBroker({
+    initialCash,
+    slippageRatio: 0.0005,
+  });
+  broker.registerSecurity(options.code, {
+    name: options.code === '000001' ? '上证指数' : options.code,
+    preClose: bars[0]?.open ?? 1000,
+  });
+  const position = new PositionStateMachine(
+    DEFAULT_DEV_SECURITY_ID,
+    options.code,
+    initialCash,
+  );
+  const enableStopLoss =
+    options.enableStopLoss === true ||
+    (options.enableStopLoss !== false && options.mode === 'composite');
+  const arbiter = enableStopLoss
+    ? new ExecutionRiskArbiter({
+        hardStopLossRatio: -0.08,
+      })
+    : null;
+
+  const collectedSignals: SimulationSignal[] = [];
+  let lastDateStr: string | null = null;
+  let lastBar: StrategyBar | null = null;
+
+  for (let i = 0; i < bars.length; i++) {
+    const bar = bars[i];
+    const currentDateStr = formatShanghaiDateString(bar.timestamp);
+
+    // 跨日日终结算
+    if (lastDateStr !== null && currentDateStr !== lastDateStr) {
+      broker.settleDayClose(lastDateStr);
+      if (lastBar !== null) {
+        position.onDayClose(lastBar);
+      }
+    }
+    lastDateStr = currentDateStr;
+    lastBar = bar;
+
+    // Next-Bar 撮合成交上一根 Bar 下达的待撮合委托
+    const fills = broker.onBar(bar);
+    for (const fill of fills) {
+      position.onOrderFilled(fill);
+    }
+    position.onBar(bar);
+
+    // 统一内核推进 Bar 并获得增量信号
+    const kernelSignals: readonly KernelSignal[] = await kernel.push(bar);
+    const hasPendingOrder = broker
+      .getOpenOrders()
+      .some((o) => o.securityCode === options.code);
+
+    for (const kSig of kernelSignals) {
+      const simSig = mapKernelSignalToSimulationSignal(kSig, {
+        securityCode: options.code,
+        period: options.period,
+      });
+      collectedSignals.push(simSig);
+
+      // 因果买卖撮合委托下达 (Next-Bar 撮合，本 Bar 收盘下达)
+      if (simSig.isBuy || kSig.signalKind === 'entry') {
+        const availableCash = broker.getAccount().availableCash;
+        const buyShares =
+          Math.floor((availableCash * 0.95) / bar.close / 100) * 100;
+        if (
+          buyShares >= 100 &&
+          (position.getStatus() === 'EMPTY' ||
+            position.getStatus() === 'CLOSED') &&
+          !hasPendingOrder
+        ) {
+          broker.submitOrder({
+            securityId: DEFAULT_DEV_SECURITY_ID,
+            securityCode: options.code,
+            side: ORDER_SIDES.BUY,
+            orderType: ORDER_TYPES.MARKET,
+            quantity: buyShares,
+            signalTime: bar.timestamp,
+          });
+        }
+      } else if (!simSig.isBuy || kSig.signalKind === 'exit') {
+        if (!hasPendingOrder && position.getStatus() === 'HOLDING') {
+          const sellDto = position.onSignal(kSig);
+          if (sellDto) {
+            broker.submitOrder(sellDto);
+          }
+        }
+      }
+    }
+
+    // 风控裁决器检查 (仅当明确开启止损时生效)
+    if (arbiter && !hasPendingOrder && position.getStatus() === 'HOLDING') {
+      const arbiterSellDto = arbiter.arbitrate({
+        bar,
+        position: position.getSnapshot(),
+        availableCash: broker.getAccount().availableCash,
+      });
+      if (arbiterSellDto) {
+        broker.submitOrder(arbiterSellDto);
+      }
+    }
+
+    if (i % 500 === 0 && i > 0) {
+      console.log(
+        `📊 [Backtest] ${options.code} 步进游标: ${i}/${bars.length} (${bar.timestamp.toISOString().slice(0, 10)})`,
       );
     }
+
+    // 异步让渡事件循环，确保单线程 Node.js 维持 HTTP 响应流畅
+    if (i % 50 === 0) {
+      await new Promise<void>((r) => setImmediate(r));
+    }
   }
-  backtestSignalsCache.set(cacheKey, collected);
+
+  // 最后一根 Bar 的日终结算
+  if (lastBar !== null && lastDateStr !== null) {
+    broker.settleDayClose(lastDateStr);
+    position.onDayClose(lastBar);
+  }
+
+  // 提取净值时序与平仓交易
+  const navSeries = position.getNavHistory().map((n) => n.totalEquity);
+  const closedTrades = position.getClosedTrades();
+
+  // 基于 Rust Polars 计算量化绩效
+  const performance = computePerformanceSummary(navSeries, closedTrades, {
+    initialCash,
+  });
+
+  // 极端压力测试联动
+  let stressReport: any = undefined;
+  if (options.runStressSuite) {
+    const orchestrator = new StressTestingSuiteOrchestrator();
+    const suiteReport = await orchestrator.execute({
+      scenarios: [
+        'CRASH_2015',
+        'CIRCUIT_2016',
+        'BEAR_2018',
+        'SQUEEZE_2024',
+        'PULSE_2024',
+      ],
+      runner: async (scenarioDef) => {
+        const scenarioResult = await runUnifiedSimulationBacktest({
+          code: options.code,
+          period: options.period,
+          startDate: scenarioDef.startDate,
+          endDate: scenarioDef.endDate,
+          mode: options.mode,
+          pluginId: options.pluginId,
+          initialCash,
+          runStressSuite: false,
+        });
+        return {
+          navSeries: scenarioResult.navSeries,
+          trades: scenarioResult.closedTrades,
+          initialCash,
+        };
+      },
+    });
+
+    stressReport = {
+      overallRating: suiteReport.healthCard.overallRating,
+      overallHealthScore: suiteReport.healthCard.overallHealthScore,
+      hasBankruptcy: suiteReport.healthCard.hasBankruptcy,
+      worstDailyReturn: suiteReport.healthCard.worstDailyReturn,
+      totalLiquidityPenalty: suiteReport.healthCard.totalLiquidityPenalty,
+      scenarioOutcomes: suiteReport.scenarioOutcomes.map((o) => ({
+        scenarioId: o.scenario.id,
+        scenarioName: o.scenario.name,
+        riskGrade: o.survivalAssessment.riskGrade,
+        maxDrawdown: o.metrics.maxDrawdown,
+        sharpeRatio: o.metrics.sharpeRatio,
+        liquidityPenaltyLoss: o.survivalAssessment.liquidityPenaltyLoss,
+      })),
+    };
+  }
+
+  if (!options.runStressSuite && !options.mode && !options.pluginId) {
+    backtestSignalsCache.set(cacheKey, collectedSignals);
+  }
 
   return {
-    signals: collected,
+    signals: collectedSignals,
     kernel,
+    navSeries,
+    closedTrades,
+    performance,
+    stressReport,
   };
 }
 
@@ -706,7 +1131,7 @@ const server = http.createServer(async (req, res) => {
         ruleSnapshot = compiled.ruleSnapshot;
         windowBudget = compiled.requiredBarCount;
       }
-      flow ||= createTacticsDecisionFlow();
+      flow ||= createEnhancedChanDecisionFlow();
 
       const session = new StrategySimulationSession(bars, {
         securityCode: code,
@@ -1018,8 +1443,9 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, [
       {
         id: 1,
-        name: '缠论标准策略树',
-        description: '基于策略树决策流与标准缠论买卖点',
+        name: '缠论形态增强买卖点策略树',
+        description:
+          '以标准缠论一/二/三类买卖点为基石，私有量价共振与波动率放量爆发增强 (无止损止盈)',
         kind: 'decision_flow',
         status: 'active',
         activeVersionNumber: 1,
@@ -1040,9 +1466,9 @@ const server = http.createServer(async (req, res) => {
         id: 1,
         strategyDefinitionId: 1,
         versionNumber: 1,
-        signalKind: 'entry',
+        signalKind: 'both',
         status: 'active',
-        description: '标准决策流版本 (集成标准缠论)',
+        description: '缠论原典形态与私有战术增强双重买卖点决策流 (无止损止盈)',
         config: {},
         createdAt: new Date('2026-09-01').toISOString(),
       },
@@ -1072,23 +1498,64 @@ const server = http.createServer(async (req, res) => {
       const symbol = resolveSecurityCode(body, DEFAULT_DEV_SECURITY_CODE);
       const period = resolvePeriod(body.period, DEFAULT_DEV_PERIOD);
       const source = body.source || DEFAULT_DEV_MARKET_SOURCE;
-      const startDate = body.startDate || '2024-01-01T00:00:00.000Z';
+      const mode =
+        body.mode === 'single' || body.mode === 'composite'
+          ? body.mode
+          : undefined;
+      const pluginId =
+        typeof body.pluginId === 'string' ? body.pluginId : undefined;
+      const startDate = body.startDate || '1996-12-16T00:00:00.000Z';
       const endDate = body.endDate || '2026-12-31T23:59:59.000Z';
+      const initialCash = Number(body.initialCash) || 1_000_000;
+      const runStressSuite =
+        body.runStressSuite === true || body.runStressSuite === 'true';
+      const enableStopLoss =
+        body.enableStopLoss === true ||
+        (body.enableStopLoss !== false &&
+          body.mode === 'composite' &&
+          body.disableStopLoss !== true &&
+          body.noStopLoss !== true);
 
       // 统一走策略树仿真引擎计算
-      const { signals } = await runUnifiedSimulationBacktest({
-        code: symbol,
-        period,
-        startDate,
-        endDate,
-      });
+      const { signals, performance, stressReport, closedTrades } =
+        await runUnifiedSimulationBacktest({
+          code: symbol,
+          period,
+          mode,
+          pluginId,
+          startDate,
+          endDate,
+          initialCash,
+          runStressSuite,
+          enableStopLoss,
+        });
+
+      // 计算更细致的交易盈亏统计（区分 Profit Factor 获利因子 与 Payoff Ratio 单笔盈亏比）
+      const winTrades = (closedTrades || []).filter(
+        (t: any) => t.realizedPnl > 0,
+      );
+      const lossTrades = (closedTrades || []).filter(
+        (t: any) => t.realizedPnl < 0,
+      );
+      const totalWinPnl = winTrades.reduce(
+        (sum: number, t: any) => sum + t.realizedPnl,
+        0,
+      );
+      const totalLossPnl = Math.abs(
+        lossTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0),
+      );
+      const avgWin = winTrades.length > 0 ? totalWinPnl / winTrades.length : 0;
+      const avgLoss =
+        lossTrades.length > 0 ? totalLossPnl / lossTrades.length : 0;
+      const payoffRatio =
+        avgLoss > 0 ? Math.round((avgWin / avgLoss) * 10000) / 10000 : 0;
 
       const newId =
         mockRuns.length > 0 ? Math.max(...mockRuns.map((r) => r.id)) + 1 : 1;
       const newRun: DevBacktestRun = {
         id: newId,
         strategyDefinitionId: Number(body.strategyDefinitionId) || 1,
-        strategyName: `${symbol === '000001' ? '上证指数' : symbol} ${period === 1440 ? '日线' : period + 'm'} 策略回测`,
+        strategyName: `${symbol === '000001' ? '上证指数' : symbol} ${period === 1440 ? '日线' : period + 'm'} ${mode === 'composite' ? '复合决策流' : pluginId || '缠论策略树'}回测`,
         strategyVersionId: Number(body.strategyVersionId) || 1,
         status: 'completed',
         source,
@@ -1112,10 +1579,40 @@ const server = http.createServer(async (req, res) => {
           runId: newRun.id,
           status: 'completed',
           message: '回测任务执行完成',
+          symbol,
+          period,
+          mode: mode ?? 'composite',
+          pluginId,
+          performance: {
+            sharpeRatio: performance?.sharpeRatio ?? 0,
+            totalReturnRatio: performance?.totalReturn ?? 0,
+            annualizedReturnRatio: performance?.annualizedReturn ?? 0,
+            maxDrawdown: performance?.maxDrawdown ?? 0,
+            winRate: performance?.winRate ?? 0,
+            profitFactor: performance?.profitLossRatio ?? 0,
+            payoffRatio,
+            totalTrades: performance?.tradeCount ?? 0,
+            winTradeCount: winTrades.length,
+            lossTradeCount: lossTrades.length,
+            totalWinPnl: Math.round(totalWinPnl * 100) / 100,
+            totalLossPnl: Math.round(totalLossPnl * 100) / 100,
+            avgWinPnl: Math.round(avgWin * 100) / 100,
+            avgLossPnl: Math.round(avgLoss * 100) / 100,
+            initialCash,
+            endingEquity:
+              performance?.totalReturn !== undefined
+                ? Math.round(
+                    initialCash * (1 + performance.totalReturn) * 100,
+                  ) / 100
+                : initialCash,
+          },
+          trades: closedTrades,
+          stressReport,
+          signalCount: signals.length,
           pollUrl: `/v1/strategy-backtests/${newRun.id}`,
           acceptedAt: newRun.createdAt,
         },
-        202,
+        200,
       );
     } catch (err: any) {
       console.error(`[POST /v1/strategy-backtests] 错误:`, err.message);
@@ -1250,6 +1747,12 @@ server.listen(PORT, '0.0.0.0', () => {
 
   setTimeout(async () => {
     try {
+      if (process.env.SKIP_DEV_PREHEAT === 'true') {
+        console.log(
+          `⏩ [预热] 检测到环境变量 SKIP_DEV_PREHEAT=true，跳过启动全量预热。`,
+        );
+        return;
+      }
       console.log(`🔄 [预热] 正在后台基于策略树预热决策流回测数据...`);
       for (const run of mockRuns) {
         const symbol = run.targetUniverse[0] || '000001';
@@ -1258,6 +1761,7 @@ server.listen(PORT, '0.0.0.0', () => {
           period: run.period,
           startDate: run.startDate,
           endDate: run.endDate,
+          enableStopLoss: false,
         });
         backtestRunSignalsMap.set(run.id, signals);
         run.signalCount = signals.length;

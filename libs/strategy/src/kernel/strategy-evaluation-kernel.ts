@@ -32,6 +32,29 @@ import type {
  * 窗口不足 `windowBudget` 期间不判定不发射（insufficient_history 语义，
  * 预热不足时随公开 Bar 逐根增长，窗口补满自动开始判定）。
  */
+class LazyAttributeMap extends Map<string, unknown> {
+  constructor(private readonly computeLazy: (key: string) => unknown) {
+    super();
+  }
+
+  override get(key: string): unknown {
+    if (super.has(key)) {
+      return super.get(key);
+    }
+    const computed = this.computeLazy(key);
+    if (computed !== undefined && computed !== null) {
+      super.set(key, computed);
+      return computed;
+    }
+    return undefined;
+  }
+
+  override has(key: string): boolean {
+    if (super.has(key)) return true;
+    return this.get(key) !== undefined;
+  }
+}
+
 export class StrategyEvaluationKernel {
   public readonly securityId: number;
   public readonly securityCode: string;
@@ -157,11 +180,21 @@ export class StrategyEvaluationKernel {
 
   private buildContext(timestamp: Date): FactorContext {
     const bars = this.imputer.read();
-    const attributes = new Map<string, unknown>();
-    const vf = extractVolumeFeatures(bars);
-    if (vf) {
-      attributes.set('volumeFeatures', vf);
-    }
+    let cachedVf: ReturnType<typeof extractVolumeFeatures> | undefined =
+      undefined;
+    let vfComputed = false;
+
+    const attributes = new LazyAttributeMap((key) => {
+      if (key === 'volumeFeatures') {
+        if (!vfComputed) {
+          cachedVf = extractVolumeFeatures(bars) ?? undefined;
+          vfComputed = true;
+        }
+        return cachedVf;
+      }
+      return undefined;
+    });
+
     return {
       securityId: this.securityId,
       securityCode: this.securityCode,

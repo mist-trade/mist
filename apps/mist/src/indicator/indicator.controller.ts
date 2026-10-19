@@ -7,7 +7,6 @@ import { IndicatorQueryDto } from './dto/query/indicator-query.dto';
 import { IndicatorService } from './indicator.service';
 import { KDJVo } from './vo/kdj.vo';
 import { MACDVo } from './vo/macd.vo';
-import { RSIVo } from './vo/rsi.vo';
 import { KVo } from './vo/k.vo';
 import { prepareMarketData } from '@app/market-data';
 
@@ -128,43 +127,6 @@ export class IndicatorController {
       k: formatIndicator(kdjResult.begIndex, index, kdjResult.K),
       d: formatIndicator(kdjResult.begIndex, index, kdjResult.D),
       j: formatIndicator(kdjResult.begIndex, index, kdjResult.J),
-      symbol: item.security.code,
-      time: item.timestamp,
-      close: item.close,
-    }));
-  }
-
-  @Post('rsi')
-  @Throttle({ default: { limit: 40, ttl: 60000 } }) // 40 requests per minute for RSI
-  @ApiOperation({
-    summary: 'Calculate RSI indicator',
-    description:
-      'Computes RSI (Relative Strength Index) with default period of 14',
-  })
-  @ApiEnvelopeResponse({
-    status: 200,
-    description: 'Returns array of RSI values (0-100 range)',
-    type: RSIVo,
-    isArray: true,
-  })
-  async rsi(@Body() queryDto: IndicatorQueryDto): Promise<RSIVo[]> {
-    const startDate = this.timezoneService.parseDateString(queryDto.startDate);
-    const endDate = this.timezoneService.parseDateString(queryDto.endDate);
-
-    const data = await this.indicatorService.findKData({
-      code: queryDto.code,
-      period: queryDto.period,
-      startDate,
-      endDate,
-      source: queryDto.source,
-    });
-
-    const rsiResult = await this.indicatorService.runRSI(
-      data.map((item) => Number(item.close)),
-    );
-
-    return data.map((item, index) => ({
-      rsi: formatIndicator(rsiResult.begIndex, index, rsiResult.rsi),
       symbol: item.security.code,
       time: item.timestamp,
       close: item.close,

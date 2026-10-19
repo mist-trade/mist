@@ -148,6 +148,9 @@ export function extractVolumeFeatures(
     return undefined;
   }
 
+  // 截取最近 50 根 Bar 进行特征提取，确保所有指标（最大长周期 20）充分收敛且大幅提升计算吞吐
+  const inputBars = bars.length > 50 ? bars.slice(-50) : bars;
+
   const opens: number[] = [];
   const highs: number[] = [];
   const lows: number[] = [];
@@ -155,7 +158,7 @@ export function extractVolumeFeatures(
   const volumes: number[] = [];
   const amounts: (number | null)[] = [];
 
-  for (const b of bars) {
+  for (const b of inputBars) {
     const parsed = parseBar(b);
     if (!parsed) continue;
     opens.push(parsed.open);

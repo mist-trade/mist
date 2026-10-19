@@ -381,4 +381,39 @@ describe('PositionStateMachine', () => {
         }),
     ).toThrow('exitRatio must be in range (0, 1.0]');
   });
+
+  it('resets entryTime and holdingBars on subsequent buys after position is CLOSED', () => {
+    // 交易 1：买入并平仓
+    const t1Entry = new Date('2026-10-01T09:31:00.000Z');
+    psm.onOrderFilled(
+      createFillEvent(ORDER_SIDES.BUY, 10.0, 1000, 10, t1Entry),
+    );
+    psm.onBar(createBar('2026-10-01T10:00:00.000Z', 10.5));
+    psm.onBar(createBar('2026-10-01T11:00:00.000Z', 11.0));
+    const t1Exit = new Date('2026-10-01T15:00:00.000Z');
+    psm.onOrderFilled(
+      createFillEvent(ORDER_SIDES.SELL, 11.0, 1000, 10, t1Exit),
+    );
+
+    expect(psm.getStatus()).toBe(POSITION_STATUSES.CLOSED);
+
+    // 交易 2：再次买入
+    const t2Entry = new Date('2026-10-08T09:31:00.000Z');
+    psm.onOrderFilled(
+      createFillEvent(ORDER_SIDES.BUY, 12.0, 1000, 10, t2Entry),
+    );
+    expect(psm.getStatus()).toBe(POSITION_STATUSES.HOLDING);
+    psm.onBar(createBar('2026-10-08T10:00:00.000Z', 12.5));
+    const t2Exit = new Date('2026-10-08T15:00:00.000Z');
+    psm.onOrderFilled(
+      createFillEvent(ORDER_SIDES.SELL, 12.5, 1000, 10, t2Exit),
+    );
+
+    const trades = psm.getClosedTrades();
+    expect(trades).toHaveLength(2);
+    expect(trades[0].entryTime).toEqual(t1Entry);
+    expect(trades[0].holdingBars).toBe(2);
+    expect(trades[1].entryTime).toEqual(t2Entry);
+    expect(trades[1].holdingBars).toBe(1);
+  });
 });

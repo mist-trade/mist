@@ -1,4 +1,3 @@
-export * from './adx';
 export * from './atr';
 export * from './bollinger';
 export * from './dual-ma';
@@ -7,7 +6,6 @@ export * from './keltner';
 export * from './macd';
 export * from './obv';
 export * from './rpp';
-export * from './rsi';
 export * from './volume';
 export * from './vpci';
 export * from './vwap';

@@ -7,8 +7,6 @@ import { DataSourceService } from '../sources/services';
 import {
   computeMacdSeries,
   computeKdjSeries,
-  computeRsiSeries,
-  computeAdxSeries,
   computeAtrSeries,
   computeDualMaSeries,
 } from '@app/indicators';
@@ -74,23 +72,6 @@ export class IndicatorService {
     };
   }
 
-  async runRSI(
-    prices: number[],
-    period: number = 14,
-  ): Promise<{
-    begIndex: number;
-    nbElement: number;
-    rsi: number[];
-  }> {
-    const { begIndex, rsi } = computeRsiSeries(prices.map(Number), period);
-
-    return {
-      begIndex,
-      nbElement: rsi.length,
-      rsi,
-    };
-  }
-
   async runKDJ(data: RunKDJDto): Promise<{
     begIndex: number;
     nbElement: number;
@@ -116,16 +97,6 @@ export class IndicatorService {
       D,
       J,
     };
-  }
-
-  async runADX(data: RunOhlcIndicatorDto): Promise<number[]> {
-    const { adx } = computeAdxSeries(
-      data.high.map(Number),
-      data.low.map(Number),
-      data.close.map(Number),
-      data.period,
-    );
-    return adx;
   }
 
   async runDualMA(

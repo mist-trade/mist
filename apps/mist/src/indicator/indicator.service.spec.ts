@@ -83,16 +83,6 @@ describe('IndicatorService', () => {
     expect(result.histogram[0]).toBeCloseTo(expected.histogram[0], 10);
   });
 
-  it('keeps the RSI response shape and period-based alignment', async () => {
-    const result = await service.runRSI(close, 14);
-
-    expect(result.begIndex).toBe(14);
-    expect(result.nbElement).toBe(result.rsi.length);
-    expect(Array.isArray(result.rsi)).toBe(true);
-    expect(result.rsi).toHaveLength(66);
-    expect(result.rsi[0]).toBeCloseTo(67.95, 2);
-  });
-
   it('keeps KDJ fields aligned using the catalog default (9,3,3) after the fix', async () => {
     const result = await service.runKDJ({
       high,
@@ -115,7 +105,6 @@ describe('IndicatorService', () => {
   });
 
   it('keeps direct indicator array outputs finite and aligned', async () => {
-    const adx = await service.runADX({ high, low, close, period: 14 });
     const atr = await service.runATR({ high, low, close, period: 14 });
     const dualMA = await service.runDualMA({
       close,
@@ -123,18 +112,14 @@ describe('IndicatorService', () => {
       longPeriod: 60,
     });
 
-    expect(adx).toHaveLength(53);
     expect(atr).toHaveLength(66);
     expect(dualMA.shortMA).toHaveLength(68);
     expect(dualMA.longMA).toHaveLength(21);
-    expect(adx[0]).toBeCloseTo(63.72878, 5);
     expect(atr[0]).toBeCloseTo(4.273998, 6);
     expect(dualMA.shortMA[0]).toBeCloseTo(105.944811, 6);
     expect(dualMA.longMA[0]).toBeCloseTo(120.758567, 6);
     expect(
-      [...adx, ...atr, ...dualMA.shortMA, ...dualMA.longMA].every(
-        Number.isFinite,
-      ),
+      [...atr, ...dualMA.shortMA, ...dualMA.longMA].every(Number.isFinite),
     ).toBe(true);
   });
 

@@ -151,7 +151,7 @@ function assertBackendJestHygiene(packageJson) {
 function assertNoSelectedBackendProductionConsoleCalls() {
   const selectedProductionFiles = [
     'apps/mist/src/collector/collector.service.ts',
-    'libs/utils/src/services/data-source.service.ts',
+    'apps/mist/src/sources/services/data-source.service.ts',
   ];
   const consoleCallPattern = /\bconsole\.(?:log|warn|error|info|debug)\s*\(/g;
 

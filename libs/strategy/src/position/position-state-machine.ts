@@ -76,7 +76,10 @@ export class PositionStateMachine {
 
   onOrderFilled(event: OrderFilledEvent): void {
     if (event.side === ORDER_SIDES.BUY) {
-      if (this.status === POSITION_STATUSES.EMPTY) {
+      if (
+        this.status === POSITION_STATUSES.EMPTY ||
+        this.status === POSITION_STATUSES.CLOSED
+      ) {
         this.entryTime = event.fillTime;
         this.holdingBars = 0;
       }
@@ -143,6 +146,7 @@ export class PositionStateMachine {
         this.holdingQuantity = 0;
         this.costPrice = 0;
         this.accumulatedBuyFees = 0;
+        this.entryTime = undefined;
       }
     }
   }
@@ -209,6 +213,7 @@ export class PositionStateMachine {
         orderType: ORDER_TYPES.MARKET,
         quantity: this.calculateExitQuantity(options?.exitRatio),
         signalTime: signal.signalTime,
+        exitReason: signal.signalType ?? 'SIGNAL_EXIT',
       };
     }
 
