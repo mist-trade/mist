@@ -633,45 +633,6 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     };
   }
 
-  // 优先尝试读取磁盘预计算回测信号快照（加速标准策略冷启动，单因子/复合模式除外）
-  if (!options.mode && !options.pluginId) {
-    const diskSignalPath = path.resolve(
-      __dirname,
-      `data/signals/${options.code}_${options.period}m_full.json`,
-    );
-    if (fs.existsSync(diskSignalPath)) {
-      try {
-        const fileRaw = JSON.parse(fs.readFileSync(diskSignalPath, 'utf-8'));
-        if (Array.isArray(fileRaw)) {
-          let filtered = fileRaw;
-          if (options.startDate) {
-            const startMs = new Date(options.startDate).getTime();
-            filtered = filtered.filter(
-              (s) => new Date(s.signalTime).getTime() >= startMs,
-            );
-          }
-          if (options.endDate) {
-            const endMs = new Date(options.endDate).getTime();
-            filtered = filtered.filter(
-              (s) => new Date(s.signalTime).getTime() <= endMs,
-            );
-          }
-          backtestSignalsCache.set(cacheKey, filtered);
-          return {
-            signals: filtered,
-            kernel: null,
-            navSeries: [],
-            closedTrades: [],
-            performance: null,
-            stressReport: null,
-          };
-        }
-      } catch {
-        // 容错降级
-      }
-    }
-  }
-
   const initialCash = options.initialCash ?? 1_000_000;
   const fullKlines = loadCanonicalKlines({
     code: options.code,
