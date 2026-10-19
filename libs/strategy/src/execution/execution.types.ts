@@ -27,6 +27,7 @@ export interface Order {
   readonly createdAt: Date;
   readonly rejectReason?: OrderRejectReason;
   readonly exitReason?: string;
+  readonly entryReason?: string;
 }
 
 export interface FeeDetails {
@@ -50,6 +51,7 @@ export interface OrderFilledEvent {
   readonly fees: FeeDetails;
   readonly netAmount: number;
   readonly exitReason?: string;
+  readonly entryReason?: string;
 }
 
 export interface PositionSlot {
@@ -75,6 +77,7 @@ export interface CreateOrderDto {
   readonly limitPrice?: number;
   readonly stopPrice?: number;
   readonly exitReason?: string;
+  readonly entryReason?: string;
 }
 
 /**

@@ -152,6 +152,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
       status: ORDER_STATUSES.PENDING,
       createdAt: new Date(),
       ...(dto.exitReason ? { exitReason: dto.exitReason } : {}),
+      ...(dto.entryReason ? { entryReason: dto.entryReason } : {}),
     };
 
     this.pendingOrders.set(orderId, order);
@@ -269,6 +270,8 @@ export class SimulatedBroker implements ExecutionBrokerPort {
           if (fill) {
             fills.push(fill);
             this.pendingOrders.delete(orderId);
+          } else {
+            this.pendingOrders.delete(orderId);
           }
         } else if (order.side === ORDER_SIDES.SELL) {
           if (isOneWordLimitDown(bar, prevClose, securityName)) {
@@ -289,6 +292,14 @@ export class SimulatedBroker implements ExecutionBrokerPort {
           const fill = this.executeFill(order, fillPrice, bar.timestamp);
           if (fill) {
             fills.push(fill);
+            this.pendingOrders.delete(orderId);
+          } else {
+            // 无法成交（如无持仓或可用份额不足），标记拒单并移除，防止悬挂死锁
+            this.pendingOrders.set(orderId, {
+              ...order,
+              status: ORDER_STATUSES.REJECTED,
+              rejectReason: ORDER_REJECT_REASONS.INSUFFICIENT_SHARES,
+            });
             this.pendingOrders.delete(orderId);
           }
         }
@@ -408,6 +419,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
         turnover,
         fees,
         netAmount: -totalRequired,
+        ...(order.entryReason ? { entryReason: order.entryReason } : {}),
         ...(order.exitReason ? { exitReason: order.exitReason } : {}),
       };
     } else {
@@ -439,6 +451,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
         turnover,
         fees,
         netAmount: netIncome,
+        ...(order.entryReason ? { entryReason: order.entryReason } : {}),
         ...(order.exitReason ? { exitReason: order.exitReason } : {}),
       };
     }

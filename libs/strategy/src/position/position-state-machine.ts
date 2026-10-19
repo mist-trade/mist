@@ -42,6 +42,7 @@ export class PositionStateMachine {
   private readonly exitRatio: number;
   private readonly navHistory: DailyNavSnapshot[] = [];
   private readonly closedTrades: PositionClosedRecord[] = [];
+  private entryReason?: string;
 
   constructor(
     securityId: number,
@@ -81,6 +82,7 @@ export class PositionStateMachine {
         this.status === POSITION_STATUSES.CLOSED
       ) {
         this.entryTime = event.fillTime;
+        this.entryReason = event.entryReason;
         this.holdingBars = 0;
       }
       this.status = POSITION_STATUSES.HOLDING;
@@ -137,6 +139,7 @@ export class PositionStateMachine {
         quantity: fillQty,
         realizedPnl: tradePnl,
         returnRatio,
+        entryReason: this.entryReason ?? 'BUY_SIGNAL',
         exitReason: event.exitReason ?? POSITION_EXIT_REASONS.SIGNAL_EXIT,
       });
 
@@ -147,6 +150,7 @@ export class PositionStateMachine {
         this.costPrice = 0;
         this.accumulatedBuyFees = 0;
         this.entryTime = undefined;
+        this.entryReason = undefined;
       }
     }
   }

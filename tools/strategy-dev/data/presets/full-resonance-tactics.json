@@ -1,0 +1,232 @@
+{
+  "id": "strategy_preset_full_resonance_tactics",
+  "name": "上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强策略树",
+  "version": "1.0.0",
+  "kind": "decision_flow",
+  "status": "active",
+  "author": "Mist Quant Team",
+  "description": "在宏观大盘牛熊分流与缠论原典形态基础上，叠加两大私有战术插件增强：牛市缠论买点融合VPCI量价共振校验（不拦截原典），未出笔形态时由肯特纳/布林带波动率挤压爆发捕捉突破买点；熊市执行双中枢背驰极限抄底与破位逃命清仓防守。",
+  "tags": [
+    "regime",
+    "chan",
+    "tactics",
+    "volume-price-confirmation",
+    "volatility-squeeze",
+    "bull-bear-adaptive"
+  ],
+  "targetUniverse": ["000001", "510050", "510300"],
+  "supportedPeriods": [5, 15, 30, 60, 1440],
+  "mountedPlugins": [
+    {
+      "pluginId": "plugin.regime.shanghai-index",
+      "name": "上证指数全局牛熊判定插件",
+      "role": "MACRO_REGIME_ROOT",
+      "params": {
+        "mode": "dual_speed",
+        "fastMaPeriod": 20,
+        "slowMaPeriod": 60,
+        "breakoutThreshold": 0.005
+      }
+    },
+    {
+      "pluginId": "plugin.chan.bsp",
+      "name": "牛市缠论形态主门禁",
+      "role": "BULL_PRIMARY_MORPHOLOGY",
+      "params": {
+        "units": "bi",
+        "direction": "both",
+        "points": {
+          "first": true,
+          "second": true,
+          "third": true
+        },
+        "requiredBarCount": 60,
+        "deduplicate": true
+      }
+    },
+    {
+      "pluginId": "plugin.tactics.volume-price-confirmation",
+      "name": "VPCI量价共振增强校验插件",
+      "role": "BULL_VPCI_CONFIRMATION",
+      "params": {
+        "shortPeriod": 5,
+        "longPeriod": 20,
+        "vpciThreshold": 0.0
+      }
+    },
+    {
+      "pluginId": "plugin.tactics.volatility-squeeze-fire",
+      "name": "私有波动率蓄能挤压放量突破增强插件",
+      "role": "BULL_SQUEEZE_FIRE_ENHANCEMENT",
+      "params": {
+        "minVolumeTsRank": 0.65,
+        "minEntityAtrRatio": 0.65
+      }
+    },
+    {
+      "pluginId": "plugin.tactics.bull-left-right-bsp",
+      "name": "牛市微观左右侧战术增强插件",
+      "role": "BULL_MICRO_TACTICS",
+      "params": {
+        "fallbackToMainBars": true,
+        "oversoldThreshold": 0.05,
+        "slopeThreshold": 0.005
+      }
+    },
+    {
+      "pluginId": "plugin.tactics.bear-left-right-bsp",
+      "name": "熊市左右侧战术防守插件",
+      "role": "BEAR_DEFENSIVE_TACTICS",
+      "params": {
+        "fallbackToMainBars": true,
+        "slopeThreshold": 0.008
+      }
+    }
+  ],
+  "decisionFlow": {
+    "id": "guard_regime_shanghai",
+    "type": "GUARD",
+    "name": "上证宏观大周期滤网",
+    "pluginId": "plugin.regime.shanghai-index",
+    "params": {
+      "mode": "dual_speed"
+    },
+    "requiredAction": "BUY",
+    "minConfidence": 0.6,
+    "onPass": {
+      "id": "guard_bull_chan_bsp",
+      "type": "GUARD",
+      "name": "牛市缠论形态主门禁",
+      "pluginId": "plugin.chan.bsp",
+      "params": {
+        "units": "bi",
+        "direction": "both",
+        "points": {
+          "first": true,
+          "second": true,
+          "third": true
+        },
+        "requiredBarCount": 60,
+        "deduplicate": true
+      },
+      "requiredAction": "BOTH",
+      "minConfidence": 0.5,
+      "onPass": {
+        "id": "guard_bull_vpci",
+        "type": "GUARD",
+        "name": "VPCI量价共振增强校验",
+        "pluginId": "plugin.tactics.volume-price-confirmation",
+        "params": {},
+        "requiredAction": "BUY",
+        "minConfidence": 0.5,
+        "onPass": {
+          "id": "term_bull_chan_enhanced",
+          "type": "TERMINAL",
+          "action": "INHERIT",
+          "signalTag": "ENHANCED_CHAN_BSP",
+          "reason": "牛市顺势下缠论形态结构确立且通过私有量价共振增强确认"
+        },
+        "onFail": {
+          "id": "term_bull_chan_standard",
+          "type": "TERMINAL",
+          "action": "INHERIT",
+          "signalTag": "BULL_CHAN_BSP",
+          "reason": "牛市顺势下缠论标准形态买卖点确立"
+        }
+      },
+      "onFail": {
+        "id": "guard_bull_squeeze",
+        "type": "GUARD",
+        "name": "私有波动率挤压放量战术买点增强",
+        "pluginId": "plugin.tactics.volatility-squeeze-fire",
+        "params": {
+          "minVolumeTsRank": 0.65,
+          "minEntityAtrRatio": 0.65
+        },
+        "requiredAction": "BUY",
+        "minConfidence": 0.5,
+        "onPass": {
+          "id": "term_bull_squeeze_fire",
+          "type": "TERMINAL",
+          "action": "BUY",
+          "signalTag": "TACTICS_FIRE_BUY",
+          "reason": "宏观牛市蓄能挤压释放爆发买点"
+        },
+        "onFail": {
+          "id": "guard_bull_tactics",
+          "type": "GUARD",
+          "name": "牛市微观左右侧战术增强",
+          "pluginId": "plugin.tactics.bull-left-right-bsp",
+          "params": {
+            "fallbackToMainBars": true
+          },
+          "requiredAction": "BOTH",
+          "minConfidence": 0.5,
+          "onPass": {
+            "id": "term_bull_tactics_pass",
+            "type": "TERMINAL",
+            "action": "INHERIT",
+            "signalTag": "BULL_TACTICS_SIGNAL",
+            "reason": "宏观牛市下触发左右侧微观战术信号"
+          },
+          "onFail": {
+            "id": "term_bull_abort",
+            "type": "TERMINAL",
+            "action": "ABORT",
+            "reason": "牛市环境中未满足缠论形态或战术增强触发条件"
+          }
+        }
+      }
+    },
+    "onFail": {
+      "id": "guard_regime_bear_check",
+      "type": "GUARD",
+      "name": "上证宏观走熊与防守研判",
+      "pluginId": "plugin.regime.shanghai-index",
+      "params": {
+        "mode": "dual_speed"
+      },
+      "requiredAction": "SELL",
+      "minConfidence": 0.6,
+      "onPass": {
+        "id": "guard_bear_tactics",
+        "type": "GUARD",
+        "name": "熊市左右侧战术研判门禁",
+        "pluginId": "plugin.tactics.bear-left-right-bsp",
+        "params": {
+          "fallbackToMainBars": true
+        },
+        "requiredAction": "BOTH",
+        "minConfidence": 0.5,
+        "onPass": {
+          "id": "term_bear_tactics_pass",
+          "type": "TERMINAL",
+          "action": "INHERIT",
+          "signalTag": "BEAR_TACTICS_SIGNAL",
+          "reason": "熊市左右侧战术买点触发"
+        },
+        "onFail": {
+          "id": "term_regime_defend_sell",
+          "type": "TERMINAL",
+          "action": "SELL",
+          "signalTag": "REGIME_DEFEND_SELL",
+          "reason": "上证指数宏观走熊清仓防守"
+        }
+      },
+      "onFail": {
+        "id": "term_regime_neutral_abort",
+        "type": "TERMINAL",
+        "action": "ABORT",
+        "reason": "上证指数震荡纠缠，维持观望"
+      }
+    }
+  },
+  "riskManagement": {
+    "executionModel": "next_bar_open",
+    "enableHardStopLoss": true,
+    "hardStopLossRatio": -0.08,
+    "slippage": 0.0005,
+    "feeModel": "A_SHARE_STOCK_TAX_COMMISSION",
+    "tPlusOneLocking": true
+  }
+}

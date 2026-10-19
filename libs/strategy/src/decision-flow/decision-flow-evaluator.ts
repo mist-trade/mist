@@ -111,7 +111,7 @@ export class DecisionFlowEvaluator {
             trace,
             nextScore,
             inheritedAction,
-            nextInheritedMeta,
+            inheritedMeta,
           );
         }
 

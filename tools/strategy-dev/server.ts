@@ -417,6 +417,7 @@ function getBacktestCacheKey(options: {
 function createCustomDecisionFlow(
   mode?: string,
   pluginId?: string,
+  strategyDefinitionId?: number,
 ): DecisionFlowNode {
   if (mode === 'single' && pluginId) {
     const params: Record<string, unknown> = {};
@@ -454,7 +455,11 @@ function createCustomDecisionFlow(
     };
   }
 
-  if (mode === 'composite') {
+  if (
+    strategyDefinitionId === 3 ||
+    mode === 'full_resonance' ||
+    mode === 'enhanced'
+  ) {
     return {
       id: 'guard_regime_shanghai',
       type: 'GUARD',
@@ -463,58 +468,217 @@ function createCustomDecisionFlow(
       params: { mode: 'dual_speed' },
       requiredAction: 'BUY',
       minConfidence: 0.6,
+      // 牛市多头环境分支 (onPass: 宏观 BUY)
       onPass: {
-        id: 'guard_volatility_squeeze',
+        id: 'guard_bull_chan_bsp',
         type: 'GUARD',
-        name: '波动率放量爆发确认',
-        pluginId: 'plugin.tactics.volatility-squeeze-fire',
-        params: { minVolumeTsRank: 0.65, minEntityAtrRatio: 0.65 },
-        requiredAction: 'BUY',
+        name: '牛市缠论形态主门禁',
+        pluginId: 'plugin.chan.bsp',
+        params: {
+          units: 'bi',
+          direction: 'both',
+          points: { first: true, second: true, third: true },
+          requiredBarCount: 60,
+          deduplicate: true,
+        },
+        requiredAction: 'BOTH',
         minConfidence: 0.5,
         onPass: {
-          id: 'term_tactics_fire_buy',
-          type: 'TERMINAL',
-          action: 'BUY',
-          signalTag: 'TACTICS_FIRE_BUY',
-          reason: '宏观牛市叠加放量挤压释放买点',
-        },
-        onFail: {
-          id: 'guard_fallback_chan_bsp',
+          id: 'guard_bull_vpci',
           type: 'GUARD',
-          name: '缠论形态共振确认',
-          pluginId: 'plugin.chan.bsp',
-          params: { units: 'bi', direction: 'both' },
-          requiredAction: 'BOTH',
+          name: 'VPCI量价共振增强校验',
+          pluginId: 'plugin.tactics.volume-price-confirmation',
+          params: {},
+          requiredAction: 'BUY',
           minConfidence: 0.5,
           onPass: {
-            id: 'term_chan_pass',
+            id: 'term_bull_chan_enhanced',
             type: 'TERMINAL',
             action: 'INHERIT',
-            signalTag: 'COMPOSITE_CHAN_SIGNAL',
-            reason: '宏观顺势下缠论形态结构确立',
+            signalTag: 'ENHANCED_CHAN_BSP',
+            reason: '牛市顺势下缠论形态结构确立且通过私有量价共振增强确认',
           },
           onFail: {
-            id: 'term_composite_abort',
+            id: 'term_bull_chan_standard',
             type: 'TERMINAL',
-            action: 'ABORT',
-            reason: '未满足复合策略触发条件',
+            action: 'INHERIT',
+            signalTag: 'BULL_CHAN_BSP',
+            reason: '牛市顺势下缠论标准形态买卖点确立',
+          },
+        },
+        // 若缠论未出笔形态，由波动率挤压放量爆发增强捕捉额外爆发买点
+        onFail: {
+          id: 'guard_bull_squeeze',
+          type: 'GUARD',
+          name: '私有波动率挤压放量战术买点增强',
+          pluginId: 'plugin.tactics.volatility-squeeze-fire',
+          params: { minVolumeTsRank: 0.65, minEntityAtrRatio: 0.65 },
+          requiredAction: 'BUY',
+          minConfidence: 0.5,
+          onPass: {
+            id: 'term_bull_squeeze_fire',
+            type: 'TERMINAL',
+            action: 'BUY',
+            signalTag: 'TACTICS_FIRE_BUY',
+            reason: '宏观牛市蓄能挤压释放爆发买点',
+          },
+          // 若亦未触发挤压爆发，由牛市微观左右侧战术插件确认买卖点
+          onFail: {
+            id: 'guard_bull_tactics',
+            type: 'GUARD',
+            name: '牛市微观左右侧战术增强',
+            pluginId: 'plugin.tactics.bull-left-right-bsp',
+            params: { fallbackToMainBars: true },
+            requiredAction: 'BOTH',
+            minConfidence: 0.5,
+            onPass: {
+              id: 'term_bull_tactics_pass',
+              type: 'TERMINAL',
+              action: 'INHERIT',
+              signalTag: 'BULL_TACTICS_SIGNAL',
+              reason: '宏观牛市下触发左右侧微观战术信号',
+            },
+            onFail: {
+              id: 'term_bull_abort',
+              type: 'TERMINAL',
+              action: 'ABORT',
+              reason: '牛市环境中未满足缠论形态或战术增强触发条件',
+            },
           },
         },
       },
+      // 熊市/非牛市环境分支 (onFail: 宏观 SELL 或 NEUTRAL)
       onFail: {
-        id: 'guard_regime_sell_check',
+        id: 'guard_regime_bear_check',
         type: 'GUARD',
-        name: '上证宏观走熊清仓门禁',
+        name: '上证宏观走熊与防守研判',
         pluginId: 'plugin.regime.shanghai-index',
         params: { mode: 'dual_speed' },
         requiredAction: 'SELL',
         minConfidence: 0.6,
         onPass: {
-          id: 'term_regime_defend_sell',
+          id: 'guard_bear_tactics',
+          type: 'GUARD',
+          name: '熊市左右侧战术研判门禁',
+          pluginId: 'plugin.tactics.bear-left-right-bsp',
+          params: { fallbackToMainBars: true },
+          requiredAction: 'BOTH',
+          minConfidence: 0.5,
+          onPass: {
+            id: 'term_bear_tactics_pass',
+            type: 'TERMINAL',
+            action: 'INHERIT',
+            signalTag: 'BEAR_TACTICS_SIGNAL',
+            reason: '熊市左右侧战术买点触发',
+          },
+          onFail: {
+            id: 'term_regime_defend_sell',
+            type: 'TERMINAL',
+            action: 'SELL',
+            signalTag: 'REGIME_DEFEND_SELL',
+            reason: '上证指数宏观走熊清仓防守',
+          },
+        },
+        onFail: {
+          id: 'term_regime_neutral_abort',
           type: 'TERMINAL',
-          action: 'SELL',
-          signalTag: 'REGIME_DEFEND_SELL',
-          reason: '上证指数宏观走熊清仓防守',
+          action: 'ABORT',
+          reason: '上证指数震荡纠缠，维持观望',
+        },
+      },
+    };
+  }
+
+  if (
+    strategyDefinitionId === 2 ||
+    mode === 'composite' ||
+    mode === 'tactics'
+  ) {
+    return {
+      id: 'guard_regime_shanghai',
+      type: 'GUARD',
+      name: '上证宏观大周期滤网',
+      pluginId: 'plugin.regime.shanghai-index',
+      params: { mode: 'dual_speed' },
+      requiredAction: 'BUY',
+      minConfidence: 0.6,
+      // 牛市多头环境分支 (onPass: 宏观 BUY)
+      onPass: {
+        id: 'guard_bull_chan_bsp',
+        type: 'GUARD',
+        name: '牛市缠论形态主门禁',
+        pluginId: 'plugin.chan.bsp',
+        params: {
+          units: 'bi',
+          direction: 'both',
+          points: { first: true, second: true, third: true },
+          requiredBarCount: 60,
+          deduplicate: true,
+        },
+        requiredAction: 'BOTH',
+        minConfidence: 0.5,
+        onPass: {
+          id: 'term_bull_chan_pass',
+          type: 'TERMINAL',
+          action: 'INHERIT',
+          signalTag: 'BULL_CHAN_BSP',
+          reason: '宏观牛市顺势下缠论标准形态买卖点确立',
+        },
+        // 若缠论未出笔形态，由牛市微观左右侧战术插件确认买卖点
+        onFail: {
+          id: 'guard_bull_tactics',
+          type: 'GUARD',
+          name: '牛市微观左右侧战术增强',
+          pluginId: 'plugin.tactics.bull-left-right-bsp',
+          params: { fallbackToMainBars: true },
+          requiredAction: 'BOTH',
+          minConfidence: 0.5,
+          onPass: {
+            id: 'term_bull_tactics_pass',
+            type: 'TERMINAL',
+            action: 'INHERIT',
+            signalTag: 'BULL_TACTICS_SIGNAL',
+            reason: '宏观牛市下触发左右侧微观战术信号',
+          },
+          onFail: {
+            id: 'term_bull_abort',
+            type: 'TERMINAL',
+            action: 'ABORT',
+            reason: '牛市环境中未满足缠论形态或左右侧战术触发条件',
+          },
+        },
+      },
+      // 熊市/非牛市环境分支 (onFail: 宏观 SELL 或 NEUTRAL)
+      onFail: {
+        id: 'guard_regime_bear_check',
+        type: 'GUARD',
+        name: '上证宏观走熊与防守研判',
+        pluginId: 'plugin.regime.shanghai-index',
+        params: { mode: 'dual_speed' },
+        requiredAction: 'SELL',
+        minConfidence: 0.6,
+        onPass: {
+          id: 'guard_bear_tactics',
+          type: 'GUARD',
+          name: '熊市左右侧战术研判门禁',
+          pluginId: 'plugin.tactics.bear-left-right-bsp',
+          params: { fallbackToMainBars: true },
+          requiredAction: 'BOTH',
+          minConfidence: 0.5,
+          onPass: {
+            id: 'term_bear_tactics_pass',
+            type: 'TERMINAL',
+            action: 'INHERIT',
+            signalTag: 'BEAR_TACTICS_SIGNAL',
+            reason: '熊市左右侧战术买点触发',
+          },
+          onFail: {
+            id: 'term_regime_defend_sell',
+            type: 'TERMINAL',
+            action: 'SELL',
+            signalTag: 'REGIME_DEFEND_SELL',
+            reason: '上证指数宏观走熊清仓防守',
+          },
         },
         onFail: {
           id: 'term_regime_neutral_abort',
@@ -530,12 +694,9 @@ function createCustomDecisionFlow(
 }
 
 /**
- * 构造标准缠论买卖点与私有量价/动量共振增强决策流树：
- * 1. 以缠论原典形态买卖点 (plugin.chan.bsp) 为不可动摇的第一基石；
- * 2. 缠论形态触发时，经私有 VPCI (plugin.tactics.volume-price-confirmation) 增强置信度；
- *    若 VPCI 未共振，原典买卖点依然 100% 完整通过 (CHAN_BSP)，绝不拦截原典；
- * 3. 缠论形态未出现时，由私有放量挤压 (plugin.tactics.volatility-squeeze-fire) 捕捉额外爆发买点；
- * 4. 彻底去除硬止损与硬止盈，出入场 100% 遵照形态与战术信号。
+ * 构造标准纯原典缠论买卖点决策流树：
+ * 彻底移除 volume-price-confirmation 与 volatility-squeeze-fire，
+ * 100% 遵照缠论原典形态买卖点。
  */
 function createEnhancedChanDecisionFlow(): DecisionFlowNode {
   return {
@@ -553,49 +714,17 @@ function createEnhancedChanDecisionFlow(): DecisionFlowNode {
     requiredAction: 'BOTH',
     minConfidence: 0.5,
     onPass: {
-      id: 'guard_vpci_enhancer',
-      type: 'GUARD',
-      name: 'VPCI量价共振增强校验',
-      pluginId: 'plugin.tactics.volume-price-confirmation',
-      params: {},
-      requiredAction: 'BOTH',
-      minConfidence: 0.5,
-      onPass: {
-        id: 'term_chan_bsp_enhanced',
-        type: 'TERMINAL',
-        action: 'INHERIT',
-        signalTag: 'ENHANCED_CHAN_BSP',
-        reason: '缠论形态结构确立且通过私有量价共振增强确认',
-      },
-      onFail: {
-        id: 'term_chan_bsp_standard',
-        type: 'TERMINAL',
-        action: 'INHERIT',
-        signalTag: 'CHAN_BSP',
-        reason: '缠论原典形态买卖点确立',
-      },
+      id: 'term_chan_bsp_standard',
+      type: 'TERMINAL',
+      action: 'INHERIT',
+      signalTag: 'CHAN_BSP',
+      reason: '缠论原典形态买卖点确立',
     },
     onFail: {
-      id: 'guard_tactics_squeeze_fire',
-      type: 'GUARD',
-      name: '私有波动率挤压放量战术买点增强',
-      pluginId: 'plugin.tactics.volatility-squeeze-fire',
-      params: { minVolumeTsRank: 0.7, minEntityAtrRatio: 0.7 },
-      requiredAction: 'BUY',
-      minConfidence: 0.5,
-      onPass: {
-        id: 'term_tactics_fire_buy',
-        type: 'TERMINAL',
-        action: 'BUY',
-        signalTag: 'TACTICS_FIRE_BUY',
-        reason: '私有波动率蓄能挤压释放爆发买点',
-      },
-      onFail: {
-        id: 'term_abort',
-        type: 'TERMINAL',
-        action: 'ABORT',
-        reason: '未满足缠论形态或私有增强买卖点触发条件',
-      },
+      id: 'term_abort',
+      type: 'TERMINAL',
+      action: 'ABORT',
+      reason: '未满足缠论形态买卖点触发条件',
     },
   };
 }
@@ -606,8 +735,9 @@ interface RunBacktestOptions {
   startDate?: string | Date;
   endDate?: string | Date;
   filterFenxingContainment?: boolean;
-  mode?: 'single' | 'composite';
+  mode?: 'single' | 'composite' | 'tactics' | 'full_resonance' | 'enhanced';
   pluginId?: string;
+  strategyDefinitionId?: number;
   initialCash?: number;
   runStressSuite?: boolean;
   enableStopLoss?: boolean;
@@ -621,7 +751,8 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     cachedSignals &&
     !options.runStressSuite &&
     !options.mode &&
-    !options.pluginId
+    !options.pluginId &&
+    !options.strategyDefinitionId
   ) {
     return {
       signals: cachedSignals,
@@ -674,7 +805,11 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   ExternalFactorPluginLoader.registerExternalPlugins(registry);
 
   // 2. 构造对应决策流树
-  const flow = createCustomDecisionFlow(options.mode, options.pluginId);
+  const flow = createCustomDecisionFlow(
+    options.mode,
+    options.pluginId,
+    options.strategyDefinitionId,
+  );
   const publicFrom = options.startDate
     ? new Date(options.startDate)
     : new Date(-8640000000000000);
@@ -712,7 +847,12 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   );
   const enableStopLoss =
     options.enableStopLoss === true ||
-    (options.enableStopLoss !== false && options.mode === 'composite');
+    (options.enableStopLoss !== false &&
+      (options.mode === 'composite' ||
+        options.mode === 'full_resonance' ||
+        options.mode === 'enhanced' ||
+        options.strategyDefinitionId === 2 ||
+        options.strategyDefinitionId === 3));
   const arbiter = enableStopLoss
     ? new ExecutionRiskArbiter({
         hardStopLossRatio: -0.08,
@@ -746,9 +886,6 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
 
     // 统一内核推进 Bar 并获得增量信号
     const kernelSignals: readonly KernelSignal[] = await kernel.push(bar);
-    const hasPendingOrder = broker
-      .getOpenOrders()
-      .some((o) => o.securityCode === options.code);
 
     for (const kSig of kernelSignals) {
       const simSig = mapKernelSignalToSimulationSignal(kSig, {
@@ -756,6 +893,10 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         period: options.period,
       });
       collectedSignals.push(simSig);
+
+      const hasPendingOrder = broker
+        .getOpenOrders()
+        .some((o) => o.securityCode === options.code);
 
       // 因果买卖撮合委托下达 (Next-Bar 撮合，本 Bar 收盘下达)
       if (simSig.isBuy || kSig.signalKind === 'entry') {
@@ -775,6 +916,12 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
             orderType: ORDER_TYPES.MARKET,
             quantity: buyShares,
             signalTime: bar.timestamp,
+            entryReason:
+              kSig.displayTag ||
+              kSig.signalType ||
+              kSig.badgeText ||
+              simSig.badgeText ||
+              'BUY_SIGNAL',
           });
         }
       } else if (!simSig.isBuy || kSig.signalKind === 'exit') {
@@ -788,7 +935,14 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     }
 
     // 风控裁决器检查 (仅当明确开启止损时生效)
-    if (arbiter && !hasPendingOrder && position.getStatus() === 'HOLDING') {
+    const hasPendingOrderForArbiter = broker
+      .getOpenOrders()
+      .some((o) => o.securityCode === options.code);
+    if (
+      arbiter &&
+      !hasPendingOrderForArbiter &&
+      position.getStatus() === 'HOLDING'
+    ) {
       const arbiterSellDto = arbiter.arbitrate({
         bar,
         position: position.getSnapshot(),
@@ -1404,9 +1558,31 @@ const server = http.createServer(async (req, res) => {
     sendJson(res, [
       {
         id: 1,
-        name: '缠论形态增强买卖点策略树',
+        name: '纯原典缠论买卖点策略树',
         description:
-          '以标准缠论一/二/三类买卖点为基石，私有量价共振与波动率放量爆发增强 (无止损止盈)',
+          '100% 遵照标准缠论一/二/三类买卖点形态进出场，彻底移除所有外挂指标与硬止损止盈',
+        kind: 'decision_flow',
+        status: 'active',
+        activeVersionNumber: 1,
+        periods: [1, 5, 15, 30, 60, 1440],
+        sources: ['qmt', 'tdx'],
+      },
+      {
+        id: 2,
+        name: '上证大盘宏观+纯缠论+牛熊左右侧战术联动策略树',
+        description:
+          '双频宏观状态机判定大周期牛熊，牛市顺势执行缠论形态主门禁与微观左右侧止盈战术，熊市执行双中枢背驰极限抄底与破位逃命清仓防守',
+        kind: 'decision_flow',
+        status: 'active',
+        activeVersionNumber: 1,
+        periods: [1, 5, 15, 30, 60, 1440],
+        sources: ['qmt', 'tdx'],
+      },
+      {
+        id: 3,
+        name: '上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强策略树',
+        description:
+          '在策略2基础上叠加私有战术增强：牛市缠论买点融合VPCI量价共振增强与通道挤压放量爆发买点，熊市极限背驰抄底与防守清仓',
         kind: 'decision_flow',
         status: 'active',
         activeVersionNumber: 1,
@@ -1422,18 +1598,50 @@ const server = http.createServer(async (req, res) => {
     pathname.match(/\/v1\/strategies\/\d+\/versions$/) &&
     req.method === 'GET'
   ) {
-    sendJson(res, [
-      {
-        id: 1,
-        strategyDefinitionId: 1,
-        versionNumber: 1,
-        signalKind: 'both',
-        status: 'active',
-        description: '缠论原典形态与私有战术增强双重买卖点决策流 (无止损止盈)',
-        config: {},
-        createdAt: new Date('2026-09-01').toISOString(),
-      },
-    ]);
+    const idMatch = pathname.match(/\/v1\/strategies\/(\d+)\/versions$/);
+    const stratId = idMatch && idMatch[1] ? Number(idMatch[1]) : 1;
+    if (stratId === 3) {
+      sendJson(res, [
+        {
+          id: 3,
+          strategyDefinitionId: 3,
+          versionNumber: 1,
+          signalKind: 'both',
+          status: 'active',
+          description:
+            '上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强决策流 (动态牛熊分流+量价突破增强)',
+          config: { mode: 'full_resonance' },
+          createdAt: new Date('2026-10-19').toISOString(),
+        },
+      ]);
+    } else if (stratId === 2) {
+      sendJson(res, [
+        {
+          id: 2,
+          strategyDefinitionId: 2,
+          versionNumber: 1,
+          signalKind: 'both',
+          status: 'active',
+          description:
+            '上证大盘宏观+纯缠论+牛熊左右侧战术联动决策流 (动态牛熊分流)',
+          config: { mode: 'composite' },
+          createdAt: new Date('2026-10-19').toISOString(),
+        },
+      ]);
+    } else {
+      sendJson(res, [
+        {
+          id: 1,
+          strategyDefinitionId: 1,
+          versionNumber: 1,
+          signalKind: 'both',
+          status: 'active',
+          description: '纯原典缠论标准形态买卖点决策流 (无止损止盈)',
+          config: {},
+          createdAt: new Date('2026-09-01').toISOString(),
+        },
+      ]);
+    }
     return;
   }
 
@@ -1459,10 +1667,23 @@ const server = http.createServer(async (req, res) => {
       const symbol = resolveSecurityCode(body, DEFAULT_DEV_SECURITY_CODE);
       const period = resolvePeriod(body.period, DEFAULT_DEV_PERIOD);
       const source = body.source || DEFAULT_DEV_MARKET_SOURCE;
-      const mode =
-        body.mode === 'single' || body.mode === 'composite'
-          ? body.mode
+      const strategyDefinitionId =
+        typeof body.strategyDefinitionId === 'number' ||
+        typeof body.strategyDefinitionId === 'string'
+          ? Number(body.strategyDefinitionId)
           : undefined;
+      const mode =
+        body.mode === 'single' ||
+        body.mode === 'composite' ||
+        body.mode === 'tactics' ||
+        body.mode === 'full_resonance' ||
+        body.mode === 'enhanced'
+          ? body.mode
+          : strategyDefinitionId === 3
+            ? 'full_resonance'
+            : strategyDefinitionId === 2
+              ? 'composite'
+              : undefined;
       const pluginId =
         typeof body.pluginId === 'string' ? body.pluginId : undefined;
       const startDate = body.startDate || '1996-12-16T00:00:00.000Z';
@@ -1473,7 +1694,11 @@ const server = http.createServer(async (req, res) => {
       const enableStopLoss =
         body.enableStopLoss === true ||
         (body.enableStopLoss !== false &&
-          body.mode === 'composite' &&
+          (mode === 'composite' ||
+            mode === 'full_resonance' ||
+            mode === 'enhanced' ||
+            strategyDefinitionId === 2 ||
+            strategyDefinitionId === 3) &&
           body.disableStopLoss !== true &&
           body.noStopLoss !== true);
 
@@ -1484,6 +1709,7 @@ const server = http.createServer(async (req, res) => {
           period,
           mode,
           pluginId,
+          strategyDefinitionId,
           startDate,
           endDate,
           initialCash,
@@ -1511,12 +1737,22 @@ const server = http.createServer(async (req, res) => {
       const payoffRatio =
         avgLoss > 0 ? Math.round((avgWin / avgLoss) * 10000) / 10000 : 0;
 
+      const strategyNameStr =
+        strategyDefinitionId === 3 ||
+        mode === 'full_resonance' ||
+        mode === 'enhanced'
+          ? '大盘+缠论+牛熊战术+量价挤压全增强策略'
+          : strategyDefinitionId === 2 ||
+              mode === 'composite' ||
+              mode === 'tactics'
+            ? '大盘+缠论+牛熊左右侧战术联动策略'
+            : pluginId || '纯原典缠论策略';
       const newId =
         mockRuns.length > 0 ? Math.max(...mockRuns.map((r) => r.id)) + 1 : 1;
       const newRun: DevBacktestRun = {
         id: newId,
-        strategyDefinitionId: Number(body.strategyDefinitionId) || 1,
-        strategyName: `${symbol === '000001' ? '上证指数' : symbol} ${period === 1440 ? '日线' : period + 'm'} ${mode === 'composite' ? '复合决策流' : pluginId || '缠论策略树'}回测`,
+        strategyDefinitionId: strategyDefinitionId || 1,
+        strategyName: `${symbol === '000001' ? '上证指数' : symbol} ${period === 1440 ? '日线' : period + 'm'} ${strategyNameStr}回测`,
         strategyVersionId: Number(body.strategyVersionId) || 1,
         status: 'completed',
         source,

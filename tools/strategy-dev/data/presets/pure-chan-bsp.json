@@ -1,0 +1,77 @@
+{
+  "id": "strategy_preset_pure_chan_bsp",
+  "name": "纯原典缠论买卖点策略树",
+  "version": "1.0.0",
+  "kind": "decision_flow",
+  "status": "active",
+  "author": "Mist Quant Team",
+  "description": "以标准缠论几何形态（笔/段/中枢）与动力学背驰一/二/三类买卖点为唯一驱动，彻底移除所有外挂指标与硬止损止盈，100% 遵照缠论原典形态进出场。",
+  "tags": ["chan", "pure-geometry", "bsp", "unconstrained"],
+  "targetUniverse": ["000001", "510050", "510300"],
+  "supportedPeriods": [5, 15, 30, 60, 1440],
+  "mountedPlugins": [
+    {
+      "pluginId": "plugin.chan.bsp",
+      "name": "缠论标准形态买卖点主门禁",
+      "role": "PRIMARY_GATE",
+      "params": {
+        "units": "bi",
+        "direction": "both",
+        "points": {
+          "first": true,
+          "second": true,
+          "third": true
+        },
+        "requiredBarCount": 60,
+        "deduplicate": true
+      }
+    }
+  ],
+  "decisionFlow": {
+    "id": "guard_chan_bsp_primary",
+    "type": "GUARD",
+    "name": "缠论标准形态买卖点主门禁",
+    "pluginId": "plugin.chan.bsp",
+    "params": {
+      "units": "bi",
+      "direction": "both",
+      "points": {
+        "first": true,
+        "second": true,
+        "third": true
+      },
+      "requiredBarCount": 60,
+      "deduplicate": true
+    },
+    "requiredAction": "BOTH",
+    "minConfidence": 0.5,
+    "onPass": {
+      "id": "term_chan_bsp_standard",
+      "type": "TERMINAL",
+      "action": "INHERIT",
+      "signalTag": "CHAN_BSP",
+      "reason": "缠论原典形态买卖点确立"
+    },
+    "onFail": {
+      "id": "term_abort",
+      "type": "TERMINAL",
+      "action": "ABORT",
+      "reason": "未满足缠论形态买卖点触发条件"
+    }
+  },
+  "backtestBaseline": {
+    "target": "000001 (上证指数)",
+    "period": "1440 (日线)",
+    "timeRange": "2020-01-01 ~ 2026-10-14",
+    "initialCash": 1000000,
+    "endingEquity": 883000,
+    "totalReturn": -0.1170,
+    "sharpeRatio": -0.4177,
+    "maxDrawdown": 0.1997,
+    "totalTrades": 5,
+    "winRate": 0.400,
+    "payoffRatio": 0.922,
+    "averageHoldingBars": 131.6,
+    "notableTrade": "2024-01-14 ~ 2025-01-22 (持仓 248 天，收益 +12.48%)"
+  }
+}

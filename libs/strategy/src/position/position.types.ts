@@ -44,6 +44,7 @@ export interface PositionClosedRecord {
   readonly realizedPnl: number;
   readonly returnRatio: number;
   readonly exitReason: string;
+  readonly entryReason?: string;
 }
 
 export interface ExitDecision {
