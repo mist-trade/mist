@@ -110,6 +110,26 @@ describe('BacktestMarketDataAdapter', () => {
     });
   });
 
+  it('maps vendor rows through the historical source mapper', async () => {
+    const find = jest.fn().mockResolvedValue([
+      Object.assign(row('2026-08-04T01:30:00.000Z'), {
+        source: DataSource.VENDOR_A,
+      }),
+    ]);
+    const adapter = new BacktestMarketDataAdapter({ find } as any);
+
+    const window = await adapter.loadReplayWindow({
+      securityId: 7,
+      source: 'vendor_a',
+      period: Period.FIVE_MIN,
+      endAt: new Date('2026-08-04T02:00:00.000Z'),
+      requiredBars: 5,
+    });
+
+    expect(window.bars).toHaveLength(1);
+    expect(window.bars[0].source).toBe('vendor_a');
+  });
+
   it('rejects ef as a replay source', async () => {
     const adapter = new BacktestMarketDataAdapter({
       createQueryBuilder: jest.fn(),

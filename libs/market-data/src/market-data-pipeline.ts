@@ -3,7 +3,7 @@ import type { StrategyBar } from './strategy-bar';
 import { Decimal8, normalizeExternalDecimalText } from '@app/decimal';
 import { isValidDate } from '@app/utils';
 import type { K } from '@app/shared-data';
-import { DataSource } from '@app/shared-data';
+import { DataSource, isVendorSource } from '@app/shared-data';
 
 import {
   StrategySeriesImputer,
@@ -137,10 +137,12 @@ function normalizeQuantityField(value: string | null): string | null {
 }
 
 function mapSource(source: string): StrategyBar['source'] | null {
-  // DataSource enum values: ef, tdx, qmt (check)
   if (source === DataSource.EAST_MONEY || source === 'ef') return 'ef';
   if (source === DataSource.TDX || source === 'tdx') return 'tdx';
   if (source === DataSource.QMT || source === 'qmt') return 'qmt';
+  // Third-party long-history sources are first-class market data; dropping them
+  // here silently empties every indicator/visual response for vendor series.
+  if (isVendorSource(source)) return source as StrategyBar['source'];
   return null;
 }
 

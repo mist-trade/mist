@@ -1,10 +1,13 @@
-export type StrategyMarketSource = 'ef' | 'tdx' | 'qmt' | 'vendor_a';
+/** Every third-party provider is its own `vendor_<slug>` source. */
+export type VendorSource = `vendor_${string}`;
+
+export type StrategyMarketSource = 'ef' | 'tdx' | 'qmt' | VendorSource;
 
 /** Realtime evaluation is fed only by the two live providers. */
 export type StrategyRealtimeSource = 'tdx' | 'qmt';
 
 /** Historical replay additionally accepts third-party long-history sources. */
-export type StrategyHistorySource = StrategyRealtimeSource | 'vendor_a';
+export type StrategyHistorySource = StrategyRealtimeSource | VendorSource;
 
 export type StrategyBarType = 'complete' | 'incomplete';
 

@@ -7,7 +7,7 @@ import type {
   StrategyBarType,
   StrategyMarketSource,
 } from './strategy-bar';
-import { DataSource } from '@app/shared-data';
+import { DataSource, isVendorSource } from '@app/shared-data';
 import { K } from '@app/shared-data';
 
 /**
@@ -106,6 +106,9 @@ function selectedSecurityId(k: K): number {
 }
 
 function mapSource(source: DataSource): StrategyMarketSource {
+  if (isVendorSource(source)) {
+    return source as StrategyMarketSource;
+  }
   switch (source) {
     case DataSource.EAST_MONEY:
       return 'ef';
