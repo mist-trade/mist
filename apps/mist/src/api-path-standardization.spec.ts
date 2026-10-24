@@ -109,9 +109,13 @@ describe('Mist API path standardization', () => {
   it('registers only preferred indicator routes', () => {
     const routes = getRoutes(IndicatorController);
 
-    for (const suffix of ['macd', 'kdj', 'rsi', 'k']) {
+    for (const suffix of ['macd', 'kdj', 'k']) {
       expectRoute(routes, RequestMethod.POST, `/v1/indicators/${suffix}`);
       expectNoRoute(routes, RequestMethod.POST, `/indicator/${suffix}`);
+    }
+
+    for (const retired of ['rsi', 'adx']) {
+      expectNoRoute(routes, RequestMethod.POST, `/v1/indicators/${retired}`);
     }
   });
 

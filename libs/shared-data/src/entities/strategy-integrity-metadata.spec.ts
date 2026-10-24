@@ -74,13 +74,16 @@ describe('strategy integrity entity metadata', () => {
     expect(column?.options.nullable).not.toBe(true);
   });
 
-  it('keeps only run-owned backtest result identity and evidence columns', () => {
+  it('mirrors the run-owned identity columns on backtest results', () => {
     const resultColumns = storage.columns
       .filter((column) => column.target === BacktestSignalResult)
       .map((column) => column.propertyName);
 
-    expect(resultColumns).not.toEqual(
+    // Migration 027 restores run-owned identity so a result row can be traced
+    // to its definition/version/period/source without joining backtest_runs.
+    expect(resultColumns).toEqual(
       expect.arrayContaining([
+        'securityId',
         'strategyDefinitionId',
         'strategyVersionId',
         'period',
