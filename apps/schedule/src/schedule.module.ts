@@ -14,6 +14,7 @@ import {
   StrategyAlertEvent,
   BacktestRun,
   BacktestSignalResult,
+  BacktestTradeResult,
 } from '@app/shared-data';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -81,6 +82,7 @@ import * as path from 'path';
             StrategyAlertEvent,
             BacktestRun,
             BacktestSignalResult,
+            BacktestTradeResult,
           ],
           poolSize: 10,
           connectorPackage: 'mysql2',

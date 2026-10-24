@@ -14,6 +14,7 @@ import {
   StrategyAlertEvent,
   BacktestRun,
   BacktestSignalResult,
+  BacktestTradeResult,
 } from '@app/shared-data';
 import { DynamicModule, Module, Type } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -156,6 +157,7 @@ export function mockModeModulesForMode(
                 StrategyAlertEvent,
                 BacktestRun,
                 BacktestSignalResult,
+                BacktestTradeResult,
               ],
               poolSize: 10,
               connectorPackage: 'mysql2',
