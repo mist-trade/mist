@@ -1,12 +1,12 @@
 import type {
   StrategyBar,
-  StrategyMarketSource,
+  StrategyHistorySource,
   StrategyRealtimeSource,
 } from './strategy-bar';
 
 export interface StrategyReplayPageCriteria {
   readonly securityId: number;
-  readonly source: StrategyMarketSource;
+  readonly source: StrategyHistorySource;
   readonly period: number;
   readonly startAt: Date;
   readonly endAt: Date;
@@ -57,7 +57,7 @@ export type StrategyMarketObservation =
 
 export interface StrategyReplayWindowCriteria {
   readonly securityId: number;
-  readonly source: StrategyRealtimeSource;
+  readonly source: StrategyHistorySource;
   readonly period: number;
   /** Exclusive upper bound: only bars strictly before this timestamp are returned. */
   readonly endAt: Date;

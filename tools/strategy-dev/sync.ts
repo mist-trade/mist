@@ -82,10 +82,18 @@ async function syncSinglePeriod(
   const sourceCondition = options.source
     ? `AND k.source = '${options.source}'`
     : '';
+  // Explicit precedence: a live QMT bar always wins, then TDX, then any
+  // third-party vendor series, then everything else.
+  const sourcePrecedence = `CASE
+      WHEN k.source = 'qmt' THEN 0
+      WHEN k.source = 'tdx' THEN 1
+      WHEN k.source LIKE 'vendor\\_%' THEN 2
+      ELSE 3
+    END`;
   const orderAndLimit =
     options.limit > 0
-      ? `ORDER BY k.timestamp DESC, CASE WHEN k.source = 'qmt' THEN 0 ELSE 1 END LIMIT ${options.limit * 2}`
-      : `ORDER BY k.timestamp ASC, CASE WHEN k.source = 'qmt' THEN 0 ELSE 1 END`;
+      ? `ORDER BY k.timestamp DESC, ${sourcePrecedence} LIMIT ${options.limit * 2}`
+      : `ORDER BY k.timestamp ASC, ${sourcePrecedence}`;
 
   const sql = `
     SELECT 

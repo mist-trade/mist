@@ -45,7 +45,8 @@
     "test:cov": "jest --coverage",
     "test:coverage": "jest --coverage --runInBand --watchman=false --forceExit",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "prepare": "husky"
+    "prepare": "husky",
+    "data:vendor-import": "node -r ts-node/register -r tsconfig-paths/register tools/market-data-import/vendor-import.ts"
   },
   "lint-staged": {
     "*.{ts,mjs}": [

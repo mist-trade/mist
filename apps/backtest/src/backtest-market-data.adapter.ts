@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, K } from '@app/shared-data';
+import { DataSource, isBacktestSource, K } from '@app/shared-data';
 import { isValidDate } from '@app/utils';
 import {
   mapKToStrategyBar,
-  type StrategyRealtimeSource,
+  type StrategyHistorySource,
   type StrategyReplayMarketDataPort,
   type StrategyReplayPage,
   type StrategyReplayPageCriteria,
@@ -13,7 +13,6 @@ import {
 } from '@app/market-data';
 import { LessThan } from 'typeorm';
 import type { Repository } from 'typeorm';
-import { MARKET_SOURCES } from '@app/constants';
 
 export const BACKTEST_REPLAY_PAGE_SIZE = 1_000;
 
@@ -95,11 +94,10 @@ function assertCriteria(criteria: StrategyReplayPageCriteria): void {
   if (!Number.isSafeInteger(criteria.period) || criteria.period <= 0) {
     throw new TypeError('replay period must be a positive safe integer');
   }
-  if (
-    criteria.source !== MARKET_SOURCES.TDX &&
-    criteria.source !== MARKET_SOURCES.QMT
-  ) {
-    throw new TypeError('backtest replay source must be tdx or qmt');
+  if (!isBacktestSource(criteria.source)) {
+    throw new TypeError(
+      'backtest replay source must be tdx, qmt or a vendor source',
+    );
   }
   if (!isValidDate(criteria.startAt) || !isValidDate(criteria.endAt)) {
     throw new TypeError('replay range requires valid dates');
@@ -121,11 +119,10 @@ function assertWindowCriteria(criteria: StrategyReplayWindowCriteria): void {
   if (!Number.isSafeInteger(criteria.period) || criteria.period <= 0) {
     throw new TypeError('replay window period must be a positive safe integer');
   }
-  if (
-    criteria.source !== MARKET_SOURCES.TDX &&
-    criteria.source !== MARKET_SOURCES.QMT
-  ) {
-    throw new TypeError('backtest replay window source must be tdx or qmt');
+  if (!isBacktestSource(criteria.source)) {
+    throw new TypeError(
+      'backtest replay window source must be tdx, qmt or a vendor source',
+    );
   }
   if (!isValidDate(criteria.endAt)) {
     throw new TypeError('replay window endAt must be a valid date');
@@ -140,6 +137,6 @@ function assertWindowCriteria(criteria: StrategyReplayWindowCriteria): void {
   }
 }
 
-function toDataSource(source: StrategyRealtimeSource): DataSource {
-  return source === MARKET_SOURCES.TDX ? DataSource.TDX : DataSource.QMT;
+function toDataSource(source: StrategyHistorySource): DataSource {
+  return source as DataSource;
 }

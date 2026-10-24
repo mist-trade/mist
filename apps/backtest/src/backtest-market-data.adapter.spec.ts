@@ -1,6 +1,6 @@
 import { DataSource, Period } from '@app/shared-data';
 import type {
-  StrategyRealtimeSource,
+  StrategyHistorySource,
   StrategyReplayWindowCriteria,
 } from '@app/market-data';
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
@@ -90,6 +90,42 @@ describe('BacktestMarketDataAdapter', () => {
     expect(page.nextAfterTimestamp).toBeNull();
   });
 
+  it('replays a vendor source with source-exact criteria', async () => {
+    const query = makeBuilder([row('2026-08-04T01:30:00.000Z')]);
+    const adapter = new BacktestMarketDataAdapter({
+      createQueryBuilder: jest.fn().mockReturnValue(query.builder),
+    } as any);
+
+    await adapter.readReplayPage({
+      securityId: 7,
+      source: 'vendor_a',
+      period: Period.FIVE_MIN,
+      startAt: new Date('2026-08-04T01:30:00.000Z'),
+      endAt: new Date('2026-08-04T02:30:00.000Z'),
+    });
+
+    expect(query.calls).toContainEqual({
+      method: 'andWhere',
+      args: ['k.source = :source', { source: 'vendor_a' }],
+    });
+  });
+
+  it('rejects ef as a replay source', async () => {
+    const adapter = new BacktestMarketDataAdapter({
+      createQueryBuilder: jest.fn(),
+    } as any);
+
+    await expect(
+      adapter.readReplayPage({
+        securityId: 7,
+        source: 'ef' as StrategyHistorySource,
+        period: Period.FIVE_MIN,
+        startAt: new Date('2026-08-04T01:30:00.000Z'),
+        endAt: new Date('2026-08-04T02:30:00.000Z'),
+      }),
+    ).rejects.toThrow(/tdx, qmt or a vendor source/);
+  });
+
   it('adds a strict timestamp cursor only on later pages', async () => {
     const afterTimestamp = new Date('2026-08-04T01:30:00.000Z');
     const query = makeBuilder([row('2026-08-04T01:31:00.000Z')]);
@@ -172,7 +208,7 @@ describe('BacktestMarketDataAdapter', () => {
       'source',
       {
         securityId: 1,
-        source: 'ef' as StrategyRealtimeSource,
+        source: 'ef' as StrategyHistorySource,
         period: 1,
         endAt: new Date(),
         requiredBars: 2,

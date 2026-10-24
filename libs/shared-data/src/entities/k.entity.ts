@@ -13,6 +13,7 @@ import { DataSource } from '../enums/data-source.enum';
 import { Period } from '../enums/period.enum';
 import { KExtensionEf } from './k-extension-ef.entity';
 import { KExtensionQmt } from './k-extension-qmt.entity';
+import { KQuality } from './k-quality.entity';
 import { canonicalDecimalTransformer } from '../transformers/canonical-decimal.transformer';
 import { KExtensionTdx } from './k-extension-tdx.entity';
 import { Security } from './security.entity';
@@ -112,6 +113,9 @@ export class K {
 
   @OneToOne(() => KExtensionQmt, { eager: false })
   kExtensionQmt!: KExtensionQmt;
+
+  @OneToOne(() => KQuality, { eager: false })
+  kQuality!: KQuality;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;

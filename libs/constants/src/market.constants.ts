@@ -6,6 +6,7 @@ export const MARKET_SOURCES = Object.freeze({
   TDX: 'tdx',
   QMT: 'qmt',
   EASTMONEY: 'eastmoney',
+  VENDOR_A: 'vendor_a',
 } as const);
 
 export const PERIOD_MINUTES = Object.freeze({

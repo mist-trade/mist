@@ -1,5 +1,11 @@
-export type StrategyMarketSource = 'ef' | 'tdx' | 'qmt';
-export type StrategyRealtimeSource = Exclude<StrategyMarketSource, 'ef'>;
+export type StrategyMarketSource = 'ef' | 'tdx' | 'qmt' | 'vendor_a';
+
+/** Realtime evaluation is fed only by the two live providers. */
+export type StrategyRealtimeSource = 'tdx' | 'qmt';
+
+/** Historical replay additionally accepts third-party long-history sources. */
+export type StrategyHistorySource = StrategyRealtimeSource | 'vendor_a';
+
 export type StrategyBarType = 'complete' | 'incomplete';
 
 /**

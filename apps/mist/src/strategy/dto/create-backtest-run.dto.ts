@@ -9,7 +9,7 @@ import {
   IsString,
   Matches,
 } from 'class-validator';
-import { DataSource, Period } from '@app/shared-data';
+import { BACKTEST_SOURCES, DataSource, Period } from '@app/shared-data';
 
 export class CreateBacktestRunDto {
   @ApiProperty({ description: 'Strategy version to replay' })
@@ -29,10 +29,10 @@ export class CreateBacktestRunDto {
 
   @ApiProperty({
     description: 'Replay data source',
-    enum: [DataSource.TDX, DataSource.QMT],
+    enum: BACKTEST_SOURCES,
   })
-  @IsIn([DataSource.TDX, DataSource.QMT])
-  source!: DataSource.TDX | DataSource.QMT;
+  @IsIn(BACKTEST_SOURCES)
+  source!: DataSource;
 
   @ApiProperty({ description: 'Inclusive replay start date' })
   @IsDateString()

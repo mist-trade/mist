@@ -52,7 +52,19 @@ describe('realtime subscription HIL operation sequence', () => {
         .getMetadata('Security')
         .relations.map(({ propertyName }) => propertyName),
     ).toEqual(expect.arrayContaining(['sourceConfigs', 'ks']));
-    expect(dataSource.getMetadata('K').relations).toHaveLength(4);
+    expect(
+      dataSource
+        .getMetadata('K')
+        .relations.map(({ propertyName }) => propertyName),
+    ).toEqual(
+      expect.arrayContaining([
+        'security',
+        'kExtensionEf',
+        'kExtensionTdx',
+        'kExtensionQmt',
+        'kQuality',
+      ]),
+    );
   });
 
   it('records a sanitized canonical readback without native provider data', () => {

@@ -1,6 +1,27 @@
 export { KPriceProjector } from './k-price-projector';
 export type { StrategyPriceInput } from './k-price-projector';
 export {
+  VENDOR_CSV_COLUMNS,
+  VendorImportError,
+  aggregateSessionThirtyMinute,
+  assertVendorSeries,
+  buildVendorImport,
+  parseVendorCsv,
+  resolveQuality,
+} from './vendor-import/vendor-import';
+export type {
+  BarQuality,
+  BuildVendorImportOptions,
+  QualitySegment,
+  ValidityFlag,
+  VendorCsvRow,
+  VendorImportBundle,
+  VendorKRow,
+  VendorQualityRow,
+  VendorSeriesValidationOptions,
+} from './vendor-import/vendor-import';
+export { VENDOR_A_QUALITY_PROFILES } from './vendor-import/vendor-a-quality-profiles';
+export {
   mapKToStrategyBar,
   assertOhlcTopology,
   createCanonicalStrategyBar,
@@ -9,6 +30,7 @@ export type { CanonicalStrategyBarInput } from './k-strategy-bar-mapper';
 export type {
   StrategyBar,
   StrategyBarType,
+  StrategyHistorySource,
   StrategyMarketSource,
   StrategyRealtimeSource,
 } from './strategy-bar';

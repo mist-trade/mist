@@ -3,9 +3,10 @@ import { DataSource, Period } from '@app/shared-data';
 
 @Injectable()
 export class PeriodMappingService {
-  private readonly periodMapping: Record<
-    DataSource,
-    Partial<Record<Period, string>>
+  // Vendor sources are import-only and intentionally absent: collection paths
+  // must reject them through the missing-mapping guard below.
+  private readonly periodMapping: Partial<
+    Record<DataSource, Partial<Record<Period, string>>>
   > = {
     [DataSource.EAST_MONEY]: {
       [Period.ONE_MIN]: '1',
@@ -41,9 +42,8 @@ export class PeriodMappingService {
     },
   };
 
-  private readonly sourcePeriodAliases: Record<
-    DataSource,
-    Record<string, string>
+  private readonly sourcePeriodAliases: Partial<
+    Record<DataSource, Record<string, string>>
   > = {
     [DataSource.EAST_MONEY]: {
       '1min': '1',

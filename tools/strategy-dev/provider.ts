@@ -54,6 +54,36 @@ export const REVERSE_PERIOD_MAP: Record<number, string> = {
   10080: '1w',
 };
 
+interface ParsedKlineCacheEntry {
+  readonly mtimeMs: number;
+  readonly size: number;
+  readonly rows: unknown[];
+}
+
+/**
+ * In-process parse cache. Long vendor series reach ~250k bars (~60MB JSON), so
+ * re-parsing per request dominates the dev gateway latency. Entries invalidate
+ * on mtime/size change; callers still receive freshly mapped objects.
+ */
+const PARSED_KLINE_CACHE = new Map<string, ParsedKlineCacheEntry>();
+
+function readKlineCache(file: string): any {
+  const stat = fs.statSync(file);
+  const cached = PARSED_KLINE_CACHE.get(file);
+  if (cached && cached.mtimeMs === stat.mtimeMs && cached.size === stat.size) {
+    return cached.rows;
+  }
+  const parsed = JSON.parse(fs.readFileSync(file, 'utf-8'));
+  if (Array.isArray(parsed)) {
+    PARSED_KLINE_CACHE.set(file, {
+      mtimeMs: stat.mtimeMs,
+      size: stat.size,
+      rows: parsed,
+    });
+  }
+  return parsed;
+}
+
 /**
  * 统一加载标准化 ChanK 序列
  */
@@ -118,7 +148,7 @@ export function loadCanonicalKlines(options: KLineLoadOptions): ChanK[] {
     throw new Error('必须指定 --caseKey 或同时指定 --code 与 --period');
   }
 
-  const rawData = JSON.parse(fs.readFileSync(targetFile, 'utf-8'));
+  const rawData = readKlineCache(targetFile);
   if (!Array.isArray(rawData)) {
     throw new Error(`数据文件 ${targetFile} 内容非法: 必须为 K 线数组`);
   }

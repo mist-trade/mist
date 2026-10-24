@@ -20,6 +20,7 @@ import {
   StrategySignalKind,
   StrategySignalSource,
   StrategyVersion,
+  isBacktestSource,
   type BacktestNavPoint,
   type BacktestTargetIssue,
 } from '@app/shared-data';
@@ -182,7 +183,7 @@ export class BacktestRunExecutor {
   }
 
   private async replay(run: BacktestRun): Promise<void> {
-    if (run.source !== DataSource.TDX && run.source !== DataSource.QMT) {
+    if (!isBacktestSource(run.source)) {
       throw new BacktestRunFailure('BACKTEST_SOURCE_UNSUPPORTED');
     }
     if (!Array.isArray(run.targetUniverse) || run.targetUniverse.length === 0) {

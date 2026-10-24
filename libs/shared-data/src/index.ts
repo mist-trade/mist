@@ -1,6 +1,7 @@
 export * from './entities';
 export type { BacktestNavPoint } from './entities/backtest-run.entity';
 export * from './enums/data-source.enum';
+export * from './data-source-families';
 export * from './enums/period.enum';
 export * from './enums/security-status.enum';
 export * from './enums/security-type.enum';
