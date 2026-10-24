@@ -1,4 +1,10 @@
-import { HttpException, HttpStatus, Injectable, Logger } from '@nestjs/common';
+import {
+  HttpException,
+  HttpStatus,
+  Injectable,
+  Logger,
+  Optional,
+} from '@nestjs/common';
 import axios, { type AxiosInstance } from 'axios';
 import {
   format,
@@ -48,7 +54,11 @@ export class TimezoneService {
    */
   private cacheTimestamps: Map<string, number> = new Map();
 
-  constructor(axiosInstance?: AxiosInstance) {
+  // The parameter exists for tests only. It MUST stay @Optional(): under the
+  // webpack `transpileOnly` build the emitted `design:paramtypes` for an
+  // interface-typed parameter is `Object`, which Nest cannot resolve and would
+  // crash the application at boot (hit in production on 2026-10-24).
+  constructor(@Optional() axiosInstance?: AxiosInstance) {
     this.axios =
       axiosInstance ??
       axios.create({
