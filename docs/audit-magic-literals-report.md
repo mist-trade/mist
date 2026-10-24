@@ -1,85 +1,85 @@
 # Mist 全仓硬编码数字与字符串（魔法值）审计盘点报告
 
-> 生成时间：2026-10-17T14:23:53.789Z
-> 扫描文件总数：455 个
-> 检出硬编码总量：2085 处（数字 428 处，字符串 1657 处）
+> 生成时间：2026-10-24T11:48:00.311Z
+> 扫描文件总数：459 个
+> 检出硬编码总量：2335 处（数字 496 处，字符串 1839 处）
 
 ## 一、高频魔法数字汇总（Top 30）
 
 | 排名 | 硬编码数值 | 出现频次 | 典型分布位置 | 建议归宿分类 |
 | :--- | :--- | :--- | :--- | :--- |
-| 1 | `3` | 38 次 | `apps/backtest/src/backtest-run.executor.ts:418`, `apps/backtest/src/suite/backtest-suite.executor.ts:89`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:640` | 领域常量 (*.constants.ts) |
-| 2 | `5` | 22 次 | `apps/mist/src/collector/post-close-sync.service.ts:275`, `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165`, `apps/schedule/src/data-collection.controller.ts:107` | 领域常量 (*.constants.ts) |
-| 3 | `60` | 20 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101`, `apps/mist/src/sources/services/k-boundary-calculator.ts:54`, `apps/mist/src/sources/services/k-boundary-calculator.ts:165` | 领域常量 (*.constants.ts) |
-| 4 | `8` | 18 次 | `apps/backtest/src/backtest-admission.service.ts:37`, `apps/backtest/src/backtest-startup.service.ts:49`, `apps/backtest/src/health/health-state.service.ts:11` | 领域常量 (*.constants.ts) |
-| 5 | `1000` | 18 次 | `apps/backtest/src/health/health-state.service.ts:173`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:51`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:80` | 环境超时/系统参数 (.env / @app/config) |
-| 6 | `10` | 18 次 | `apps/mist/src/app.module.ts:158`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:133`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:145` | 领域常量 (*.constants.ts) |
-| 7 | `4` | 18 次 | `apps/mist/src/realtime/candle/candle-bucket.util.ts:107`, `apps/mist/src/sources/qmt/qmt-source.service.ts:378`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383` | 领域常量 (*.constants.ts) |
-| 8 | `500` | 17 次 | `apps/mist/src/realtime/realtime-redis.service.ts:91`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:169`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:324` | 领域常量 (*.constants.ts) |
-| 9 | `5000` | 16 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1027`, `apps/mist/src/realtime/realtime-redis.service.ts:87`, `apps/mist/src/realtime/realtime-redis.service.ts:91` | 环境超时/系统参数 (.env / @app/config) |
-| 10 | `6` | 16 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:378`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `apps/mist/src/sources/services/k-boundary-calculator.ts:90` | 领域常量 (*.constants.ts) |
-| 11 | `10000` | 15 次 | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:35`, `apps/mist/src/sources/tdx/tdx-source.service.ts:355`, `libs/decimal/src/decimal8.ts:163` | 环境超时/系统参数 (.env / @app/config) |
-| 12 | `20` | 13 次 | `apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts:19`, `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:403` | 领域常量 (*.constants.ts) |
-| 13 | `50` | 10 次 | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10`, `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27`, `apps/mist/src/strategy/services/backtest-run-query.service.ts:89` | 领域常量 (*.constants.ts) |
-| 14 | `200` | 9 次 | `apps/mist/src/collector/post-close-sync.service.ts:131`, `apps/mist/src/collector/post-close-sync.service.ts:199`, `libs/transport/src/http/http-openapi.decorator.ts:37` | 领域常量 (*.constants.ts) |
-| 15 | `12` | 8 次 | `apps/backtest/src/suite/backtest-suite.executor.ts:88`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `libs/strategy/src/wfa/wfa-window-slicer.ts:15` | 领域常量 (*.constants.ts) |
-| 16 | `0.5` | 8 次 | `libs/indicators/src/classic/rpp.ts:57`, `libs/indicators/src/time-series/ts-rank.ts:36`, `libs/indicators/src/time-series/ts-rank.ts:99` | 算法比例系数 (*.constants.ts) |
-| 17 | `30` | 7 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:168`, `apps/signal/src/signal-registry.service.ts:142`, `tools/strategy-dev/runner.ts:75` | 领域常量 (*.constants.ts) |
-| 18 | `15` | 7 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:176`, `apps/signal/src/signal-registry.service.ts:141`, `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:281` | 领域常量 (*.constants.ts) |
-| 19 | `60000` | 6 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1105`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:180`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:285` | 环境超时/系统参数 (.env / @app/config) |
-| 20 | `14` | 5 次 | `apps/mist/src/indicator/indicator.service.ts:79`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `libs/indicators/src/classic/atr.ts:27` | 领域常量 (*.constants.ts) |
+| 1 | `3` | 48 次 | `apps/backtest/src/backtest-run.executor.ts:419`, `apps/backtest/src/suite/backtest-suite.executor.ts:89`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:642` | 领域常量 (*.constants.ts) |
+| 2 | `5` | 25 次 | `apps/mist/src/collector/post-close-sync.service.ts:275`, `apps/mist/src/realtime/realtime-security-allowlist.service.ts:165`, `apps/schedule/src/data-collection.controller.ts:107` | 领域常量 (*.constants.ts) |
+| 3 | `60` | 25 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1103`, `apps/mist/src/sources/services/k-boundary-calculator.ts:54`, `apps/mist/src/sources/services/k-boundary-calculator.ts:165` | 领域常量 (*.constants.ts) |
+| 4 | `10` | 21 次 | `apps/mist/src/app.module.ts:160`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:133`, `apps/mist/src/collector/helpers/data-freshness.validator.ts:145` | 领域常量 (*.constants.ts) |
+| 5 | `0.5` | 21 次 | `libs/indicators/src/classic/rpp.ts:57`, `libs/indicators/src/force/kiss-states.ts:72`, `libs/indicators/src/force/zhongshu-oscillation.ts:60` | 算法比例系数 (*.constants.ts) |
+| 6 | `1000` | 19 次 | `apps/backtest/src/health/health-state.service.ts:173`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:51`, `apps/mist/src/collector/observability/post-close-sync-metrics.ts:80` | 环境超时/系统参数 (.env / @app/config) |
+| 7 | `4` | 19 次 | `apps/mist/src/realtime/candle/candle-bucket.util.ts:107`, `apps/mist/src/sources/qmt/qmt-source.service.ts:378`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383` | 领域常量 (*.constants.ts) |
+| 8 | `8` | 18 次 | `apps/backtest/src/backtest-admission.service.ts:37`, `apps/backtest/src/backtest-startup.service.ts:49`, `apps/backtest/src/health/health-state.service.ts:11` | 领域常量 (*.constants.ts) |
+| 9 | `500` | 18 次 | `apps/mist/src/realtime/realtime-redis.service.ts:91`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:169`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:324` | 领域常量 (*.constants.ts) |
+| 10 | `10000` | 17 次 | `apps/mist/src/sources/tdx/realtime/native-snapshot.converter.ts:35`, `apps/mist/src/sources/tdx/tdx-source.service.ts:355`, `libs/decimal/src/decimal8.ts:163` | 环境超时/系统参数 (.env / @app/config) |
+| 11 | `5000` | 16 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1029`, `apps/mist/src/realtime/realtime-redis.service.ts:87`, `apps/mist/src/realtime/realtime-redis.service.ts:91` | 环境超时/系统参数 (.env / @app/config) |
+| 12 | `6` | 16 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:378`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `apps/mist/src/sources/services/k-boundary-calculator.ts:90` | 领域常量 (*.constants.ts) |
+| 13 | `20` | 15 次 | `apps/mist/src/realtime-subscriptions/dto/realtime-subscription-query.dto.ts:19`, `apps/mist/src/realtime-subscriptions/realtime-subscription.service.ts:89`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:403` | 领域常量 (*.constants.ts) |
+| 14 | `50` | 12 次 | `apps/mist/src/strategy/dto/backtest-signal-result-query.dto.ts:10`, `apps/mist/src/strategy/dto/list-backtest-runs-query.dto.ts:27`, `apps/mist/src/strategy/services/backtest-run-query.service.ts:89` | 领域常量 (*.constants.ts) |
+| 15 | `200` | 9 次 | `apps/mist/src/collector/post-close-sync.service.ts:131`, `apps/mist/src/collector/post-close-sync.service.ts:199`, `libs/transport/src/http/http-openapi.decorator.ts:37` | 领域常量 (*.constants.ts) |
+| 16 | `30` | 9 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:168`, `apps/signal/src/signal-registry.service.ts:142`, `tools/strategy-dev/runner.ts:75` | 领域常量 (*.constants.ts) |
+| 17 | `15` | 9 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:176`, `apps/signal/src/signal-registry.service.ts:141`, `libs/strategy/src/stress-testing/stress-testing-suite.orchestrator.ts:281` | 领域常量 (*.constants.ts) |
+| 18 | `12` | 8 次 | `apps/backtest/src/suite/backtest-suite.executor.ts:88`, `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `libs/strategy/src/wfa/wfa-window-slicer.ts:15` | 领域常量 (*.constants.ts) |
+| 19 | `60000` | 6 次 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1107`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:180`, `apps/signal/src/realtime/signal-strategy-market-data.adapter.ts:285` | 环境超时/系统参数 (.env / @app/config) |
+| 20 | `1440` | 6 次 | `tools/strategy-dev/server.ts:358`, `tools/strategy-dev/server.ts:1567`, `tools/strategy-dev/server.ts:1578` | 环境超时/系统参数 (.env / @app/config) |
 | 21 | `3000` | 5 次 | `apps/mist/src/realtime/realtime-redis.service.ts:88`, `apps/notification/src/delivery/alert-delivery-queue.service.ts:39`, `apps/notification/src/oo-alert/oo-alert-queue.service.ts:32` | 环境超时/系统参数 (.env / @app/config) |
 | 22 | `11` | 5 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:169`, `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472` | 领域常量 (*.constants.ts) |
-| 23 | `37` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77`, `libs/decimal/src/decimal8.ts:19` | 领域常量 (*.constants.ts) |
-| 24 | `100000` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:84`, `libs/strategy/src/wfa/walk-forward.orchestrator.ts:29` | 环境超时/系统参数 (.env / @app/config) |
-| 25 | `0.95` | 4 次 | `libs/indicators/src/risk-performance/risk-performance.ts:452`, `libs/indicators/src/risk-performance/risk-performance.ts:454`, `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:121` | 算法比例系数 (*.constants.ts) |
-| 26 | `1440` | 4 次 | `tools/strategy-dev/server.ts:343`, `tools/strategy-dev/server.ts:1026`, `tools/strategy-dev/server.ts:1091` | 环境超时/系统参数 (.env / @app/config) |
-| 27 | `9` | 3 次 | `apps/mist/src/sources/services/k-boundary-calculator.ts:168`, `libs/chancore/src/internal/duan-channel.ts:148`, `libs/indicators/src/classic/kdj.ts:36` | 领域常量 (*.constants.ts) |
-| 28 | `503` | 3 次 | `apps/mist/src/strategy/services/backtest-run-command.service.ts:185`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:340`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:396` | 领域常量 (*.constants.ts) |
-| 29 | `-8640000000000000` | 3 次 | `libs/strategy/src/simulation/strategy-simulation.session.ts:60`, `tools/strategy-dev/runner.ts:171`, `tools/strategy-dev/server.ts:467` | 领域常量 (*.constants.ts) |
-| 30 | `400` | 3 次 | `libs/transport/src/http/http-exception.filter.ts:38`, `libs/transport/src/http/http-exception.filter.ts:79`, `libs/transport/src/http/http-openapi.decorator.ts:79` | 领域常量 (*.constants.ts) |
+| 23 | `0.95` | 5 次 | `libs/indicators/src/risk-performance/risk-performance.ts:452`, `libs/indicators/src/risk-performance/risk-performance.ts:454`, `libs/strategy/src/factor/plugins/financial-guard.plugin.ts:121` | 算法比例系数 (*.constants.ts) |
+| 24 | `0.6` | 5 次 | `libs/strategy/src/simulation/standard-simulation-flows.ts:50`, `tools/strategy-dev/server.ts:470`, `tools/strategy-dev/server.ts:558` | 算法比例系数 (*.constants.ts) |
+| 25 | `37` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:465`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:77`, `libs/decimal/src/decimal8.ts:19` | 领域常量 (*.constants.ts) |
+| 26 | `100000` | 4 次 | `libs/chancore/src/chan-duan-anchor.characterization.fixture.ts:472`, `libs/chancore/src/chan-full-output.characterization.fixture.ts:84`, `libs/strategy/src/wfa/walk-forward.orchestrator.ts:29` | 环境超时/系统参数 (.env / @app/config) |
+| 27 | `1000000` | 4 次 | `libs/indicators/src/fibonacci/fibonacci.ts:26`, `tools/strategy-dev/server.ts:767`, `tools/strategy-dev/server.ts:1691` | 环境超时/系统参数 (.env / @app/config) |
+| 28 | `0.65` | 4 次 | `libs/indicators/src/force/chan-slope.ts:66`, `libs/indicators/src/force/chan-slope.ts:143`, `tools/strategy-dev/server.ts:515` | 算法比例系数 (*.constants.ts) |
+| 29 | `-0.08` | 3 次 | `apps/backtest/src/backtest-run.executor.ts:418`, `libs/strategy/src/execution/execution-risk-arbiter.ts:70`, `tools/strategy-dev/server.ts:858` | 领域常量 (*.constants.ts) |
+| 30 | `14` | 3 次 | `apps/mist/src/sources/qmt/qmt-source.service.ts:383`, `libs/indicators/src/classic/atr.ts:27`, `libs/indicators/src/classic/atr.ts:80` | 领域常量 (*.constants.ts) |
 
 ## 二、高频魔法字符串汇总（Top 30）
 
 | 排名 | 硬编码字符串 | 出现频次 | 语法语境类别 | 典型分布位置 | 建议归宿分类 |
 | :--- | :--- | :--- | :--- | :--- | :--- |
-| 1 | `volume` | 23 次 | function-argument | `apps/mist/src/sources/east-money/east-money-source.service.ts:121`, `apps/mist/src/sources/east-money/east-money-source.service.ts:196`, `apps/mist/src/sources/qmt/qmt-source.service.ts:215` | 契约字面量 (*.constants.ts) |
-| 2 | `qmt` | 21 次 | comparison, function-argument, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:275`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:367`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:856` | 契约字面量 (*.constants.ts) |
-| 3 | `tdx` | 18 次 | function-argument, comparison, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:855`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:870`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:886` | 契约字面量 (*.constants.ts) |
-| 4 | `high` | 16 次 | function-argument | `libs/indicators/src/classic/adx.ts:38`, `libs/indicators/src/classic/adx.ts:43`, `libs/indicators/src/classic/adx.ts:47` | 契约字面量 (*.constants.ts) |
-| 5 | `low` | 16 次 | function-argument | `libs/indicators/src/classic/adx.ts:39`, `libs/indicators/src/classic/adx.ts:44`, `libs/indicators/src/classic/adx.ts:47` | 契约字面量 (*.constants.ts) |
+| 1 | `TERMINAL` | 26 次 | switch-case, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:283`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:291`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:51` | 业务状态枚举 (Enums / *.constants.ts) |
+| 2 | `volume` | 23 次 | function-argument | `apps/mist/src/sources/east-money/east-money-source.service.ts:121`, `apps/mist/src/sources/east-money/east-money-source.service.ts:196`, `apps/mist/src/sources/qmt/qmt-source.service.ts:215` | 契约字面量 (*.constants.ts) |
+| 3 | `qmt` | 21 次 | comparison, function-argument, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:277`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:369`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:858` | 契约字面量 (*.constants.ts) |
+| 4 | `GUARD` | 20 次 | switch-case, object-property, comparison | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:58`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:64`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:59` | 业务状态枚举 (Enums / *.constants.ts) |
+| 5 | `tdx` | 18 次 | function-argument, comparison, object-property | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:857`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:872`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:888` | 契约字面量 (*.constants.ts) |
 | 6 | `discarded` | 13 次 | object-property, function-argument, comparison | `apps/mist/src/realtime/candle/candle-finalizer.ts:271`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:890`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:893` | 契约字面量 (*.constants.ts) |
 | 7 | `amount` | 13 次 | function-argument, comparison | `apps/mist/src/sources/east-money/east-money-source.service.ts:125`, `apps/mist/src/sources/east-money/east-money-source.service.ts:198`, `apps/mist/src/sources/qmt/qmt-source.service.ts:234` | 契约字面量 (*.constants.ts) |
-| 8 | `unavailable` | 12 次 | comparison, object-property | `apps/backtest/src/health/health-state.service.ts:64`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:365`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:393` | 契约字面量 (*.constants.ts) |
-| 9 | `completed` | 12 次 | object-property, function-argument | `apps/backtest/src/observability/metrics.ts:76`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:147`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:198` | 契约字面量 (*.constants.ts) |
-| 10 | `failure` | 12 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:100`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:745`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:748` | 契约字面量 (*.constants.ts) |
-| 11 | `off` | 11 次 | comparison | `apps/mist/src/app.module.ts:93`, `apps/mist/src/app.module.ts:107`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:204` | 契约字面量 (*.constants.ts) |
-| 12 | `sealed` | 10 次 | function-argument, object-property, comparison | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:883`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:884`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:960` | 契约字面量 (*.constants.ts) |
-| 13 | `queue_full` | 9 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:125`, `apps/backtest/src/backtest-admission.service.ts:145`, `apps/backtest/src/backtest-startup.service.ts:79` | 契约字面量 (*.constants.ts) |
-| 14 | `up` | 9 次 | comparison | `libs/indicators/src/fibonacci/fibonacci.ts:261`, `libs/indicators/src/fibonacci/fibonacci.ts:278`, `libs/indicators/src/fibonacci/fibonacci.ts:343` | 契约字面量 (*.constants.ts) |
-| 15 | `0.1.0` | 8 次 | function-argument | `apps/backtest/src/observability/metrics.ts:16`, `apps/mist/src/realtime/observability/candle-metrics.ts:26`, `apps/mist/src/realtime/observability/startup-compensation-metrics.ts:18` | 协议键/事件名 (*.constants.ts) |
-| 16 | `success` | 8 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:98`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:695`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:755` | 契约字面量 (*.constants.ts) |
-| 17 | `chan` | 8 次 | object-property, function-argument | `apps/chan/src/health/health.controller.ts:19`, `apps/chan/src/health/health.controller.ts:20`, `apps/mist/src/main.ts:47` | 契约字面量 (*.constants.ts) |
-| 18 | `, ` | 8 次 | function-argument | `apps/mist/src/collector/collector.controller.ts:50`, `apps/mist/src/sources/k-save.helper.ts:47`, `apps/mist/src/sources/services/data-source.service.ts:68` | 契约字面量 (*.constants.ts) |
-| 19 | `1m` | 8 次 | comparison, object-property | `apps/mist/src/collector/post-close-sync.service.ts:139`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:958`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:974` | 契约字面量 (*.constants.ts) |
-| 20 | `text` | 8 次 | object-property | `apps/notification/src/channels/feishu.channel-adapter.ts:69`, `apps/notification/src/channels/qq.channel-adapter.ts:60`, `apps/notification/src/channels/wechat.channel-adapter.ts:54` | 契约字面量 (*.constants.ts) |
-| 21 | `tr` | 8 次 | function-argument | `libs/indicators/src/classic/adx.ts:67`, `libs/indicators/src/classic/adx.ts:72`, `libs/indicators/src/classic/adx.ts:89` | 契约字面量 (*.constants.ts) |
-| 22 | `TERMINAL` | 8 次 | switch-case, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:283`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:291`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:51` | 业务状态枚举 (Enums / *.constants.ts) |
-| 23 | `BUY` | 8 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:324`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:63`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:74` | 业务状态枚举 (Enums / *.constants.ts) |
-| 24 | `run_failed` | 7 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:108`, `apps/backtest/src/backtest-admission.service.ts:112`, `apps/backtest/src/health/health-state.service.ts:58` | 契约字面量 (*.constants.ts) |
-| 25 | `ok` | 7 次 | object-property, comparison | `apps/backtest/src/health/health-state.service.ts:105`, `apps/chan/src/health/health.controller.ts:18`, `apps/mist/src/health/health.controller.ts:43` | 契约字面量 (*.constants.ts) |
-| 26 | `failed` | 7 次 | object-property, function-argument, comparison | `apps/backtest/src/observability/metrics.ts:77`, `apps/mist/src/collector/post-close-sync.service.ts:441`, `apps/notification/src/observability/oo-alert-metrics.ts:32` | 契约字面量 (*.constants.ts) |
-| 27 | `reset` | 7 次 | function-argument, comparison | `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:171`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:220`, `apps/mist/src/realtime-subscriptions/realtime-subscription-lifecycle.coordinator.ts:225` | 契约字面量 (*.constants.ts) |
-| 28 | `not_ready` | 6 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:93`, `apps/backtest/src/backtest-admission.service.ts:97`, `apps/backtest/src/health/health-state.service.ts:57` | 契约字面量 (*.constants.ts) |
-| 29 | `builtin` | 6 次 | comparison | `apps/mist/src/app.module.ts:90`, `apps/mist/src/app.module.ts:104`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:297` | 契约字面量 (*.constants.ts) |
-| 30 | `QMT_BASE_URL` | 6 次 | function-argument | `apps/mist/src/collector/history-download.client.ts:47`, `apps/mist/src/sources/qmt/qmt-source.service.ts:73`, `apps/mist/src/sources/qmt/realtime/realtime.client.ts:88` | 业务状态枚举 (Enums / *.constants.ts) |
+| 8 | `BUY` | 13 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:324`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:63`, `libs/strategy/src/decision-flow/decision-trace-builder.ts:74` | 业务状态枚举 (Enums / *.constants.ts) |
+| 9 | `unavailable` | 12 次 | comparison, object-property | `apps/backtest/src/health/health-state.service.ts:64`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:365`, `apps/mist/src/strategy/services/backtest-run-command.service.ts:393` | 契约字面量 (*.constants.ts) |
+| 10 | `completed` | 12 次 | object-property, function-argument | `apps/backtest/src/observability/metrics.ts:76`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:147`, `apps/signal/src/realtime/candle-finalized-job.processor.ts:198` | 契约字面量 (*.constants.ts) |
+| 11 | `failure` | 12 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:100`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:747`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:750` | 契约字面量 (*.constants.ts) |
+| 12 | `off` | 11 次 | comparison | `apps/mist/src/app.module.ts:94`, `apps/mist/src/app.module.ts:108`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:204` | 契约字面量 (*.constants.ts) |
+| 13 | `high` | 11 次 | function-argument | `libs/indicators/src/classic/atr.ts:49`, `libs/indicators/src/classic/atr.ts:54`, `libs/indicators/src/classic/atr.ts:55` | 契约字面量 (*.constants.ts) |
+| 14 | `low` | 11 次 | function-argument | `libs/indicators/src/classic/atr.ts:50`, `libs/indicators/src/classic/atr.ts:54`, `libs/indicators/src/classic/atr.ts:56` | 契约字面量 (*.constants.ts) |
+| 15 | `ABORT` | 11 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:297`, `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:300`, `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:59` | 业务状态枚举 (Enums / *.constants.ts) |
+| 16 | `both` | 11 次 | comparison, object-property | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts:71`, `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:164`, `libs/strategy/src/factor/plugins/fibonacci.plugin.ts:190` | 契约字面量 (*.constants.ts) |
+| 17 | `sealed` | 10 次 | function-argument, object-property, comparison | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:883`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:884`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:960` | 契约字面量 (*.constants.ts) |
+| 18 | `INHERIT` | 10 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:285`, `tools/strategy-dev/server.ts:445`, `tools/strategy-dev/server.ts:497` | 业务状态枚举 (Enums / *.constants.ts) |
+| 19 | `queue_full` | 9 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:125`, `apps/backtest/src/backtest-admission.service.ts:145`, `apps/backtest/src/backtest-startup.service.ts:79` | 契约字面量 (*.constants.ts) |
+| 20 | `active` | 9 次 | function-argument, object-property | `apps/notification/src/delivery/alert-delivery-queue.service.ts:101`, `apps/notification/src/observability/delivery-metrics.ts:89`, `apps/notification/src/oo-alert/oo-alert-queue.service.ts:55` | 契约字面量 (*.constants.ts) |
+| 21 | `up` | 9 次 | comparison | `libs/indicators/src/fibonacci/fibonacci.ts:261`, `libs/indicators/src/fibonacci/fibonacci.ts:278`, `libs/indicators/src/fibonacci/fibonacci.ts:343` | 契约字面量 (*.constants.ts) |
+| 22 | `BOTH` | 9 次 | comparison, object-property | `libs/strategy/src/decision-flow/decision-flow-evaluator.ts:77`, `tools/strategy-dev/server.ts:440`, `tools/strategy-dev/server.ts:484` | 业务状态枚举 (Enums / *.constants.ts) |
+| 23 | `0.1.0` | 8 次 | function-argument | `apps/backtest/src/observability/metrics.ts:16`, `apps/mist/src/realtime/observability/candle-metrics.ts:26`, `apps/mist/src/realtime/observability/startup-compensation-metrics.ts:18` | 协议键/事件名 (*.constants.ts) |
+| 24 | `success` | 8 次 | object-property, comparison | `apps/backtest/src/observability/metrics.ts:98`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:697`, `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:757` | 契约字面量 (*.constants.ts) |
+| 25 | `chan` | 8 次 | object-property, function-argument | `apps/chan/src/health/health.controller.ts:19`, `apps/chan/src/health/health.controller.ts:20`, `apps/mist/src/main.ts:47` | 契约字面量 (*.constants.ts) |
+| 26 | `, ` | 8 次 | function-argument | `apps/mist/src/collector/collector.controller.ts:50`, `apps/mist/src/sources/k-save.helper.ts:47`, `apps/mist/src/sources/services/data-source.service.ts:68` | 契约字面量 (*.constants.ts) |
+| 27 | `1m` | 8 次 | comparison, object-property | `apps/mist/src/collector/post-close-sync.service.ts:139`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:958`, `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:974` | 契约字面量 (*.constants.ts) |
+| 28 | `text` | 8 次 | object-property | `apps/notification/src/channels/feishu.channel-adapter.ts:69`, `apps/notification/src/channels/qq.channel-adapter.ts:60`, `apps/notification/src/channels/wechat.channel-adapter.ts:54` | 契约字面量 (*.constants.ts) |
+| 29 | `run_failed` | 7 次 | function-argument, object-property, comparison | `apps/backtest/src/backtest-admission.service.ts:108`, `apps/backtest/src/backtest-admission.service.ts:112`, `apps/backtest/src/health/health-state.service.ts:58` | 契约字面量 (*.constants.ts) |
+| 30 | `ok` | 7 次 | object-property, comparison | `apps/backtest/src/health/health-state.service.ts:105`, `apps/chan/src/health/health.controller.ts:18`, `apps/mist/src/health/health.controller.ts:43` | 契约字面量 (*.constants.ts) |
 
 ## 三、硬编码重灾区文件列表（Top 20）
 
 | 排名 | 文件路径 | 硬编码总数 |
 | :--- | :--- | :--- |
-| 1 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts` | 119 处 |
-| 2 | `tools/strategy-dev/server.ts` | 90 处 |
+| 1 | `tools/strategy-dev/server.ts` | 343 处 |
+| 2 | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts` | 119 处 |
 | 3 | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts` | 69 处 |
 | 4 | `apps/schedule/src/pre-market-inspection.service.ts` | 63 处 |
 | 5 | `apps/mist/src/sources/tdx/realtime/realtime.client.ts` | 55 处 |
@@ -95,14 +95,14 @@
 | 15 | `libs/strategy/src/decision-flow/legacy-strategy-compiler.ts` | 30 处 |
 | 16 | `libs/chancore/src/internal/bi.ts` | 28 处 |
 | 17 | `apps/mist/src/sources/qmt/qmt-source.service.ts` | 27 处 |
-| 18 | `libs/indicators/src/classic/adx.ts` | 26 处 |
-| 19 | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts` | 24 处 |
-| 20 | `apps/mist/src/sources/services/k-boundary-calculator.ts` | 24 处 |
+| 18 | `apps/mist/src/sources/qmt/realtime/native-snapshot.converter.ts` | 24 处 |
+| 19 | `apps/mist/src/sources/services/k-boundary-calculator.ts` | 24 处 |
+| 20 | `libs/strategy/src/evaluation/strategy-context.builder.ts` | 24 处 |
 
 ## 四、完整明细清单
 
 <details>
-<summary>展开查看全部 2085 处详细命中文档</summary>
+<summary>展开查看全部 2335 处详细命中文档</summary>
 
 | 类型 | 数值/字符串 | 文件位置 | 上下文代码片段 |
 | :--- | :--- | :--- | :--- |
@@ -118,27 +118,27 @@
 | string | `queue_full` | `apps/backtest/src/backtest-admission.service.ts:125:33` | `this.health.recordCommand('queue_full')` |
 | string | `accepted` | `apps/backtest/src/backtest-admission.service.ts:131:31` | `this.health.recordCommand('accepted')` |
 | string | `queue_full` | `apps/backtest/src/backtest-admission.service.ts:145:41` | `code: 'queue_full'` |
-| string | `k` | `apps/backtest/src/backtest-market-data.adapter.ts:50:27` | `this.repository .createQueryBuilder('k')` |
-| string | `k.securityId` | `apps/backtest/src/backtest-market-data.adapter.ts:62:18` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.securityId = :securityId` | `apps/backtest/src/backtest-market-data.adapter.ts:63:14` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.source = :source` | `apps/backtest/src/backtest-market-data.adapter.ts:66:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.period = :period` | `apps/backtest/src/backtest-market-data.adapter.ts:67:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.timestamp >= :startAt` | `apps/backtest/src/backtest-market-data.adapter.ts:68:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.timestamp <= :endAt` | `apps/backtest/src/backtest-market-data.adapter.ts:69:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
-| string | `k.timestamp > :afterTimestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:72:22` | `query.andWhere('k.timestamp > :afterTimestamp', { afterTimestamp: criteria.afterTimestamp, })` |
-| string | `k.timestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:77:19` | `query.orderBy('k.timestamp', 'ASC')` |
-| string | `BACKTEST_DATABASE_ERROR` | `apps/backtest/src/backtest-run.executor.ts:120:35` | `this.health.recordRunFailed('BACKTEST_DATABASE_ERROR', 0)` |
-| string | `BACKTEST_RUN_TIMEOUT_MS` | `apps/backtest/src/backtest-run.executor.ts:216:31` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS')` |
-| number | `1800000` | `apps/backtest/src/backtest-run.executor.ts:216:61` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS') ?? 1_800_000` |
-| string | `BACKTEST_MAX_BARS_PER_RUN` | `apps/backtest/src/backtest-run.executor.ts:218:31` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN')` |
-| number | `10000000` | `apps/backtest/src/backtest-run.executor.ts:218:63` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN') ?? 10_000_000` |
-| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:244:49` | `code: 'SECURITY_NOT_FOUND'` |
-| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:245:39` | `this.health.recordTargetIssue('SECURITY_NOT_FOUND')` |
-| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:290:49` | `code: 'NO_HISTORICAL_BARS'` |
-| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:291:39` | `this.health.recordTargetIssue('NO_HISTORICAL_BARS')` |
-| number | `-0.08` | `apps/backtest/src/backtest-run.executor.ts:417:26` | `hardStopLossRatio: -0.08` |
-| number | `3` | `apps/backtest/src/backtest-run.executor.ts:418:28` | `defaultCooldownBars: 3` |
-| number | `0.995` | `apps/backtest/src/backtest-run.executor.ts:419:28` | `cashAllocationRatio: 0.995` |
+| string | `k` | `apps/backtest/src/backtest-market-data.adapter.ts:49:27` | `this.repository .createQueryBuilder('k')` |
+| string | `k.securityId` | `apps/backtest/src/backtest-market-data.adapter.ts:61:18` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.securityId = :securityId` | `apps/backtest/src/backtest-market-data.adapter.ts:62:14` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.source = :source` | `apps/backtest/src/backtest-market-data.adapter.ts:65:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.period = :period` | `apps/backtest/src/backtest-market-data.adapter.ts:66:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.timestamp >= :startAt` | `apps/backtest/src/backtest-market-data.adapter.ts:67:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.timestamp <= :endAt` | `apps/backtest/src/backtest-market-data.adapter.ts:68:17` | `this.repository .createQueryBuilder('k') .select([ 'k.source', 'k.period', 'k.timestamp', 'k.open', ` |
+| string | `k.timestamp > :afterTimestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:71:22` | `query.andWhere('k.timestamp > :afterTimestamp', { afterTimestamp: criteria.afterTimestamp, })` |
+| string | `k.timestamp` | `apps/backtest/src/backtest-market-data.adapter.ts:76:19` | `query.orderBy('k.timestamp', 'ASC')` |
+| string | `BACKTEST_DATABASE_ERROR` | `apps/backtest/src/backtest-run.executor.ts:121:35` | `this.health.recordRunFailed('BACKTEST_DATABASE_ERROR', 0)` |
+| string | `BACKTEST_RUN_TIMEOUT_MS` | `apps/backtest/src/backtest-run.executor.ts:217:31` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS')` |
+| number | `1800000` | `apps/backtest/src/backtest-run.executor.ts:217:61` | `this.config.get<number>('BACKTEST_RUN_TIMEOUT_MS') ?? 1_800_000` |
+| string | `BACKTEST_MAX_BARS_PER_RUN` | `apps/backtest/src/backtest-run.executor.ts:219:31` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN')` |
+| number | `10000000` | `apps/backtest/src/backtest-run.executor.ts:219:63` | `this.config.get<number>('BACKTEST_MAX_BARS_PER_RUN') ?? 10_000_000` |
+| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:245:49` | `code: 'SECURITY_NOT_FOUND'` |
+| string | `SECURITY_NOT_FOUND` | `apps/backtest/src/backtest-run.executor.ts:246:39` | `this.health.recordTargetIssue('SECURITY_NOT_FOUND')` |
+| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:291:49` | `code: 'NO_HISTORICAL_BARS'` |
+| string | `NO_HISTORICAL_BARS` | `apps/backtest/src/backtest-run.executor.ts:292:39` | `this.health.recordTargetIssue('NO_HISTORICAL_BARS')` |
+| number | `-0.08` | `apps/backtest/src/backtest-run.executor.ts:418:26` | `hardStopLossRatio: -0.08` |
+| number | `3` | `apps/backtest/src/backtest-run.executor.ts:419:28` | `defaultCooldownBars: 3` |
+| number | `0.995` | `apps/backtest/src/backtest-run.executor.ts:420:28` | `cashAllocationRatio: 0.995` |
 | string | `BACKTEST_INTERRUPTED` | `apps/backtest/src/backtest-startup.service.ts:39:27` | `errorMessage: 'BACKTEST_INTERRUPTED'` |
 | string | `BACKTEST_CONCURRENCY` | `apps/backtest/src/backtest-startup.service.ts:48:49` | `this.config.get<number>('BACKTEST_CONCURRENCY')` |
 | string | `BACKTEST_QUEUE_CAPACITY` | `apps/backtest/src/backtest-startup.service.ts:49:46` | `this.config.get<number>('BACKTEST_QUEUE_CAPACITY')` |
@@ -212,21 +212,21 @@
 | string | `50mb` | `apps/chan/src/main.ts:13:36` | `limit: '50mb'` |
 | string | `50mb` | `apps/chan/src/main.ts:14:42` | `limit: '50mb'` |
 | number | `8008` | `apps/chan/src/main.ts:16:40` | `process.env.PORT ?? 8008` |
-| string | `builtin` | `apps/mist/src/app.module.ts:90:22` | `normalized === 'builtin'` |
-| string | `off` | `apps/mist/src/app.module.ts:93:22` | `normalized === 'off'` |
-| string | `builtin` | `apps/mist/src/app.module.ts:104:22` | `normalized === 'builtin'` |
-| string | `off` | `apps/mist/src/app.module.ts:107:22` | `normalized === 'off'` |
-| string | `mysql` | `apps/mist/src/app.module.ts:133:21` | `type: 'mysql'` |
-| string | `mysql_server_host` | `apps/mist/src/app.module.ts:134:39` | `configService.get('mysql_server_host')` |
-| string | `mysql_server_port` | `apps/mist/src/app.module.ts:135:39` | `configService.get('mysql_server_port')` |
-| string | `mysql_server_username` | `apps/mist/src/app.module.ts:136:43` | `configService.get('mysql_server_username')` |
-| string | `mysql_server_password` | `apps/mist/src/app.module.ts:137:43` | `configService.get('mysql_server_password')` |
-| string | `mysql_server_database` | `apps/mist/src/app.module.ts:138:43` | `configService.get('mysql_server_database')` |
-| string | `+08:00` | `apps/mist/src/app.module.ts:139:25` | `timezone: '+08:00'` |
-| string | `NODE_ENV` | `apps/mist/src/app.module.ts:141:42` | `configService.get('NODE_ENV')` |
-| number | `10` | `apps/mist/src/app.module.ts:158:25` | `poolSize: 10` |
-| string | `mysql2` | `apps/mist/src/app.module.ts:159:33` | `connectorPackage: 'mysql2'` |
-| string | `sha256_password` | `apps/mist/src/app.module.ts:161:30` | `authPlugins: 'sha256_password'` |
+| string | `builtin` | `apps/mist/src/app.module.ts:91:22` | `normalized === 'builtin'` |
+| string | `off` | `apps/mist/src/app.module.ts:94:22` | `normalized === 'off'` |
+| string | `builtin` | `apps/mist/src/app.module.ts:105:22` | `normalized === 'builtin'` |
+| string | `off` | `apps/mist/src/app.module.ts:108:22` | `normalized === 'off'` |
+| string | `mysql` | `apps/mist/src/app.module.ts:134:21` | `type: 'mysql'` |
+| string | `mysql_server_host` | `apps/mist/src/app.module.ts:135:39` | `configService.get('mysql_server_host')` |
+| string | `mysql_server_port` | `apps/mist/src/app.module.ts:136:39` | `configService.get('mysql_server_port')` |
+| string | `mysql_server_username` | `apps/mist/src/app.module.ts:137:43` | `configService.get('mysql_server_username')` |
+| string | `mysql_server_password` | `apps/mist/src/app.module.ts:138:43` | `configService.get('mysql_server_password')` |
+| string | `mysql_server_database` | `apps/mist/src/app.module.ts:139:43` | `configService.get('mysql_server_database')` |
+| string | `+08:00` | `apps/mist/src/app.module.ts:140:25` | `timezone: '+08:00'` |
+| string | `NODE_ENV` | `apps/mist/src/app.module.ts:142:42` | `configService.get('NODE_ENV')` |
+| number | `10` | `apps/mist/src/app.module.ts:160:25` | `poolSize: 10` |
+| string | `mysql2` | `apps/mist/src/app.module.ts:161:33` | `connectorPackage: 'mysql2'` |
+| string | `sha256_password` | `apps/mist/src/app.module.ts:163:30` | `authPlugins: 'sha256_password'` |
 | string | `, ` | `apps/mist/src/collector/collector.controller.ts:50:17` | `enabledSources .map((c) => c.source) .join(', ')` |
 | number | `10` | `apps/mist/src/collector/helpers/data-freshness.validator.ts:133:40` | `String(bar.date).slice(0, 10)` |
 | number | `10` | `apps/mist/src/collector/helpers/data-freshness.validator.ts:145:40` | `String(bar.time).slice(0, 10)` |
@@ -276,7 +276,6 @@
 | string | `ok` | `apps/mist/src/health/health.controller.ts:43:15` | `status: 'ok'` |
 | string | `mist-backend` | `apps/mist/src/health/health.controller.ts:44:16` | `service: 'mist-backend'` |
 | string | `backend` | `apps/mist/src/health/health.controller.ts:45:17` | `instance: 'backend'` |
-| number | `14` | `apps/mist/src/indicator/indicator.service.ts:79:22` | `period: number = 14` |
 | string | `REALTIME_PRODUCTIZATION_MODE` | `apps/mist/src/main.ts:12:40` | `app.get(ConfigService).get<string>('REALTIME_PRODUCTIZATION_MODE')` |
 | string | `Mist API` | `apps/mist/src/main.ts:18:15` | `new DocumentBuilder() .setTitle('Mist API')` |
 | string | `Stock market analysis and alert system - Technical indicators and Chan Theory analysis
@@ -417,125 +416,125 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `sealed` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:960:16` | `outcome: 'sealed'` |
 | string | `1m` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:974:15` | `period: '1m'` |
 | string | `discarded` | `apps/mist/src/realtime/candle/realtime-market-data-product.service.ts:976:16` | `outcome: 'discarded'` |
-| string | `harness.initialize` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:212:18` | `operation: 'harness.initialize'` |
-| string | `HIL_INITIALIZATION_FAILED` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:214:15` | `reason: 'HIL_INITIALIZATION_FAILED'` |
-| string | `syncSubscriptions.cleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:219:39` | `recordOperation(operations, 'syncSubscriptions.cleanup', () => client.syncSubscriptions([]), )` |
-| string | `getSubscriptions.afterCleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:222:39` | `recordOperation(operations, 'getSubscriptions.afterCleanup', () => client.getSubscriptions(), )` |
-| string | `test/fixtures/realtime/realtime-native-frame-v2.json` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:229:5` | `resolve( process.cwd(), 'test/fixtures/realtime/realtime-native-frame-v2.json', )` |
-| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:275:16` | `source === 'qmt'` |
-| string | `mysql` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:289:19` | `type: 'mysql'` |
-| string | `mysql_server_host` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:290:30` | `config.get('mysql_server_host')` |
-| string | `mysql_server_port` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:291:30` | `config.get('mysql_server_port')` |
-| string | `mysql_server_username` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:292:34` | `config.get('mysql_server_username')` |
-| string | `mysql_server_password` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:293:34` | `config.get('mysql_server_password')` |
-| string | `mysql_server_database` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:294:34` | `config.get('mysql_server_database')` |
-| string | `+08:00` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:295:23` | `timezone: '+08:00'` |
-| string | `mysql2` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:299:31` | `connectorPackage: 'mysql2'` |
-| string | `mysql` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:322:19` | `type: 'mysql'` |
-| string | `mysql_server_host` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:323:30` | `config.get('mysql_server_host')` |
-| string | `mysql_server_port` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:324:30` | `config.get('mysql_server_port')` |
-| string | `mysql_server_username` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:325:34` | `config.get('mysql_server_username')` |
-| string | `mysql_server_password` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:326:34` | `config.get('mysql_server_password')` |
-| string | `mysql_server_database` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:327:34` | `config.get('mysql_server_database')` |
-| string | `+08:00` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:328:23` | `timezone: '+08:00'` |
-| string | `mysql2` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:332:31` | `connectorPackage: 'mysql2'` |
-| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:367:18` | `source === 'qmt'` |
-| string | `getSubscriptions.before` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:411:37` | `recordOperation(operations, 'getSubscriptions.before', () => client.getSubscriptions(), )` |
-| string | `syncSubscriptions.target` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:417:5` | `recordOperation( operations, 'syncSubscriptions.target', () => client.syncSubscriptions([symbol]), )` |
-| string | `captureRawFixture.whole` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:421:37` | `recordCapture(operations, 'captureRawFixture.whole', syncResult, () => capture('whole', symbol, sync` |
-| string | `whole` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:422:15` | `capture('whole', symbol, syncStartedAt)` |
-| string | `getSubscriptions.afterSync` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:425:37` | `recordOperation(operations, 'getSubscriptions.afterSync', () => client.getSubscriptions(), )` |
-| string | `subscribe.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:431:5` | `recordOperation( operations, 'subscribe.overlay', () => client.subscribe(overlaySymbol), )` |
-| string | `captureRawFixture.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:437:7` | `recordCapture( operations, 'captureRawFixture.overlay', subscribeResult, () => capture('overlay', ov` |
-| string | `overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:439:21` | `capture('overlay', overlaySymbol, subscribeStartedAt)` |
-| string | `getSubscriptions.afterSubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:442:37` | `recordOperation(operations, 'getSubscriptions.afterSubscribe', () => client.getSubscriptions(), )` |
-| string | `subscribe.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:447:5` | `successfulInteger( operations, 'subscribe.overlay', )` |
-| string | `unsubscribe.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:449:37` | `recordOperation(operations, 'unsubscribe.overlay', () => client.unsubscribe(overlaySymbol), )` |
-| string | `getSubscriptions.afterUnsubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:465:39` | `recordOperation(operations, 'getSubscriptions.afterUnsubscribe', () => client.getSubscriptions(), )` |
-| string | `observeCallbackCessation.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:475:20` | `operation: 'observeCallbackCessation.overlay'` |
-| string | `subscribe.overlayReplacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:487:9` | `recordOperation( operations, 'subscribe.overlayReplacement', () => client.subscribe(overlaySymbol), ` |
-| string | `captureRawFixture.replacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:493:11` | `recordCapture( operations, 'captureRawFixture.replacement', replacementResult, () => capture('replac` |
-| string | `replacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:495:25` | `capture('replacement', overlaySymbol, replacementStartedAt)` |
-| string | `getSubscriptions.afterReplacementSubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:500:9` | `recordOperation( operations, 'getSubscriptions.afterReplacementSubscribe', () => client.getSubscript` |
-| string | `subscribe.overlayReplacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:505:9` | `successfulInteger( operations, 'subscribe.overlayReplacement', )` |
-| string | `getSubscriptions.afterReplacementSubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:511:11` | `successfulValue( operations, 'getSubscriptions.afterReplacementSubscribe', )` |
-| string | `platform_unavailable` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:528:47` | `runtimeActiveSubscriptionObservation: 'platform_unavailable'` |
-| string | `classifyQmtQuotaAndIdReuse` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:532:20` | `operation: 'classifyQmtQuotaAndIdReuse'` |
-| string | `unsubscribe.overlayReplacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:543:41` | `recordOperation(operations, 'unsubscribe.overlayReplacement', () => client.unsubscribe(overlaySymbol` |
-| string | `getSubscriptions.afterReplacementCleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:548:9` | `recordOperation( operations, 'getSubscriptions.afterReplacementCleanup', () => client.getSubscriptio` |
-| string | `whole` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:595:32` | `phase === 'whole'` |
-| string | `sha256` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:609:24` | `createHash('sha256')` |
-| string | `getSubscriptions.afterSync` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:633:49` | `successfulValue(operations, 'getSubscriptions.afterSync')` |
-| string | `getSubscriptions.afterSubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:636:5` | `successfulValue( operations, 'getSubscriptions.afterSubscribe', )` |
-| number | `3` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:640:16` | `[1, 2, 3]` |
-| string | `getSubscriptions.afterUnsubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:646:37` | `successfulValue(operations, 'getSubscriptions.afterUnsubscribe')` |
-| string | `getSubscriptions.afterReplacementCleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:649:5` | `successfulValue( operations, 'getSubscriptions.afterReplacementCleanup', )` |
-| string | `validateSubscriptions.exactState` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:665:20` | `operation: 'validateSubscriptions.exactState'` |
-| string | `validateSubscriptions.exactState` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:670:20` | `operation: 'validateSubscriptions.exactState'` |
-| string | `HIL_SUBSCRIPTION_STATE_INVALID` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:672:17` | `reason: 'HIL_SUBSCRIPTION_STATE_INVALID'` |
-| string | `success` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:695:31` | `evidence?.result === 'success'` |
-| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:745:31` | `prerequisite.result === 'failure'` |
-| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:748:15` | `result: 'failure'` |
-| string | `HIL_RAW_CAPTURE_PREREQUISITE_FAILED` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:749:15` | `reason: 'HIL_RAW_CAPTURE_PREREQUISITE_FAILED'` |
-| string | `success` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:755:42` | `result: 'success'` |
-| string | `none` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:755:61` | `reason: 'none'` |
-| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:759:15` | `result: 'failure'` |
-| string | `HIL_RAW_CAPTURE_FAILED` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:760:15` | `reason: 'HIL_RAW_CAPTURE_FAILED'` |
-| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:799:15` | `result: 'failure'` |
-| string | `HIL_OPERATION_THROWN` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:800:15` | `reason: 'HIL_OPERATION_THROWN'` |
-| string | `success` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:814:15` | `result: 'success'` |
-| string | `none` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:815:15` | `reason: 'none'` |
-| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:821:13` | `result: 'failure'` |
-| string | `sha256` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:830:21` | `createHash('sha256')` |
-| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:855:31` | `resolveClient('tdx', context)` |
-| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:856:31` | `resolveClient('qmt', context)` |
-| number | `30000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:858:33` | `waitUntilReady(tdx.ready, 30_000)` |
-| number | `30000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:859:33` | `waitUntilReady(qmt.ready, 30_000)` |
-| string | `tdx.syncSubscriptions.soakTarget` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:862:39` | `recordOperation(operations, 'tdx.syncSubscriptions.soakTarget', () => tdx.client.syncSubscriptions([` |
-| string | `qmt.syncSubscriptions.soakTarget` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:865:39` | `recordOperation(operations, 'qmt.syncSubscriptions.soakTarget', () => qmt.client.syncSubscriptions([` |
-| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:870:7` | `waitForFreshCanonicalSnapshot( tdx, 'tdx', tdxSymbol, setupStartedAt, 90_000, )` |
-| number | `90000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:873:7` | `waitForFreshCanonicalSnapshot( tdx, 'tdx', tdxSymbol, setupStartedAt, 90_000, )` |
-| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:877:7` | `waitForFreshCanonicalSnapshot( qmt, 'qmt', qmtSymbol, setupStartedAt, 90_000, )` |
-| number | `90000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:880:7` | `waitForFreshCanonicalSnapshot( qmt, 'qmt', qmtSymbol, setupStartedAt, 90_000, )` |
-| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:886:55` | `requireCurrentSnapshot(tdx, 'tdx', tdxSymbol)` |
-| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:887:55` | `requireCurrentSnapshot(qmt, 'qmt', qmtSymbol)` |
-| number | `-5000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:893:28` | `tdxSnapshotAgeMs < -5_000` |
-| number | `-5000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:895:28` | `qmtSnapshotAgeMs < -5_000` |
-| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:906:68` | `readBridgeHealth(tdxBridgeHealthUrl, 'tdx')` |
-| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:907:68` | `readBridgeHealth(qmtBridgeHealthUrl, 'qmt')` |
-| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:942:31` | `resolveClient('tdx', context)` |
-| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:943:31` | `resolveClient('qmt', context)` |
-| string | `tdx.syncSubscriptions.cleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:944:39` | `recordOperation(operations, 'tdx.syncSubscriptions.cleanup', () => tdx.client.syncSubscriptions([]),` |
-| string | `qmt.syncSubscriptions.cleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:947:39` | `recordOperation(operations, 'qmt.syncSubscriptions.cleanup', () => qmt.client.syncSubscriptions([]),` |
-| string | `dual-source-soak` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:953:14` | `profile: 'dual-source-soak'` |
-| string | `trading-session` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:954:19` | `sessionClass: 'trading-session'` |
-| number | `5000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1027:33` | `AbortSignal.timeout(5_000)` |
-| string | `subscription-journal.jsonl` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1079:18` | `name === 'subscription-journal.jsonl'` |
-| string | `manifest` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1080:23` | `name.includes('manifest')` |
-| string | `compaction-checkpoint` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1081:23` | `name.includes('compaction-checkpoint')` |
-| string | `sealed-range-checkpoint` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1082:23` | `name.includes('sealed-range-checkpoint')` |
-| string | `sha256` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1085:29` | `createHash('sha256')` |
-| string | ` ` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1090:19` | `digest.update('\0')` |
+| string | `harness.initialize` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:214:18` | `operation: 'harness.initialize'` |
+| string | `HIL_INITIALIZATION_FAILED` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:216:15` | `reason: 'HIL_INITIALIZATION_FAILED'` |
+| string | `syncSubscriptions.cleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:221:39` | `recordOperation(operations, 'syncSubscriptions.cleanup', () => client.syncSubscriptions([]), )` |
+| string | `getSubscriptions.afterCleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:224:39` | `recordOperation(operations, 'getSubscriptions.afterCleanup', () => client.getSubscriptions(), )` |
+| string | `test/fixtures/realtime/realtime-native-frame-v2.json` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:231:5` | `resolve( process.cwd(), 'test/fixtures/realtime/realtime-native-frame-v2.json', )` |
+| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:277:16` | `source === 'qmt'` |
+| string | `mysql` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:291:19` | `type: 'mysql'` |
+| string | `mysql_server_host` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:292:30` | `config.get('mysql_server_host')` |
+| string | `mysql_server_port` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:293:30` | `config.get('mysql_server_port')` |
+| string | `mysql_server_username` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:294:34` | `config.get('mysql_server_username')` |
+| string | `mysql_server_password` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:295:34` | `config.get('mysql_server_password')` |
+| string | `mysql_server_database` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:296:34` | `config.get('mysql_server_database')` |
+| string | `+08:00` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:297:23` | `timezone: '+08:00'` |
+| string | `mysql2` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:301:31` | `connectorPackage: 'mysql2'` |
+| string | `mysql` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:324:19` | `type: 'mysql'` |
+| string | `mysql_server_host` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:325:30` | `config.get('mysql_server_host')` |
+| string | `mysql_server_port` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:326:30` | `config.get('mysql_server_port')` |
+| string | `mysql_server_username` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:327:34` | `config.get('mysql_server_username')` |
+| string | `mysql_server_password` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:328:34` | `config.get('mysql_server_password')` |
+| string | `mysql_server_database` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:329:34` | `config.get('mysql_server_database')` |
+| string | `+08:00` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:330:23` | `timezone: '+08:00'` |
+| string | `mysql2` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:334:31` | `connectorPackage: 'mysql2'` |
+| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:369:18` | `source === 'qmt'` |
+| string | `getSubscriptions.before` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:413:37` | `recordOperation(operations, 'getSubscriptions.before', () => client.getSubscriptions(), )` |
+| string | `syncSubscriptions.target` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:419:5` | `recordOperation( operations, 'syncSubscriptions.target', () => client.syncSubscriptions([symbol]), )` |
+| string | `captureRawFixture.whole` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:423:37` | `recordCapture(operations, 'captureRawFixture.whole', syncResult, () => capture('whole', symbol, sync` |
+| string | `whole` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:424:15` | `capture('whole', symbol, syncStartedAt)` |
+| string | `getSubscriptions.afterSync` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:427:37` | `recordOperation(operations, 'getSubscriptions.afterSync', () => client.getSubscriptions(), )` |
+| string | `subscribe.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:433:5` | `recordOperation( operations, 'subscribe.overlay', () => client.subscribe(overlaySymbol), )` |
+| string | `captureRawFixture.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:439:7` | `recordCapture( operations, 'captureRawFixture.overlay', subscribeResult, () => capture('overlay', ov` |
+| string | `overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:441:21` | `capture('overlay', overlaySymbol, subscribeStartedAt)` |
+| string | `getSubscriptions.afterSubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:444:37` | `recordOperation(operations, 'getSubscriptions.afterSubscribe', () => client.getSubscriptions(), )` |
+| string | `subscribe.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:449:5` | `successfulInteger( operations, 'subscribe.overlay', )` |
+| string | `unsubscribe.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:451:37` | `recordOperation(operations, 'unsubscribe.overlay', () => client.unsubscribe(overlaySymbol), )` |
+| string | `getSubscriptions.afterUnsubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:467:39` | `recordOperation(operations, 'getSubscriptions.afterUnsubscribe', () => client.getSubscriptions(), )` |
+| string | `observeCallbackCessation.overlay` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:477:20` | `operation: 'observeCallbackCessation.overlay'` |
+| string | `subscribe.overlayReplacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:489:9` | `recordOperation( operations, 'subscribe.overlayReplacement', () => client.subscribe(overlaySymbol), ` |
+| string | `captureRawFixture.replacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:495:11` | `recordCapture( operations, 'captureRawFixture.replacement', replacementResult, () => capture('replac` |
+| string | `replacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:497:25` | `capture('replacement', overlaySymbol, replacementStartedAt)` |
+| string | `getSubscriptions.afterReplacementSubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:502:9` | `recordOperation( operations, 'getSubscriptions.afterReplacementSubscribe', () => client.getSubscript` |
+| string | `subscribe.overlayReplacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:507:9` | `successfulInteger( operations, 'subscribe.overlayReplacement', )` |
+| string | `getSubscriptions.afterReplacementSubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:513:11` | `successfulValue( operations, 'getSubscriptions.afterReplacementSubscribe', )` |
+| string | `platform_unavailable` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:530:47` | `runtimeActiveSubscriptionObservation: 'platform_unavailable'` |
+| string | `classifyQmtQuotaAndIdReuse` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:534:20` | `operation: 'classifyQmtQuotaAndIdReuse'` |
+| string | `unsubscribe.overlayReplacement` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:545:41` | `recordOperation(operations, 'unsubscribe.overlayReplacement', () => client.unsubscribe(overlaySymbol` |
+| string | `getSubscriptions.afterReplacementCleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:550:9` | `recordOperation( operations, 'getSubscriptions.afterReplacementCleanup', () => client.getSubscriptio` |
+| string | `whole` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:597:32` | `phase === 'whole'` |
+| string | `sha256` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:611:24` | `createHash('sha256')` |
+| string | `getSubscriptions.afterSync` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:635:49` | `successfulValue(operations, 'getSubscriptions.afterSync')` |
+| string | `getSubscriptions.afterSubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:638:5` | `successfulValue( operations, 'getSubscriptions.afterSubscribe', )` |
+| number | `3` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:642:16` | `[1, 2, 3]` |
+| string | `getSubscriptions.afterUnsubscribe` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:648:37` | `successfulValue(operations, 'getSubscriptions.afterUnsubscribe')` |
+| string | `getSubscriptions.afterReplacementCleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:651:5` | `successfulValue( operations, 'getSubscriptions.afterReplacementCleanup', )` |
+| string | `validateSubscriptions.exactState` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:667:20` | `operation: 'validateSubscriptions.exactState'` |
+| string | `validateSubscriptions.exactState` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:672:20` | `operation: 'validateSubscriptions.exactState'` |
+| string | `HIL_SUBSCRIPTION_STATE_INVALID` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:674:17` | `reason: 'HIL_SUBSCRIPTION_STATE_INVALID'` |
+| string | `success` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:697:31` | `evidence?.result === 'success'` |
+| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:747:31` | `prerequisite.result === 'failure'` |
+| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:750:15` | `result: 'failure'` |
+| string | `HIL_RAW_CAPTURE_PREREQUISITE_FAILED` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:751:15` | `reason: 'HIL_RAW_CAPTURE_PREREQUISITE_FAILED'` |
+| string | `success` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:757:42` | `result: 'success'` |
+| string | `none` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:757:61` | `reason: 'none'` |
+| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:761:15` | `result: 'failure'` |
+| string | `HIL_RAW_CAPTURE_FAILED` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:762:15` | `reason: 'HIL_RAW_CAPTURE_FAILED'` |
+| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:801:15` | `result: 'failure'` |
+| string | `HIL_OPERATION_THROWN` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:802:15` | `reason: 'HIL_OPERATION_THROWN'` |
+| string | `success` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:816:15` | `result: 'success'` |
+| string | `none` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:817:15` | `reason: 'none'` |
+| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:823:13` | `result: 'failure'` |
+| string | `sha256` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:832:21` | `createHash('sha256')` |
+| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:857:31` | `resolveClient('tdx', context)` |
+| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:858:31` | `resolveClient('qmt', context)` |
+| number | `30000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:860:33` | `waitUntilReady(tdx.ready, 30_000)` |
+| number | `30000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:861:33` | `waitUntilReady(qmt.ready, 30_000)` |
+| string | `tdx.syncSubscriptions.soakTarget` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:864:39` | `recordOperation(operations, 'tdx.syncSubscriptions.soakTarget', () => tdx.client.syncSubscriptions([` |
+| string | `qmt.syncSubscriptions.soakTarget` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:867:39` | `recordOperation(operations, 'qmt.syncSubscriptions.soakTarget', () => qmt.client.syncSubscriptions([` |
+| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:872:7` | `waitForFreshCanonicalSnapshot( tdx, 'tdx', tdxSymbol, setupStartedAt, 90_000, )` |
+| number | `90000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:875:7` | `waitForFreshCanonicalSnapshot( tdx, 'tdx', tdxSymbol, setupStartedAt, 90_000, )` |
+| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:879:7` | `waitForFreshCanonicalSnapshot( qmt, 'qmt', qmtSymbol, setupStartedAt, 90_000, )` |
+| number | `90000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:882:7` | `waitForFreshCanonicalSnapshot( qmt, 'qmt', qmtSymbol, setupStartedAt, 90_000, )` |
+| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:888:55` | `requireCurrentSnapshot(tdx, 'tdx', tdxSymbol)` |
+| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:889:55` | `requireCurrentSnapshot(qmt, 'qmt', qmtSymbol)` |
+| number | `-5000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:895:28` | `tdxSnapshotAgeMs < -5_000` |
+| number | `-5000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:897:28` | `qmtSnapshotAgeMs < -5_000` |
+| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:908:68` | `readBridgeHealth(tdxBridgeHealthUrl, 'tdx')` |
+| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:909:68` | `readBridgeHealth(qmtBridgeHealthUrl, 'qmt')` |
+| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:944:31` | `resolveClient('tdx', context)` |
+| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:945:31` | `resolveClient('qmt', context)` |
+| string | `tdx.syncSubscriptions.cleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:946:39` | `recordOperation(operations, 'tdx.syncSubscriptions.cleanup', () => tdx.client.syncSubscriptions([]),` |
+| string | `qmt.syncSubscriptions.cleanup` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:949:39` | `recordOperation(operations, 'qmt.syncSubscriptions.cleanup', () => qmt.client.syncSubscriptions([]),` |
+| string | `dual-source-soak` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:955:14` | `profile: 'dual-source-soak'` |
+| string | `trading-session` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:956:19` | `sessionClass: 'trading-session'` |
+| number | `5000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1029:33` | `AbortSignal.timeout(5_000)` |
+| string | `subscription-journal.jsonl` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1081:18` | `name === 'subscription-journal.jsonl'` |
+| string | `manifest` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1082:23` | `name.includes('manifest')` |
+| string | `compaction-checkpoint` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1083:23` | `name.includes('compaction-checkpoint')` |
+| string | `sealed-range-checkpoint` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1084:23` | `name.includes('sealed-range-checkpoint')` |
+| string | `sha256` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1087:29` | `createHash('sha256')` |
 | string | ` ` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1092:19` | `digest.update('\0')` |
-| string | `dual-source-soak` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1098:40` | `process.env.MIST_HIL_PROFILE === 'dual-source-soak'` |
-| string | `MIST_HIL_SOAK_DURATION_MS` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1100:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_DURATION_MS', 35 * 60 * 1000, )` |
-| number | `35` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101:7` | `35 * 60` |
-| number | `60` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101:12` | `35 * 60` |
-| number | `1000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1101:17` | `35 * 60 * 1000` |
-| string | `MIST_HIL_SOAK_INTERVAL_MS` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1104:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_INTERVAL_MS', 60_000, )` |
-| number | `60000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1105:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_INTERVAL_MS', 60_000, )` |
-| string | `MIST_HIL_SOAK_MAX_SNAPSHOT_AGE_MS` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1108:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_MAX_SNAPSHOT_AGE_MS', 180_000, )` |
-| number | `180000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1109:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_MAX_SNAPSHOT_AGE_MS', 180_000, )` |
-| string | `MIST_HIL_TDX_SYMBOL` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1112:37` | `requireEnvironment('MIST_HIL_TDX_SYMBOL')` |
-| string | `MIST_HIL_QMT_SYMBOL` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1113:37` | `requireEnvironment('MIST_HIL_QMT_SYMBOL')` |
-| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1127:61` | `operation.result === 'failure'` |
-| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1139:17` | `source !== 'tdx'` |
-| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1139:37` | `source !== 'qmt'` |
-| string | `capture` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1142:15` | `mode !== 'capture'` |
-| string | `verify` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1142:37` | `mode !== 'verify'` |
-| string | `verify` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1143:15` | `mode === 'verify'` |
-| string | `verify` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1171:30` | `mode === 'verify'` |
-| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1177:68` | `operation.result === 'failure'` |
+| string | ` ` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1094:19` | `digest.update('\0')` |
+| string | `dual-source-soak` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1100:40` | `process.env.MIST_HIL_PROFILE === 'dual-source-soak'` |
+| string | `MIST_HIL_SOAK_DURATION_MS` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1102:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_DURATION_MS', 35 * 60 * 1000, )` |
+| number | `35` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1103:7` | `35 * 60` |
+| number | `60` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1103:12` | `35 * 60` |
+| number | `1000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1103:17` | `35 * 60 * 1000` |
+| string | `MIST_HIL_SOAK_INTERVAL_MS` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1106:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_INTERVAL_MS', 60_000, )` |
+| number | `60000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1107:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_INTERVAL_MS', 60_000, )` |
+| string | `MIST_HIL_SOAK_MAX_SNAPSHOT_AGE_MS` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1110:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_MAX_SNAPSHOT_AGE_MS', 180_000, )` |
+| number | `180000` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1111:7` | `positiveIntegerEnvironment( 'MIST_HIL_SOAK_MAX_SNAPSHOT_AGE_MS', 180_000, )` |
+| string | `MIST_HIL_TDX_SYMBOL` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1114:37` | `requireEnvironment('MIST_HIL_TDX_SYMBOL')` |
+| string | `MIST_HIL_QMT_SYMBOL` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1115:37` | `requireEnvironment('MIST_HIL_QMT_SYMBOL')` |
+| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1129:61` | `operation.result === 'failure'` |
+| string | `tdx` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1141:17` | `source !== 'tdx'` |
+| string | `qmt` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1141:37` | `source !== 'qmt'` |
+| string | `capture` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1144:15` | `mode !== 'capture'` |
+| string | `verify` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1144:37` | `mode !== 'verify'` |
+| string | `verify` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1145:15` | `mode === 'verify'` |
+| string | `verify` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1173:30` | `mode === 'verify'` |
+| string | `failure` | `apps/mist/src/realtime/hil/realtime-subscription-hil.ts:1179:68` | `operation.result === 'failure'` |
 | string | `mist-backend` | `apps/mist/src/realtime/observability/candle-metrics.ts:26:34` | `metrics.getMeter('mist-backend', '0.1.0')` |
 | string | `0.1.0` | `apps/mist/src/realtime/observability/candle-metrics.ts:26:50` | `metrics.getMeter('mist-backend', '0.1.0')` |
 | string | `mist_candle_sealed_total` | `apps/mist/src/realtime/observability/candle-metrics.ts:29:28` | `meter .createObservableGauge('mist_candle_sealed_total', { description: 'Sealed realtime candles (pr` |
@@ -1405,32 +1404,6 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `8` | `libs/decimal/src/decimal8.ts:113:61` | `places > 8` |
 | number | `8` | `libs/decimal/src/decimal8.ts:116:34` | `8 - places` |
 | number | `10000` | `libs/decimal/src/decimal8.ts:163:18` | `factor === 10_000` |
-| string | `v` | `libs/indicators/src/classic/adx.ts:9:23` | `pl.Series('v', arr as any)` |
-| string | `tail` | `libs/indicators/src/classic/adx.ts:13:32` | `pl.Series('tail', tail as any)` |
-| string | `high` | `libs/indicators/src/classic/adx.ts:38:21` | `pl.Series('high', high as any)` |
-| string | `low` | `libs/indicators/src/classic/adx.ts:39:20` | `pl.Series('low', low as any)` |
-| string | `high` | `libs/indicators/src/classic/adx.ts:43:27` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/classic/adx.ts:44:26` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/classic/adx.ts:47:22` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/classic/adx.ts:47:41` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/classic/adx.ts:48:22` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/classic/adx.ts:49:22` | `pl.col('low')` |
-| string | `high` | `libs/indicators/src/classic/adx.ts:53:25` | `pl.col('high')` |
-| string | `low` | `libs/indicators/src/classic/adx.ts:54:39` | `pl.col('low')` |
-| string | `tr` | `libs/indicators/src/classic/adx.ts:67:18` | `trExpr.alias('tr')` |
-| string | `plusDm` | `libs/indicators/src/classic/adx.ts:68:18` | `plusDm.alias('plusDm')` |
-| string | `minusDm` | `libs/indicators/src/classic/adx.ts:69:19` | `minusDm.alias('minusDm')` |
-| string | `tr` | `libs/indicators/src/classic/adx.ts:72:33` | `selected.getColumn('tr')` |
-| string | `plusDm` | `libs/indicators/src/classic/adx.ts:73:34` | `selected.getColumn('plusDm')` |
-| string | `minusDm` | `libs/indicators/src/classic/adx.ts:74:34` | `selected.getColumn('minusDm')` |
-| string | `tr` | `libs/indicators/src/classic/adx.ts:89:18` | `pl.col('tr')` |
-| string | `pdm` | `libs/indicators/src/classic/adx.ts:90:18` | `pl.col('pdm')` |
-| string | `tr` | `libs/indicators/src/classic/adx.ts:90:36` | `pl.col('tr')` |
-| string | `tr` | `libs/indicators/src/classic/adx.ts:93:18` | `pl.col('tr')` |
-| string | `mdm` | `libs/indicators/src/classic/adx.ts:94:18` | `pl.col('mdm')` |
-| string | `tr` | `libs/indicators/src/classic/adx.ts:94:36` | `pl.col('tr')` |
-| string | `dx` | `libs/indicators/src/classic/adx.ts:105:26` | `dxExpr.alias('dx')` |
-| string | `dx` | `libs/indicators/src/classic/adx.ts:106:16` | `diDf .select(dxExpr.alias('dx')) .getColumn('dx')` |
 | string | `v` | `libs/indicators/src/classic/atr.ts:14:23` | `pl.Series('v', arr as any)` |
 | string | `tail` | `libs/indicators/src/classic/atr.ts:18:32` | `pl.Series('tail', tail as any)` |
 | number | `14` | `libs/indicators/src/classic/atr.ts:27:20` | `period: number = 14` |
@@ -1496,19 +1469,6 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `rpp` | `libs/indicators/src/classic/rpp.ts:59:46` | `rppExpr.alias('rpp')` |
 | string | `rpp` | `libs/indicators/src/classic/rpp.ts:61:39` | `calculated.getColumn('rpp')` |
 | number | `20` | `libs/indicators/src/classic/rpp.ts:76:20` | `window: number = 20` |
-| string | `v` | `libs/indicators/src/classic/rsi.ts:9:23` | `pl.Series('v', arr as any)` |
-| string | `tail` | `libs/indicators/src/classic/rsi.ts:13:32` | `pl.Series('tail', tail as any)` |
-| number | `14` | `libs/indicators/src/classic/rsi.ts:20:20` | `period: number = 14` |
-| string | `ignore` | `libs/indicators/src/classic/rsi.ts:32:40` | `pl.col('close').diff(1, 'ignore')` |
-| string | `gain` | `libs/indicators/src/classic/rsi.ts:36:43` | `gainExpr.alias('gain')` |
-| string | `loss` | `libs/indicators/src/classic/rsi.ts:36:67` | `lossExpr.alias('loss')` |
-| string | `gain` | `libs/indicators/src/classic/rsi.ts:38:34` | `diffDf.getColumn('gain')` |
-| string | `loss` | `libs/indicators/src/classic/rsi.ts:39:35` | `diffDf.getColumn('loss')` |
-| string | `gain` | `libs/indicators/src/classic/rsi.ts:48:21` | `pl.col('gain')` |
-| string | `loss` | `libs/indicators/src/classic/rsi.ts:48:40` | `pl.col('loss')` |
-| string | `loss` | `libs/indicators/src/classic/rsi.ts:50:18` | `pl.col('loss')` |
-| string | `rsi` | `libs/indicators/src/classic/rsi.ts:55:27` | `rsiExpr.alias('rsi')` |
-| string | `rsi` | `libs/indicators/src/classic/rsi.ts:56:16` | `rsiDf .select(rsiExpr.alias('rsi')) .getColumn('rsi')` |
 | number | `5` | `libs/indicators/src/classic/volume.ts:33:45` | `[5, 10, 20]` |
 | number | `10` | `libs/indicators/src/classic/volume.ts:33:48` | `[5, 10, 20]` |
 | number | `20` | `libs/indicators/src/classic/volume.ts:33:52` | `[5, 10, 20]` |
@@ -1580,9 +1540,44 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | number | `4` | `libs/indicators/src/fibonacci/fibonacci.ts:349:43` | `options?.precision ?? 4` |
 | number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:351:27` | `10 ** precision` |
 | number | `10` | `libs/indicators/src/fibonacci/fibonacci.ts:351:46` | `10 ** precision` |
+| number | `0.65` | `libs/indicators/src/force/chan-slope.ts:66:47` | `velocityRatio < 0.65` |
+| string | `pc` | `libs/indicators/src/force/chan-slope.ts:97:9` | `pl .Series( 'pc', units.map((u) => u.priceChange), )` |
+| string | `bc` | `libs/indicators/src/force/chan-slope.ts:103:9` | `pl .Series( 'bc', units.map((u) => Math.max(1, u.barCount)), )` |
+| string | `pc` | `libs/indicators/src/force/chan-slope.ts:110:16` | `df .getColumn('pc')` |
+| string | `bc` | `libs/indicators/src/force/chan-slope.ts:111:23` | `df.getColumn('bc')` |
+| string | `pc` | `libs/indicators/src/force/chan-slope.ts:114:16` | `df .getColumn('pc')` |
+| string | `bc` | `libs/indicators/src/force/chan-slope.ts:116:23` | `df.getColumn('bc')` |
+| number | `0.65` | `libs/indicators/src/force/chan-slope.ts:143:39` | `vRatio < 0.65` |
 | string | `up` | `libs/indicators/src/force/force.ts:29:34` | `unit.trend.toLowerCase() === 'up'` |
 | string | `up` | `libs/indicators/src/force/force.ts:42:34` | `direction === 'up'` |
 | string | `up` | `libs/indicators/src/force/force.ts:95:44` | `directions[unitIndex] === 'up'` |
+| number | `5` | `libs/indicators/src/force/kiss-states.ts:35:45` | `options?.fastPeriod ?? 5` |
+| number | `20` | `libs/indicators/src/force/kiss-states.ts:36:45` | `options?.slowPeriod ?? 20` |
+| number | `10` | `libs/indicators/src/force/kiss-states.ts:37:45` | `options?.windowSize ?? 10` |
+| number | `0.5` | `libs/indicators/src/force/kiss-states.ts:72:41` | `fastCol.add(slowCol).mul(0.5)` |
+| number | `1e-12` | `libs/indicators/src/force/kiss-states.ts:75:25` | `mean.abs().gt(1e-12)` |
+| number | `1e-12` | `libs/indicators/src/force/kiss-states.ts:80:28` | `slowCol.abs().gt(1e-12)` |
+| string | `fast` | `libs/indicators/src/force/kiss-states.ts:87:19` | `fastCol.alias('fast')` |
+| string | `slow` | `libs/indicators/src/force/kiss-states.ts:88:19` | `slowCol.alias('slow')` |
+| string | `diff` | `libs/indicators/src/force/kiss-states.ts:89:16` | `diff.alias('diff')` |
+| string | `diffRatio` | `libs/indicators/src/force/kiss-states.ts:90:21` | `diffRatio.alias('diffRatio')` |
+| string | `mei` | `libs/indicators/src/force/kiss-states.ts:91:15` | `mei.alias('mei')` |
+| string | `fast` | `libs/indicators/src/force/kiss-states.ts:96:16` | `computedDf .getColumn('fast')` |
+| string | `slow` | `libs/indicators/src/force/kiss-states.ts:100:16` | `computedDf .getColumn('slow')` |
+| string | `diff` | `libs/indicators/src/force/kiss-states.ts:104:16` | `computedDf .getColumn('diff')` |
+| string | `diffRatio` | `libs/indicators/src/force/kiss-states.ts:108:16` | `computedDf .getColumn('diffRatio')` |
+| string | `mei` | `libs/indicators/src/force/kiss-states.ts:112:16` | `computedDf .getColumn('mei')` |
+| number | `4` | `libs/indicators/src/force/kiss-states.ts:134:42` | `i - 4` |
+| number | `3` | `libs/indicators/src/force/kiss-states.ts:153:32` | `recent5Ratios.length >= 3` |
+| number | `0.003` | `libs/indicators/src/force/kiss-states.ts:153:58` | `recent5AvgAbsRatio < 0.003` |
+| number | `0.006` | `libs/indicators/src/force/kiss-states.ts:160:22` | `minAbsRatio <= 0.006` |
+| number | `20` | `libs/indicators/src/force/kiss-states.ts:185:45` | `options?.slowPeriod ?? 20` |
+| number | `0.2` | `libs/indicators/src/force/zhongshu-oscillation.ts:31:14` | `zoi <= 0.2` |
+| number | `0.8` | `libs/indicators/src/force/zhongshu-oscillation.ts:32:13` | `zoi < 0.8` |
+| number | `0.5` | `libs/indicators/src/force/zhongshu-oscillation.ts:60:42` | `new Array(closes.length).fill(0.5)` |
+| string | `NEUTRAL_CORE` | `libs/indicators/src/force/zhongshu-oscillation.ts:61:43` | `new Array(closes.length).fill('NEUTRAL_CORE')` |
+| number | `0.5` | `libs/indicators/src/force/zhongshu-oscillation.ts:88:12` | `zoi: 0.5` |
+| string | `NEUTRAL_CORE` | `libs/indicators/src/force/zhongshu-oscillation.ts:89:13` | `zone: 'NEUTRAL_CORE'` |
 | number | `0.95` | `libs/indicators/src/risk-performance/risk-performance.ts:452:45` | `computeValueAtRisk(returns, 0.95)` |
 | number | `0.99` | `libs/indicators/src/risk-performance/risk-performance.ts:453:45` | `computeValueAtRisk(returns, 0.99)` |
 | number | `0.95` | `libs/indicators/src/risk-performance/risk-performance.ts:454:49` | `computeConditionalVaR(returns, 0.95)` |
@@ -1772,9 +1767,11 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `../../../../..` | `libs/strategy/src/factor/external-plugin-loader.ts:152:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
 | string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:153:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
 | string | `require` | `libs/strategy/src/factor/external-plugin-loader.ts:248:18` | `eval('require')` |
-| number | `5` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:222:64` | `[5, 10, 20]` |
-| number | `10` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:222:67` | `[5, 10, 20]` |
-| number | `20` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:222:71` | `[5, 10, 20]` |
+| number | `50` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:152:35` | `bars.length > 50` |
+| number | `-50` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:152:51` | `bars.slice(-50)` |
+| number | `5` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:225:64` | `[5, 10, 20]` |
+| number | `10` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:225:67` | `[5, 10, 20]` |
+| number | `20` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:225:71` | `[5, 10, 20]` |
 | string | `有效行情数据为空，未形成缠论K线` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:133:17` | `reason: '有效行情数据为空，未形成缠论K线'` |
 | string | `未检测到满足条件的缠论买卖点` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:147:17` | `reason: '未检测到满足条件的缠论买卖点'` |
 | string | `缠论买卖点已在先前批次发射，无需重复触发` | `libs/strategy/src/factor/plugins/chan-bsp.plugin.ts:191:19` | `reason: '缠论买卖点已在先前批次发射，无需重复触发'` |
@@ -1837,11 +1834,11 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `amount` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:119:31` | `sumQuantity(bars, 'amount')` |
 | string | `discarded` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:172:27` | `trigger.outcome === 'discarded'` |
 | string | `complete` | `libs/strategy/src/kernel/adapters/realtime-period.builder.ts:184:24` | `sealedBar.type !== 'complete'` |
-| string | `volumeFeatures` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:163:22` | `attributes.set('volumeFeatures', vf)` |
-| string | `SIGNAL_EMITTED` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:190:31` | `decision.status !== 'SIGNAL_EMITTED'` |
-| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:191:31` | `decision.action !== 'BUY'` |
-| string | `SELL` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:191:60` | `decision.action !== 'SELL'` |
-| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:202:39` | `decision.action === 'BUY'` |
+| string | `volumeFeatures` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:188:19` | `key === 'volumeFeatures'` |
+| string | `SIGNAL_EMITTED` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:223:31` | `decision.status !== 'SIGNAL_EMITTED'` |
+| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:224:31` | `decision.action !== 'BUY'` |
+| string | `SELL` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:224:60` | `decision.action !== 'SELL'` |
+| string | `BUY` | `libs/strategy/src/kernel/strategy-evaluation-kernel.ts:235:39` | `decision.action === 'BUY'` |
 | string | `finiteNumber` | `libs/strategy/src/rules/strategy-field.catalog.ts:41:16` | `valueType: 'finiteNumber'` |
 | string | `decimal` | `libs/strategy/src/rules/strategy-field.catalog.ts:48:16` | `valueType: 'decimal'` |
 | string | `forwardFillWithinTradingDay` | `libs/strategy/src/rules/strategy-field.catalog.ts:51:20` | `missingPolicy: 'forwardFillWithinTradingDay'` |
@@ -2077,18 +2074,18 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `chan` | `libs/visual-command/src/visual-command.service.ts:67:40` | `layerSet.has('chan')` |
 | string | `chan` | `libs/visual-command/src/visual-command.service.ts:68:35` | `layerSet.has('chan')` |
 | string | `fibonacci` | `libs/visual-command/src/visual-command.service.ts:74:22` | `layerSet.has('fibonacci')` |
-| string | `k.json` | `tools/strategy-dev/provider.ts:67:61` | `path.join(baseDir, options.caseKey, 'k.json')` |
-| string | `, ` | `tools/strategy-dev/provider.ts:75:66` | `FIXTURE_DIRS.join(', ')` |
-| string | `, ` | `tools/strategy-dev/provider.ts:114:19` | `listAvailableDatasets() .map((d) => d.key) .join(', ')` |
-| string | `k.json` | `tools/strategy-dev/provider.ts:157:54` | `path.join(baseDir, ent.name, 'k.json')` |
-| string | `meta.json` | `tools/strategy-dev/provider.ts:162:61` | `path.join(baseDir, ent.name, 'meta.json')` |
-| string | `fixture` | `tools/strategy-dev/provider.ts:174:21` | `type: 'fixture'` |
-| string | `.json` | `tools/strategy-dev/provider.ts:192:24` | `f.endsWith('.json')` |
-| string | `.json` | `tools/strategy-dev/provider.ts:193:35` | `f.replace('.json', '')` |
-| string | `cache` | `tools/strategy-dev/provider.ts:197:19` | `type: 'cache'` |
-| string | `.json` | `tools/strategy-dev/provider.ts:198:28` | `f.replace('.json', '')` |
-| string | `meta.json` | `tools/strategy-dev/provider.ts:220:53` | `path.join(baseDir, ent.name, 'meta.json')` |
-| string | `k.json` | `tools/strategy-dev/provider.ts:228:49` | `path.join(baseDir, ent.name, 'k.json')` |
+| string | `k.json` | `tools/strategy-dev/provider.ts:97:61` | `path.join(baseDir, options.caseKey, 'k.json')` |
+| string | `, ` | `tools/strategy-dev/provider.ts:105:66` | `FIXTURE_DIRS.join(', ')` |
+| string | `, ` | `tools/strategy-dev/provider.ts:144:19` | `listAvailableDatasets() .map((d) => d.key) .join(', ')` |
+| string | `k.json` | `tools/strategy-dev/provider.ts:187:54` | `path.join(baseDir, ent.name, 'k.json')` |
+| string | `meta.json` | `tools/strategy-dev/provider.ts:192:61` | `path.join(baseDir, ent.name, 'meta.json')` |
+| string | `fixture` | `tools/strategy-dev/provider.ts:204:21` | `type: 'fixture'` |
+| string | `.json` | `tools/strategy-dev/provider.ts:222:24` | `f.endsWith('.json')` |
+| string | `.json` | `tools/strategy-dev/provider.ts:223:35` | `f.replace('.json', '')` |
+| string | `cache` | `tools/strategy-dev/provider.ts:227:19` | `type: 'cache'` |
+| string | `.json` | `tools/strategy-dev/provider.ts:228:28` | `f.replace('.json', '')` |
+| string | `meta.json` | `tools/strategy-dev/provider.ts:250:53` | `path.join(baseDir, ent.name, 'meta.json')` |
+| string | `k.json` | `tools/strategy-dev/provider.ts:258:49` | `path.join(baseDir, ent.name, 'k.json')` |
 | string | `case` | `tools/strategy-dev/runner.ts:58:26` | `getArg('case')` |
 | string | `caseKey` | `tools/strategy-dev/runner.ts:58:44` | `getArg('caseKey')` |
 | string | `code` | `tools/strategy-dev/runner.ts:59:23` | `getArg('code')` |
@@ -2109,100 +2106,353 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | number | `19` | `tools/strategy-dev/runner.ts:215:61` | `s.signalTime.replace('T', ' ').substring(0, 19)` |
 | number | `19` | `tools/strategy-dev/runner.ts:216:60` | `s.pivotTime.replace('T', ' ').substring(0, 19)` |
 | number | `99.9` | `tools/strategy-dev/runner.ts:287:65` | `grossProfit > 0 ? 99.9 : 0` |
-| string | `Forbidden: Strategy simulation suite is strictly restricted to local development environment and disabled in production.` | `tools/strategy-dev/server.ts:80:11` | `error: 'Forbidden: Strategy simulation suite is strictly restricted to local development environment` |
-| string | `.json` | `tools/strategy-dev/server.ts:168:39` | `file.endsWith('.json')` |
-| string | `latest-dump.json` | `tools/strategy-dev/server.ts:168:60` | `file !== 'latest-dump.json'` |
-| string | `complete` | `tools/strategy-dev/server.ts:229:11` | `type: 'complete'` |
-| string | `上证指数 30m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:321:19` | `strategyName: '上证指数 30m 缠论策略树决策流回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:323:13` | `status: 'completed'` |
-| string | `qmt` | `tools/strategy-dev/server.ts:324:13` | `source: 'qmt'` |
-| number | `30` | `tools/strategy-dev/server.ts:326:13` | `period: 30` |
-| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:327:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
-| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:328:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
-| number | `51` | `tools/strategy-dev/server.ts:329:18` | `signalCount: 51` |
-| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:331:16` | `startedAt: '2026-09-25T05:00:00.000Z'` |
-| string | `2026-09-25T05:00:02.000Z` | `tools/strategy-dev/server.ts:332:18` | `completedAt: '2026-09-25T05:00:02.000Z'` |
-| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:333:16` | `createdAt: '2026-09-25T05:00:00.000Z'` |
-| string | `上证指数 日线 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:338:19` | `strategyName: '上证指数 日线 缠论策略树决策流回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:340:13` | `status: 'completed'` |
-| string | `qmt` | `tools/strategy-dev/server.ts:341:13` | `source: 'qmt'` |
-| number | `1440` | `tools/strategy-dev/server.ts:343:13` | `period: 1440` |
-| string | `2024-01-01T16:00:00.000Z` | `tools/strategy-dev/server.ts:344:16` | `startDate: '2024-01-01T16:00:00.000Z'` |
-| string | `2026-09-23T16:00:00.000Z` | `tools/strategy-dev/server.ts:345:14` | `endDate: '2026-09-23T16:00:00.000Z'` |
-| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:348:16` | `startedAt: '2026-09-25T04:50:00.000Z'` |
-| string | `2026-09-25T04:50:01.000Z` | `tools/strategy-dev/server.ts:349:18` | `completedAt: '2026-09-25T04:50:01.000Z'` |
-| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:350:16` | `createdAt: '2026-09-25T04:50:00.000Z'` |
-| number | `3` | `tools/strategy-dev/server.ts:353:9` | `id: 3` |
-| string | `上证指数 5m 缠论策略树决策流回测` | `tools/strategy-dev/server.ts:355:19` | `strategyName: '上证指数 5m 缠论策略树决策流回测'` |
-| string | `completed` | `tools/strategy-dev/server.ts:357:13` | `status: 'completed'` |
-| string | `qmt` | `tools/strategy-dev/server.ts:358:13` | `source: 'qmt'` |
-| number | `5` | `tools/strategy-dev/server.ts:360:13` | `period: 5` |
-| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:361:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
-| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:362:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
-| number | `4` | `tools/strategy-dev/server.ts:363:18` | `signalCount: 4` |
-| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:365:16` | `startedAt: '2026-09-25T04:45:00.000Z'` |
-| string | `2026-09-25T04:45:01.000Z` | `tools/strategy-dev/server.ts:366:18` | `completedAt: '2026-09-25T04:45:01.000Z'` |
-| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:367:16` | `createdAt: '2026-09-25T04:45:00.000Z'` |
-| number | `200` | `tools/strategy-dev/server.ts:460:51` | `startIndex - 200` |
-| number | `-8640000000000000` | `tools/strategy-dev/server.ts:467:16` | `new Date(-8640000000000000)` |
-| number | `60` | `tools/strategy-dev/server.ts:480:27` | `requiredBarCount: 60` |
-| string | `/v1/indicators/k` | `tools/strategy-dev/server.ts:518:24` | `pathname.endsWith('/v1/indicators/k')` |
-| string | `/indicators/k` | `tools/strategy-dev/server.ts:519:25` | `pathname.endsWith('/indicators/k')` |
-| string | `/v1/chan/merge-k` | `tools/strategy-dev/server.ts:581:25` | `pathname.endsWith('/v1/chan/merge-k')` |
-| number | `200` | `tools/strategy-dev/server.ts:609:25` | `sendJson(res, [], 200)` |
-| string | `/v1/visual/commands` | `tools/strategy-dev/server.ts:615:25` | `pathname.endsWith('/v1/visual/commands')` |
-| string | `/v1/simulation/` | `tools/strategy-dev/server.ts:675:25` | `pathname.includes('/v1/simulation/')` |
-| string | `/v1/simulation/start` | `tools/strategy-dev/server.ts:682:25` | `pathname.endsWith('/v1/simulation/start')` |
-| string | `/v1/simulation/stream` | `tools/strategy-dev/server.ts:802:25` | `pathname.endsWith('/v1/simulation/stream')` |
-| number | `404` | `tools/strategy-dev/server.ts:807:21` | `res.writeHead(404, { 'Content-Type': 'text/plain' })` |
-| number | `200` | `tools/strategy-dev/server.ts:812:19` | `res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform',` |
-| string | `no-cache, no-transform` | `tools/strategy-dev/server.ts:814:24` | `'Cache-Control': 'no-cache, no-transform'` |
-| string | `no` | `tools/strategy-dev/server.ts:817:28` | `'X-Accel-Buffering': 'no'` |
+| string | `Forbidden: Strategy simulation suite is strictly restricted to local development environment and disabled in production.` | `tools/strategy-dev/server.ts:93:11` | `error: 'Forbidden: Strategy simulation suite is strictly restricted to local development environment` |
+| string | `.json` | `tools/strategy-dev/server.ts:181:39` | `file.endsWith('.json')` |
+| string | `latest-dump.json` | `tools/strategy-dev/server.ts:181:60` | `file !== 'latest-dump.json'` |
+| string | `complete` | `tools/strategy-dev/server.ts:244:11` | `type: 'complete'` |
+| string | `上证指数 30m 缠论形态增强买卖点回测 (无止损止盈)` | `tools/strategy-dev/server.ts:336:19` | `strategyName: '上证指数 30m 缠论形态增强买卖点回测 (无止损止盈)'` |
+| string | `completed` | `tools/strategy-dev/server.ts:338:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:339:13` | `source: 'qmt'` |
+| number | `30` | `tools/strategy-dev/server.ts:341:13` | `period: 30` |
+| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:342:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
+| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:343:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
+| number | `51` | `tools/strategy-dev/server.ts:344:18` | `signalCount: 51` |
+| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:346:16` | `startedAt: '2026-09-25T05:00:00.000Z'` |
+| string | `2026-09-25T05:00:02.000Z` | `tools/strategy-dev/server.ts:347:18` | `completedAt: '2026-09-25T05:00:02.000Z'` |
+| string | `2026-09-25T05:00:00.000Z` | `tools/strategy-dev/server.ts:348:16` | `createdAt: '2026-09-25T05:00:00.000Z'` |
+| string | `上证指数 日线 缠论形态增强买卖点回测 (无止损止盈)` | `tools/strategy-dev/server.ts:353:19` | `strategyName: '上证指数 日线 缠论形态增强买卖点回测 (无止损止盈)'` |
+| string | `completed` | `tools/strategy-dev/server.ts:355:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:356:13` | `source: 'qmt'` |
+| number | `1440` | `tools/strategy-dev/server.ts:358:13` | `period: 1440` |
+| string | `2015-01-01T00:00:00.000Z` | `tools/strategy-dev/server.ts:359:16` | `startDate: '2015-01-01T00:00:00.000Z'` |
+| string | `2026-10-13T16:00:00.000Z` | `tools/strategy-dev/server.ts:360:14` | `endDate: '2026-10-13T16:00:00.000Z'` |
+| number | `10` | `tools/strategy-dev/server.ts:361:18` | `signalCount: 10` |
+| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:363:16` | `startedAt: '2026-09-25T04:50:00.000Z'` |
+| string | `2026-09-25T04:50:01.000Z` | `tools/strategy-dev/server.ts:364:18` | `completedAt: '2026-09-25T04:50:01.000Z'` |
+| string | `2026-09-25T04:50:00.000Z` | `tools/strategy-dev/server.ts:365:16` | `createdAt: '2026-09-25T04:50:00.000Z'` |
+| number | `3` | `tools/strategy-dev/server.ts:368:9` | `id: 3` |
+| string | `上证指数 5m 缠论形态增强买卖点回测 (无止损止盈)` | `tools/strategy-dev/server.ts:370:19` | `strategyName: '上证指数 5m 缠论形态增强买卖点回测 (无止损止盈)'` |
+| string | `completed` | `tools/strategy-dev/server.ts:372:13` | `status: 'completed'` |
+| string | `qmt` | `tools/strategy-dev/server.ts:373:13` | `source: 'qmt'` |
+| number | `5` | `tools/strategy-dev/server.ts:375:13` | `period: 5` |
+| string | `2025-07-03T05:30:00.000Z` | `tools/strategy-dev/server.ts:376:16` | `startDate: '2025-07-03T05:30:00.000Z'` |
+| string | `2026-09-24T07:00:00.000Z` | `tools/strategy-dev/server.ts:377:14` | `endDate: '2026-09-24T07:00:00.000Z'` |
+| number | `4` | `tools/strategy-dev/server.ts:378:18` | `signalCount: 4` |
+| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:380:16` | `startedAt: '2026-09-25T04:45:00.000Z'` |
+| string | `2026-09-25T04:45:01.000Z` | `tools/strategy-dev/server.ts:381:18` | `completedAt: '2026-09-25T04:45:01.000Z'` |
+| string | `2026-09-25T04:45:00.000Z` | `tools/strategy-dev/server.ts:382:16` | `createdAt: '2026-09-25T04:45:00.000Z'` |
+| string | `single` | `tools/strategy-dev/server.ts:422:16` | `mode === 'single'` |
+| string | `plugin.regime.shanghai-index` | `tools/strategy-dev/server.ts:424:22` | `pluginId === 'plugin.regime.shanghai-index'` |
+| string | `plugin.chan.bsp` | `tools/strategy-dev/server.ts:427:22` | `pluginId === 'plugin.chan.bsp'` |
+| number | `60` | `tools/strategy-dev/server.ts:431:33` | `params.requiredBarCount = 60` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:436:13` | `type: 'GUARD'` |
+| string | `BOTH` | `tools/strategy-dev/server.ts:440:23` | `requiredAction: 'BOTH'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:441:22` | `minConfidence: 0.5` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:444:15` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:445:17` | `action: 'INHERIT'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:451:15` | `type: 'TERMINAL'` |
+| string | `ABORT` | `tools/strategy-dev/server.ts:452:17` | `action: 'ABORT'` |
+| string | `未满足因子确认条件` | `tools/strategy-dev/server.ts:453:17` | `reason: '未满足因子确认条件'` |
+| number | `3` | `tools/strategy-dev/server.ts:459:30` | `strategyDefinitionId === 3` |
+| string | `full_resonance` | `tools/strategy-dev/server.ts:460:14` | `mode === 'full_resonance'` |
+| string | `enhanced` | `tools/strategy-dev/server.ts:461:14` | `mode === 'enhanced'` |
+| string | `guard_regime_shanghai` | `tools/strategy-dev/server.ts:464:11` | `id: 'guard_regime_shanghai'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:465:13` | `type: 'GUARD'` |
+| string | `上证宏观大周期滤网` | `tools/strategy-dev/server.ts:466:13` | `name: '上证宏观大周期滤网'` |
+| string | `plugin.regime.shanghai-index` | `tools/strategy-dev/server.ts:467:17` | `pluginId: 'plugin.regime.shanghai-index'` |
+| string | `dual_speed` | `tools/strategy-dev/server.ts:468:23` | `mode: 'dual_speed'` |
+| string | `BUY` | `tools/strategy-dev/server.ts:469:23` | `requiredAction: 'BUY'` |
+| number | `0.6` | `tools/strategy-dev/server.ts:470:22` | `minConfidence: 0.6` |
+| string | `guard_bull_chan_bsp` | `tools/strategy-dev/server.ts:473:13` | `id: 'guard_bull_chan_bsp'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:474:15` | `type: 'GUARD'` |
+| string | `牛市缠论形态主门禁` | `tools/strategy-dev/server.ts:475:15` | `name: '牛市缠论形态主门禁'` |
+| string | `plugin.chan.bsp` | `tools/strategy-dev/server.ts:476:19` | `pluginId: 'plugin.chan.bsp'` |
+| string | `bi` | `tools/strategy-dev/server.ts:478:18` | `units: 'bi'` |
+| string | `both` | `tools/strategy-dev/server.ts:479:22` | `direction: 'both'` |
+| number | `60` | `tools/strategy-dev/server.ts:481:29` | `requiredBarCount: 60` |
+| string | `BOTH` | `tools/strategy-dev/server.ts:484:25` | `requiredAction: 'BOTH'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:485:24` | `minConfidence: 0.5` |
+| string | `guard_bull_vpci` | `tools/strategy-dev/server.ts:487:15` | `id: 'guard_bull_vpci'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:488:17` | `type: 'GUARD'` |
+| string | `VPCI量价共振增强校验` | `tools/strategy-dev/server.ts:489:17` | `name: 'VPCI量价共振增强校验'` |
+| string | `plugin.tactics.volume-price-confirmation` | `tools/strategy-dev/server.ts:490:21` | `pluginId: 'plugin.tactics.volume-price-confirmation'` |
+| string | `BUY` | `tools/strategy-dev/server.ts:492:27` | `requiredAction: 'BUY'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:493:26` | `minConfidence: 0.5` |
+| string | `term_bull_chan_enhanced` | `tools/strategy-dev/server.ts:495:17` | `id: 'term_bull_chan_enhanced'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:496:19` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:497:21` | `action: 'INHERIT'` |
+| string | `ENHANCED_CHAN_BSP` | `tools/strategy-dev/server.ts:498:24` | `signalTag: 'ENHANCED_CHAN_BSP'` |
+| string | `牛市顺势下缠论形态结构确立且通过私有量价共振增强确认` | `tools/strategy-dev/server.ts:499:21` | `reason: '牛市顺势下缠论形态结构确立且通过私有量价共振增强确认'` |
+| string | `term_bull_chan_standard` | `tools/strategy-dev/server.ts:502:17` | `id: 'term_bull_chan_standard'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:503:19` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:504:21` | `action: 'INHERIT'` |
+| string | `BULL_CHAN_BSP` | `tools/strategy-dev/server.ts:505:24` | `signalTag: 'BULL_CHAN_BSP'` |
+| string | `牛市顺势下缠论标准形态买卖点确立` | `tools/strategy-dev/server.ts:506:21` | `reason: '牛市顺势下缠论标准形态买卖点确立'` |
+| string | `guard_bull_squeeze` | `tools/strategy-dev/server.ts:511:15` | `id: 'guard_bull_squeeze'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:512:17` | `type: 'GUARD'` |
+| string | `私有波动率挤压放量战术买点增强` | `tools/strategy-dev/server.ts:513:17` | `name: '私有波动率挤压放量战术买点增强'` |
+| string | `plugin.tactics.volatility-squeeze-fire` | `tools/strategy-dev/server.ts:514:21` | `pluginId: 'plugin.tactics.volatility-squeeze-fire'` |
+| number | `0.65` | `tools/strategy-dev/server.ts:515:38` | `minVolumeTsRank: 0.65` |
+| number | `0.65` | `tools/strategy-dev/server.ts:515:63` | `minEntityAtrRatio: 0.65` |
+| string | `BUY` | `tools/strategy-dev/server.ts:516:27` | `requiredAction: 'BUY'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:517:26` | `minConfidence: 0.5` |
+| string | `term_bull_squeeze_fire` | `tools/strategy-dev/server.ts:519:17` | `id: 'term_bull_squeeze_fire'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:520:19` | `type: 'TERMINAL'` |
+| string | `BUY` | `tools/strategy-dev/server.ts:521:21` | `action: 'BUY'` |
+| string | `TACTICS_FIRE_BUY` | `tools/strategy-dev/server.ts:522:24` | `signalTag: 'TACTICS_FIRE_BUY'` |
+| string | `宏观牛市蓄能挤压释放爆发买点` | `tools/strategy-dev/server.ts:523:21` | `reason: '宏观牛市蓄能挤压释放爆发买点'` |
+| string | `guard_bull_tactics` | `tools/strategy-dev/server.ts:527:17` | `id: 'guard_bull_tactics'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:528:19` | `type: 'GUARD'` |
+| string | `牛市微观左右侧战术增强` | `tools/strategy-dev/server.ts:529:19` | `name: '牛市微观左右侧战术增强'` |
+| string | `plugin.tactics.bull-left-right-bsp` | `tools/strategy-dev/server.ts:530:23` | `pluginId: 'plugin.tactics.bull-left-right-bsp'` |
+| string | `BOTH` | `tools/strategy-dev/server.ts:532:29` | `requiredAction: 'BOTH'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:533:28` | `minConfidence: 0.5` |
+| string | `term_bull_tactics_pass` | `tools/strategy-dev/server.ts:535:19` | `id: 'term_bull_tactics_pass'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:536:21` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:537:23` | `action: 'INHERIT'` |
+| string | `BULL_TACTICS_SIGNAL` | `tools/strategy-dev/server.ts:538:26` | `signalTag: 'BULL_TACTICS_SIGNAL'` |
+| string | `宏观牛市下触发左右侧微观战术信号` | `tools/strategy-dev/server.ts:539:23` | `reason: '宏观牛市下触发左右侧微观战术信号'` |
+| string | `term_bull_abort` | `tools/strategy-dev/server.ts:542:19` | `id: 'term_bull_abort'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:543:21` | `type: 'TERMINAL'` |
+| string | `ABORT` | `tools/strategy-dev/server.ts:544:23` | `action: 'ABORT'` |
+| string | `牛市环境中未满足缠论形态或战术增强触发条件` | `tools/strategy-dev/server.ts:545:23` | `reason: '牛市环境中未满足缠论形态或战术增强触发条件'` |
+| string | `guard_regime_bear_check` | `tools/strategy-dev/server.ts:552:13` | `id: 'guard_regime_bear_check'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:553:15` | `type: 'GUARD'` |
+| string | `上证宏观走熊与防守研判` | `tools/strategy-dev/server.ts:554:15` | `name: '上证宏观走熊与防守研判'` |
+| string | `plugin.regime.shanghai-index` | `tools/strategy-dev/server.ts:555:19` | `pluginId: 'plugin.regime.shanghai-index'` |
+| string | `dual_speed` | `tools/strategy-dev/server.ts:556:25` | `mode: 'dual_speed'` |
+| string | `SELL` | `tools/strategy-dev/server.ts:557:25` | `requiredAction: 'SELL'` |
+| number | `0.6` | `tools/strategy-dev/server.ts:558:24` | `minConfidence: 0.6` |
+| string | `guard_bear_tactics` | `tools/strategy-dev/server.ts:560:15` | `id: 'guard_bear_tactics'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:561:17` | `type: 'GUARD'` |
+| string | `熊市左右侧战术研判门禁` | `tools/strategy-dev/server.ts:562:17` | `name: '熊市左右侧战术研判门禁'` |
+| string | `plugin.tactics.bear-left-right-bsp` | `tools/strategy-dev/server.ts:563:21` | `pluginId: 'plugin.tactics.bear-left-right-bsp'` |
+| string | `BOTH` | `tools/strategy-dev/server.ts:565:27` | `requiredAction: 'BOTH'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:566:26` | `minConfidence: 0.5` |
+| string | `term_bear_tactics_pass` | `tools/strategy-dev/server.ts:568:17` | `id: 'term_bear_tactics_pass'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:569:19` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:570:21` | `action: 'INHERIT'` |
+| string | `BEAR_TACTICS_SIGNAL` | `tools/strategy-dev/server.ts:571:24` | `signalTag: 'BEAR_TACTICS_SIGNAL'` |
+| string | `熊市左右侧战术买点触发` | `tools/strategy-dev/server.ts:572:21` | `reason: '熊市左右侧战术买点触发'` |
+| string | `term_regime_defend_sell` | `tools/strategy-dev/server.ts:575:17` | `id: 'term_regime_defend_sell'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:576:19` | `type: 'TERMINAL'` |
+| string | `SELL` | `tools/strategy-dev/server.ts:577:21` | `action: 'SELL'` |
+| string | `REGIME_DEFEND_SELL` | `tools/strategy-dev/server.ts:578:24` | `signalTag: 'REGIME_DEFEND_SELL'` |
+| string | `上证指数宏观走熊清仓防守` | `tools/strategy-dev/server.ts:579:21` | `reason: '上证指数宏观走熊清仓防守'` |
+| string | `term_regime_neutral_abort` | `tools/strategy-dev/server.ts:583:15` | `id: 'term_regime_neutral_abort'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:584:17` | `type: 'TERMINAL'` |
+| string | `ABORT` | `tools/strategy-dev/server.ts:585:19` | `action: 'ABORT'` |
+| string | `上证指数震荡纠缠，维持观望` | `tools/strategy-dev/server.ts:586:19` | `reason: '上证指数震荡纠缠，维持观望'` |
+| string | `composite` | `tools/strategy-dev/server.ts:594:14` | `mode === 'composite'` |
+| string | `tactics` | `tools/strategy-dev/server.ts:595:14` | `mode === 'tactics'` |
+| string | `guard_regime_shanghai` | `tools/strategy-dev/server.ts:598:11` | `id: 'guard_regime_shanghai'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:599:13` | `type: 'GUARD'` |
+| string | `上证宏观大周期滤网` | `tools/strategy-dev/server.ts:600:13` | `name: '上证宏观大周期滤网'` |
+| string | `plugin.regime.shanghai-index` | `tools/strategy-dev/server.ts:601:17` | `pluginId: 'plugin.regime.shanghai-index'` |
+| string | `dual_speed` | `tools/strategy-dev/server.ts:602:23` | `mode: 'dual_speed'` |
+| string | `BUY` | `tools/strategy-dev/server.ts:603:23` | `requiredAction: 'BUY'` |
+| number | `0.6` | `tools/strategy-dev/server.ts:604:22` | `minConfidence: 0.6` |
+| string | `guard_bull_chan_bsp` | `tools/strategy-dev/server.ts:607:13` | `id: 'guard_bull_chan_bsp'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:608:15` | `type: 'GUARD'` |
+| string | `牛市缠论形态主门禁` | `tools/strategy-dev/server.ts:609:15` | `name: '牛市缠论形态主门禁'` |
+| string | `plugin.chan.bsp` | `tools/strategy-dev/server.ts:610:19` | `pluginId: 'plugin.chan.bsp'` |
+| string | `bi` | `tools/strategy-dev/server.ts:612:18` | `units: 'bi'` |
+| string | `both` | `tools/strategy-dev/server.ts:613:22` | `direction: 'both'` |
+| number | `60` | `tools/strategy-dev/server.ts:615:29` | `requiredBarCount: 60` |
+| string | `BOTH` | `tools/strategy-dev/server.ts:618:25` | `requiredAction: 'BOTH'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:619:24` | `minConfidence: 0.5` |
+| string | `term_bull_chan_pass` | `tools/strategy-dev/server.ts:621:15` | `id: 'term_bull_chan_pass'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:622:17` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:623:19` | `action: 'INHERIT'` |
+| string | `BULL_CHAN_BSP` | `tools/strategy-dev/server.ts:624:22` | `signalTag: 'BULL_CHAN_BSP'` |
+| string | `宏观牛市顺势下缠论标准形态买卖点确立` | `tools/strategy-dev/server.ts:625:19` | `reason: '宏观牛市顺势下缠论标准形态买卖点确立'` |
+| string | `guard_bull_tactics` | `tools/strategy-dev/server.ts:629:15` | `id: 'guard_bull_tactics'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:630:17` | `type: 'GUARD'` |
+| string | `牛市微观左右侧战术增强` | `tools/strategy-dev/server.ts:631:17` | `name: '牛市微观左右侧战术增强'` |
+| string | `plugin.tactics.bull-left-right-bsp` | `tools/strategy-dev/server.ts:632:21` | `pluginId: 'plugin.tactics.bull-left-right-bsp'` |
+| string | `BOTH` | `tools/strategy-dev/server.ts:634:27` | `requiredAction: 'BOTH'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:635:26` | `minConfidence: 0.5` |
+| string | `term_bull_tactics_pass` | `tools/strategy-dev/server.ts:637:17` | `id: 'term_bull_tactics_pass'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:638:19` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:639:21` | `action: 'INHERIT'` |
+| string | `BULL_TACTICS_SIGNAL` | `tools/strategy-dev/server.ts:640:24` | `signalTag: 'BULL_TACTICS_SIGNAL'` |
+| string | `宏观牛市下触发左右侧微观战术信号` | `tools/strategy-dev/server.ts:641:21` | `reason: '宏观牛市下触发左右侧微观战术信号'` |
+| string | `term_bull_abort` | `tools/strategy-dev/server.ts:644:17` | `id: 'term_bull_abort'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:645:19` | `type: 'TERMINAL'` |
+| string | `ABORT` | `tools/strategy-dev/server.ts:646:21` | `action: 'ABORT'` |
+| string | `牛市环境中未满足缠论形态或左右侧战术触发条件` | `tools/strategy-dev/server.ts:647:21` | `reason: '牛市环境中未满足缠论形态或左右侧战术触发条件'` |
+| string | `guard_regime_bear_check` | `tools/strategy-dev/server.ts:653:13` | `id: 'guard_regime_bear_check'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:654:15` | `type: 'GUARD'` |
+| string | `上证宏观走熊与防守研判` | `tools/strategy-dev/server.ts:655:15` | `name: '上证宏观走熊与防守研判'` |
+| string | `plugin.regime.shanghai-index` | `tools/strategy-dev/server.ts:656:19` | `pluginId: 'plugin.regime.shanghai-index'` |
+| string | `dual_speed` | `tools/strategy-dev/server.ts:657:25` | `mode: 'dual_speed'` |
+| string | `SELL` | `tools/strategy-dev/server.ts:658:25` | `requiredAction: 'SELL'` |
+| number | `0.6` | `tools/strategy-dev/server.ts:659:24` | `minConfidence: 0.6` |
+| string | `guard_bear_tactics` | `tools/strategy-dev/server.ts:661:15` | `id: 'guard_bear_tactics'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:662:17` | `type: 'GUARD'` |
+| string | `熊市左右侧战术研判门禁` | `tools/strategy-dev/server.ts:663:17` | `name: '熊市左右侧战术研判门禁'` |
+| string | `plugin.tactics.bear-left-right-bsp` | `tools/strategy-dev/server.ts:664:21` | `pluginId: 'plugin.tactics.bear-left-right-bsp'` |
+| string | `BOTH` | `tools/strategy-dev/server.ts:666:27` | `requiredAction: 'BOTH'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:667:26` | `minConfidence: 0.5` |
+| string | `term_bear_tactics_pass` | `tools/strategy-dev/server.ts:669:17` | `id: 'term_bear_tactics_pass'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:670:19` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:671:21` | `action: 'INHERIT'` |
+| string | `BEAR_TACTICS_SIGNAL` | `tools/strategy-dev/server.ts:672:24` | `signalTag: 'BEAR_TACTICS_SIGNAL'` |
+| string | `熊市左右侧战术买点触发` | `tools/strategy-dev/server.ts:673:21` | `reason: '熊市左右侧战术买点触发'` |
+| string | `term_regime_defend_sell` | `tools/strategy-dev/server.ts:676:17` | `id: 'term_regime_defend_sell'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:677:19` | `type: 'TERMINAL'` |
+| string | `SELL` | `tools/strategy-dev/server.ts:678:21` | `action: 'SELL'` |
+| string | `REGIME_DEFEND_SELL` | `tools/strategy-dev/server.ts:679:24` | `signalTag: 'REGIME_DEFEND_SELL'` |
+| string | `上证指数宏观走熊清仓防守` | `tools/strategy-dev/server.ts:680:21` | `reason: '上证指数宏观走熊清仓防守'` |
+| string | `term_regime_neutral_abort` | `tools/strategy-dev/server.ts:684:15` | `id: 'term_regime_neutral_abort'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:685:17` | `type: 'TERMINAL'` |
+| string | `ABORT` | `tools/strategy-dev/server.ts:686:19` | `action: 'ABORT'` |
+| string | `上证指数震荡纠缠，维持观望` | `tools/strategy-dev/server.ts:687:19` | `reason: '上证指数震荡纠缠，维持观望'` |
+| string | `guard_chan_bsp_primary` | `tools/strategy-dev/server.ts:703:9` | `id: 'guard_chan_bsp_primary'` |
+| string | `GUARD` | `tools/strategy-dev/server.ts:704:11` | `type: 'GUARD'` |
+| string | `缠论标准形态买卖点主门禁` | `tools/strategy-dev/server.ts:705:11` | `name: '缠论标准形态买卖点主门禁'` |
+| string | `plugin.chan.bsp` | `tools/strategy-dev/server.ts:706:15` | `pluginId: 'plugin.chan.bsp'` |
+| string | `bi` | `tools/strategy-dev/server.ts:708:14` | `units: 'bi'` |
+| string | `both` | `tools/strategy-dev/server.ts:709:18` | `direction: 'both'` |
+| number | `60` | `tools/strategy-dev/server.ts:711:25` | `requiredBarCount: 60` |
+| string | `BOTH` | `tools/strategy-dev/server.ts:714:21` | `requiredAction: 'BOTH'` |
+| number | `0.5` | `tools/strategy-dev/server.ts:715:20` | `minConfidence: 0.5` |
+| string | `term_chan_bsp_standard` | `tools/strategy-dev/server.ts:717:11` | `id: 'term_chan_bsp_standard'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:718:13` | `type: 'TERMINAL'` |
+| string | `INHERIT` | `tools/strategy-dev/server.ts:719:15` | `action: 'INHERIT'` |
+| string | `CHAN_BSP` | `tools/strategy-dev/server.ts:720:18` | `signalTag: 'CHAN_BSP'` |
+| string | `缠论原典形态买卖点确立` | `tools/strategy-dev/server.ts:721:15` | `reason: '缠论原典形态买卖点确立'` |
+| string | `term_abort` | `tools/strategy-dev/server.ts:724:11` | `id: 'term_abort'` |
+| string | `TERMINAL` | `tools/strategy-dev/server.ts:725:13` | `type: 'TERMINAL'` |
+| string | `ABORT` | `tools/strategy-dev/server.ts:726:15` | `action: 'ABORT'` |
+| string | `未满足缠论形态买卖点触发条件` | `tools/strategy-dev/server.ts:727:15` | `reason: '未满足缠论形态买卖点触发条件'` |
+| number | `1000000` | `tools/strategy-dev/server.ts:767:46` | `options.initialCash ?? 1_000_000` |
+| number | `300` | `tools/strategy-dev/server.ts:797:51` | `startIndex - 300` |
+| number | `-8640000000000000` | `tools/strategy-dev/server.ts:815:16` | `new Date(-8640000000000000)` |
+| number | `300` | `tools/strategy-dev/server.ts:829:27` | `requiredBarCount: 300` |
+| number | `0.0005` | `tools/strategy-dev/server.ts:837:20` | `slippageRatio: 0.0005` |
+| string | `000001` | `tools/strategy-dev/server.ts:840:28` | `options.code === '000001'` |
+| number | `1000` | `tools/strategy-dev/server.ts:841:32` | `bars[0]?.open ?? 1000` |
+| string | `composite` | `tools/strategy-dev/server.ts:851:25` | `options.mode === 'composite'` |
+| string | `full_resonance` | `tools/strategy-dev/server.ts:852:26` | `options.mode === 'full_resonance'` |
+| string | `enhanced` | `tools/strategy-dev/server.ts:853:26` | `options.mode === 'enhanced'` |
+| number | `3` | `tools/strategy-dev/server.ts:855:42` | `options.strategyDefinitionId === 3` |
+| number | `-0.08` | `tools/strategy-dev/server.ts:858:28` | `hardStopLossRatio: -0.08` |
+| string | `entry` | `tools/strategy-dev/server.ts:902:47` | `kSig.signalKind === 'entry'` |
+| number | `0.95` | `tools/strategy-dev/server.ts:905:39` | `availableCash * 0.95` |
+| string | `EMPTY` | `tools/strategy-dev/server.ts:908:37` | `position.getStatus() === 'EMPTY'` |
+| string | `CLOSED` | `tools/strategy-dev/server.ts:909:38` | `position.getStatus() === 'CLOSED'` |
+| string | `exit` | `tools/strategy-dev/server.ts:927:55` | `kSig.signalKind === 'exit'` |
+| string | `HOLDING` | `tools/strategy-dev/server.ts:928:58` | `position.getStatus() === 'HOLDING'` |
+| string | `HOLDING` | `tools/strategy-dev/server.ts:944:32` | `position.getStatus() === 'HOLDING'` |
+| number | `500` | `tools/strategy-dev/server.ts:956:13` | `i % 500` |
+| number | `10` | `tools/strategy-dev/server.ts:958:106` | `bar.timestamp.toISOString().slice(0, 10)` |
+| number | `50` | `tools/strategy-dev/server.ts:963:13` | `i % 50` |
+| string | `/v1/indicators/k` | `tools/strategy-dev/server.ts:1058:24` | `pathname.endsWith('/v1/indicators/k')` |
+| string | `/indicators/k` | `tools/strategy-dev/server.ts:1059:25` | `pathname.endsWith('/indicators/k')` |
+| string | `/v1/chan/merge-k` | `tools/strategy-dev/server.ts:1121:25` | `pathname.endsWith('/v1/chan/merge-k')` |
+| number | `200` | `tools/strategy-dev/server.ts:1149:25` | `sendJson(res, [], 200)` |
+| string | `/v1/visual/commands` | `tools/strategy-dev/server.ts:1155:25` | `pathname.endsWith('/v1/visual/commands')` |
+| string | `/v1/simulation/` | `tools/strategy-dev/server.ts:1215:25` | `pathname.includes('/v1/simulation/')` |
+| string | `/v1/simulation/start` | `tools/strategy-dev/server.ts:1222:25` | `pathname.endsWith('/v1/simulation/start')` |
+| string | `/v1/simulation/stream` | `tools/strategy-dev/server.ts:1342:25` | `pathname.endsWith('/v1/simulation/stream')` |
+| number | `404` | `tools/strategy-dev/server.ts:1347:21` | `res.writeHead(404, { 'Content-Type': 'text/plain' })` |
+| number | `200` | `tools/strategy-dev/server.ts:1352:19` | `res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache, no-transform',` |
+| string | `no-cache, no-transform` | `tools/strategy-dev/server.ts:1354:24` | `'Cache-Control': 'no-cache, no-transform'` |
+| string | `no` | `tools/strategy-dev/server.ts:1357:28` | `'X-Accel-Buffering': 'no'` |
 | string | `: stream-connected
 
-` | `tools/strategy-dev/server.ts:819:15` | `res.write(': stream-connected\n\n')` |
+` | `tools/strategy-dev/server.ts:1359:15` | `res.write(': stream-connected\n\n')` |
 | string | `: ping
 
-` | `tools/strategy-dev/server.ts:850:19` | `res.write(': ping\n\n')` |
-| string | `/v1/simulation/control` | `tools/strategy-dev/server.ts:869:25` | `pathname.endsWith('/v1/simulation/control')` |
-| string | `/v1/simulation/stop` | `tools/strategy-dev/server.ts:905:25` | `pathname.endsWith('/v1/simulation/stop')` |
-| string | `completed` | `tools/strategy-dev/server.ts:918:64` | `status: 'completed'` |
-| string | `/v1/simulation/dump` | `tools/strategy-dev/server.ts:932:25` | `pathname.endsWith('/v1/simulation/dump')` |
-| string | `No active simulation session found` | `tools/strategy-dev/server.ts:942:30` | `error: 'No active simulation session found'` |
-| number | `404` | `tools/strategy-dev/server.ts:942:70` | `sendJson(res, { error: 'No active simulation session found' }, 404)` |
-| string | `../../.data/simulation-dumps` | `tools/strategy-dev/server.ts:987:49` | `path.resolve(__dirname, '../../.data/simulation-dumps')` |
-| string | `latest-dump.json` | `tools/strategy-dev/server.ts:992:30` | `path.join(dumpDir, 'latest-dump.json')` |
-| number | `500` | `tools/strategy-dev/server.ts:1011:45` | `sendJson(res, { error: err.message }, 500)` |
-| string | `/v1/strategies` | `tools/strategy-dev/server.ts:1017:25` | `pathname.endsWith('/v1/strategies')` |
-| string | `缠论标准策略树` | `tools/strategy-dev/server.ts:1021:15` | `name: '缠论标准策略树'` |
-| string | `基于策略树决策流与标准缠论买卖点` | `tools/strategy-dev/server.ts:1022:22` | `description: '基于策略树决策流与标准缠论买卖点'` |
-| string | `decision_flow` | `tools/strategy-dev/server.ts:1023:15` | `kind: 'decision_flow'` |
-| string | `active` | `tools/strategy-dev/server.ts:1024:17` | `status: 'active'` |
-| number | `5` | `tools/strategy-dev/server.ts:1026:22` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `15` | `tools/strategy-dev/server.ts:1026:25` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `30` | `tools/strategy-dev/server.ts:1026:29` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `60` | `tools/strategy-dev/server.ts:1026:33` | `[1, 5, 15, 30, 60, 1440]` |
-| number | `1440` | `tools/strategy-dev/server.ts:1026:37` | `[1, 5, 15, 30, 60, 1440]` |
-| string | `entry` | `tools/strategy-dev/server.ts:1043:21` | `signalKind: 'entry'` |
-| string | `active` | `tools/strategy-dev/server.ts:1044:17` | `status: 'active'` |
-| string | `标准决策流版本 (集成标准缠论)` | `tools/strategy-dev/server.ts:1045:22` | `description: '标准决策流版本 (集成标准缠论)'` |
-| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:1064:25` | `pathname.endsWith('/v1/strategy-backtests')` |
-| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:1069:25` | `pathname.endsWith('/v1/strategy-backtests')` |
-| string | `000001` | `tools/strategy-dev/server.ts:1091:37` | `symbol === '000001'` |
-| number | `1440` | `tools/strategy-dev/server.ts:1091:78` | `period === 1440` |
-| string | `m` | `tools/strategy-dev/server.ts:1091:101` | `period + 'm'` |
-| string | `completed` | `tools/strategy-dev/server.ts:1093:17` | `status: 'completed'` |
-| number | `1000` | `tools/strategy-dev/server.ts:1101:42` | `Date.now() - 1000` |
-| string | `completed` | `tools/strategy-dev/server.ts:1113:19` | `status: 'completed'` |
-| string | `回测任务执行完成` | `tools/strategy-dev/server.ts:1114:20` | `message: '回测任务执行完成'` |
-| number | `202` | `tools/strategy-dev/server.ts:1118:9` | `sendJson( res, { runId: newRun.id, status: 'completed', message: '回测任务执行完成', pollUrl: `/v1/strategy-` |
-| number | `500` | `tools/strategy-dev/server.ts:1122:45` | `sendJson(res, { error: err.message }, 500)` |
-| number | `30` | `tools/strategy-dev/server.ts:1145:31` | `matchedRun?.period \|\| 30` |
-| string | `HIGH` | `tools/strategy-dev/server.ts:1176:26` | `confidenceLevel: 'HIGH'` |
-| string | `Not Found` | `tools/strategy-dev/server.ts:1231:26` | `error: 'Not Found'` |
-| number | `404` | `tools/strategy-dev/server.ts:1231:57` | `sendJson(res, { error: 'Not Found', path: pathname }, 404)` |
-| string | `0.0.0.0` | `tools/strategy-dev/server.ts:1234:21` | `server.listen(PORT, '0.0.0.0', () => { console.log( `\n🚀 [Mist Dev Server] 本地开发服务已就绪: http://localh` |
-| number | `1440` | `tools/strategy-dev/server.ts:1265:46` | `run.period === 1440` |
+` | `tools/strategy-dev/server.ts:1390:19` | `res.write(': ping\n\n')` |
+| string | `/v1/simulation/control` | `tools/strategy-dev/server.ts:1409:25` | `pathname.endsWith('/v1/simulation/control')` |
+| string | `/v1/simulation/stop` | `tools/strategy-dev/server.ts:1445:25` | `pathname.endsWith('/v1/simulation/stop')` |
+| string | `completed` | `tools/strategy-dev/server.ts:1458:64` | `status: 'completed'` |
+| string | `/v1/simulation/dump` | `tools/strategy-dev/server.ts:1472:25` | `pathname.endsWith('/v1/simulation/dump')` |
+| string | `No active simulation session found` | `tools/strategy-dev/server.ts:1482:30` | `error: 'No active simulation session found'` |
+| number | `404` | `tools/strategy-dev/server.ts:1482:70` | `sendJson(res, { error: 'No active simulation session found' }, 404)` |
+| string | `../../.data/simulation-dumps` | `tools/strategy-dev/server.ts:1527:49` | `path.resolve(__dirname, '../../.data/simulation-dumps')` |
+| string | `latest-dump.json` | `tools/strategy-dev/server.ts:1532:30` | `path.join(dumpDir, 'latest-dump.json')` |
+| number | `500` | `tools/strategy-dev/server.ts:1551:45` | `sendJson(res, { error: err.message }, 500)` |
+| string | `/v1/strategies` | `tools/strategy-dev/server.ts:1557:25` | `pathname.endsWith('/v1/strategies')` |
+| string | `纯原典缠论买卖点策略树` | `tools/strategy-dev/server.ts:1561:15` | `name: '纯原典缠论买卖点策略树'` |
+| string | `100% 遵照标准缠论一/二/三类买卖点形态进出场，彻底移除所有外挂指标与硬止损止盈` | `tools/strategy-dev/server.ts:1563:11` | `description: '100% 遵照标准缠论一/二/三类买卖点形态进出场，彻底移除所有外挂指标与硬止损止盈'` |
+| string | `decision_flow` | `tools/strategy-dev/server.ts:1564:15` | `kind: 'decision_flow'` |
+| string | `active` | `tools/strategy-dev/server.ts:1565:17` | `status: 'active'` |
+| number | `5` | `tools/strategy-dev/server.ts:1567:22` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `15` | `tools/strategy-dev/server.ts:1567:25` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `30` | `tools/strategy-dev/server.ts:1567:29` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `60` | `tools/strategy-dev/server.ts:1567:33` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `1440` | `tools/strategy-dev/server.ts:1567:37` | `[1, 5, 15, 30, 60, 1440]` |
+| string | `上证大盘宏观+纯缠论+牛熊左右侧战术联动策略树` | `tools/strategy-dev/server.ts:1572:15` | `name: '上证大盘宏观+纯缠论+牛熊左右侧战术联动策略树'` |
+| string | `双频宏观状态机判定大周期牛熊，牛市顺势执行缠论形态主门禁与微观左右侧止盈战术，熊市执行双中枢背驰极限抄底与破位逃命清仓防守` | `tools/strategy-dev/server.ts:1574:11` | `description: '双频宏观状态机判定大周期牛熊，牛市顺势执行缠论形态主门禁与微观左右侧止盈战术，熊市执行双中枢背驰极限抄底与破位逃命清仓防守'` |
+| string | `decision_flow` | `tools/strategy-dev/server.ts:1575:15` | `kind: 'decision_flow'` |
+| string | `active` | `tools/strategy-dev/server.ts:1576:17` | `status: 'active'` |
+| number | `5` | `tools/strategy-dev/server.ts:1578:22` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `15` | `tools/strategy-dev/server.ts:1578:25` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `30` | `tools/strategy-dev/server.ts:1578:29` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `60` | `tools/strategy-dev/server.ts:1578:33` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `1440` | `tools/strategy-dev/server.ts:1578:37` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `3` | `tools/strategy-dev/server.ts:1582:13` | `id: 3` |
+| string | `上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强策略树` | `tools/strategy-dev/server.ts:1583:15` | `name: '上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强策略树'` |
+| string | `在策略2基础上叠加私有战术增强：牛市缠论买点融合VPCI量价共振增强与通道挤压放量爆发买点，熊市极限背驰抄底与防守清仓` | `tools/strategy-dev/server.ts:1585:11` | `description: '在策略2基础上叠加私有战术增强：牛市缠论买点融合VPCI量价共振增强与通道挤压放量爆发买点，熊市极限背驰抄底与防守清仓'` |
+| string | `decision_flow` | `tools/strategy-dev/server.ts:1586:15` | `kind: 'decision_flow'` |
+| string | `active` | `tools/strategy-dev/server.ts:1587:17` | `status: 'active'` |
+| number | `5` | `tools/strategy-dev/server.ts:1589:22` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `15` | `tools/strategy-dev/server.ts:1589:25` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `30` | `tools/strategy-dev/server.ts:1589:29` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `60` | `tools/strategy-dev/server.ts:1589:33` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `1440` | `tools/strategy-dev/server.ts:1589:37` | `[1, 5, 15, 30, 60, 1440]` |
+| number | `3` | `tools/strategy-dev/server.ts:1603:21` | `stratId === 3` |
+| number | `3` | `tools/strategy-dev/server.ts:1606:15` | `id: 3` |
+| number | `3` | `tools/strategy-dev/server.ts:1607:33` | `strategyDefinitionId: 3` |
+| string | `both` | `tools/strategy-dev/server.ts:1609:23` | `signalKind: 'both'` |
+| string | `active` | `tools/strategy-dev/server.ts:1610:19` | `status: 'active'` |
+| string | `上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强决策流 (动态牛熊分流+量价突破增强)` | `tools/strategy-dev/server.ts:1612:13` | `description: '上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强决策流 (动态牛熊分流+量价突破增强)'` |
+| string | `full_resonance` | `tools/strategy-dev/server.ts:1613:27` | `mode: 'full_resonance'` |
+| string | `both` | `tools/strategy-dev/server.ts:1623:23` | `signalKind: 'both'` |
+| string | `active` | `tools/strategy-dev/server.ts:1624:19` | `status: 'active'` |
+| string | `上证大盘宏观+纯缠论+牛熊左右侧战术联动决策流 (动态牛熊分流)` | `tools/strategy-dev/server.ts:1626:13` | `description: '上证大盘宏观+纯缠论+牛熊左右侧战术联动决策流 (动态牛熊分流)'` |
+| string | `composite` | `tools/strategy-dev/server.ts:1627:27` | `mode: 'composite'` |
+| string | `both` | `tools/strategy-dev/server.ts:1637:23` | `signalKind: 'both'` |
+| string | `active` | `tools/strategy-dev/server.ts:1638:19` | `status: 'active'` |
+| string | `纯原典缠论标准形态买卖点决策流 (无止损止盈)` | `tools/strategy-dev/server.ts:1639:24` | `description: '纯原典缠论标准形态买卖点决策流 (无止损止盈)'` |
+| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:1659:25` | `pathname.endsWith('/v1/strategy-backtests')` |
+| string | `/v1/strategy-backtests` | `tools/strategy-dev/server.ts:1664:25` | `pathname.endsWith('/v1/strategy-backtests')` |
+| string | `single` | `tools/strategy-dev/server.ts:1676:23` | `body.mode === 'single'` |
+| string | `composite` | `tools/strategy-dev/server.ts:1677:23` | `body.mode === 'composite'` |
+| string | `tactics` | `tools/strategy-dev/server.ts:1678:23` | `body.mode === 'tactics'` |
+| string | `full_resonance` | `tools/strategy-dev/server.ts:1679:23` | `body.mode === 'full_resonance'` |
+| string | `enhanced` | `tools/strategy-dev/server.ts:1680:23` | `body.mode === 'enhanced'` |
+| number | `3` | `tools/strategy-dev/server.ts:1682:38` | `strategyDefinitionId === 3` |
+| number | `1000000` | `tools/strategy-dev/server.ts:1691:55` | `Number(body.initialCash) \|\| 1_000_000` |
+| string | `composite` | `tools/strategy-dev/server.ts:1697:21` | `mode === 'composite'` |
+| string | `full_resonance` | `tools/strategy-dev/server.ts:1698:22` | `mode === 'full_resonance'` |
+| string | `enhanced` | `tools/strategy-dev/server.ts:1699:22` | `mode === 'enhanced'` |
+| number | `3` | `tools/strategy-dev/server.ts:1701:38` | `strategyDefinitionId === 3` |
+| number | `10000` | `tools/strategy-dev/server.ts:1738:55` | `(avgWin / avgLoss) * 10000` |
+| number | `10000` | `tools/strategy-dev/server.ts:1738:64` | `Math.round((avgWin / avgLoss) * 10000) / 10000` |
+| number | `3` | `tools/strategy-dev/server.ts:1741:34` | `strategyDefinitionId === 3` |
+| string | `full_resonance` | `tools/strategy-dev/server.ts:1742:18` | `mode === 'full_resonance'` |
+| string | `enhanced` | `tools/strategy-dev/server.ts:1743:18` | `mode === 'enhanced'` |
+| string | `composite` | `tools/strategy-dev/server.ts:1746:24` | `mode === 'composite'` |
+| string | `tactics` | `tools/strategy-dev/server.ts:1747:24` | `mode === 'tactics'` |
+| string | `000001` | `tools/strategy-dev/server.ts:1755:37` | `symbol === '000001'` |
+| number | `1440` | `tools/strategy-dev/server.ts:1755:78` | `period === 1440` |
+| string | `m` | `tools/strategy-dev/server.ts:1755:101` | `period + 'm'` |
+| string | `completed` | `tools/strategy-dev/server.ts:1757:17` | `status: 'completed'` |
+| number | `1000` | `tools/strategy-dev/server.ts:1765:42` | `Date.now() - 1000` |
+| string | `completed` | `tools/strategy-dev/server.ts:1777:19` | `status: 'completed'` |
+| string | `回测任务执行完成` | `tools/strategy-dev/server.ts:1778:20` | `message: '回测任务执行完成'` |
+| number | `200` | `tools/strategy-dev/server.ts:1812:9` | `sendJson( res, { runId: newRun.id, status: 'completed', message: '回测任务执行完成', symbol, period, mode: m` |
+| number | `500` | `tools/strategy-dev/server.ts:1816:45` | `sendJson(res, { error: err.message }, 500)` |
+| number | `30` | `tools/strategy-dev/server.ts:1839:31` | `matchedRun?.period \|\| 30` |
+| string | `HIGH` | `tools/strategy-dev/server.ts:1870:26` | `confidenceLevel: 'HIGH'` |
+| string | `Not Found` | `tools/strategy-dev/server.ts:1925:26` | `error: 'Not Found'` |
+| number | `404` | `tools/strategy-dev/server.ts:1925:57` | `sendJson(res, { error: 'Not Found', path: pathname }, 404)` |
+| string | `0.0.0.0` | `tools/strategy-dev/server.ts:1928:21` | `server.listen(PORT, '0.0.0.0', () => { console.log( `\n🚀 [Mist Dev Server] 本地开发服务已就绪: http://localh` |
+| number | `1440` | `tools/strategy-dev/server.ts:1966:46` | `run.period === 1440` |
 | string | `code` | `tools/strategy-dev/sync.ts:35:26` | `getArg('code')` |
 | string | `periods` | `tools/strategy-dev/sync.ts:37:28` | `getArg('periods')` |
 | string | `period` | `tools/strategy-dev/sync.ts:37:49` | `getArg('period')` |
@@ -2212,12 +2462,12 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `source` | `tools/strategy-dev/sync.ts:47:25` | `getArg('source')` |
 | string | `box` | `tools/strategy-dev/sync.ts:48:26` | `getArg('box')` |
 | string | `password` | `tools/strategy-dev/sync.ts:50:12` | `getArg('password')` |
-| string | `'\''` | `tools/strategy-dev/sync.ts:113:5` | `(options.password \|\| 'change-me-root').replace( /'/g, "'\\''", )` |
-| number | `1024` | `tools/strategy-dev/sync.ts:120:26` | `100 * 1024` |
-| number | `1024` | `tools/strategy-dev/sync.ts:120:33` | `100 * 1024 * 1024` |
-| number | `120000` | `tools/strategy-dev/sync.ts:122:18` | `timeout: 120000` |
-| string | `NULL` | `tools/strategy-dev/sync.ts:153:36` | `volume !== 'NULL'` |
-| string | `NULL` | `tools/strategy-dev/sync.ts:154:36` | `amount !== 'NULL'` |
-| string | `data/kline` | `tools/strategy-dev/sync.ts:178:42` | `path.resolve(__dirname, 'data/kline')` |
+| string | `'\''` | `tools/strategy-dev/sync.ts:121:5` | `(options.password \|\| 'change-me-root').replace( /'/g, "'\\''", )` |
+| number | `1024` | `tools/strategy-dev/sync.ts:128:26` | `100 * 1024` |
+| number | `1024` | `tools/strategy-dev/sync.ts:128:33` | `100 * 1024 * 1024` |
+| number | `120000` | `tools/strategy-dev/sync.ts:130:18` | `timeout: 120000` |
+| string | `NULL` | `tools/strategy-dev/sync.ts:161:36` | `volume !== 'NULL'` |
+| string | `NULL` | `tools/strategy-dev/sync.ts:162:36` | `amount !== 'NULL'` |
+| string | `data/kline` | `tools/strategy-dev/sync.ts:186:42` | `path.resolve(__dirname, 'data/kline')` |
 
 </details>
