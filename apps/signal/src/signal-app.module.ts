@@ -7,19 +7,8 @@ import {
   signalEnvSchema,
   type RealtimeStrategyMode,
 } from '@app/config';
-import {
-  K,
-  KExtensionEf,
-  KExtensionQmt,
-  KExtensionTdx,
-  KQuality,
-  Security,
-  SecuritySourceConfig,
-  StrategyDefinition,
-  StrategyAlertEvent,
-  StrategySignal,
-  StrategyVersion,
-} from '@app/shared-data';
+
+import { MIST_ENTITIES } from '@app/shared-data';
 import * as path from 'node:path';
 import { LoggerModule } from 'nestjs-pino';
 
@@ -65,19 +54,7 @@ import { SignalRegistryModule } from './signal-registry.module';
           timezone: '+08:00',
           synchronize: false,
           logging: configService.get('NODE_ENV') !== 'production',
-          entities: [
-            K,
-            KExtensionEf,
-            KExtensionTdx,
-            KExtensionQmt,
-            KQuality,
-            Security,
-            SecuritySourceConfig,
-            StrategyDefinition,
-            StrategyVersion,
-            StrategySignal,
-            StrategyAlertEvent,
-          ],
+          entities: [...MIST_ENTITIES],
           poolSize: 10,
           connectorPackage: 'mysql2' as const,
           extra: {

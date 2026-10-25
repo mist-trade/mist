@@ -106,3 +106,18 @@
 - [ ] **5.2** `pnpm dev:server` + `mist-fe pnpm dev:local`，确认 2025-07 之前历史可见、切面连续
 - [ ] **5.3 文档**：`tools/market-data-import/README.md`（用法/SQL/校验/回滚/质量口径）、`docs/` 数据来源与质量说明
 - [ ] **5.4 收尾**：`pnpm -C mist test:ci`、`openspec validate add-vendor-market-data-import --strict`
+
+---
+
+## Phase 6: 防退化门禁（2026-10-24 上线后补）
+
+- [x] **6.1 共享实体图目录**：`libs/shared-data/src/entity-graph.ts` 的 `MIST_ENTITIES`（17 个实体），
+  6 处根 TypeORM 配置与 notification / HIL 常量全部改为展开该目录，消灭手写子集。
+- [x] **6.2 实体图守卫**：`libs/shared-data/src/entity-graph.spec.ts`
+  - 用目录构建 `buildMetadatas()`（不连库）；
+  - 静态断言每个应用的 `entities: [...]` 必须来自共享目录，禁止手写清单；
+  - 断言 notification 清单与目录一致。
+- [x] **6.3 源映射守卫**：`libs/market-data/src/source-mapping.guard.spec.ts`
+  - 遍历 `Object.values(DataSource)`，逐个断言 `prepareMarketData` 不丢 bar、`mapKToStrategyBar` 不抛错；
+  - 未知 source 仍然被丢弃/抛错（防止"全部放行"式修复）；
+  - 新增供应商枚举值会自动纳入用例。

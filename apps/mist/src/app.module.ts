@@ -1,21 +1,4 @@
-import {
-  K,
-  KExtensionEf,
-  KExtensionTdx,
-  KExtensionQmt,
-  KQuality,
-  Security,
-  SecuritySourceConfig,
-  RealtimeSubscriptionAssignment,
-  RuntimeConfig,
-  StrategyDefinition,
-  StrategyVersion,
-  StrategySignal,
-  StrategyAlertEvent,
-  BacktestRun,
-  BacktestSignalResult,
-  BacktestTradeResult,
-} from '@app/shared-data';
+import { MIST_ENTITIES } from '@app/shared-data';
 import { DynamicModule, Module, Type } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ThrottlerModule } from '@nestjs/throttler';
@@ -141,24 +124,7 @@ export function mockModeModulesForMode(
               timezone: '+08:00',
               synchronize: false,
               logging: configService.get('NODE_ENV') !== 'production',
-              entities: [
-                K,
-                KExtensionEf,
-                KExtensionTdx,
-                KExtensionQmt,
-                KQuality,
-                Security,
-                SecuritySourceConfig,
-                RealtimeSubscriptionAssignment,
-                RuntimeConfig,
-                StrategyDefinition,
-                StrategyVersion,
-                StrategySignal,
-                StrategyAlertEvent,
-                BacktestRun,
-                BacktestSignalResult,
-                BacktestTradeResult,
-              ],
+              entities: [...MIST_ENTITIES],
               poolSize: 10,
               connectorPackage: 'mysql2',
               extra: {

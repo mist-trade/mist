@@ -8,15 +8,8 @@ import * as path from 'path';
 import { AppController } from './app.controller';
 import { HealthController } from './health/health.controller';
 import { TypeOrmModule } from '@nestjs/typeorm';
-import {
-  K,
-  KExtensionEf,
-  KExtensionQmt,
-  KQuality,
-  KExtensionTdx,
-  Security,
-  SecuritySourceConfig,
-} from '@app/shared-data';
+
+import { MIST_ENTITIES } from '@app/shared-data';
 import { HttpTransportModule } from '@app/transport/http';
 
 @Module({
@@ -55,15 +48,7 @@ import { HttpTransportModule } from '@app/transport/http';
           timezone: '+08:00',
           synchronize: false,
           logging: configService.get('NODE_ENV') !== 'production',
-          entities: [
-            K,
-            KExtensionEf,
-            KExtensionTdx,
-            KExtensionQmt,
-            KQuality,
-            Security,
-            SecuritySourceConfig,
-          ],
+          entities: [...MIST_ENTITIES],
           poolSize: 10,
           connectorPackage: 'mysql2',
           extra: {

@@ -1,17 +1,4 @@
-import {
-  K,
-  KExtensionEf,
-  KExtensionQmt,
-  KQuality,
-  KExtensionTdx,
-  Security,
-  SecuritySourceConfig,
-  StrategyAlertDelivery,
-  StrategyAlertEvent,
-  StrategyDefinition,
-  StrategySignal,
-  StrategyVersion,
-} from '@app/shared-data';
+import { MIST_ENTITIES } from '@app/shared-data';
 
 /**
  * Full entity graph registered by the notification app's TypeORM connection.
@@ -22,17 +9,4 @@ import {
  * Kept as a shared constant so notification-entities.spec.ts can validate the graph
  * without booting the app or a database. Add new entities the app touches here.
  */
-export const NOTIFICATION_ENTITIES = [
-  K,
-  KExtensionEf,
-  KExtensionTdx,
-  KExtensionQmt,
-  KQuality,
-  Security,
-  SecuritySourceConfig,
-  StrategyDefinition,
-  StrategyVersion,
-  StrategySignal,
-  StrategyAlertEvent,
-  StrategyAlertDelivery,
-];
+export const NOTIFICATION_ENTITIES = [...MIST_ENTITIES];

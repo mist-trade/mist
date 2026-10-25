@@ -10,6 +10,7 @@ describe('ChanAppModule', () => {
   it('registers a TypeORM root connection for imported repository modules', () => {
     expect(source).toContain('TypeOrmModule.forRootAsync');
     expect(source).toContain('ConfigService');
-    expect(source).toContain('SecuritySourceConfig');
+    expect(source).toContain('MIST_ENTITIES');
+    expect(source).toContain('entities: [...MIST_ENTITIES]');
   });
 });

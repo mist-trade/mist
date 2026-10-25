@@ -7,17 +7,11 @@ import {
   BacktestSignalResult,
   BacktestTradeResult,
   K,
-  KExtensionEf,
-  KExtensionQmt,
-  KQuality,
-  KExtensionTdx,
   Security,
-  SecuritySourceConfig,
-  StrategyAlertEvent,
   StrategyDefinition,
-  StrategySignal,
   StrategyVersion,
 } from '@app/shared-data';
+import { MIST_ENTITIES } from '@app/shared-data';
 import { RpcTransportModule } from '@app/transport/rpc';
 import { LoggerModule } from 'nestjs-pino';
 
@@ -58,22 +52,7 @@ import { BacktestStartupService } from './backtest-startup.service';
           timezone: '+08:00',
           synchronize: false,
           logging: config.get<string>('NODE_ENV') !== 'production',
-          entities: [
-            K,
-            KExtensionEf,
-            KExtensionTdx,
-            KExtensionQmt,
-            KQuality,
-            Security,
-            SecuritySourceConfig,
-            StrategyDefinition,
-            StrategyVersion,
-            StrategySignal,
-            StrategyAlertEvent,
-            BacktestRun,
-            BacktestSignalResult,
-            BacktestTradeResult,
-          ],
+          entities: [...MIST_ENTITIES],
           poolSize: 10,
           connectorPackage: 'mysql2' as const,
         };

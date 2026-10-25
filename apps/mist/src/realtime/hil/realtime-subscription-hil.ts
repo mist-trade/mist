@@ -8,17 +8,9 @@ import {
 } from 'node:fs';
 import { basename, join, resolve } from 'node:path';
 
-import {
-  K,
-  KExtensionEf,
-  KExtensionQmt,
-  KQuality,
-  KExtensionTdx,
-  Security,
-  SecuritySourceConfig,
-} from '@app/shared-data';
 import { mistEnvSchema } from '@app/config';
 import { MARKET_SOURCES } from '@app/constants';
+import { MIST_ENTITIES } from '@app/shared-data';
 import {
   HIL_REASONS,
   HIL_RESULTS,
@@ -134,15 +126,7 @@ type CapturePhase = CapturedRawFixtureEvidence['phase'];
 @Module({})
 class RealtimeSubscriptionHilModule {}
 
-export const realtimeSubscriptionHilEntities = [
-  K,
-  KExtensionEf,
-  KExtensionQmt,
-  KQuality,
-  KExtensionTdx,
-  Security,
-  SecuritySourceConfig,
-] as const;
+export const realtimeSubscriptionHilEntities = [...MIST_ENTITIES] as const;
 
 export async function runRealtimeSubscriptionHil({
   source,

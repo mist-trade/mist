@@ -1,21 +1,5 @@
-import {
-  K,
-  KExtensionEf,
-  KExtensionTdx,
-  KExtensionQmt,
-  KQuality,
-  Security,
-  SecuritySourceConfig,
-  RealtimeSubscriptionAssignment,
-  RuntimeConfig,
-  StrategyDefinition,
-  StrategyVersion,
-  StrategySignal,
-  StrategyAlertEvent,
-  BacktestRun,
-  BacktestSignalResult,
-  BacktestTradeResult,
-} from '@app/shared-data';
+import { K, Security, RealtimeSubscriptionAssignment } from '@app/shared-data';
+import { MIST_ENTITIES } from '@app/shared-data';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
@@ -66,24 +50,7 @@ import * as path from 'path';
           timezone: '+08:00',
           synchronize: false,
           logging: configService.get('NODE_ENV') !== 'production',
-          entities: [
-            K,
-            KExtensionEf,
-            KExtensionTdx,
-            KExtensionQmt,
-            KQuality,
-            Security,
-            SecuritySourceConfig,
-            RealtimeSubscriptionAssignment,
-            RuntimeConfig,
-            StrategyDefinition,
-            StrategyVersion,
-            StrategySignal,
-            StrategyAlertEvent,
-            BacktestRun,
-            BacktestSignalResult,
-            BacktestTradeResult,
-          ],
+          entities: [...MIST_ENTITIES],
           poolSize: 10,
           connectorPackage: 'mysql2',
           extra: {
