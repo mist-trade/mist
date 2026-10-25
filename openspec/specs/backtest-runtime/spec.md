@@ -1401,64 +1401,59 @@ unique-conflict and result-pagination semantics are already fixed by this change
 - **THEN** implementation MUST pause
 - **AND** the accepted decision MUST be written to the change artifacts first
 
-### Requirement: Backtest Shall Accept TDX, QMT And Vendor Sources
+### Requirement: Backtest Shall Replay The Canonical Series
 
-The public Backtest create contract SHALL accept `tdx`, `qmt` and every `vendor_<slug>` value
-defined by the `DataSource` enum. `ef` and any value outside that set SHALL remain rejected. The
-accepted set SHALL be derived from the enum rather than hand-maintained, so that registering a
-new vendor source does not require a DTO change.
+A Backtest run SHALL replay the canonical series for each target security and the run's period.
+The create contract SHALL NOT accept a provider source. The run SHALL record the applied splice
+policy version, and every persisted result SHALL record the raw provider origin of its bar.
 
-Every run SHALL still replay exactly one source: a run MUST NOT query, merge or fall back to
-another source, including between two vendors or between a vendor and `qmt`.
+Runs created before this capability SHALL remain replayable using their original provider, without
+being rewritten or reinterpreted.
 
-#### Scenario: A supported Backtest source is submitted
-- **WHEN** `CreateBacktestRunDto.source` is `tdx`, `qmt` or a defined `vendor_<slug>` value
-- **THEN** source validation MAY proceed to the remaining request and business validation
-- **AND** the HTTP/OpenAPI contract MUST expose the derived accepted set
+#### Scenario: A canonical run is created
+- **WHEN** a create request is submitted without a source
+- **THEN** the run MUST be accepted and marked as canonical
+- **AND** its execution MUST read the canonical series for each target
 
-#### Scenario: A new vendor source is registered
-- **WHEN** a new `vendor_<slug>` value is added to the `DataSource` enum and migration
-- **THEN** it MUST become selectable for backtests without editing the DTO or the executor
-- **AND** no other read path MAY require a per-vendor change
+#### Scenario: A legacy source is submitted on create
+- **WHEN** a create request carries a `source` field
+- **THEN** the request MUST be rejected with a validation error
+- **AND** no StrategyVersion query, run insert or RPC submission MAY occur
 
-#### Scenario: A vendor source is replayed
-- **WHEN** a vendor run is claimed and executed
-- **THEN** every replay group MUST read only `k` rows with that exact vendor source value
-- **AND** the run MUST NOT read `qmt` or another vendor's bars to extend, fill or splice the series
-- **AND** the run result MUST be reported as an independent experiment from runs of other sources
+#### Scenario: A legacy pending run is claimed
+- **WHEN** the runner claims a PENDING run created before this capability
+- **THEN** it MUST replay that run's original provider series
+- **AND** it MUST NOT rewrite the run's source or apply the canonical policy
+
+#### Scenario: The policy version is recorded
+- **WHEN** a canonical run completes
+- **THEN** `data_policy_version` MUST equal the policy version used for the replay
+- **AND** result rows MUST record each bar's raw provider as their source
 
 #### Scenario: A run contains multiple target securities
-- **WHEN** a valid BacktestRun resolves one or more securities from `targetUniverse`
-- **THEN** every replay group MUST use the single required `BacktestRun.source`
-- **AND** a target item MUST NOT override or add another source
-- **AND** one execution context MUST NOT merge bars from different sources
+- **WHEN** a run resolves one or more securities from `targetUniverse`
+- **THEN** every target MUST use the same canonical policy version and the run's period
+- **AND** a target item MUST NOT select a different provider or policy
 
-#### Scenario: The selected source has no bar for a security or time
-- **WHEN** the run's selected source has no persisted K for part of the requested replay
-- **THEN** Backtest MUST preserve that absence for the selected source
-- **AND** it MUST NOT query, merge or fall back to another source
+#### Scenario: The canonical range has no bars
+- **WHEN** the canonical series has no bars for part of the requested replay
+- **THEN** Backtest MUST preserve that absence
+- **AND** it MUST NOT query, merge or fall back to a provider outside the policy
 
-#### Scenario: Provider price-adjustment modes differ
-- **WHEN** TDX supplies its configured `front` series, QMT supplies its configured `front_ratio`
-  series, and a vendor supplies its delivered series
-- **THEN** the strategy engine MUST evaluate each run only within its selected source series
-- **AND** it MUST NOT normalize adjustment modes or claim cross-source price equivalence
-- **AND** runs using different sources MUST be treated as independent experiments whose results
-  need not match
-
-#### Scenario: EF or an unknown source is submitted
-- **WHEN** `CreateBacktestRunDto.source` is `ef` or any value outside `tdx | qmt | vendor_<slug>`
-- **THEN** DTO validation MUST return actual HTTP `400` with `ApiErrorDto.code=VALIDATION_ERROR`
-- **AND** no StrategyVersion query, `BacktestRun` insert or RPC submission MAY occur
+#### Scenario: Legacy runs of different providers are queried
+- **WHEN** previously completed runs with different providers are read
+- **THEN** their original results MUST remain unchanged
+- **AND** runs created under different policy versions MUST be treated as independent experiments
 
 #### Scenario: Startup or abnormal data exposes an unsupported pending run
-- **WHEN** the runner claims a persisted PENDING run whose source is `ef` or an unknown value
-- **THEN** it MUST enter the runner-owned FAILED path with safe class `BACKTEST_SOURCE_UNSUPPORTED`
-- **AND** it MUST do so before the first historical page query, provider call or evaluation
-- **AND** an existing COMPLETED or FAILED run MUST remain queryable through the existing run-resource contract
+- **WHEN** the runner claims a persisted PENDING run whose marker is neither canonical nor a
+  supported legacy provider
+- **THEN** it MUST enter the runner-owned FAILED path with safe class
+  `BACKTEST_SOURCE_UNSUPPORTED`
+- **AND** it MUST do so before the first historical page query or evaluation
 
-#### Scenario: EF scope is inspected
+#### Scenario: The removed selector is inspected
 - **WHEN** this change is implemented or released
-- **THEN** it MUST NOT add an EF replay reader, quantity profile, provider call, data repair or backfill
-- **AND** any further Backtest source family MUST be introduced through focused review
+- **THEN** the public create contract MUST NOT expose a provider source field
+- **AND** no per-request provider override MAY be added without a focused review
 
