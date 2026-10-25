@@ -1,7 +1,4 @@
-import type {
-  ProjectedStrategyBar,
-  StrategyMarketDataPort,
-} from '@app/market-data';
+import type { ProjectedStrategyBar } from '@app/market-data';
 
 export type FactorCategory =
   | 'REGIME'
@@ -70,9 +67,6 @@ export interface FactorContext {
    * 命名规范推荐使用领域前缀，如 'chan.central', 'capital.main_inflow'
    */
   readonly attributes: Map<string, unknown>;
-
-  /** 标的行情数据只读代理端口（可选） */
-  readonly marketData?: StrategyMarketDataPort;
 
   /** 外部特征代理端口（如需按需拉取外部财务/资金流等，按需提供） */
   readonly featureProvider?: {
