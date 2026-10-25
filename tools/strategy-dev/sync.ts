@@ -10,13 +10,14 @@
 import { execSync } from 'child_process';
 import * as fs from 'fs';
 import * as path from 'path';
+import { resolveSegments, type ResolvedSegment } from '@app/market-data';
+import { CanonicalPolicyLoader } from '@app/strategy';
 import { PERIOD_NAME_MAP } from './provider';
 
 interface SyncCliOptions {
   code: string;
   periods: string[];
   limit: number;
-  source?: string;
   boxHost?: string;
   password?: string;
 }
@@ -44,7 +45,7 @@ function parseCliArgs(): SyncCliOptions {
       limit = Number(limitStr) || 0;
     }
   }
-  const source = getArg('source');
+
   const boxHost = getArg('box') || 'mist-box';
   const password =
     getArg('password') ||
@@ -61,10 +62,18 @@ function parseCliArgs(): SyncCliOptions {
     code,
     periods,
     limit,
-    source,
     boxHost,
     password,
   };
+}
+
+const BEIJING_OFFSET_MS = 8 * 3600 * 1000;
+
+function formatBeijing(date: Date): string {
+  return new Date(date.getTime() + BEIJING_OFFSET_MS)
+    .toISOString()
+    .slice(0, 19)
+    .replace('T', ' ');
 }
 
 async function syncSinglePeriod(
@@ -79,21 +88,24 @@ async function syncSinglePeriod(
     return;
   }
 
-  const sourceCondition = options.source
-    ? `AND k.source = '${options.source}'`
-    : '';
-  // Explicit precedence: a live QMT bar always wins, then TDX, then any
-  // third-party vendor series, then everything else.
-  const sourcePrecedence = `CASE
-      WHEN k.source = 'qmt' THEN 0
-      WHEN k.source = 'tdx' THEN 1
-      WHEN k.source LIKE 'vendor\\_%' THEN 2
-      ELSE 3
-    END`;
+  const policy = CanonicalPolicyLoader.load();
+  const segments = resolveSegments(policy, options.code, periodValue);
+  const rangePredicate = segments
+    .map((segment: ResolvedSegment) => {
+      const parts = [`k.source = '${segment.source}'`];
+      if (segment.from) {
+        parts.push(`k.timestamp >= '${formatBeijing(segment.from)}'`);
+      }
+      if (segment.before) {
+        parts.push(`k.timestamp < '${formatBeijing(segment.before)}'`);
+      }
+      return `(${parts.join(' AND ')})`;
+    })
+    .join(' OR ');
   const orderAndLimit =
     options.limit > 0
-      ? `ORDER BY k.timestamp DESC, ${sourcePrecedence} LIMIT ${options.limit * 2}`
-      : `ORDER BY k.timestamp ASC, ${sourcePrecedence}`;
+      ? `ORDER BY k.timestamp DESC LIMIT ${options.limit}`
+      : `ORDER BY k.timestamp ASC`;
 
   const sql = `
     SELECT 
@@ -103,7 +115,7 @@ async function syncSinglePeriod(
     JOIN securities s ON k.security_id = s.id
     WHERE s.code = '${options.code}'
       AND k.period = ${periodValue}
-      ${sourceCondition}
+      AND (${rangePredicate})
     ${orderAndLimit};
   `
     .replace(/\s+/g, ' ')

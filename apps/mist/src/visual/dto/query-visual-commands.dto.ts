@@ -1,7 +1,7 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { IsEnum, IsNotEmpty, IsOptional, IsString } from 'class-validator';
-import { DataSource, Period } from '@app/shared-data';
+import { Period } from '@app/shared-data';
 
 export class QueryVisualCommandsDto {
   @ApiProperty({
@@ -20,15 +20,6 @@ export class QueryVisualCommandsDto {
   @Type(() => Number)
   @IsEnum(Period)
   period: Period;
-
-  @ApiPropertyOptional({
-    description: '数据源',
-    enum: DataSource,
-    example: DataSource.QMT,
-  })
-  @IsOptional()
-  @IsEnum(DataSource)
-  source?: DataSource;
 
   @ApiPropertyOptional({
     description: '需要渲染的图层（逗号分隔，如 chan,chan_bi,chan_zs,backtest）',

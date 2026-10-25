@@ -56,6 +56,15 @@ export class BacktestRun {
   @Column({ type: 'enum', enum: DataSource })
   source: DataSource = DataSource.EAST_MONEY;
 
+  @Column({
+    name: 'data_policy_version',
+    type: 'varchar',
+    length: 64,
+    nullable: true,
+    comment: '拼接策略版本；canonical 回测必填，旧 run 为空',
+  })
+  dataPolicyVersion?: string | null;
+
   @Column({ name: 'start_date', type: 'datetime' })
   startDate: Date = new Date();
 

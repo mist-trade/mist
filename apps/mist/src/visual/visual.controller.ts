@@ -3,9 +3,8 @@ import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { ApiEnvelopeResponse } from '@app/transport/http';
 import { TimezoneService } from '@app/timezone';
 import { VisualCommandService } from '@app/visual-command';
-import { prepareMarketData } from '@app/market-data';
+import { prepareMarketData, type StrategyBar } from '@app/market-data';
 import { type ChanK } from '@app/chancore';
-import { K } from '@app/shared-data';
 import { IndicatorService } from '../indicator/indicator.service';
 import { QueryVisualCommandsDto } from './dto/query-visual-commands.dto';
 import { VisualCommandPayloadVo } from './vo/visual-command.vo';
@@ -22,7 +21,7 @@ export class VisualController {
   ) {}
 
   private toChanKlines(
-    kEntities: K[],
+    kEntities: readonly StrategyBar[],
     period: number,
     startDate: Date,
     endDate: Date,
@@ -98,7 +97,6 @@ export class VisualController {
       period: query.period,
       startDate,
       endDate,
-      source: query.source,
     });
 
     const chanKlines = this.toChanKlines(
@@ -107,7 +105,6 @@ export class VisualController {
       startDate,
       endDate,
       query.code,
-      query.source,
     );
 
     const requestedLayers = query.layers
@@ -117,7 +114,7 @@ export class VisualController {
     return this.visualCommandService.generateCommands({
       code: query.code,
       period: query.period,
-      source: query.source ?? 'default',
+      source: 'canonical',
       klines: chanKlines,
       layers: requestedLayers,
       chanOptions: {

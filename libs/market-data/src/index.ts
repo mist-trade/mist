@@ -41,6 +41,7 @@ export type {
   StrategyRealtimeWindow,
   StrategyRealtimeWindowCriteria,
   StrategyReplayMarketDataPort,
+  ReplayDataSelection,
   StrategyReplayPage,
   StrategyReplayPageCriteria,
   StrategyReplayWindow,
@@ -79,3 +80,30 @@ export {
   ST_SECURITY_PATTERN,
 } from './price-limit.util';
 export type { PriceLimits } from './price-limit.util';
+export {
+  assertSplicePolicy,
+  clipSegments,
+  resolveSegments,
+} from './canonical/splice-policy';
+export {
+  loadCanonicalWindow,
+  readCanonicalPage,
+  readCanonicalRange,
+} from './canonical/canonical-series';
+export { CanonicalDataError } from './canonical/splice-policy.types';
+export type {
+  CanonicalErrorCode,
+  ResolvedSegment,
+  SplicePolicy,
+  SplicePolicyOverride,
+  SplicePolicyProvider,
+  SpliceSegment,
+} from './canonical/splice-policy.types';
+export type {
+  CanonicalPage,
+  CanonicalPageParams,
+  CanonicalRangeParams,
+  CanonicalSegmentRead,
+  CanonicalSegmentReader,
+  CanonicalWindowParams,
+} from './canonical/canonical-series';

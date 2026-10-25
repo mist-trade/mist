@@ -200,7 +200,7 @@ describe('BacktestRunExecutor', () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         securityId: 9,
-        source: 'tdx',
+        selection: { kind: 'provider', source: 'tdx' },
         period: Period.ONE_MIN,
         endAt: startDate,
       }),
@@ -301,7 +301,7 @@ describe('BacktestRunExecutor', () => {
     ).toHaveBeenCalledWith(
       expect.objectContaining({
         securityId: 9,
-        source: 'tdx',
+        selection: { kind: 'provider', source: 'tdx' },
         period: Period.ONE_MIN,
         endAt: run.startDate,
       }),

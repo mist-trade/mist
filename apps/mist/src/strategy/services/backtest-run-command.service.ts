@@ -9,11 +9,13 @@ import { InjectRepository } from '@nestjs/typeorm';
 import {
   BacktestRun,
   BacktestRunStatus,
+  DataSource,
   StrategyDefinition,
   StrategyKind,
   StrategyVersion,
 } from '@app/shared-data';
 import {
+  CanonicalPolicyLoader,
   StoredDefinitionCompileError,
   compileStoredDefinitionVersion,
 } from '@app/strategy';
@@ -129,7 +131,8 @@ export class BacktestRunCommandService {
         targetUniverse: dto.targetUniverse,
         targetIssues: [],
         period: dto.period,
-        source: dto.source,
+        source: DataSource.CANONICAL,
+        dataPolicyVersion: CanonicalPolicyLoader.load().version,
         startDate: new Date(dto.startDate),
         endDate: new Date(dto.endDate),
         status: BacktestRunStatus.PENDING,
@@ -262,7 +265,8 @@ export class BacktestRunCommandService {
         targetUniverse: dto.targetUniverse,
         targetIssues: [],
         period: dto.period,
-        source: dto.source,
+        source: DataSource.CANONICAL,
+        dataPolicyVersion: CanonicalPolicyLoader.load().version,
         startDate,
         endDate,
         status: BacktestRunStatus.PENDING,

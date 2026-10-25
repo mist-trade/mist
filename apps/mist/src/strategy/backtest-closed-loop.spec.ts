@@ -15,6 +15,7 @@ import { BacktestRunCommandService } from './services/backtest-run-command.servi
 import { BacktestRunQueryService } from './services/backtest-run-query.service';
 import { BacktestRunExecutor } from '../../../backtest/src/backtest-run.executor';
 import { HealthStateService } from '../../../backtest/src/health/health-state.service';
+import { CanonicalPolicyLoader } from '@app/strategy';
 import { CreateBacktestRunDto } from './dto/create-backtest-run.dto';
 
 describe('Strategy Backtest Closed-Loop Verification', () => {
@@ -34,6 +35,10 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
   let nextResultId = 1000;
 
   beforeEach(() => {
+    jest.spyOn(CanonicalPolicyLoader, 'load').mockReturnValue({
+      version: 'test-policy-v1',
+      defaults: { '30': [{ source: 'qmt' }] },
+    } as never);
     runStore = new Map();
     resultStore = [];
     definitionStore = new Map();
@@ -213,7 +218,6 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
         bars: [
           {
             securityId: 1,
-            source: 'tdx',
             period: 30,
             timestamp: new Date('2026-01-05T01:30:00.000Z'),
             open: 10.0,
@@ -320,7 +324,6 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
       strategyVersionId: 10,
       targetUniverse: ['000001.SZ'],
       period: Period.THIRTY_MIN,
-      source: DataSource.TDX,
       startDate: '2026-01-01T00:00:00.000Z',
       endDate: '2026-01-10T00:00:00.000Z',
     };

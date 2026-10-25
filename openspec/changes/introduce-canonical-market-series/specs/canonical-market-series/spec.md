@@ -29,9 +29,10 @@ series SHALL be assembled at read time from raw `k` rows and MUST NOT be stored 
 
 The canonical series SHALL be defined by a splice policy supplied from the private plugin
 channel. A policy SHALL contain a version, per-period default segment lists and optional
-per-security overrides. A segment list SHALL support an arbitrary number of ordered,
-non-overlapping segments; each segment SHALL declare a source and MAY declare a `from` (inclusive)
-and `before` (exclusive) boundary. Only the first segment MAY omit `from` and only the last MAY
+per-security overrides. A segment list SHALL support an arbitrary number of ordered segments; each segment SHALL declare
+a source and MAY declare a `from` (inclusive) and a `before` (exclusive) boundary. Segments MAY
+overlap; when they do, the earlier segment in the list SHALL win, and the resolver SHALL normalize
+the overlapping ranges into disjoint effective intervals before any read. Only the first segment MAY omit `from` and only the last MAY
 omit `before`. The public repository SHALL NOT contain any concrete boundary, provider
 precedence or security list.
 
@@ -44,8 +45,13 @@ precedence or security list.
 - **WHEN** an override exists for the requested security and period
 - **THEN** the override segments MUST be used instead of the period default
 
+#### Scenario: Segments overlap
+- **WHEN** two segments cover the same timestamps
+- **THEN** bars in the overlap MUST come from the earlier segment
+- **AND** the later segment MUST be clipped so that no timestamp is served twice
+
 #### Scenario: The policy is invalid
-- **WHEN** segments overlap, are out of order, or reference an unknown source
+- **WHEN** segments are out of order or reference an unknown source
 - **THEN** the policy MUST be rejected before serving any read
 
 ### Requirement: Consumers SHALL Not Accept A Source Parameter
@@ -77,8 +83,9 @@ provider.
 ### Requirement: Cross-Segment Reads SHALL Be Correct And Deterministic
 
 Window loads SHALL walk segments backwards from the requested end time until the required bar
-count is collected. Page reads SHALL walk segments forwards from the cursor. Segment boundaries
-are non-overlapping, so a timestamp cursor is sufficient. Reads MUST NOT duplicate bars at a
+count is collected. Page reads SHALL walk segments forwards from the cursor. The resolver
+normalizes every policy into disjoint effective intervals (earlier segment wins), so a timestamp
+cursor is sufficient. Reads MUST NOT duplicate bars at a
 boundary, MUST NOT skip bars, and MUST remain strictly ascending.
 
 #### Scenario: A prewarm window crosses two boundaries

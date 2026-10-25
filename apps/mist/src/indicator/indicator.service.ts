@@ -1,9 +1,17 @@
 import { ERROR_MESSAGES } from '@app/constants';
 import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, Repository } from 'typeorm';
-import { K, Security, Period, DataSource } from '@app/shared-data';
-import { DataSourceService } from '../sources/services';
+import { Repository } from 'typeorm';
+import { K, Security, Period } from '@app/shared-data';
+import { CanonicalPolicyLoader } from '@app/strategy';
+import {
+  mapKToStrategyBar,
+  readCanonicalRange,
+  resolveSegments,
+  type CanonicalSegmentRead,
+  type CanonicalSegmentReader,
+  type StrategyBar,
+} from '@app/market-data';
 import {
   computeMacdSeries,
   computeKdjSeries,
@@ -34,12 +42,23 @@ interface RunDualMADto {
   longPeriod?: number;
 }
 
+const K_ALIAS = 'k';
+const K_ORDER = { ASC: 'ASC', DESC: 'DESC' } as const;
+const K_PREDICATE = {
+  SECURITY_ID: 'k.securityId = :securityId',
+  SOURCE: 'k.source = :source',
+  PERIOD: 'k.period = :period',
+  FROM: 'k.timestamp >= :from',
+  BEFORE: 'k.timestamp < :before',
+  AFTER: 'k.timestamp > :after',
+} as const;
+const K_COLUMN = { TIMESTAMP: 'k.timestamp' } as const;
+
 interface FindKDataQuery {
   code: string;
   period: Period;
   startDate: Date;
   endDate: Date;
-  source?: DataSource;
 }
 
 @Injectable()
@@ -49,8 +68,11 @@ export class IndicatorService {
     private securityRepository: Repository<Security>,
     @InjectRepository(K)
     private kRepository: Repository<K>,
-    private dataSourceService: DataSourceService,
   ) {}
+
+  private readonly canonicalSegmentReader: CanonicalSegmentReader = {
+    read: (params) => this.readCanonicalSegment(params),
+  };
 
   async runMACD(prices: number[]): Promise<{
     begIndex: number;
@@ -126,7 +148,7 @@ export class IndicatorService {
    * @param query - Query parameters including symbol, period, dates, and optional source
    * @returns Array of K entities
    */
-  async findKData(query: FindKDataQuery): Promise<K[]> {
+  async findKData(query: FindKDataQuery): Promise<readonly StrategyBar[]> {
     const foundSecurity = await this.securityRepository.findOneBy({
       code: query.code,
     });
@@ -137,26 +159,58 @@ export class IndicatorService {
       );
     }
 
-    // Resolve data source (use provided or fall back to default)
-    const source = query.source
-      ? this.dataSourceService.select(query.source)
-      : this.dataSourceService.getDefault();
+    const policy = CanonicalPolicyLoader.load();
+    const segments = resolveSegments(policy, foundSecurity.code, query.period);
 
-    const foundKs = await this.kRepository.find({
-      relations: ['security'],
-      where: {
-        security: {
-          id: foundSecurity.id,
-          code: foundSecurity.code,
-        },
-        source,
-        period: query.period,
-        timestamp: Between(query.startDate, query.endDate),
-      },
-      order: {
-        timestamp: 'ASC',
-      },
+    return readCanonicalRange(this.canonicalSegmentReader, segments, {
+      securityId: foundSecurity.id,
+      period: query.period,
+      startAt: query.startDate,
+      endAt: query.endDate,
     });
-    return foundKs;
+  }
+
+  private async readCanonicalSegment(
+    params: CanonicalSegmentRead,
+  ): Promise<readonly StrategyBar[]> {
+    const query = this.kRepository
+      .createQueryBuilder(K_ALIAS)
+      .select([
+        'k.source',
+        'k.period',
+        'k.timestamp',
+        'k.open',
+        'k.high',
+        'k.low',
+        'k.close',
+        'k.volume',
+        'k.amount',
+      ])
+      .addSelect('k.securityId')
+      .where(K_PREDICATE.SECURITY_ID, {
+        securityId: params.securityId,
+      })
+      .andWhere(K_PREDICATE.SOURCE, { source: params.source })
+      .andWhere(K_PREDICATE.PERIOD, { period: params.period });
+
+    if (params.from) {
+      query.andWhere(K_PREDICATE.FROM, { from: params.from });
+    }
+    if (params.before) {
+      query.andWhere(K_PREDICATE.BEFORE, { before: params.before });
+    }
+    if (params.afterTimestamp) {
+      query.andWhere(K_PREDICATE.AFTER, { after: params.afterTimestamp });
+    }
+
+    query
+      .orderBy(
+        K_COLUMN.TIMESTAMP,
+        params.order === 'asc' ? K_ORDER.ASC : K_ORDER.DESC,
+      )
+      .limit(params.limit);
+
+    const rows = await query.getMany();
+    return rows.map(mapKToStrategyBar);
   }
 }

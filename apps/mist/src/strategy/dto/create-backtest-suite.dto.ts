@@ -10,7 +10,7 @@ import {
   IsString,
   Matches,
 } from 'class-validator';
-import { DataSource, Period } from '@app/shared-data';
+import { Period } from '@app/shared-data';
 
 export class WfaOptionsDto {
   @ApiPropertyOptional({ enum: ['rolling', 'anchored'], default: 'rolling' })
@@ -75,13 +75,6 @@ export class CreateBacktestSuiteDto {
   @ApiProperty({ description: 'Replay period', enum: Period })
   @IsEnum(Period)
   period!: Period;
-
-  @ApiProperty({
-    description: 'Replay data source',
-    enum: [DataSource.TDX, DataSource.QMT],
-  })
-  @IsIn([DataSource.TDX, DataSource.QMT])
-  source!: DataSource.TDX | DataSource.QMT;
 
   @ApiPropertyOptional({ description: 'Inclusive replay start date' })
   @IsOptional()

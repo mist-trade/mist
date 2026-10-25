@@ -4,9 +4,19 @@ import type {
   StrategyRealtimeSource,
 } from './strategy-bar';
 
+/**
+ * Canonical runs resolve their series from the external splice policy.
+ * The provider variant exists only to replay runs created before that policy.
+ */
+export type ReplayDataSelection =
+  | { readonly kind: 'canonical' }
+  | { readonly kind: 'provider'; readonly source: StrategyHistorySource };
+
 export interface StrategyReplayPageCriteria {
   readonly securityId: number;
-  readonly source: StrategyHistorySource;
+  /** Required for canonical selection (policy overrides are keyed by code). */
+  readonly securityCode?: string;
+  readonly selection: ReplayDataSelection;
   readonly period: number;
   readonly startAt: Date;
   readonly endAt: Date;
@@ -57,7 +67,9 @@ export type StrategyMarketObservation =
 
 export interface StrategyReplayWindowCriteria {
   readonly securityId: number;
-  readonly source: StrategyHistorySource;
+  /** Required for canonical selection (policy overrides are keyed by code). */
+  readonly securityCode?: string;
+  readonly selection: ReplayDataSelection;
   readonly period: number;
   /** Exclusive upper bound: only bars strictly before this timestamp are returned. */
   readonly endAt: Date;

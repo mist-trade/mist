@@ -1,6 +1,6 @@
 import type {
+  ReplayDataSelection,
   StrategyBar,
-  StrategyRealtimeSource,
   StrategyReplayMarketDataPort,
 } from '@app/market-data';
 import {
@@ -12,7 +12,8 @@ import type { StrategyEvaluationKernel } from './strategy-evaluation-kernel';
 
 export interface HistoricalReplayCriteria {
   readonly securityId: number;
-  readonly source: StrategyRealtimeSource;
+  readonly securityCode?: string;
+  readonly selection: ReplayDataSelection;
   readonly period: number;
   /**
    * 预热段查询上界（loadReplayWindow endAt）与回放页起点（readReplayPage startAt）。
@@ -72,13 +73,21 @@ export class HistoricalBarSource {
   ): Promise<HistoricalReplaySummary> {
     HistoricalBarSource.validateBoundary(this.criteria);
 
-    const { securityId, source, period, preWarmEndAt, endAt, requiredBars } =
-      this.criteria;
+    const {
+      securityId,
+      securityCode,
+      selection,
+      period,
+      preWarmEndAt,
+      endAt,
+      requiredBars,
+    } = this.criteria;
 
     // ① 预热段：公开起点之前的历史窗口整段推进（kernel 按时间轴进预热相）。
     const initial = await this.port.loadReplayWindow({
       securityId,
-      source,
+      ...(securityCode ? { securityCode } : {}),
+      selection,
       period,
       endAt: preWarmEndAt,
       requiredBars,
@@ -98,7 +107,8 @@ export class HistoricalBarSource {
     while (true) {
       const page = await this.port.readReplayPage({
         securityId,
-        source,
+        ...(securityCode ? { securityCode } : {}),
+        selection,
         period,
         startAt: preWarmEndAt,
         endAt,

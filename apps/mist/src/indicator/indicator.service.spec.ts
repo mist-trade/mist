@@ -3,6 +3,7 @@ import { IndicatorService } from './indicator.service';
 import { getRepositoryToken } from '@nestjs/typeorm';
 import { DataSource, Period, Security, K } from '@app/shared-data';
 import { DataSourceService } from '../sources/services';
+import { CanonicalPolicyLoader } from '@app/strategy';
 
 describe('IndicatorService', () => {
   let service: IndicatorService;
@@ -19,8 +20,19 @@ describe('IndicatorService', () => {
     findOneBy: jest.fn(),
   };
 
+  const canonicalBuilder = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue([]),
+  };
+
   const mockKRepository = {
     find: jest.fn(),
+    createQueryBuilder: jest.fn().mockReturnValue(canonicalBuilder),
   };
 
   const mockDataSourceService = {
@@ -123,12 +135,15 @@ describe('IndicatorService', () => {
     ).toBe(true);
   });
 
-  it('queries K rows with the Period enum value without string double-casting', async () => {
+  it('reads canonical segments with the Period enum value', async () => {
+    jest.spyOn(CanonicalPolicyLoader, 'load').mockReturnValue({
+      version: 'test-policy',
+      defaults: { '1': [{ source: DataSource.QMT }] },
+    } as never);
     mockSecurityRepository.findOneBy.mockResolvedValue({
       id: 1,
       code: '000001',
     });
-    mockKRepository.find.mockResolvedValue([]);
 
     await service.findKData({
       code: '000001',
@@ -137,12 +152,14 @@ describe('IndicatorService', () => {
       endDate: new Date('2026-07-02T10:30:00+08:00'),
     });
 
-    expect(mockKRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          period: Period.ONE_MIN,
-        }),
-      }),
+    expect(mockKRepository.createQueryBuilder).toHaveBeenCalledWith('k');
+    expect(canonicalBuilder.andWhere).toHaveBeenCalledWith(
+      'k.period = :period',
+      { period: Period.ONE_MIN },
+    );
+    expect(canonicalBuilder.andWhere).toHaveBeenCalledWith(
+      'k.source = :source',
+      { source: DataSource.QMT },
     );
   });
 });

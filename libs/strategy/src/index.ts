@@ -61,3 +61,5 @@ export * from './stress-testing';
 export * from './wfa';
 export * from './strategy.constants';
 export * from './strategy.errors';
+
+export * from './market-data/canonical-policy.loader';

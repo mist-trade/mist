@@ -206,7 +206,7 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
         },
         {
           securityId: 9,
-          source: 'tdx',
+          selection: { kind: 'provider', source: 'tdx' },
           period: 1,
           preWarmEndAt: publicFrom,
           publicFrom,

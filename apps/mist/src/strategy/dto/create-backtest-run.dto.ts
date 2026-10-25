@@ -4,12 +4,11 @@ import {
   IsArray,
   IsDateString,
   IsEnum,
-  IsIn,
   IsInt,
   IsString,
   Matches,
 } from 'class-validator';
-import { BACKTEST_SOURCES, DataSource, Period } from '@app/shared-data';
+import { Period } from '@app/shared-data';
 
 export class CreateBacktestRunDto {
   @ApiProperty({ description: 'Strategy version to replay' })
@@ -26,13 +25,6 @@ export class CreateBacktestRunDto {
   @ApiProperty({ description: 'Replay period', enum: Period })
   @IsEnum(Period)
   period!: Period;
-
-  @ApiProperty({
-    description: 'Replay data source',
-    enum: BACKTEST_SOURCES,
-  })
-  @IsIn(BACKTEST_SOURCES)
-  source!: DataSource;
 
   @ApiProperty({ description: 'Inclusive replay start date' })
   @IsDateString()

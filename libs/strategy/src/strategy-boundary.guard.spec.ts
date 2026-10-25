@@ -136,9 +136,10 @@ describe('Strategy domain boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('does not read environment configuration except external-plugin-loader', () => {
+  it('does not read environment configuration except private-plugin loaders', () => {
     const allowedEnvFiles = new Set([
       join(sourceRoot, 'factor', 'external-plugin-loader.ts'),
+      join(sourceRoot, 'market-data', 'canonical-policy.loader.ts'),
     ]);
     const violations = runtimeFiles
       .filter((file) => !allowedEnvFiles.has(file))

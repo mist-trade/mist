@@ -60,7 +60,6 @@ export class IndicatorController {
       period: queryDto.period,
       startDate,
       endDate,
-      source: queryDto.source,
     });
 
     const macdResult = await this.indicatorService.runMACD(
@@ -75,7 +74,7 @@ export class IndicatorController {
         index,
         macdResult.histogram,
       ),
-      symbol: item.security.code,
+      symbol: item.securityCode ?? queryDto.code,
       time: item.timestamp,
       close: item.close,
     }));
@@ -103,7 +102,6 @@ export class IndicatorController {
       period: queryDto.period,
       startDate,
       endDate,
-      source: queryDto.source,
     });
 
     const KDJParams = data.reduce<RunKDJDto>(
@@ -127,7 +125,7 @@ export class IndicatorController {
       k: formatIndicator(kdjResult.begIndex, index, kdjResult.K),
       d: formatIndicator(kdjResult.begIndex, index, kdjResult.D),
       j: formatIndicator(kdjResult.begIndex, index, kdjResult.J),
-      symbol: item.security.code,
+      symbol: item.securityCode ?? queryDto.code,
       time: item.timestamp,
       close: item.close,
     }));
@@ -156,7 +154,6 @@ export class IndicatorController {
       period: queryDto.period,
       startDate,
       endDate,
-      source: queryDto.source,
     });
 
     // 统一走全局 market-data pipeline：先精度(KPriceProjector via mapKToStrategyBar) → 再补齐(Imputer) → 视图

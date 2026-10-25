@@ -14,7 +14,10 @@ import { mapKToStrategyBar } from './k-strategy-bar-mapper';
  * dropped, so the SQL hits rows but the HTTP response is `data: []` with no log.
  * Production hit exactly this for `vendor_a` on 2026-10-24.
  */
-const PERSISTED_SOURCES = Object.values(DataSource);
+// `canonical` is a backtest run marker, never a persisted k.source value.
+const PERSISTED_SOURCES = Object.values(DataSource).filter(
+  (source) => source !== DataSource.CANONICAL,
+);
 
 function kRow(source: string): K {
   return {

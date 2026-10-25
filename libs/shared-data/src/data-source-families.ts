@@ -24,5 +24,8 @@ export const BACKTEST_SOURCES: readonly DataSource[] = Object.values(
 );
 
 export function isBacktestSource(source: string): boolean {
-  return BACKTEST_SOURCES.includes(source as DataSource);
+  return (
+    source === DataSource.CANONICAL ||
+    BACKTEST_SOURCES.includes(source as DataSource)
+  );
 }

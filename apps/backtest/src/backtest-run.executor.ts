@@ -37,7 +37,11 @@ import {
   type DailyNavSnapshot,
   type PositionClosedRecord,
 } from '@app/strategy';
-import type { StrategyBar, StrategyRealtimeSource } from '@app/market-data';
+import type {
+  ReplayDataSelection,
+  StrategyBar,
+  StrategyHistorySource,
+} from '@app/market-data';
 import { computePerformanceSummary } from '@app/indicators';
 import { formatShanghaiDateString, isSessionCloseBar } from '@app/timezone';
 import { TRADING_RULES } from '@app/constants';
@@ -397,9 +401,17 @@ export class BacktestRunExecutor {
         },
       ],
     });
+    const selection: ReplayDataSelection =
+      run.source === DataSource.CANONICAL
+        ? { kind: 'canonical' }
+        : {
+            kind: 'provider',
+            source: run.source as StrategyHistorySource,
+          };
     const source = new HistoricalBarSource(this.marketData, {
       securityId,
-      source: run.source as StrategyRealtimeSource,
+      securityCode,
+      selection,
       period: run.period,
       preWarmEndAt,
       publicFrom: run.startDate,
@@ -429,7 +441,7 @@ export class BacktestRunExecutor {
         const payload = mapKernelSignalToPersistencePayload(signal, {
           securityId,
           securityCode,
-          source: run.source,
+          source: bar.source as unknown as DataSource,
           period: run.period,
           ruleSnapshot,
         });

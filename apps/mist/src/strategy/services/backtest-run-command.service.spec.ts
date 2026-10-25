@@ -1,9 +1,10 @@
-import { BacktestRunStatus, DataSource, Period } from '@app/shared-data';
+import { BacktestRunStatus, Period } from '@app/shared-data';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import {
   BacktestRpcTransportError,
   type BacktestRpcClient,
 } from '../runtime/backtest-rpc.client';
+import { CanonicalPolicyLoader } from '@app/strategy';
 import {
   BacktestCommandHttpException,
   BacktestRunCommandService,
@@ -14,7 +15,6 @@ function dto() {
     strategyVersionId: 7,
     targetUniverse: ['600000.SH'],
     period: Period.DAY,
-    source: DataSource.TDX as const,
     startDate: '2026-01-01T00:00:00.000Z',
     endDate: '2026-01-31T00:00:00.000Z',
   };
@@ -49,6 +49,16 @@ function fixture() {
   );
   return { service, runRepository, rpc, run, definitionRepository, version };
 }
+
+beforeEach(() => {
+  jest
+    .spyOn(CanonicalPolicyLoader, 'load')
+    .mockReturnValue({ version: 'test-policy-v1' } as never);
+});
+
+afterEach(() => {
+  jest.restoreAllMocks();
+});
 
 describe('BacktestRunCommandService handoff boundaries', () => {
   it('returns 429 with confirmed FAILED status after queue rejection', async () => {
@@ -201,7 +211,6 @@ describe('BacktestRunCommandService chan_bsp dispatch', () => {
       strategyVersionId: 7,
       targetUniverse: ['600000.SH'],
       period: Period.DAY,
-      source: DataSource.TDX,
       startDate: '2020-01-01T00:00:00.000Z',
       endDate: '2022-01-01T00:00:00.000Z',
       wfaOptions: {
@@ -243,7 +252,6 @@ describe('BacktestRunCommandService chan_bsp dispatch', () => {
       strategyVersionId: 7,
       targetUniverse: ['600000.SH'],
       period: Period.DAY,
-      source: DataSource.TDX,
       stressOptions: {
         scenarios: ['CRASH_2015'],
       },

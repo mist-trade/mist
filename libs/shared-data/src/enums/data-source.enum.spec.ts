@@ -6,11 +6,12 @@ describe('DataSource', () => {
     expect(DataSource.TDX).toBe('tdx');
     expect(DataSource.QMT).toBe('qmt');
     expect(DataSource.VENDOR_A).toBe('vendor_a');
+    expect(DataSource.CANONICAL).toBe('canonical');
   });
 
   it('exposes the live sources plus one value per vendor provider', () => {
     const values = Object.values(DataSource);
-    expect(values).toEqual(['ef', 'tdx', 'qmt', 'vendor_a']);
+    expect(values).toEqual(['ef', 'tdx', 'qmt', 'vendor_a', 'canonical']);
   });
 
   it('does not expose legacy miniQMT aliases', () => {

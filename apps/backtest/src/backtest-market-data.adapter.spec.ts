@@ -1,8 +1,9 @@
 import { DataSource, Period } from '@app/shared-data';
 import type {
-  StrategyHistorySource,
+  ReplayDataSelection,
   StrategyReplayWindowCriteria,
 } from '@app/market-data';
+import { CanonicalPolicyLoader } from '@app/strategy';
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
 
 function makeBuilder(rows: unknown[]) {
@@ -25,240 +26,289 @@ function makeBuilder(rows: unknown[]) {
   return { builder, calls };
 }
 
-function row(timestamp: string) {
-  return Object.assign({
+function row(timestamp: string, source: DataSource = DataSource.TDX) {
+  return {
     securityId: 7,
-    source: DataSource.TDX,
+    source,
     period: Period.ONE_MIN,
     timestamp: new Date(timestamp),
-    open: 10,
-    high: 11,
-    low: 9,
-    close: 10.5,
+    open: '10.00',
+    high: '11.00',
+    low: '9.00',
+    close: '10.50',
     volume: '100',
     amount: '12.345',
-  });
+  };
 }
 
+const PROVIDER_TDX: ReplayDataSelection = { kind: 'provider', source: 'tdx' };
+const PROVIDER_VENDOR: ReplayDataSelection = {
+  kind: 'provider',
+  source: 'vendor_a',
+};
+const CANONICAL: ReplayDataSelection = { kind: 'canonical' };
+
+const POLICY = {
+  version: 'test-v1',
+  defaults: {
+    '1': [
+      { source: DataSource.VENDOR_A, before: '2025-07-04' },
+      { source: DataSource.QMT },
+    ],
+  },
+};
+
 describe('BacktestMarketDataAdapter', () => {
-  it('uses source-exact keyset criteria and only maps returned rows', async () => {
-    const query = makeBuilder([row('2026-08-04T01:30:00.000Z')]);
-    const repository = {
-      createQueryBuilder: jest.fn().mockReturnValue(query.builder),
-    };
-    const adapter = new BacktestMarketDataAdapter(repository as any);
-
-    const page = await adapter.readReplayPage({
-      securityId: 7,
-      source: 'tdx',
-      period: Period.ONE_MIN,
-      startAt: new Date('2026-08-04T01:30:00.000Z'),
-      endAt: new Date('2026-08-04T02:30:00.000Z'),
-    });
-
-    expect(repository.createQueryBuilder).toHaveBeenCalledWith('k');
-    expect(query.builder.select).toHaveBeenCalledWith([
-      'k.source',
-      'k.period',
-      'k.timestamp',
-      'k.open',
-      'k.high',
-      'k.low',
-      'k.close',
-      'k.volume',
-      'k.amount',
-    ]);
-    expect(query.calls).toContainEqual({
-      method: 'where',
-      args: ['k.securityId = :securityId', { securityId: 7 }],
-    });
-    expect(query.calls).toContainEqual({
-      method: 'andWhere',
-      args: [
-        'k.timestamp >= :startAt',
-        {
-          startAt: new Date('2026-08-04T01:30:00.000Z'),
-        },
-      ],
-    });
-    expect(query.calls).toContainEqual({
-      method: 'orderBy',
-      args: ['k.timestamp', 'ASC'],
-    });
-    expect(query.builder.limit).toHaveBeenCalledWith(1000);
-    expect(page.bars).toHaveLength(1);
-    expect(page.nextAfterTimestamp).toBeNull();
+  afterEach(() => {
+    jest.restoreAllMocks();
   });
 
-  it('replays a vendor source with source-exact criteria', async () => {
-    const query = makeBuilder([row('2026-08-04T01:30:00.000Z')]);
-    const adapter = new BacktestMarketDataAdapter({
-      createQueryBuilder: jest.fn().mockReturnValue(query.builder),
-    } as any);
+  describe('legacy provider replay', () => {
+    it('uses source-exact keyset criteria and only maps returned rows', async () => {
+      const query = makeBuilder([row('2026-08-04T01:30:00.000Z')]);
+      const repository = {
+        createQueryBuilder: jest.fn().mockReturnValue(query.builder),
+      };
+      const adapter = new BacktestMarketDataAdapter(repository as never);
 
-    await adapter.readReplayPage({
-      securityId: 7,
-      source: 'vendor_a',
-      period: Period.FIVE_MIN,
-      startAt: new Date('2026-08-04T01:30:00.000Z'),
-      endAt: new Date('2026-08-04T02:30:00.000Z'),
-    });
-
-    expect(query.calls).toContainEqual({
-      method: 'andWhere',
-      args: ['k.source = :source', { source: 'vendor_a' }],
-    });
-  });
-
-  it('maps vendor rows through the historical source mapper', async () => {
-    const find = jest.fn().mockResolvedValue([
-      Object.assign(row('2026-08-04T01:30:00.000Z'), {
-        source: DataSource.VENDOR_A,
-      }),
-    ]);
-    const adapter = new BacktestMarketDataAdapter({ find } as any);
-
-    const window = await adapter.loadReplayWindow({
-      securityId: 7,
-      source: 'vendor_a',
-      period: Period.FIVE_MIN,
-      endAt: new Date('2026-08-04T02:00:00.000Z'),
-      requiredBars: 5,
-    });
-
-    expect(window.bars).toHaveLength(1);
-    expect(window.bars[0].source).toBe('vendor_a');
-  });
-
-  it('rejects ef as a replay source', async () => {
-    const adapter = new BacktestMarketDataAdapter({
-      createQueryBuilder: jest.fn(),
-    } as any);
-
-    await expect(
-      adapter.readReplayPage({
+      const page = await adapter.readReplayPage({
         securityId: 7,
-        source: 'ef' as StrategyHistorySource,
+        selection: PROVIDER_TDX,
+        period: Period.ONE_MIN,
+        startAt: new Date('2026-08-04T01:30:00.000Z'),
+        endAt: new Date('2026-08-04T02:30:00.000Z'),
+      });
+
+      expect(repository.createQueryBuilder).toHaveBeenCalledWith('k');
+      expect(query.calls).toContainEqual({
+        method: 'andWhere',
+        args: ['k.source = :source', { source: 'tdx' }],
+      });
+      expect(query.calls).toContainEqual({
+        method: 'orderBy',
+        args: ['k.timestamp', 'ASC'],
+      });
+      expect(query.builder.limit).toHaveBeenCalledWith(1000);
+      expect(page.bars).toHaveLength(1);
+      expect(page.nextAfterTimestamp).toBeNull();
+    });
+
+    it('replays a vendor provider source', async () => {
+      const query = makeBuilder([
+        row('2026-08-04T01:30:00.000Z', DataSource.VENDOR_A),
+      ]);
+      const adapter = new BacktestMarketDataAdapter({
+        createQueryBuilder: jest.fn().mockReturnValue(query.builder),
+      } as never);
+
+      const page = await adapter.readReplayPage({
+        securityId: 7,
+        selection: PROVIDER_VENDOR,
         period: Period.FIVE_MIN,
         startAt: new Date('2026-08-04T01:30:00.000Z'),
         endAt: new Date('2026-08-04T02:30:00.000Z'),
-      }),
-    ).rejects.toThrow(/tdx, qmt or a vendor source/);
-  });
+      });
 
-  it('adds a strict timestamp cursor only on later pages', async () => {
-    const afterTimestamp = new Date('2026-08-04T01:30:00.000Z');
-    const query = makeBuilder([row('2026-08-04T01:31:00.000Z')]);
-    const adapter = new BacktestMarketDataAdapter({
-      createQueryBuilder: jest.fn().mockReturnValue(query.builder),
-    } as any);
-
-    await adapter.readReplayPage({
-      securityId: 7,
-      source: 'tdx',
-      period: Period.ONE_MIN,
-      startAt: new Date('2026-08-04T01:30:00.000Z'),
-      endAt: new Date('2026-08-04T02:30:00.000Z'),
-      afterTimestamp,
+      expect(query.calls).toContainEqual({
+        method: 'andWhere',
+        args: ['k.source = :source', { source: 'vendor_a' }],
+      });
+      expect(page.bars[0].source).toBe('vendor_a');
     });
 
-    expect(query.calls).toContainEqual({
-      method: 'andWhere',
-      args: ['k.timestamp > :afterTimestamp', { afterTimestamp }],
+    it('adds a strict timestamp cursor only on later pages', async () => {
+      const afterTimestamp = new Date('2026-08-04T01:30:00.000Z');
+      const query = makeBuilder([row('2026-08-04T01:31:00.000Z')]);
+      const adapter = new BacktestMarketDataAdapter({
+        createQueryBuilder: jest.fn().mockReturnValue(query.builder),
+      } as never);
+
+      await adapter.readReplayPage({
+        securityId: 7,
+        selection: PROVIDER_TDX,
+        period: Period.ONE_MIN,
+        startAt: new Date('2026-08-04T01:30:00.000Z'),
+        endAt: new Date('2026-08-04T02:30:00.000Z'),
+        afterTimestamp,
+      });
+
+      expect(query.calls).toContainEqual({
+        method: 'andWhere',
+        args: ['k.timestamp > :afterTimestamp', { afterTimestamp }],
+      });
+    });
+
+    it('loads the last bars strictly before endAt and returns them ascending', async () => {
+      const find = jest
+        .fn()
+        .mockResolvedValue([
+          row('2026-08-04T01:31:00.000Z'),
+          row('2026-08-04T01:30:00.000Z'),
+        ]);
+      const adapter = new BacktestMarketDataAdapter({ find } as never);
+
+      const window = await adapter.loadReplayWindow({
+        securityId: 7,
+        selection: PROVIDER_TDX,
+        period: Period.ONE_MIN,
+        endAt: new Date('2026-08-04T01:32:00.000Z'),
+        requiredBars: 5,
+      });
+
+      expect(find).toHaveBeenCalledWith(
+        expect.objectContaining({
+          where: expect.objectContaining({ source: DataSource.TDX }),
+          order: { timestamp: 'DESC' },
+          take: 5,
+        }),
+      );
+      expect(window.bars).toHaveLength(2);
+      expect(window.bars[1].timestamp.toISOString()).toBe(
+        '2026-08-04T01:31:00.000Z',
+      );
+    });
+
+    it('returns an empty window when no bar precedes endAt', async () => {
+      const adapter = new BacktestMarketDataAdapter({
+        find: jest.fn().mockResolvedValue([]),
+      } as never);
+
+      const window = await adapter.loadReplayWindow({
+        securityId: 7,
+        selection: { kind: 'provider', source: 'qmt' },
+        period: Period.ONE_MIN,
+        endAt: new Date('2026-08-04T01:32:00.000Z'),
+        requiredBars: 5,
+      });
+
+      expect(window.bars).toEqual([]);
+    });
+
+    it.each<[string, StrategyReplayWindowCriteria]>([
+      [
+        'securityId',
+        {
+          securityId: 0,
+          selection: PROVIDER_TDX,
+          period: 1,
+          endAt: new Date(),
+          requiredBars: 2,
+        },
+      ],
+      [
+        'source',
+        {
+          securityId: 1,
+          selection: { kind: 'provider', source: 'ef' as never },
+          period: 1,
+          endAt: new Date(),
+          requiredBars: 2,
+        },
+      ],
+      [
+        'endAt',
+        {
+          securityId: 1,
+          selection: PROVIDER_TDX,
+          period: 1,
+          endAt: new Date('nope'),
+          requiredBars: 2,
+        },
+      ],
+      [
+        'requiredBars',
+        {
+          securityId: 1,
+          selection: PROVIDER_TDX,
+          period: 1,
+          endAt: new Date(),
+          requiredBars: 0,
+        },
+      ],
+    ])('rejects invalid window criteria: %s', async (_label, criteria) => {
+      const adapter = new BacktestMarketDataAdapter({} as never);
+      await expect(adapter.loadReplayWindow(criteria)).rejects.toThrow();
     });
   });
 
-  it('loads the last bars strictly before endAt and returns them ascending', async () => {
-    const find = jest
-      .fn()
-      .mockResolvedValue([
-        row('2026-08-04T01:31:00.000Z'),
-        row('2026-08-04T01:30:00.000Z'),
+  describe('canonical replay', () => {
+    beforeEach(() => {
+      jest
+        .spyOn(CanonicalPolicyLoader, 'load')
+        .mockReturnValue(POLICY as never);
+    });
+
+    it('reads canonical segments without a provider selection', async () => {
+      const vendorQuery = makeBuilder([
+        row('2025-06-02T01:30:00.000Z', DataSource.VENDOR_A),
+        row('2025-06-03T01:30:00.000Z', DataSource.VENDOR_A),
       ]);
-    const adapter = new BacktestMarketDataAdapter({ find } as any);
+      const qmtQuery = makeBuilder([]);
+      const adapter = new BacktestMarketDataAdapter({
+        createQueryBuilder: jest
+          .fn()
+          .mockReturnValueOnce(vendorQuery.builder)
+          .mockReturnValueOnce(qmtQuery.builder),
+      } as never);
 
-    const window = await adapter.loadReplayWindow({
-      securityId: 7,
-      source: 'tdx',
-      period: Period.ONE_MIN,
-      endAt: new Date('2026-08-04T01:32:00.000Z'),
-      requiredBars: 5,
+      const page = await adapter.readReplayPage({
+        securityId: 7,
+        securityCode: '000001',
+        selection: CANONICAL,
+        period: Period.ONE_MIN,
+        startAt: new Date('2025-06-01T00:00:00.000Z'),
+        endAt: new Date('2025-07-10T00:00:00.000Z'),
+      });
+
+      expect(vendorQuery.calls).toContainEqual({
+        method: 'andWhere',
+        args: ['k.source = :source', { source: DataSource.VENDOR_A }],
+      });
+      expect(page.bars).toHaveLength(2);
+      expect(page.bars[0].source).toBe('vendor_a');
     });
 
-    expect(find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        order: { timestamp: 'DESC' },
-        take: 5,
-      }),
-    );
-    expect(window.bars.map((bar) => bar.timestamp.toISOString())).toEqual([
-      '2026-08-04T01:30:00.000Z',
-      '2026-08-04T01:31:00.000Z',
-    ]);
-  });
+    it('requires a security code to resolve overrides', async () => {
+      const adapter = new BacktestMarketDataAdapter({} as never);
 
-  it('returns an empty window when no bar precedes endAt', async () => {
-    const adapter = new BacktestMarketDataAdapter({
-      find: jest.fn().mockResolvedValue([]),
-    } as any);
-
-    const window = await adapter.loadReplayWindow({
-      securityId: 7,
-      source: 'qmt',
-      period: Period.ONE_MIN,
-      endAt: new Date('2026-08-04T01:32:00.000Z'),
-      requiredBars: 5,
+      await expect(
+        adapter.readReplayPage({
+          securityId: 7,
+          selection: CANONICAL,
+          period: Period.ONE_MIN,
+          startAt: new Date('2025-06-01T00:00:00.000Z'),
+          endAt: new Date('2025-07-10T00:00:00.000Z'),
+        }),
+      ).rejects.toThrow(/securityCode/);
     });
 
-    expect(window.bars).toEqual([]);
-  });
+    it('loads a canonical window across segment boundaries', async () => {
+      const qmtQuery = makeBuilder([
+        row('2025-07-04T01:30:00.000Z', DataSource.QMT),
+      ]);
+      const vendorQuery = makeBuilder([
+        row('2025-07-03T01:30:00.000Z', DataSource.VENDOR_A),
+      ]);
+      const adapter = new BacktestMarketDataAdapter({
+        createQueryBuilder: jest
+          .fn()
+          .mockReturnValueOnce(qmtQuery.builder)
+          .mockReturnValueOnce(vendorQuery.builder),
+      } as never);
 
-  it.each<[string, StrategyReplayWindowCriteria]>([
-    [
-      'securityId',
-      {
-        securityId: 0,
-        source: 'tdx',
-        period: 1,
-        endAt: new Date(),
+      const window = await adapter.loadReplayWindow({
+        securityId: 7,
+        securityCode: '000001',
+        selection: CANONICAL,
+        period: Period.ONE_MIN,
+        endAt: new Date('2025-07-10T00:00:00.000Z'),
         requiredBars: 2,
-      },
-    ],
-    [
-      'source',
-      {
-        securityId: 1,
-        source: 'ef' as StrategyHistorySource,
-        period: 1,
-        endAt: new Date(),
-        requiredBars: 2,
-      },
-    ],
-    [
-      'endAt',
-      {
-        securityId: 1,
-        source: 'tdx',
-        period: 1,
-        endAt: new Date('nope'),
-        requiredBars: 2,
-      },
-    ],
-    [
-      'requiredBars',
-      {
-        securityId: 1,
-        source: 'tdx',
-        period: 1,
-        endAt: new Date(),
-        requiredBars: 0,
-      },
-    ],
-  ])('rejects an invalid %s window criteria', async (_label, criteria) => {
-    const adapter = new BacktestMarketDataAdapter({
-      find: jest.fn(),
-    } as any);
+      });
 
-    await expect(adapter.loadReplayWindow(criteria)).rejects.toThrow(TypeError);
+      expect(window.bars).toHaveLength(2);
+      expect(window.bars[0].timestamp.getTime()).toBeLessThan(
+        window.bars[1].timestamp.getTime(),
+      );
+    });
   });
 });

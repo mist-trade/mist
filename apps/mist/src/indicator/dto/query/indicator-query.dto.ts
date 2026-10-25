@@ -1,4 +1,4 @@
-import { DataSource, Period } from '@app/shared-data';
+import { Period } from '@app/shared-data';
 import {
   IsBoolean,
   IsEnum,
@@ -9,20 +9,14 @@ import {
 import { BEIJING_DATE_REGEX } from '@app/timezone';
 
 /**
- * Unified query DTO for all indicator endpoints
- * Supports optional data source selection
+ * Unified query DTO for all indicator endpoints.
+ * The provider source is no longer selectable: reads use the canonical series.
  */
 export class IndicatorQueryDto {
   @IsNotEmpty({
     message: '指数代码不能为空',
   })
   code!: string;
-
-  @IsOptional()
-  @IsEnum(DataSource, {
-    message: `数据源必须是以下值之一: ${Object.values(DataSource).join(', ')}`,
-  })
-  source?: DataSource;
 
   @IsEnum(Period, {
     message: `周期必须是以下数值之一: ${Object.values(Period).join(', ')}`,
