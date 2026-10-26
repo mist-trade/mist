@@ -87,6 +87,16 @@ export interface FactorPluginMetadata {
   readonly description: string;
   /** 参数配置 Schema（用于前台动态渲染配置表单，可选） */
   readonly paramSchema?: Record<string, unknown>;
+
+  /**
+   * 声明多周期上下文需求（可选）：context 周期 → 最少保留根数。
+   * 编译边界遍历决策流树按 period 取 max 合并进 plan.contextRequirements；
+   * 这是 context 需求的唯一来源（延续"策略定义不存调用方 lookback"契约），
+   * 运行时内核据此注入 `attributes['series.<period>']` 只读快照。
+   */
+  resolveContextRequirements?(
+    params?: Record<string, unknown>,
+  ): Readonly<Record<number, number>>;
 }
 
 export interface FactorPlugin extends FactorPluginMetadata {

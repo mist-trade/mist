@@ -9,6 +9,7 @@ import {
   type RealtimeStrategyExecutionPlan,
 } from '@app/strategy';
 import { StrategySimulationSession } from './simulation/strategy-simulation.session';
+import { availabilityKey } from './kernel/availability';
 import { mapKernelSignalToSimulationSignal } from './simulation/kernel-signal-mapper';
 
 /**
@@ -184,7 +185,6 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
       const kernelA = new StrategyEvaluationKernel({
         securityId: 9,
         securityCode: '600000.SH',
-        period: 1,
         publicFrom,
         plans: [
           {
@@ -192,7 +192,9 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
             versionId: 1,
             flow,
             ruleSnapshot,
+            period: 1,
             requiredBarCount: REQUIRED_BAR_COUNT,
+            contextRequirements: {},
           },
         ],
       });
@@ -207,7 +209,8 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
         {
           securityId: 9,
           selection: { kind: 'provider', source: 'tdx' },
-          period: 1,
+          evaluationPeriod: 1,
+          contextPeriods: {},
           preWarmEndAt: publicFrom,
           publicFrom,
           endAt: allBars[allBars.length - 1].timestamp,
@@ -241,6 +244,7 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
           flow,
           signalKind: 'entry',
           requiredBarCount: REQUIRED_BAR_COUNT,
+          contextRequirements: {},
         },
       ];
       const laneB: ComparableSimulationSignal[] = [];
@@ -289,6 +293,273 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
       const comparableC = laneC.map(toComparable);
       expect(comparableB).toEqual(comparableA);
       expect(comparableC).toEqual(comparableA);
+    });
+
+    describe('3. 多周期三路 parity（30m 求值 + 5m context，orderKey 归并序）', () => {
+      const EVAL_REQUIRED = 2;
+      const CONTEXT_REQUIRED = 4;
+      const BAR30_COUNT = 8;
+      const PRE_WARM_30 = 1;
+      const base = Date.UTC(2026, 8, 4, 1, 30); // 09:30 上海
+      const publicFrom = new Date(base);
+
+      function make30(count: number, startSlot: number): StrategyBar[] {
+        return Array.from({ length: count }, (_, i) => {
+          const close =
+            Math.round((10 + Math.sin((startSlot + i) / 3) * 0.4) * 100) / 100;
+          return {
+            securityId: 9,
+            source: 'tdx' as const,
+            period: 30,
+            timestamp: new Date(base + (startSlot + i) * 30 * 60_000),
+            open: close - 0.1,
+            high: close + 0.3,
+            low: close - 0.3,
+            close,
+            volume: '1000',
+            amount: '10000',
+            type: 'complete' as const,
+          };
+        });
+      }
+
+      function make5(count: number, startSlot: number): StrategyBar[] {
+        return Array.from({ length: count }, (_, i) => {
+          const close =
+            Math.round((10 + Math.sin((startSlot + i) / 3) * 0.4) * 100) / 100;
+          return {
+            securityId: 9,
+            source: 'tdx' as const,
+            period: 5,
+            timestamp: new Date(base + (startSlot + i) * 5 * 60_000),
+            open: close - 0.1,
+            high: close + 0.3,
+            low: close - 0.3,
+            close,
+            volume: '1000',
+            amount: '10000',
+            type: 'complete' as const,
+          };
+        });
+      }
+
+      // 5m 覆盖 [base-15min, base+210min]；30m 覆盖 [base-30min, base+210min]
+      const bars5Pre = make5(3, -3);
+      const bars5Public = make5(43, 0);
+      const bars30Pre = make30(PRE_WARM_30, -1);
+      const bars30Public = make30(BAR30_COUNT - PRE_WARM_30, 0);
+      const merged = [
+        ...bars5Pre,
+        ...bars30Pre,
+        ...bars5Public,
+        ...bars30Public,
+      ].sort((left, right) => {
+        const leftKey = availabilityKey(left).getTime();
+        const rightKey = availabilityKey(right).getTime();
+        return leftKey - rightKey || left.period - right.period;
+      });
+
+      const plans = [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow: {
+            id: 'guard_legacy_rule',
+            type: 'GUARD' as const,
+            name: '存量规则门禁',
+            pluginId: 'plugin.legacy.rule-dsl',
+            params: {
+              plan: compileStoredStrategyRule(
+                { field: 'k.close', operator: 'gt', value: 1 },
+                'entry',
+              ),
+            },
+            requiredAction: 'BUY' as const,
+            minConfidence: 0.5,
+            onPass: {
+              id: 'term_pass',
+              type: 'TERMINAL' as const,
+              action: 'BUY' as const,
+              signalTag: 'LEGACY_DSL',
+              reason: 'matched',
+            },
+          },
+          ruleSnapshot: Object.freeze({
+            field: 'k.close',
+            operator: 'gt',
+            value: 1,
+          }),
+          source: 'tdx' as const,
+          period: 30,
+          requiredBarCount: EVAL_REQUIRED,
+          contextRequirements: { 5: CONTEXT_REQUIRED },
+          kind: 'decision_flow' as const,
+          signalKind: 'entry' as const,
+        },
+      ];
+      const kernelPlan = [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow: plans[0].flow,
+          ruleSnapshot: plans[0].ruleSnapshot,
+          period: 30,
+          requiredBarCount: EVAL_REQUIRED,
+          contextRequirements: { 5: CONTEXT_REQUIRED },
+        },
+      ];
+
+      function toComparableList(
+        signals: readonly {
+          signalTime: string;
+          triggerTime: string;
+          pivotTime: string;
+          triggerPrice: number;
+          signalType: string;
+          isBuy: boolean;
+        }[],
+      ) {
+        return signals.map((signal) => ({
+          signalTime: signal.signalTime,
+          triggerTime: signal.triggerTime,
+          pivotTime: signal.pivotTime,
+          triggerPrice: signal.triggerPrice,
+          signalType: signal.signalType,
+          signalKind: signal.isBuy ? 'entry' : 'exit',
+        }));
+      }
+
+      it('HistoricalBarSource 与 RealtimeKernelPool 与 会话驱动 三路一致（多周期）', async () => {
+        // Lane A：历史回放（多序列归并）
+        const laneA: {
+          signalTime: string;
+          triggerTime: string;
+          pivotTime: string;
+          triggerPrice: number;
+          signalType: string;
+          isBuy: boolean;
+        }[] = [];
+        const kernelA = new StrategyEvaluationKernel({
+          securityId: 9,
+          securityCode: '600000.SH',
+          publicFrom,
+          plans: kernelPlan,
+        });
+        const source = new HistoricalBarSource(
+          {
+            loadReplayWindow: jest
+              .fn()
+              .mockImplementation(
+                (criteria: { period: number; endAt: Date }) => ({
+                  bars: merged.filter(
+                    (bar) =>
+                      bar.period === criteria.period &&
+                      bar.timestamp < criteria.endAt,
+                  ),
+                }),
+              ),
+            readReplayPage: jest
+              .fn()
+              .mockImplementation(
+                (criteria: { period: number; startAt: Date; endAt: Date }) => ({
+                  bars: merged.filter(
+                    (bar) =>
+                      bar.period === criteria.period &&
+                      bar.timestamp >= criteria.startAt &&
+                      bar.timestamp <= criteria.endAt,
+                  ),
+                  nextAfterTimestamp: null,
+                }),
+              ),
+          },
+          {
+            securityId: 9,
+            selection: { kind: 'provider', source: 'tdx' },
+            evaluationPeriod: 30,
+            contextPeriods: { 5: CONTEXT_REQUIRED },
+            preWarmEndAt: publicFrom,
+            publicFrom,
+            endAt: merged[merged.length - 1].timestamp,
+            requiredBars: EVAL_REQUIRED,
+          },
+        );
+        await source.drive(kernelA, (signal) => {
+          laneA.push(
+            mapKernelSignalToSimulationSignal(signal, {
+              securityCode: '600000.SH',
+              period: 30,
+            }),
+          );
+        });
+
+        // Lane B：实时（合并流逐根入池；hydration 与流重复的部分由内核游标去重）
+        const kernelPool = new RealtimeKernelPool({
+          loadRealtimeWindow: jest
+            .fn()
+            .mockImplementation(
+              (criteria: { period: number; anchorAvailabilityMs: number }) => ({
+                bars: merged.filter(
+                  (bar) =>
+                    bar.period === criteria.period &&
+                    availabilityKey(bar).getTime() <
+                      criteria.anchorAvailabilityMs,
+                ),
+              }),
+            ),
+          resolveRealtimeObservation: jest.fn(),
+        });
+        const laneB: {
+          signalTime: string;
+          triggerTime: string;
+          pivotTime: string;
+          triggerPrice: number;
+          signalType: string;
+          isBuy: boolean;
+        }[] = [];
+        for (const bar of merged) {
+          const signals = await kernelPool.push(bar, plans);
+          for (const signal of signals) {
+            laneB.push(
+              mapKernelSignalToSimulationSignal(signal, {
+                securityCode: '600000.SH',
+                period: 30,
+              }),
+            );
+          }
+        }
+
+        // Lane C：本地会话（合并流 + 求值周期配置）
+        const session = new StrategySimulationSession(merged, {
+          securityId: 9,
+          securityCode: '600000.SH',
+          period: 30,
+          startDate: publicFrom,
+          flow: plans[0].flow,
+          windowBudget: EVAL_REQUIRED,
+          contextRequirements: { 5: CONTEXT_REQUIRED },
+        });
+        const laneC: {
+          signalTime: string;
+          triggerTime: string;
+          pivotTime: string;
+          triggerPrice: number;
+          signalType: string;
+          isBuy: boolean;
+        }[] = [];
+        while (session.currentCursor < session.totalBars - 1) {
+          const frame = await session.stepNext();
+          if (!frame) break;
+          for (const signal of frame.latestSignals ?? []) {
+            laneC.push(signal);
+          }
+        }
+
+        expect(laneA.length).toBeGreaterThan(0);
+        expect(laneB).toHaveLength(laneA.length);
+        expect(laneC).toHaveLength(laneA.length);
+        expect(toComparableList(laneB)).toEqual(toComparableList(laneA));
+        expect(toComparableList(laneC)).toEqual(toComparableList(laneA));
+      });
     });
   });
 });

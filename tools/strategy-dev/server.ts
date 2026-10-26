@@ -817,7 +817,6 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   const kernel = new StrategyEvaluationKernel({
     securityId: DEFAULT_DEV_SECURITY_ID,
     securityCode: options.code,
-    period: options.period,
     publicFrom,
     registry,
     plans: [
@@ -826,7 +825,9 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         versionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
         flow,
         ruleSnapshot: Object.freeze({}),
+        period: options.period,
         requiredBarCount: 300,
+        contextRequirements: {},
       },
     ],
   });

@@ -120,7 +120,6 @@ describe('策略推演纯透传专项测试 (Strategy Simulation Pass-Through Sp
     const kernel = new StrategyEvaluationKernel({
       securityId: 1,
       securityCode: '000001',
-      period: 30,
       publicFrom,
       plans: [
         {
@@ -128,7 +127,9 @@ describe('策略推演纯透传专项测试 (Strategy Simulation Pass-Through Sp
           versionId: 1,
           flow: createFlow('plugin.alpha.custom-left-buy', 'BUY'),
           ruleSnapshot: {},
+          period: 30,
           requiredBarCount: 1,
+          contextRequirements: {},
         },
       ],
       registry,

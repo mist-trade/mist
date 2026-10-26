@@ -10,6 +10,21 @@ import type { Repository } from 'typeorm';
 import { SignalRealtimeRedisService } from './signal-realtime-redis.service';
 import { SignalStrategyMarketDataAdapter } from './signal-strategy-market-data.adapter';
 
+function chainBuilder(rows: K[], code: string) {
+  const builder = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue(rows),
+    getRawOne: jest.fn().mockResolvedValue({ code }),
+  };
+  return builder;
+}
+
 describe('SignalIndexPeriodAggregation Mock Suite', () => {
   it('aggregates 1m candles into 5m index bars and joins with historical 5m bars', async () => {
     // 构造今日 09:30 ~ 09:40 间 10 根 1m sealed candles (对应 2 根完整 5m bars: 09:30 和 09:35)
@@ -65,6 +80,9 @@ describe('SignalIndexPeriodAggregation Mock Suite', () => {
 
     const kRepository = {
       find: jest.fn().mockResolvedValue(historicalBars),
+      createQueryBuilder: jest
+        .fn()
+        .mockReturnValue(chainBuilder(historicalBars, '000001')),
     } as unknown as Repository<K>;
 
     const adapter = new SignalStrategyMarketDataAdapter(
@@ -79,6 +97,7 @@ describe('SignalIndexPeriodAggregation Mock Suite', () => {
       period: 5,
       anchorAt,
       requiredBars: 500,
+      anchorAvailabilityMs: Number.POSITIVE_INFINITY,
     });
 
     // 历史 498 根 + 今日 2 根 (09:30, 09:35) = 500 根满足预算
@@ -88,7 +107,7 @@ describe('SignalIndexPeriodAggregation Mock Suite', () => {
     // 最后一根为今日 09:35 桶 (01:35:00.000Z)
     const lastBar = result.bars.at(-1)!;
     expect(lastBar.period).toBe(5);
-    expect(lastBar.timestamp.toISOString()).toBe('2026-08-26T01:35:00.000Z');
+    expect(lastBar.timestamp.toISOString()).toBe('2026-08-26T01:40:00.000Z');
     expect(lastBar.type).toBe('complete');
   });
 
@@ -144,6 +163,9 @@ describe('SignalIndexPeriodAggregation Mock Suite', () => {
 
     const kRepository = {
       find: jest.fn().mockResolvedValue(historicalBars),
+      createQueryBuilder: jest
+        .fn()
+        .mockReturnValue(chainBuilder(historicalBars, '000001')),
     } as unknown as Repository<K>;
 
     const adapter = new SignalStrategyMarketDataAdapter(
@@ -158,13 +180,14 @@ describe('SignalIndexPeriodAggregation Mock Suite', () => {
       period: 30,
       anchorAt,
       requiredBars: 200,
+      anchorAvailabilityMs: Number.POSITIVE_INFINITY,
     });
 
     // 历史 199 根 + 今日 1 根 (09:30~10:00) = 200 根满足预算
     expect(result.bars.length).toBe(200);
     const lastBar = result.bars.at(-1)!;
     expect(lastBar.period).toBe(30);
-    expect(lastBar.timestamp.toISOString()).toBe('2026-08-26T01:30:00.000Z');
+    expect(lastBar.timestamp.toISOString()).toBe('2026-08-26T02:00:00.000Z');
     expect(lastBar.type).toBe('complete');
   });
 });

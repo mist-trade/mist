@@ -6,6 +6,7 @@ import {
 import { BullRegistrar } from '@nestjs/bullmq';
 import { SignalRegistryService } from '../signal-registry.service';
 import { CandleFinalizedJobProcessor } from './candle-finalized-job.processor';
+import { SignalPreMarketWarmupService } from './signal-pre-market-warmup.service';
 import { HealthStateService } from '../health/health-state.service';
 
 @Injectable()
@@ -18,6 +19,7 @@ export class SignalRealtimeStartupService
     private readonly registry: SignalRegistryService,
     private readonly registrar: BullRegistrar,
     private readonly processor: CandleFinalizedJobProcessor,
+    private readonly warmupService: SignalPreMarketWarmupService,
     private readonly healthState: HealthStateService,
   ) {}
 
@@ -29,6 +31,8 @@ export class SignalRealtimeStartupService
     );
     this.registrar.register();
     this.healthState.recordWorkerRunning(true);
+    // 注册表就绪后异步补热（幂等、不阻塞启动）；09:20 cron 为每日主屏障
+    void this.warmupService.handlePreMarketWarmup();
   }
 
   onModuleDestroy(): void {

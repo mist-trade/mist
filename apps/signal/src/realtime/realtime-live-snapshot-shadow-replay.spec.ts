@@ -126,6 +126,7 @@ describe.each(REALTIME_LIVE_SNAPSHOT_FIXTURES)(
               },
             },
             requiredBarCount: 1,
+            contextRequirements: {},
           },
         ],
         () => new Date(fixture.expectedEventTime),

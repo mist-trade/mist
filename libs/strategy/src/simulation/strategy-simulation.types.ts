@@ -59,6 +59,8 @@ export interface SimulationSessionConfig {
   readonly ruleSnapshot?: Readonly<Record<string, unknown>>;
   readonly flow: DecisionFlowNode;
   readonly windowBudget?: number;
+  /** context 周期 → 最少保留根数（多周期推演用，注入内核 plan） */
+  readonly contextRequirements?: Readonly<Record<number, number>>;
   readonly registry?: FactorPluginRegistry;
 }
 

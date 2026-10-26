@@ -5,6 +5,8 @@ import {
 } from './legacy-strategy-compiler';
 import { compileStoredStrategyRuleWithNormalized } from '../rules/strategy-rule.compiler';
 import type { StrategySignalKind } from '../rules/strategy-rule.types';
+import { ensureStandardPluginsRegistered } from '../factor/standard-plugins';
+import { factorPluginRegistry } from '../factor/factor-plugin-registry';
 
 export type StoredDefinitionSourceKind =
   | 'rule_dsl'
@@ -22,6 +24,8 @@ export interface CompiledStoredDefinition {
   /** 统一决策流树（运行时唯一求值形态） */
   readonly flow: DecisionFlowNode;
   readonly requiredBarCount: number;
+  /** context 周期 → 最少保留根数（由插件元数据推导，可能为空对象） */
+  readonly contextRequirements: Readonly<Record<number, number>>;
   readonly sourceKind: StoredDefinitionSourceKind;
   /** 快照：rule_dsl 为归一化规则，其余为原 rule */
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
@@ -75,6 +79,7 @@ export function compileStoredDefinitionVersion(
           typeof input.rule.requiredBarCount === 'number'
             ? input.rule.requiredBarCount
             : DECISION_FLOW_DEFAULT_REQUIRED_BAR_COUNT,
+        contextRequirements: deriveContextRequirements(flow),
         sourceKind: 'decision_flow',
         ruleSnapshot: input.rule,
       };
@@ -92,6 +97,7 @@ export function compileStoredDefinitionVersion(
         return {
           flow,
           requiredBarCount: compilation.plan.requiredBarCount,
+          contextRequirements: deriveContextRequirements(flow),
           sourceKind: 'rule_dsl',
           ruleSnapshot: compilation.normalizedRule as Readonly<
             Record<string, unknown>
@@ -112,6 +118,7 @@ export function compileStoredDefinitionVersion(
         flow,
         requiredBarCount:
           chanPlan.requiredBarCount ?? DEFAULT_REQUIRED_BAR_COUNT,
+        contextRequirements: deriveContextRequirements(flow),
         sourceKind: 'chan_bsp',
         ruleSnapshot: input.rule,
       };
@@ -170,4 +177,87 @@ function validateChanBspRule(
     points,
     ...(typeof requiredBarCount === 'number' ? { requiredBarCount } : {}),
   };
+}
+
+/**
+ * 遍历决策流树收集全部插件引用（GUARD/EXTRACTOR 单插件，CONSENSUS 多插件）。
+ */
+function collectPluginReferences(
+  root: DecisionFlowNode,
+): Map<string, Record<string, unknown> | undefined> {
+  const references = new Map<string, Record<string, unknown> | undefined>();
+  const visited = new Set<string>();
+  const visit = (node: DecisionFlowNode): void => {
+    if (visited.has(node.id)) return;
+    visited.add(node.id);
+    switch (node.type) {
+      case 'GUARD':
+        references.set(node.pluginId, node.params);
+        visit(node.onPass);
+        if (node.onFail) visit(node.onFail);
+        return;
+      case 'BRANCH':
+        visit(node.branches.true);
+        visit(node.branches.false);
+        return;
+      case 'EXTRACTOR':
+        references.set(node.pluginId, node.params);
+        visit(node.next);
+        return;
+      case 'CONSENSUS':
+        for (const item of node.plugins) {
+          references.set(item.pluginId, item.params);
+        }
+        visit(node.onSuccess);
+        if (node.onFailure) visit(node.onFailure);
+        return;
+      case 'TERMINAL':
+        return;
+    }
+  };
+  visit(root);
+  return references;
+}
+
+/**
+ * context 需求推导（编译边界唯一实现）：
+ * 遍历树内插件节点，从插件注册表取 `resolveContextRequirements(params)`，
+ * 按 period 取 max 合并。插件未注册或声明非法 → 编译失败（fail-closed）。
+ * 未声明 context 的插件不产生任何需求（等价现状）。
+ */
+function deriveContextRequirements(
+  flow: DecisionFlowNode,
+): Readonly<Record<number, number>> {
+  const references = collectPluginReferences(flow);
+  if (references.size === 0) return {};
+  ensureStandardPluginsRegistered();
+  const merged: Record<number, number> = {};
+  for (const [pluginId, params] of references) {
+    const plugin = factorPluginRegistry.get(pluginId);
+    if (!plugin) {
+      throw new StoredDefinitionCompileError(
+        'DECISION_FLOW_RULE_INVALID',
+        `decision flow references unknown factor plugin: ${pluginId}`,
+      );
+    }
+    const resolved = plugin.resolveContextRequirements?.(params);
+    if (!resolved) continue;
+    for (const [rawPeriod, rawBars] of Object.entries(resolved)) {
+      const period = Number(rawPeriod);
+      if (
+        !Number.isSafeInteger(period) ||
+        period <= 0 ||
+        typeof rawBars !== 'number' ||
+        !Number.isSafeInteger(rawBars) ||
+        rawBars <= 0
+      ) {
+        throw new StoredDefinitionCompileError(
+          'DECISION_FLOW_RULE_INVALID',
+          `factor plugin ${pluginId} declared an invalid context requirement: ${rawPeriod}=${String(rawBars)}`,
+        );
+      }
+      merged[period] = Math.max(merged[period] ?? 0, rawBars as number);
+    }
+  }
+  return merged;
 }

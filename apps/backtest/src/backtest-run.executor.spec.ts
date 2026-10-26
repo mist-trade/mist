@@ -396,12 +396,12 @@ describe('BacktestRunExecutor', () => {
   });
 });
 
-function strategyBar(timestamp: string): StrategyBar {
+function strategyBar(timestamp: string, period = 1): StrategyBar {
   const close = 10.5;
   return {
     securityId: 9,
     source: 'tdx',
-    period: 1,
+    period,
     timestamp: new Date(timestamp),
     open: close - 0.2,
     high: close + 0.5,
@@ -549,7 +549,10 @@ describe('BacktestRunExecutor 统一内核回放', () => {
     // 7 根 Bar：统一内核窗口满额（requiredBarCount=5，index 4 起）后恒定发射
     fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
       bars: [1, 2, 3, 4, 5, 6, 7].map((n) =>
-        strategyBar(`2026-01-${String(n + 4).padStart(2, '0')}T01:30:00.000Z`),
+        strategyBar(
+          `2026-01-${String(n + 4).padStart(2, '0')}T01:30:00.000Z`,
+          30,
+        ),
       ),
       nextAfterTimestamp: undefined,
     });

@@ -31,8 +31,12 @@ export interface StrategyReplayPage {
 export interface StrategyRealtimeWindowCriteria {
   readonly securityId: number;
   readonly source: StrategyRealtimeSource;
+  /** Required for canonical policy resolution (overrides are keyed by code). */
+  readonly securityCode?: string;
   readonly period: number;
   readonly anchorAt: Date;
+  /** 锚 bar 的可用时刻（availabilityKey）：hydration 因果过滤基准。 */
+  readonly anchorAvailabilityMs: number;
   readonly requiredBars: number;
 }
 

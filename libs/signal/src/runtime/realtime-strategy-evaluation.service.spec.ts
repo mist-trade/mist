@@ -34,6 +34,7 @@ function plan(overrides?: Partial<RealtimeStrategyExecutionPlan>) {
     flow: { id: 'term', type: 'TERMINAL' } as never,
     signalKind: 'entry' as const,
     requiredBarCount: 50,
+    contextRequirements: {},
     ...overrides,
   };
 }
@@ -91,16 +92,18 @@ describe('RealtimeStrategyEvaluationService（统一内核单通路）', () => {
     const candidates = await service.evaluate(bar('2026-08-04T06:44:00.000Z'), [
       plan(),
       plan({ definitionId: 1, versionId: 2, signalKind: 'exit' }),
-      // 非 eligible：source/period 不匹配，必须被过滤
+      // 全 bar 进池（R2 多周期）：不再按 bar.period 预过滤，
+      // 非求值周期 plan 由内核按 plan.period 分派
       plan({ definitionId: 5, source: 'qmt' }),
       plan({ definitionId: 6, period: 15 }),
     ]);
 
     const poolMock = pool.push as jest.Mock;
     expect(poolMock).toHaveBeenCalledTimes(1);
+    expect(poolMock.mock.calls[0][1]).toHaveLength(4);
     const pushedPlans = poolMock.mock
       .calls[0][1] as RealtimeStrategyExecutionPlan[];
-    expect(pushedPlans.map((p) => p.definitionId)).toEqual([1, 3]);
+    expect(pushedPlans.map((p) => p.definitionId)).toEqual([1, 3, 5, 6]);
 
     expect(candidates).toHaveLength(2);
     // 双时间戳契约：signalTime = 确认 Bar timestamp，pivot 透传
@@ -139,7 +142,7 @@ describe('RealtimeStrategyEvaluationService（统一内核单通路）', () => {
     const service = new RealtimeStrategyEvaluationService(pool);
 
     const groups: RealtimeWindowGroupIdentity[] = [
-      { securityId: 9, source: 'tdx', period: 5 },
+      { securityId: 9, source: 'tdx' },
     ];
     service.retainRegistryScopes(groups);
     expect(pool.retainGroups).toHaveBeenCalledWith(groups);

@@ -20,6 +20,7 @@ describe('SignalRealtimeStartupService', () => {
         register: jest.fn().mockImplementation(() => order.push('worker')),
       } as never,
       processor as never,
+      { handlePreMarketWarmup: jest.fn().mockResolvedValue(null) } as never,
       health as never,
     );
 
@@ -41,6 +42,7 @@ describe('SignalRealtimeStartupService', () => {
       } as never,
       registrar as never,
       { reconcileRegistry: jest.fn() } as never,
+      { handlePreMarketWarmup: jest.fn().mockResolvedValue(null) } as never,
       { recordWorkerRunning: jest.fn() } as never,
     );
 

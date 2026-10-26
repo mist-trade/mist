@@ -18,11 +18,14 @@ import { SignalRealtimeStartupService } from './signal-realtime-startup.service'
 import { LiveStrategyPersistenceService } from './live-strategy-persistence.service';
 import { StrategyAlertDeliveryHandoffModule } from './notification/strategy-alert-delivery-handoff.module';
 import { resolveRealtimeStrategyMode } from '@app/config';
+import { TimezoneModule } from '@app/timezone';
+import { SignalPreMarketWarmupService } from './signal-pre-market-warmup.service';
 import { RuntimeObservabilityService } from '../observability/runtime-observability.service';
 
 @Module({
   imports: [
     SignalRegistryModule,
+    TimezoneModule,
     TypeOrmModule.forFeature([K]),
     BullModule.forRootAsync({
       inject: [ConfigService],
@@ -77,6 +80,7 @@ import { RuntimeObservabilityService } from '../observability/runtime-observabil
     },
     CandleFinalizedBullMqWorker,
     SignalRealtimeStartupService,
+    SignalPreMarketWarmupService,
   ],
 })
 export class SignalRealtimeModule {}

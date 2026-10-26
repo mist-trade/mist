@@ -16,3 +16,6 @@ export const CRON_POST_CLOSE_SYNC_NIGHTLY_2230 = '30 22 * * 1-5';
 
 /** 06:30 Asia/Shanghai on following mornings (Tuesday - Saturday). Morning fallback retry post-close sync for previous trading day. */
 export const CRON_POST_CLOSE_SYNC_MORNING_0630 = '30 6 * * 2-6';
+
+/** 09:20 Asia/Shanghai on exchange trading days (Monday - Friday). Pre-market strategy kernel pool warmup barrier. */
+export const CRON_PRE_MARKET_STRATEGY_WARMUP_0920 = '0 20 9 * * 1-5';

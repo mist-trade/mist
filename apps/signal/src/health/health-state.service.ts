@@ -49,6 +49,16 @@ export class HealthStateService {
     lastPersistenceOutcome: null,
     lastFailureCode: null,
   };
+  private preMarketWarmup: SignalHealthVo['preMarketWarmup'] = {
+    state: 'off',
+    warmedAt: null,
+    anchorTradingDay: null,
+    total: 0,
+    succeeded: 0,
+    skipped: 0,
+    failed: 0,
+    lastFailureCode: null,
+  };
 
   recordRegistrySuccess(
     generation: number,
@@ -190,7 +200,37 @@ export class HealthStateService {
       marketData: { ...this.marketData },
       queue: { ...this.queue },
       evaluation: { ...this.evaluation },
+      preMarketWarmup: { ...this.preMarketWarmup },
       runtime: this.runtime.snapshot(),
+    };
+  }
+
+  /** 盘前预热结果上屏：失败只记有界原因，绝不置服务 unready。 */
+  recordPreMarketWarmup(
+    report: Readonly<{
+      total: number;
+      succeeded: number;
+      skipped: number;
+      failed: number;
+      failedTargets: readonly { reason: string }[];
+    }>,
+    warmedAt: string,
+    anchorTradingDay: string,
+  ): void {
+    this.preMarketWarmup = {
+      state:
+        report.failed > 0
+          ? report.succeeded > 0
+            ? 'partial'
+            : 'error'
+          : 'ready',
+      warmedAt,
+      anchorTradingDay,
+      total: report.total,
+      succeeded: report.succeeded,
+      skipped: report.skipped,
+      failed: report.failed,
+      lastFailureCode: report.failedTargets[0]?.reason ?? null,
     };
   }
 }

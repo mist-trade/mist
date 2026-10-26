@@ -71,7 +71,6 @@ export class StrategySimulationSession {
     this.kernel = new StrategyEvaluationKernel({
       securityId: config.securityId ?? 1,
       securityCode: config.securityCode,
-      period: config.period,
       publicFrom,
       plans: [
         {
@@ -82,7 +81,9 @@ export class StrategySimulationSession {
             config.versionId ?? SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
           flow: config.flow,
           ruleSnapshot: config.ruleSnapshot ?? Object.freeze({}),
+          period: config.period,
           requiredBarCount: config.windowBudget ?? 600,
+          contextRequirements: config.contextRequirements ?? {},
         },
       ],
       registry: config.registry,
@@ -218,7 +219,7 @@ export class StrategySimulationSession {
       cursor: next,
       total: this.publicBars.length,
       bar,
-      windowBars: this.kernel.readWindow(),
+      windowBars: this.kernel.readWindow(this.config.period),
       signals: [...this.accumulatedSignals],
       latestSignals,
       status: next >= this.publicBars.length - 1 ? 'completed' : 'idle',
@@ -283,7 +284,7 @@ export class StrategySimulationSession {
     const currentFrame = this.getCurrentFrame();
     const windowBars = currentFrame
       ? currentFrame.windowBars
-      : this.kernel.readWindow();
+      : this.kernel.readWindow(this.config.period);
     return {
       sessionId: this.sessionId,
       securityCode: this.config.securityCode,

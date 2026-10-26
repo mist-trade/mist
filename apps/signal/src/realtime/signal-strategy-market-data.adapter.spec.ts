@@ -1,14 +1,32 @@
 import { DataSource, K, Period, Security } from '@app/shared-data';
 import type Redis from 'ioredis';
 import type { Repository } from 'typeorm';
+import type { SplicePolicy } from '@app/market-data';
 import { SignalRealtimeRedisService } from './signal-realtime-redis.service';
 import { SignalStrategyMarketDataAdapter } from './signal-strategy-market-data.adapter';
+
+// canonical policy 测试桩：1m/5m 单段 tdx（历史段走 canonical 段读取）
+const TEST_POLICY = {
+  version: 'adapter-spec-v1',
+  defaults: {
+    '1': [{ source: 'tdx' }],
+    '5': [{ source: 'tdx' }],
+  },
+} as unknown as SplicePolicy;
+jest.mock('@app/strategy', () => ({
+  ...jest.requireActual('@app/strategy'),
+  CanonicalPolicyLoader: {
+    load: () => TEST_POLICY,
+    setCustomPaths: jest.fn(),
+    resetConfiguration: jest.fn(),
+  },
+}));
 
 describe('SignalStrategyMarketDataAdapter', () => {
   it('resolves one exact sealed Redis record into a canonical 1m bar', async () => {
     const redis = fakeRedis({ hget: JSON.stringify(record(10.5)) });
     const adapter = new SignalStrategyMarketDataAdapter(
-      repository([]),
+      repository({}),
       redis.service,
     );
 
@@ -42,7 +60,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
     );
   });
 
-  it('hydrates one source-exact window from pre-day MySQL and current-day Redis', async () => {
+  it('hydrates one canonical-history + current-day window with the anchor excluded', async () => {
     const anchor = new Date('2026-08-04T01:32:00.000Z');
     const redis = fakeRedis({
       hgetall: {
@@ -58,7 +76,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
       },
     });
     const rows = [historicalK('2026-08-03T01:30:00.000Z')];
-    const kRepository = repository(rows);
+    const kRepository = repository({ rows });
     const adapter = new SignalStrategyMarketDataAdapter(
       kRepository,
       redis.service,
@@ -69,6 +87,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
       source: 'tdx',
       period: 1,
       anchorAt: anchor,
+      anchorAvailabilityMs: anchor.getTime() + 60_000,
       requiredBars: 3,
     });
 
@@ -78,17 +97,8 @@ describe('SignalStrategyMarketDataAdapter', () => {
       '2026-08-04T01:31:00.000Z',
     ]);
     expect(result.bars[0].amount).toBe('10000');
-    expect(kRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({
-          securityId: 9,
-          source: DataSource.TDX,
-          period: 1,
-        }),
-        order: { timestamp: 'DESC' },
-        take: 1,
-      }),
-    );
+    // 历史段走 canonical 段读取（k.source/k.period 谓词），不再按物理源直查
+    expect(kRepository.createQueryBuilder).toHaveBeenCalledWith('k');
   });
 
   it('returns one pre-window same-day bar so quantity projection can seed forward fill', async () => {
@@ -103,7 +113,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
       },
     });
     const adapter = new SignalStrategyMarketDataAdapter(
-      repository([]),
+      repository({}),
       redis.service,
     );
 
@@ -112,13 +122,15 @@ describe('SignalStrategyMarketDataAdapter', () => {
       source: 'tdx',
       period: 1,
       anchorAt: new Date('2026-08-04T01:32:00.000Z'),
+      anchorAvailabilityMs:
+        new Date('2026-08-04T01:32:00.000Z').getTime() + 60_000,
       requiredBars: 2,
     });
 
     expect(result.bars.map((bar) => bar.volume)).toEqual(['80', null]);
   });
 
-  it('rebuilds an incomplete higher-period bar from bounded current-day 1m records', async () => {
+  it('rebuilds an incomplete higher-period bar with a right label from bounded current-day 1m records', async () => {
     const redis = fakeRedis({
       hgetall: {
         [String(Date.parse('2026-08-04T01:30:00.000Z'))]: JSON.stringify(
@@ -129,7 +141,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
         ),
       },
     });
-    const kRepository = repository([]);
+    const kRepository = repository({});
     const adapter = new SignalStrategyMarketDataAdapter(
       kRepository,
       redis.service,
@@ -140,21 +152,21 @@ describe('SignalStrategyMarketDataAdapter', () => {
       source: 'tdx',
       period: 5,
       anchorAt: new Date('2026-08-04T01:35:00.000Z'),
+      anchorAvailabilityMs:
+        new Date('2026-08-04T01:35:00.000Z').getTime() + 60_000,
       requiredBars: 2,
     });
 
     expect(result.bars).toEqual([
       expect.objectContaining({
         period: 5,
-        timestamp: new Date('2026-08-04T01:30:00.000Z'),
+        // 右标：槽 [09:30,09:35) 的标签 = 09:35
+        timestamp: new Date('2026-08-04T01:35:00.000Z'),
         open: 10,
         close: 12,
         type: 'incomplete',
       }),
     ]);
-    expect(kRepository.find).toHaveBeenCalledWith(
-      expect.objectContaining({ take: 1 }),
-    );
   });
 
   it('propagates malformed Redis record failures without fallback', async () => {
@@ -162,7 +174,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
       hget: JSON.stringify({ ...record(10), v: 100 }),
     });
     const adapter = new SignalStrategyMarketDataAdapter(
-      repository([]),
+      repository({}),
       redis.service,
     );
 
@@ -177,9 +189,9 @@ describe('SignalStrategyMarketDataAdapter', () => {
     ).rejects.toThrow('closed-candle v must be a string or null');
   });
 
-  it('derives a 15:00 terminal sealed bar into the afternoon window without throwing', async () => {
-    // 15:00 CST = 07:00:00Z. Anchor after close so the window load derives
-    // the current-day bars including the terminal 15:00 bar.
+  it('excludes terminal-closed bars from hydration (they arrive via live emission)', async () => {
+    // 15:00 CST = 07:00Z 终端桶；hydration anchor = 15:00 触发（avail 15:01）。
+    // 终端闭合的 5m bar（avail 15:01）不得注入——它由增量 builder 现场闭合。
     const redis = fakeRedis({
       hgetall: {
         [String(Date.parse('2026-08-04T06:59:00.000Z'))]: JSON.stringify(
@@ -191,7 +203,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
       },
     });
     const adapter = new SignalStrategyMarketDataAdapter(
-      repository([]),
+      repository({}),
       redis.service,
     );
 
@@ -200,25 +212,12 @@ describe('SignalStrategyMarketDataAdapter', () => {
         securityId: 9,
         source: 'tdx',
         period: 5,
-        anchorAt: new Date('2026-08-04T07:02:00.000Z'),
+        anchorAt: new Date('2026-08-04T07:00:00.000Z'),
+        anchorAvailabilityMs:
+          new Date('2026-08-04T07:00:00.000Z').getTime() + 60_000,
         requiredBars: 2,
       }),
-    ).resolves.toMatchObject({
-      bars: [
-        expect.objectContaining({
-          period: 5,
-          timestamp: new Date('2026-08-04T06:55:00.000Z'),
-          close: 40,
-          type: 'incomplete',
-        }),
-        expect.objectContaining({
-          period: 5,
-          timestamp: new Date('2026-08-04T07:00:00.000Z'),
-          close: 41,
-          type: 'incomplete',
-        }),
-      ],
-    });
+    ).resolves.toEqual({ bars: [] });
   });
 
   it('tolerates a legacy 15:02 dead sealed bar during window load', async () => {
@@ -237,7 +236,7 @@ describe('SignalStrategyMarketDataAdapter', () => {
       },
     });
     const adapter = new SignalStrategyMarketDataAdapter(
-      repository([]),
+      repository({}),
       redis.service,
     );
 
@@ -247,6 +246,8 @@ describe('SignalStrategyMarketDataAdapter', () => {
         source: 'tdx',
         period: 5,
         anchorAt: new Date('2026-08-04T07:05:00.000Z'),
+        anchorAvailabilityMs:
+          new Date('2026-08-04T07:05:00.000Z').getTime() + 60_000,
         requiredBars: 1,
       }),
     ).resolves.toBeDefined();
@@ -270,9 +271,21 @@ function fakeRedis(options: {
   };
 }
 
-function repository(rows: K[]): Repository<K> {
+function repository(options: { rows?: K[]; code?: string }): Repository<K> {
+  const builder = {
+    select: jest.fn().mockReturnThis(),
+    addSelect: jest.fn().mockReturnThis(),
+    leftJoin: jest.fn().mockReturnThis(),
+    where: jest.fn().mockReturnThis(),
+    andWhere: jest.fn().mockReturnThis(),
+    orderBy: jest.fn().mockReturnThis(),
+    limit: jest.fn().mockReturnThis(),
+    getMany: jest.fn().mockResolvedValue(options.rows ?? []),
+    getRawOne: jest.fn().mockResolvedValue({ code: options.code ?? '000001' }),
+  };
   return {
-    find: jest.fn().mockResolvedValue(rows),
+    createQueryBuilder: jest.fn().mockReturnValue(builder),
+    find: jest.fn().mockResolvedValue(options.rows ?? []),
   } as unknown as Repository<K>;
 }
 

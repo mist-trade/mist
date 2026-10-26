@@ -167,7 +167,6 @@ async function runStrategyDev(): Promise<void> {
   const kernel = new StrategyEvaluationKernel({
     securityId: 1,
     securityCode,
-    period: periodNum,
     publicFrom: new Date(-8640000000000000), // 全时序流式推演，无静默截断
     plans: [
       {
@@ -175,7 +174,9 @@ async function runStrategyDev(): Promise<void> {
         versionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
         flow,
         ruleSnapshot: Object.freeze({}),
+        period: periodNum,
         requiredBarCount: 60,
+        contextRequirements: {},
       },
     ],
   });

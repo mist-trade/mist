@@ -41,6 +41,16 @@ export interface SignalHealthVo extends BaseHealthVo {
       | null;
     lastFailureCode: string | null;
   };
+  preMarketWarmup: {
+    state: 'off' | 'ready' | 'partial' | 'error';
+    warmedAt: string | null;
+    anchorTradingDay: string | null;
+    total: number;
+    succeeded: number;
+    skipped: number;
+    failed: number;
+    lastFailureCode: string | null;
+  };
   evaluation: {
     state: 'off' | 'idle' | 'running' | 'error';
     lastEvaluatedAt: string | null;

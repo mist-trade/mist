@@ -140,7 +140,8 @@ export class SignalRegistryService implements OnApplicationBootstrap {
               period === 5 ||
               period === 15 ||
               period === 30 ||
-              period === 60,
+              period === 60 ||
+              period === 1440,
           )
           .map((period) =>
             Object.freeze({
@@ -308,6 +309,7 @@ function compileRegistryDefinition(
     flow: compiled.flow,
     signalKind: version.signalKind,
     requiredBarCount: compiled.requiredBarCount,
+    contextRequirements: compiled.contextRequirements,
     sourceKind: compiled.sourceKind,
   };
   return Object.freeze({

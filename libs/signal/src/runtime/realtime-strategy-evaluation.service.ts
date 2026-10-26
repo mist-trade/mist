@@ -46,6 +46,11 @@ export interface RealtimeKernelPoolLike {
   ): Promise<readonly KernelSignal[]>;
   retainGroups(groups: readonly RealtimeWindowGroupIdentity[]): void;
   reset(): void;
+  warmup?(
+    targets: readonly import('@app/strategy').PreMarketWarmupTarget[],
+    anchorAt: Date,
+  ): Promise<Readonly<import('@app/strategy').PreMarketWarmupReport>>;
+  hasGroupsWarmedFor?(tradingDay: string): boolean;
   diagnostics(): Readonly<{
     groupCount: number;
     rawBarCount: number;
@@ -56,27 +61,27 @@ export interface RealtimeKernelPoolLike {
 
 /**
  * 实时链路求值服务（统一内核单通路）：
- * 滑窗与组内计划共享由 RealtimeKernelPool 承担（每 `(securityId, source, period)`
- * 组一个内核实例），求值只做「bar 输入 → 策略树 → 当期增量信号」，
+ * 滑窗与组内计划共享由 RealtimeKernelPool 承担（每 `(securityId, source)` 组一个
+ * 内核实例、组内每声明周期一个窗口），求值只做「bar 输入 → 策略树 → 当期增量信号」，
  * 输出层不做投递级去重（RealtimeEpisodeStore 已随独立分支一并退役）。
  */
 export class RealtimeStrategyEvaluationService {
   constructor(private readonly kernelPool: RealtimeKernelPoolLike) {}
 
+  /**
+   * 统一内核单通路：全部 bar（1m 封存 + 各周期派生）必须进池——context bar
+   * 只更新自己的窗口，由内核按 plan 求值周期分派。此处不得按 bar.period
+   * 预过滤（那会让 context bar 永远到不了内核窗口）。
+   */
   async evaluate(
     bar: StrategyBar,
     plans: readonly RealtimeStrategyExecutionPlan[],
   ): Promise<readonly ShadowStrategyCandidate[]> {
-    const eligible = plans
-      .filter(
-        (candidate) =>
-          candidate.source === bar.source && candidate.period === bar.period,
-      )
-      .sort(
-        (left, right) =>
-          left.definitionId - right.definitionId ||
-          left.versionId - right.versionId,
-      );
+    const eligible = [...plans].sort(
+      (left, right) =>
+        left.definitionId - right.definitionId ||
+        left.versionId - right.versionId,
+    );
     if (eligible.length === 0) return Object.freeze([]);
 
     const signals = await this.kernelPool.push(bar, eligible);
@@ -87,6 +92,19 @@ export class RealtimeStrategyEvaluationService {
 
   retainRegistryScopes(groups: readonly RealtimeWindowGroupIdentity[]): void {
     this.kernelPool.retainGroups(groups);
+  }
+
+  /** 盘前预热入口（09:20 屏障与启动补热共用）；池不支持时静默跳过。 */
+  async warmup(
+    targets: readonly import('@app/strategy').PreMarketWarmupTarget[],
+    anchorAt: Date,
+  ): Promise<Readonly<import('@app/strategy').PreMarketWarmupReport> | null> {
+    if (!this.kernelPool.warmup) return null;
+    return this.kernelPool.warmup(targets, anchorAt);
+  }
+
+  hasGroupsWarmedFor(tradingDay: string): boolean {
+    return this.kernelPool.hasGroupsWarmedFor?.(tradingDay) ?? false;
   }
 
   reset(): void {

@@ -41,7 +41,6 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
       const config: KernelConfig = {
         securityId: 1,
         securityCode: '000001',
-        period: 30,
         publicFrom: bars[0].timestamp,
         plans: [
           {
@@ -49,7 +48,9 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
             versionId: 1,
             flow,
             ruleSnapshot: Object.freeze({}),
+            period: 30,
             requiredBarCount: 50,
+            contextRequirements: {},
           },
         ],
       };

@@ -389,7 +389,6 @@ export class BacktestRunExecutor {
     const kernel = new StrategyEvaluationKernel({
       securityId,
       securityCode,
-      period: run.period,
       publicFrom: run.startDate,
       plans: [
         {
@@ -397,7 +396,9 @@ export class BacktestRunExecutor {
           versionId: run.strategyVersionId,
           flow: compiled.flow,
           ruleSnapshot,
+          period: run.period,
           requiredBarCount: compiled.requiredBarCount,
+          contextRequirements: compiled.contextRequirements,
         },
       ],
     });
@@ -412,7 +413,8 @@ export class BacktestRunExecutor {
       securityId,
       securityCode,
       selection,
-      period: run.period,
+      evaluationPeriod: run.period,
+      contextPeriods: compiled.contextRequirements,
       preWarmEndAt,
       publicFrom: run.startDate,
       endAt: new Date(run.endDate.getTime()),
@@ -515,6 +517,10 @@ export class BacktestRunExecutor {
         }
 
         await budget.checkpoint();
+      },
+      async () => {
+        // 预算计全部推送 bar（含 context 周期与预热段）——多周期合并流按预期加速消耗
+        budget.consume();
       },
     );
     await budget.checkpoint(true);

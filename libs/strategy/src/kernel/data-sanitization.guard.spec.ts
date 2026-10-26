@@ -48,7 +48,21 @@ describe('DataSanitizationGuard (A股历史数据防毒清洗门禁)', () => {
       diagnostics: jest.fn().mockReturnValue({
         prewarmStatus: 'empty',
         prewarmActual: 0,
+        prewarmExpected: 0,
         publicBarCount: 0,
+        emittedSignalCount: 0,
+        planSkips: 0,
+        lastPushedTimestamp: null,
+        perPeriod: [
+          {
+            period: 1440,
+            windowSize: 0,
+            budget: 50,
+            prewarmStatus: 'empty',
+            prewarmActual: 0,
+            prewarmExpected: 50,
+          },
+        ],
       }),
     } as unknown as StrategyEvaluationKernel;
   };
@@ -119,7 +133,8 @@ describe('DataSanitizationGuard (A股历史数据防毒清洗门禁)', () => {
       const toxicCriteria: HistoricalReplayCriteria = {
         securityId: 1,
         selection: { kind: 'provider', source: 'tdx' },
-        period: 1440,
+        evaluationPeriod: 1440,
+        contextPeriods: {},
         preWarmEndAt: new Date('1995-10-01T00:00:00.000Z'),
         publicFrom: new Date('1995-10-01T00:00:00.000Z'),
         endAt: new Date('1996-01-01T00:00:00.000Z'),
@@ -145,7 +160,8 @@ describe('DataSanitizationGuard (A股历史数据防毒清洗门禁)', () => {
       const toxicCriteria: HistoricalReplayCriteria = {
         securityId: 1,
         selection: { kind: 'provider', source: 'tdx' },
-        period: 1440,
+        evaluationPeriod: 1440,
+        contextPeriods: {},
         startDate: new Date('1996-05-01T00:00:00.000Z'),
         preWarmEndAt: new Date('2000-01-01T00:00:00.000Z'),
         publicFrom: new Date('2000-01-01T00:00:00.000Z'),
@@ -168,7 +184,8 @@ describe('DataSanitizationGuard (A股历史数据防毒清洗门禁)', () => {
       const validCriteria: HistoricalReplayCriteria = {
         securityId: 1,
         selection: { kind: 'provider', source: 'tdx' },
-        period: 1440,
+        evaluationPeriod: 1440,
+        contextPeriods: {},
         preWarmEndAt: new Date('2005-05-01T00:00:00.000Z'),
         publicFrom: new Date('2005-05-01T00:00:00.000Z'),
         endAt: new Date('2005-06-01T00:00:00.000Z'),

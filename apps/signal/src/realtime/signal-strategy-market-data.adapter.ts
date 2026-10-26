@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, K } from '@app/shared-data';
+import { K } from '@app/shared-data';
 import {
   createCanonicalStrategyBar,
   mapKToStrategyBar,
+  loadCanonicalWindow,
+  resolveSegments,
   type StrategyBar,
   type StrategyMarketObservation,
   type StrategyRealtimeMarketDataPort,
@@ -12,24 +14,23 @@ import {
   type StrategyTrigger,
 } from '@app/market-data';
 import {
+  CanonicalPolicyLoader,
+  REALTIME_STRATEGY_PERIODS,
+} from '@app/strategy';
+import {
   closedCandleKey,
   decodeRealtimeClosedCandleRecordV1,
   type RealtimeClosedCandleRecordV1,
 } from '@app/contracts';
-import { Decimal8 } from '@app/decimal';
 import { isValidDate } from '@app/utils';
 import { fromZonedTime, toZonedTime } from 'date-fns-tz';
-import {
-  ASIA_SHANGHAI_TIMEZONE,
-  MORNING_START_MIN,
-  MORNING_END_MIN,
-  AFTERNOON_START_MIN,
-  AFTERNOON_END_MIN,
-  MINUTES_PER_HOUR,
-  ONE_MINUTE_MS,
-} from '@app/timezone';
-import { REALTIME_STRATEGY_PERIODS } from '@app/strategy';
-import { LessThan, Repository } from 'typeorm';
+import { ASIA_SHANGHAI_TIMEZONE } from '@app/timezone';
+import { availabilityKey, deriveRightLabeledPeriodBars } from '@app/strategy';
+import type {
+  CanonicalSegmentRead,
+  CanonicalSegmentReader,
+} from '@app/market-data';
+import { Repository } from 'typeorm';
 import { SignalRealtimeRedisService } from './signal-realtime-redis.service';
 
 const REALTIME_PERIODS = new Set<number>(REALTIME_STRATEGY_PERIODS);
@@ -71,6 +72,11 @@ export class SignalStrategyMarketDataAdapter
     });
   }
 
+  /**
+   * R2 数据接缝：历史段（触发日之前）走 canonical 拼接源（与回测同源），
+   * 当日段只来自触发源（Redis 封存 1m + 右标派生）。policy 未覆盖该周期时
+   * 显式失败（fail-closed），绝不空窗兜底或跨源回退。
+   */
   async loadRealtimeWindow(
     criteria: StrategyRealtimeWindowCriteria,
   ): Promise<StrategyRealtimeWindow> {
@@ -83,22 +89,90 @@ export class SignalStrategyMarketDataAdapter
     const historical =
       historicalNeeded === 0
         ? []
-        : await this.kRepository.find({
-            where: {
-              securityId: criteria.securityId,
-              source: toDataSource(criteria.source),
-              period: criteria.period,
-              timestamp: LessThan(dayStart),
-            },
-            relations: { security: true },
-            order: { timestamp: 'DESC' },
-            take: historicalNeeded,
-          });
-    const bars = [...historical.reverse().map(mapKToStrategyBar), ...redisBars];
+        : await this.loadCanonicalHistory(criteria, historicalNeeded, dayStart);
+    const bars = [...historical, ...redisBars];
     return Object.freeze({
       bars: Object.freeze(bars.slice(-hydrationBarLimit)),
     });
   }
+
+  private async loadCanonicalHistory(
+    criteria: StrategyRealtimeWindowCriteria,
+    requiredBars: number,
+    dayStart: Date,
+  ): Promise<readonly StrategyBar[]> {
+    const securityCode =
+      criteria.securityCode ??
+      (await this.resolveSecurityCode(criteria.securityId));
+    const policy = CanonicalPolicyLoader.load();
+    // policy 未覆盖该周期 → resolveSegments 抛 CanonicalDataError（显式失败）
+    const segments = resolveSegments(policy, securityCode, criteria.period);
+    return loadCanonicalWindow(this.canonicalSegmentReader, segments, {
+      securityId: criteria.securityId,
+      period: criteria.period,
+      endAt: dayStart,
+      requiredBars,
+    });
+  }
+
+  private readonly canonicalSegmentReader: CanonicalSegmentReader = {
+    read: (params: CanonicalSegmentRead) => this.readCanonicalSegment(params),
+  };
+
+  private async readCanonicalSegment(
+    params: CanonicalSegmentRead,
+  ): Promise<readonly StrategyBar[]> {
+    const query = this.kRepository
+      .createQueryBuilder('k')
+      .select([
+        'k.source',
+        'k.period',
+        'k.timestamp',
+        'k.open',
+        'k.high',
+        'k.low',
+        'k.close',
+        'k.volume',
+        'k.amount',
+      ])
+      .addSelect('k.securityId')
+      .where('k.securityId = :securityId', { securityId: params.securityId })
+      .andWhere('k.source = :source', { source: params.source })
+      .andWhere('k.period = :period', { period: params.period });
+    if (params.from) {
+      query.andWhere('k.timestamp >= :from', { from: params.from });
+    }
+    if (params.before) {
+      query.andWhere('k.timestamp < :before', { before: params.before });
+    }
+    if (params.afterTimestamp) {
+      query.andWhere('k.timestamp > :after', { after: params.afterTimestamp });
+    }
+    query
+      .orderBy('k.timestamp', params.order === 'asc' ? 'ASC' : 'DESC')
+      .limit(params.limit);
+    const rows = await query.getMany();
+    return rows.map(mapKToStrategyBar);
+  }
+
+  private async resolveSecurityCode(securityId: number): Promise<string> {
+    const cached = this.securityCodeCache.get(securityId);
+    if (cached) return cached;
+    const row = await this.kRepository
+      .createQueryBuilder('k')
+      .leftJoin('k.security', 'security')
+      .addSelect('security.code', 'code')
+      .where('k.securityId = :securityId', { securityId })
+      .limit(1)
+      .getRawOne<{ code: string }>();
+    if (!row?.code) {
+      throw new Error(`security ${securityId} not found for canonical policy`);
+    }
+    this.securityCodeCache.set(securityId, row.code);
+    return row.code;
+  }
+
+  private readonly securityCodeCache = new Map<number, string>();
 
   private async loadCurrentDayBars(
     criteria: StrategyRealtimeWindowCriteria,
@@ -107,6 +181,7 @@ export class SignalStrategyMarketDataAdapter
     const values = await this.redis.client.hgetall(
       closedCandleKey(tradingDay, criteria.source, criteria.securityId),
     );
+    const anchorAvailabilityMs = criteria.anchorAvailabilityMs;
     const oneMinuteBars = Object.entries(values)
       .map(([timestampText, raw]) => {
         const timestampMs = Number(timestampText);
@@ -128,14 +203,18 @@ export class SignalStrategyMarketDataAdapter
       .filter(
         (bar) =>
           shanghaiTradingDay(bar.timestamp) === tradingDay &&
-          bar.timestamp.getTime() < criteria.anchorAt.getTime(),
+          availabilityKey(bar).getTime() < anchorAvailabilityMs,
       )
       .sort(
         (left, right) => left.timestamp.getTime() - right.timestamp.getTime(),
       );
     if (criteria.period === 1) return oneMinuteBars;
-    return derivePeriodBars(oneMinuteBars, criteria.period).filter(
-      (bar) => bar.timestamp.getTime() < criteria.anchorAt.getTime(),
+    // 右标派生（与增量 RealtimePeriodBuilder 语义一致），可用时刻过滤：
+    // 进行中 slot 与将由当前触发闭合的 bar 不得注入
+    return deriveRightLabeledPeriodBars(
+      oneMinuteBars,
+      criteria.period as 5 | 15 | 30 | 60 | 1440,
+      { anchorAvailabilityMs },
     );
   }
 }
@@ -157,92 +236,6 @@ function mapClosedRecord(
     amount: record.a,
     type: 'complete',
   });
-}
-
-function derivePeriodBars(
-  bars: readonly StrategyBar[],
-  period: number,
-): StrategyBar[] {
-  const groups = new Map<number, StrategyBar[]>();
-  for (const bar of bars) {
-    let position;
-    try {
-      position = sessionPosition(bar.timestamp);
-    } catch {
-      // A legacy or anomalous sealed bar outside the session (e.g. pre-fix
-      // 15:01/15:02 dead-time buckets still present in Redis) must not fail
-      // the whole evaluation window load — skip it. Volume is zero for such
-      // bars, so no market data is lost.
-      continue;
-    }
-    const slotStart =
-      position.sessionStartMs +
-      Math.floor(position.minuteOffset / period) * period * 60_000;
-    const group = groups.get(slotStart) ?? [];
-    group.push(bar);
-    groups.set(slotStart, group);
-  }
-  return [...groups.entries()]
-    .sort(([left], [right]) => left - right)
-    .map(([slotStart, slotBars]) => reducePeriod(slotStart, period, slotBars));
-}
-
-function reducePeriod(
-  slotStart: number,
-  period: number,
-  bars: readonly StrategyBar[],
-): StrategyBar {
-  const ordered = [...bars].sort(
-    (left, right) => left.timestamp.getTime() - right.timestamp.getTime(),
-  );
-  const first = ordered[0];
-  const last = ordered.at(-1)!;
-  return createCanonicalStrategyBar({
-    securityId: first.securityId,
-    securityCode: first.securityCode,
-    source: first.source,
-    period,
-    timestamp: new Date(slotStart),
-    open: first.open,
-    high: Math.max(...ordered.map((bar) => bar.high)),
-    low: Math.min(...ordered.map((bar) => bar.low)),
-    close: last.close,
-    volume: sumQuantity(ordered, 'volume'),
-    amount: sumQuantity(ordered, 'amount'),
-    type: ordered.length === period ? 'complete' : 'incomplete',
-  });
-}
-
-function sumQuantity(
-  bars: readonly StrategyBar[],
-  field: 'volume' | 'amount',
-): string | null {
-  let total = Decimal8.ZERO;
-  for (const bar of bars) {
-    if (bar[field] === null) return null;
-    total = total.add(Decimal8.parseCanonical(bar[field]));
-  }
-  return total.formatCanonical();
-}
-
-function sessionPosition(timestamp: Date): {
-  sessionStartMs: number;
-  minuteOffset: number;
-} {
-  const parts = shanghaiParts(timestamp);
-  const wallMinute = parts.hour * MINUTES_PER_HOUR + parts.minute;
-  const start =
-    wallMinute >= MORNING_START_MIN && wallMinute < MORNING_END_MIN
-      ? MORNING_START_MIN
-      : wallMinute >= AFTERNOON_START_MIN && wallMinute < AFTERNOON_END_MIN
-        ? AFTERNOON_START_MIN
-        : null;
-  if (start === null) throw new RangeError('realtime K is outside session');
-  const minuteOffset = wallMinute - start;
-  return {
-    sessionStartMs: timestamp.getTime() - minuteOffset * ONE_MINUTE_MS,
-    minuteOffset,
-  };
 }
 
 function shanghaiTradingDay(timestamp: Date): string {
@@ -300,10 +293,6 @@ function assertCriteria(criteria: StrategyRealtimeWindowCriteria): void {
   ) {
     throw new TypeError('Invalid realtime window criteria');
   }
-}
-
-function toDataSource(source: 'tdx' | 'qmt'): DataSource {
-  return source === 'tdx' ? DataSource.TDX : DataSource.QMT;
 }
 
 function parseJson(value: string): unknown {

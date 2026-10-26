@@ -11,6 +11,8 @@ export type SignalRegistryExecutionPlan = {
   readonly flow: DecisionFlowNode;
   readonly signalKind?: StrategySignalKind;
   readonly requiredBarCount: number;
+  /** context 周期 → 最少保留根数（编译产物） */
+  readonly contextRequirements: Readonly<Record<number, number>>;
   readonly sourceKind: StoredDefinitionSourceKind;
 };
 

@@ -12,6 +12,8 @@ import {
   RealtimePeriodBuilder,
   RealtimeKernelPool,
   REALTIME_STRATEGY_PERIODS,
+  type PreMarketWarmupReport,
+  type PreMarketWarmupTarget,
   type RealtimeStrategyExecutionPlan,
 } from '@app/strategy';
 import {
@@ -61,6 +63,8 @@ export class CandleFinalizedJobProcessor {
   private lastJobAcceptedTriggerTime: string | null = null;
   private lastJobEvaluationStarted = false;
   private lastJobEvaluated = false;
+  private warmedTradingDay: string | null = null;
+  private lastWarmupReport: PreMarketWarmupReport | null = null;
 
   constructor(
     private readonly marketData: StrategyRealtimeMarketDataPort,
@@ -116,7 +120,11 @@ export class CandleFinalizedJobProcessor {
       this.activeTradingDay = tradingDay;
       this.cursors.clear();
       this.periodBuilder.reset();
-      this.evaluation.reset();
+      // 跨日守卫：当日已预热的组必须保留（首根封存 Bar 零历史 I/O）；
+      // 仅在没有为该交易日预热的组时才清空评估态。
+      if (!this.evaluation.hasGroupsWarmedFor(tradingDay)) {
+        this.evaluation.reset();
+      }
     }
     const executionPlans = this.executionPlans(
       trigger.securityId,
@@ -150,10 +158,18 @@ export class CandleFinalizedJobProcessor {
       }
       throw new Error('conflicting candle finalization identity');
     }
+    // 派生周期集合 = 求值周期 ∪ context 周期（含 1440）
+    const derivedPeriods = new Set<number>();
+    for (const plan of executionPlans) {
+      derivedPeriods.add(plan.period);
+      for (const rawPeriod of Object.keys(plan.contextRequirements ?? {})) {
+        derivedPeriods.add(Number(rawPeriod));
+      }
+    }
     const emitted = this.periodBuilder.accept(
       trigger,
       sealedBar,
-      new Set(executionPlans.map((plan) => plan.period)),
+      derivedPeriods,
     );
     this.cursors.set(cursorKey, {
       timestampMs: triggerMs,
@@ -242,6 +258,39 @@ export class CandleFinalizedJobProcessor {
       throw new Error('sealed trigger price conflicts with Redis candle close');
     }
     return observation.bar;
+  }
+
+  /**
+   * 盘前预热入口（09:20 cron 与启动/reconcile 补热共用）。
+   * 异常吞掉不抛出；成功后记录 warmedTradingDay 供跨日守卫使用。
+   */
+  async warmupRealtimeWindows(
+    targets: readonly PreMarketWarmupTarget[],
+    anchorAt: Date,
+  ): Promise<PreMarketWarmupReport | null> {
+    try {
+      const report = await this.evaluation.warmup(targets, anchorAt);
+      if (report) {
+        this.lastWarmupReport = report;
+        if (report.succeeded > 0) {
+          this.warmedTradingDay = formatShanghaiDateString(anchorAt);
+        }
+      }
+      return report;
+    } catch {
+      // 预热失败绝不阻塞触发主路径；开盘首根走懒加载兜底
+      return null;
+    }
+  }
+
+  getWarmupDiagnostics(): {
+    warmedTradingDay: string | null;
+    lastReport: PreMarketWarmupReport | null;
+  } {
+    return {
+      warmedTradingDay: this.warmedTradingDay,
+      lastReport: this.lastWarmupReport,
+    };
   }
 
   reconcileRegistry(snapshot: SignalRegistrySnapshot): void {
