@@ -5,10 +5,31 @@ import {
   Security,
   SecurityType,
 } from '@app/shared-data';
+import type { SplicePolicy } from '@app/market-data';
 import type Redis from 'ioredis';
 import type { Repository } from 'typeorm';
 import { SignalRealtimeRedisService } from './signal-realtime-redis.service';
 import { SignalStrategyMarketDataAdapter } from './signal-strategy-market-data.adapter';
+
+// canonical policy 测试桩：1m/5m/30m 单段 qmt（历史段走 canonical 段读取）。
+// CI runner 无私有仓，真实 CanonicalPolicyLoader 会 CANONICAL_POLICY_UNAVAILABLE，
+// 与 signal-strategy-market-data.adapter.spec.ts 同款测试桩。
+const TEST_POLICY = {
+  version: 'index-aggregation-spec-v1',
+  defaults: {
+    '1': [{ source: 'qmt' }],
+    '5': [{ source: 'qmt' }],
+    '30': [{ source: 'qmt' }],
+  },
+} as unknown as SplicePolicy;
+jest.mock('@app/strategy', () => ({
+  ...jest.requireActual('@app/strategy'),
+  CanonicalPolicyLoader: {
+    load: () => TEST_POLICY,
+    setCustomPaths: jest.fn(),
+    resetConfiguration: jest.fn(),
+  },
+}));
 
 function chainBuilder(rows: K[], code: string) {
   const builder = {
