@@ -57,6 +57,17 @@ provider-neutral A-share unit contract of this capability for both segments.
 - **AND** internal results MUST use domain names such as `*Window` or `*Observation`
 - **AND** they MUST NOT use HTTP `*QueryDto` or `*Vo` naming
 
+#### Scenario: A canonical window mixes physical providers across the splice seam
+- **WHEN** hydration or a backtest replay assembles one period's window from the canonical series
+- **THEN** bars from different physical providers (per the splice policy segments) MAY coexist in
+  that one window
+- **AND** bar identity `(securityId, source, period, timestamp)` MUST prevent cross-provider
+  collisions
+- **AND** each bar's quantities MUST be normalized through its own provider's approved unit
+  profile before entering the window
+- **AND** the runtime MUST NOT assume a single physical provider inside one window, and MUST NOT
+  select, swap or reorder providers outside the policy
+
 #### Scenario: The splice policy does not cover a realtime period
 - **WHEN** a group's declared evaluation or context period has no segment in the effective splice
   policy at group build or warmup time
