@@ -74,6 +74,30 @@ describe('stored definition compiler — context requirements derivation', () =>
     expect(compiled.contextRequirements).toEqual({ 5: 120, 30: 8, 1440: 10 });
   });
 
+  it('unwraps the { rootNode, requiredBarCount } storage envelope', () => {
+    factorPluginRegistry.register(pluginWith('plugin.a'));
+    const compiled = compileStoredDefinitionVersion({
+      kind: 'decision_flow',
+      rule: {
+        requiredBarCount: 200,
+        rootNode: guardNode('plugin.a') as unknown as Record<string, unknown>,
+      } as unknown as Record<string, unknown>,
+    });
+    expect(compiled.flow.id).toBe('guard');
+    expect(compiled.flow.type).toBe('GUARD');
+    expect(compiled.requiredBarCount).toBe(200);
+  });
+
+  it('still compiles a bare-tree rule (rule payload is the node)', () => {
+    factorPluginRegistry.register(pluginWith('plugin.a'));
+    const compiled = compileStoredDefinitionVersion({
+      kind: 'decision_flow',
+      rule: guardNode('plugin.a') as unknown as Record<string, unknown>,
+    });
+    expect(compiled.flow.id).toBe('guard');
+    expect(compiled.requiredBarCount).toBe(50);
+  });
+
   it('fails compilation when a flow references an unknown plugin', () => {
     expect(() =>
       compileStoredDefinitionVersion({

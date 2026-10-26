@@ -66,7 +66,13 @@ export function compileStoredDefinitionVersion(
 ): CompiledStoredDefinition {
   switch (input.kind) {
     case 'decision_flow': {
-      const flow = input.rule as unknown as DecisionFlowNode;
+      // 创建链路（strategy-definition.service）以 { rootNode, requiredBarCount }
+      // 包装存储；裸树形状（rule 即节点）兼容直存。
+      const payload = input.rule as {
+        rootNode?: DecisionFlowNode;
+        requiredBarCount?: unknown;
+      };
+      const flow = (payload?.rootNode ?? payload) as DecisionFlowNode;
       if (!flow || typeof flow !== 'object' || !flow.id || !flow.type) {
         throw new StoredDefinitionCompileError(
           'DECISION_FLOW_RULE_INVALID',
