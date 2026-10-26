@@ -92,9 +92,17 @@
   libs/strategy/src/strategy-dual-timestamp.guard.spec.ts`
 - [x] 6.5 `pnpm -C mist typecheck && pnpm -C mist test:ci` 全绿；
   `pnpm -C mist-fe typecheck && pnpm -C mist-fe test:ci` 全绿
-- [ ] 6.6 生产验收：000001 30m + 5m/1440 上下文，canonical 回测
+- [x] 6.6 生产验收：000001 30m + 5m/1440 上下文，canonical 回测
   2005-01-04 → 2026-10-20，战术插件 `evidence.degraded` 不再为 true；
   实盘 shadow 对账一轮
+  - 回测 run 48（strategyVersionId=23，source=canonical）：2 条信号
+    （2008-03-03 / 2012-06-14，均为段级三卖），全部信号 decisionTrace 中
+    bull/bear EXTRACTOR 节点 `evidence.degraded` 非 true（断言 PASS）；
+    诊断插件实测窗口实况：series.5=40 根 / series.30=200 根 / series.1440=10 根满额
+  - 验收过程中修复：CI mock spec 无私有仓 policy 桩（`02ddc354`）、
+    decision_flow rootNode 包装契约分裂（`9c24c40e`）、
+    生产 private-plugins dist 部分旧版（部署侧全量重同步修复，教训入 AGENTS.md）
+  - 实盘 shadow 对账：随 6.9 分阶段启用执行
 - [x] 6.7 dev-server 单步推演会话多周期化（`strategy-simulation.session.ts` 的 KernelConfig
   构造），推演帧含 context 周期窗口；复跑会话门禁
 - [x] 6.8 `openspec validate support-multi-period-evaluation --strict` 通过；
