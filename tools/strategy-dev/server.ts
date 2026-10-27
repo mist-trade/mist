@@ -39,9 +39,24 @@ import {
   ORDER_TYPES,
 } from '../../libs/strategy/src/strategy.constants';
 import type { DecisionFlowNode } from '../../libs/strategy/src/decision-flow/decision-flow.types';
-import { compileStoredDefinitionVersion } from '../../libs/strategy/src/decision-flow/stored-definition-compiler';
+import {
+  compileStoredDefinitionVersion,
+  deriveContextRequirements,
+  StoredDefinitionCompileError,
+  type StoredDefinitionSourceKind,
+} from '../../libs/strategy/src/decision-flow/stored-definition-compiler';
+import { HistoricalBarSource } from '../../libs/strategy/src/kernel/historical-bar-source';
+import {
+  InMemoryReplayPort,
+  ReplaySeriesMissingError,
+} from '../../libs/strategy/src/kernel/adapters/in-memory-replay-port';
 import { mapKernelSignalToSimulationSignal } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
-import { loadCanonicalKlines, PERIOD_NAME_MAP } from './provider';
+import type { StrategySignalKind } from '../../libs/strategy/src/rules/strategy-rule.types';
+import {
+  loadCanonicalKlines,
+  PERIOD_NAME_MAP,
+  REVERSE_PERIOD_MAP,
+} from './provider';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
 import type {
   StrategyBar,
@@ -401,6 +416,11 @@ function getBacktestCacheKey(options: {
   mode?: string;
   pluginId?: string;
   enableStopLoss?: boolean;
+  strategyDefinitionId?: number;
+  /** 插件推导的 context 需求指纹：插件声明变化时使旧缓存失效 */
+  contextFingerprint?: string;
+  /** 存量定义本地重放的版本标签 */
+  definitionVersionLabel?: string;
 }): string {
   const start = isValidDate(options.startDate)
     ? options.startDate.toISOString()
@@ -408,7 +428,76 @@ function getBacktestCacheKey(options: {
   const end = isValidDate(options.endDate)
     ? options.endDate.toISOString()
     : options.endDate || '';
-  return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${options.mode || ''}:${options.pluginId || ''}:${Boolean(options.enableStopLoss)}:${start}:${end}`;
+  return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${options.mode || ''}:${options.pluginId || ''}:${Boolean(options.enableStopLoss)}:${options.strategyDefinitionId ?? ''}:${options.contextFingerprint || ''}:${options.definitionVersionLabel || ''}:${start}:${end}`;
+}
+
+/** 有界请求错误：dev 回测链路 fail-closed 的 HTTP 映射载体 */
+class DevBacktestRequestError extends Error {
+  constructor(
+    public readonly statusCode: number,
+    public readonly code: string,
+    message: string,
+  ) {
+    super(message);
+    this.name = 'DevBacktestRequestError';
+  }
+}
+
+/**
+ * 存量定义本地重放目录（`.data/` 已 gitignore）：
+ * 导出文件含私有插件参数与树形态，仅存本地，严禁提交/外传。
+ */
+const LOCAL_DEFINITIONS_DIR = path.resolve(
+  __dirname,
+  '../../.data/strategy-definitions',
+);
+
+interface LocalStoredDefinition {
+  kind: StoredDefinitionSourceKind;
+  rule: Record<string, unknown>;
+  signalKind?: StrategySignalKind;
+  versionLabel: string;
+}
+
+/**
+ * 加载本地导出的存量定义（`pnpm dev:sync --definition <id>` 产物）：
+ * `<id>_v<version>.json` 中取最高版本。未找到 → 返回 null（回落硬编码预设树）。
+ */
+function loadLocalStoredDefinition(
+  definitionId: number,
+): LocalStoredDefinition | null {
+  if (!fs.existsSync(LOCAL_DEFINITIONS_DIR)) return null;
+  const prefix = `${definitionId}_v`;
+  const files = fs
+    .readdirSync(LOCAL_DEFINITIONS_DIR)
+    .filter((f) => f.startsWith(prefix) && f.endsWith('.json'));
+  if (files.length === 0) return null;
+  files.sort((a, b) => {
+    const va = Number(a.slice(prefix.length, -'.json'.length)) || 0;
+    const vb = Number(b.slice(prefix.length, -'.json'.length)) || 0;
+    return va - vb;
+  });
+  const latest = files[files.length - 1];
+  const raw = JSON.parse(
+    fs.readFileSync(path.join(LOCAL_DEFINITIONS_DIR, latest), 'utf-8'),
+  ) as {
+    kind?: StoredDefinitionSourceKind;
+    rule?: Record<string, unknown>;
+    signalKind?: StrategySignalKind;
+  };
+  if (!raw?.rule || typeof raw.rule !== 'object') {
+    throw new DevBacktestRequestError(
+      422,
+      'DEFINITION_EXPORT_INVALID',
+      `存量定义导出文件缺少 rule 字段: ${latest}，请重新执行 pnpm dev:sync --definition ${definitionId}`,
+    );
+  }
+  return {
+    kind: raw.kind ?? 'decision_flow',
+    rule: raw.rule,
+    ...(raw.signalKind ? { signalKind: raw.signalKind } : {}),
+    versionLabel: latest.replace('.json', ''),
+  };
 }
 
 /**
@@ -745,7 +834,60 @@ interface RunBacktestOptions {
 
 // 全量执行仿真并获取回测结果的统一纯净胶水（统一内核 push 驱动 + Next-Bar 因果撮合 + Polars 绩效）
 async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
-  const cacheKey = getBacktestCacheKey(options);
+  const initialCash = options.initialCash ?? 1_000_000;
+
+  // 1. 初始化插件注册表并动态加载外部插件（含私有战术插件）
+  const registry = new InMemoryFactorPluginRegistry();
+  ensureStandardPluginsRegistered(registry);
+  ExternalFactorPluginLoader.registerExternalPlugins(registry);
+
+  // 2. 决策流解析：存量定义本地重放优先（与生产同一编译路径）→ 硬编码预设树
+  //    （内置预设仅 1/2/3；其余 definitionId 必须先导出本地定义，fail-closed）
+  const isLegacyPresetId =
+    typeof options.strategyDefinitionId === 'number' &&
+    [1, 2, 3].includes(options.strategyDefinitionId);
+  const storedDefinition =
+    typeof options.strategyDefinitionId === 'number' && !isLegacyPresetId
+      ? loadLocalStoredDefinition(options.strategyDefinitionId)
+      : null;
+  let flow: DecisionFlowNode;
+  let requiredBarCount = 300;
+  let definitionVersionLabel: string | null = null;
+  if (storedDefinition) {
+    const compiled = compileStoredDefinitionVersion(
+      {
+        kind: storedDefinition.kind,
+        rule: storedDefinition.rule,
+        signalKind: storedDefinition.signalKind,
+      },
+      registry,
+    );
+    flow = compiled.flow;
+    requiredBarCount = compiled.requiredBarCount;
+    definitionVersionLabel = storedDefinition.versionLabel;
+  } else if (typeof options.strategyDefinitionId === 'number') {
+    throw new DevBacktestRequestError(
+      422,
+      'DEFINITION_NOT_FOUND',
+      `本地未找到存量定义 ${options.strategyDefinitionId} 的导出文件（内置预设仅支持 1/2/3）` +
+        ` — 请先执行: pnpm dev:sync --definition ${options.strategyDefinitionId}`,
+    );
+  } else {
+    flow = createCustomDecisionFlow(
+      options.mode,
+      options.pluginId,
+      options.strategyDefinitionId,
+    );
+  }
+  // context 需求由插件元数据推导（编译边界唯一实现，调用方不可传 lookback）
+  const contextRequirements = deriveContextRequirements(flow, registry);
+
+  // 3. 缓存键（含 context 指纹与定义版本）
+  const cacheKey = getBacktestCacheKey({
+    ...options,
+    contextFingerprint: JSON.stringify(contextRequirements),
+    ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
+  });
   const cachedSignals = backtestSignalsCache.get(cacheKey);
   if (
     cachedSignals &&
@@ -761,58 +903,69 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       closedTrades: [],
       performance: null,
       stressReport: null,
+      replay: undefined,
     };
   }
 
-  const initialCash = options.initialCash ?? 1_000_000;
-  const fullKlines = loadCanonicalKlines({
-    code: options.code,
-    period: options.period,
-  });
-  let bars = fullKlines.map((k) =>
-    toStrategyBar(
-      k,
-      options.period,
-      DEFAULT_DEV_SECURITY_ID,
-      DEFAULT_DEV_MARKET_SOURCE,
-      options.code,
-    ),
-  );
-
-  // A 股防数据中毒门禁 (A_SHARE_DATA_MIN_BOUNDARY: 1996-12-16)
+  // 4. 多周期数据装载：周期集合 = 求值 ∪ context，逐周期映射 + A 股边界过滤
   const MIN_A_SHARE_DATE = new Date('1996-12-16T00:00:00.000Z');
-  bars = bars.filter(
-    (b) => b.timestamp.getTime() >= MIN_A_SHARE_DATE.getTime(),
+  const demandedPeriods = Array.from(
+    new Set<number>([
+      options.period,
+      ...Object.keys(contextRequirements).map(Number),
+    ]),
   );
-
-  if (options.endDate) {
-    const endMs = new Date(options.endDate).getTime();
-    bars = bars.filter((bar) => bar.timestamp.getTime() <= endMs);
-  }
-  if (options.startDate) {
-    const startMs = new Date(options.startDate).getTime();
-    const startIndex = bars.findIndex((b) => b.timestamp.getTime() >= startMs);
-    if (startIndex > 0) {
-      // 预留充足的预热 K 线（300 根），确保技术指标与缠论窗口充分收敛
-      const prewarmCut = Math.max(0, startIndex - 300);
-      bars = bars.slice(prewarmCut);
+  const seriesMap = new Map<number, StrategyBar[]>();
+  for (const period of demandedPeriods) {
+    let klines: ChanK[];
+    try {
+      // exact：多周期 context 严禁静默回退到同 symbol 其他周期数据集
+      klines = loadCanonicalKlines({ code: options.code, period, exact: true });
+    } catch (err: any) {
+      const periodName = REVERSE_PERIOD_MAP[period] ?? `${period}m`;
+      throw new DevBacktestRequestError(
+        422,
+        'DATA_MISSING',
+        `本地未找到 ${options.code} 周期 ${periodName} 行情数据（多周期回放需要）: ${err.message}` +
+          ` — 请先执行: pnpm dev:sync --code ${options.code} --periods ${periodName}`,
+      );
     }
+    const periodBars = klines
+      .map((k) =>
+        toStrategyBar(
+          k,
+          period,
+          DEFAULT_DEV_SECURITY_ID,
+          (k as { source?: StrategyMarketSource }).source ??
+            DEFAULT_DEV_MARKET_SOURCE,
+          options.code,
+        ),
+      )
+      .filter((b) => b.timestamp.getTime() >= MIN_A_SHARE_DATE.getTime());
+    seriesMap.set(period, periodBars);
   }
 
-  // 1. 初始化插件注册表并动态加载外部插件
-  const registry = new InMemoryFactorPluginRegistry();
-  ensureStandardPluginsRegistered(registry);
-  ExternalFactorPluginLoader.registerExternalPlugins(registry);
+  // 5. 内存 replay port（缺数据/乱序 fail-closed）
+  const port = new InMemoryReplayPort({
+    securityId: DEFAULT_DEV_SECURITY_ID,
+    securityCode: options.code,
+    series: seriesMap,
+  });
 
-  // 2. 构造对应决策流树
-  const flow = createCustomDecisionFlow(
-    options.mode,
-    options.pluginId,
-    options.strategyDefinitionId,
-  );
+  // 6. 公开相边界（startDate 缺省 = A 股现代样本边界，等价全公开）
   const publicFrom = options.startDate
     ? new Date(options.startDate)
-    : new Date(-8640000000000000);
+    : new Date(MIN_A_SHARE_DATE.getTime());
+  let lastTimestampMs = 0;
+  for (const bars of seriesMap.values()) {
+    const last = bars[bars.length - 1];
+    if (last && last.timestamp.getTime() > lastTimestampMs) {
+      lastTimestampMs = last.timestamp.getTime();
+    }
+  }
+  const endAt = options.endDate
+    ? new Date(options.endDate)
+    : new Date(lastTimestampMs);
 
   const kernel = new StrategyEvaluationKernel({
     securityId: DEFAULT_DEV_SECURITY_ID,
@@ -826,20 +979,34 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         flow,
         ruleSnapshot: Object.freeze({}),
         period: options.period,
-        requiredBarCount: 300,
-        contextRequirements: {},
+        requiredBarCount,
+        contextRequirements,
       },
     ],
   });
 
-  // 3. 初始化因果经纪商与持仓状态机
+  // 7. 多序列合并推流（HistoricalBarSource：k 路归并，onBar/onSignal 仅求值周期）
+  const replaySource = new HistoricalBarSource(port, {
+    securityId: DEFAULT_DEV_SECURITY_ID,
+    securityCode: options.code,
+    selection: { kind: 'canonical' },
+    evaluationPeriod: options.period,
+    contextPeriods: contextRequirements,
+    preWarmEndAt: publicFrom,
+    publicFrom,
+    endAt,
+    requiredBars: requiredBarCount,
+  });
+
+  // 8. 初始化因果经纪商与持仓状态机（T+1 / 日结 / 解锁按日线节奏）
   const broker = new SimulatedBroker({
     initialCash,
     slippageRatio: 0.0005,
   });
+  const evaluationBars = seriesMap.get(options.period) ?? [];
   broker.registerSecurity(options.code, {
     name: options.code === '000001' ? '上证指数' : options.code,
-    preClose: bars[0]?.open ?? 1000,
+    preClose: evaluationBars[0]?.open ?? 1000,
   });
   const position = new PositionStateMachine(
     DEFAULT_DEV_SECURITY_ID,
@@ -862,33 +1029,14 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
 
   const collectedSignals: SimulationSignal[] = [];
   let lastDateStr: string | null = null;
-  let lastBar: StrategyBar | null = null;
+  let lastEvalBar: StrategyBar | null = null;
+  let evalBarCount = 0;
+  let pushCount = 0;
 
-  for (let i = 0; i < bars.length; i++) {
-    const bar = bars[i];
-    const currentDateStr = formatShanghaiDateString(bar.timestamp);
-
-    // 跨日日终结算
-    if (lastDateStr !== null && currentDateStr !== lastDateStr) {
-      broker.settleDayClose(lastDateStr);
-      if (lastBar !== null) {
-        position.onDayClose(lastBar);
-      }
-    }
-    lastDateStr = currentDateStr;
-    lastBar = bar;
-
-    // Next-Bar 撮合成交上一根 Bar 下达的待撮合委托
-    const fills = broker.onBar(bar);
-    for (const fill of fills) {
-      position.onOrderFilled(fill);
-    }
-    position.onBar(bar);
-
-    // 统一内核推进 Bar 并获得增量信号
-    const kernelSignals: readonly KernelSignal[] = await kernel.push(bar);
-
-    for (const kSig of kernelSignals) {
+  const replaySummary = await replaySource.drive(
+    kernel,
+    // onSignal（仅求值周期）：信号收集 + 因果委托下达（Next-Bar 撮合，本 Bar 收盘下达）
+    async (kSig: KernelSignal, bar: StrategyBar) => {
       const simSig = mapKernelSignalToSimulationSignal(kSig, {
         securityCode: options.code,
         period: options.period,
@@ -899,7 +1047,6 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         .getOpenOrders()
         .some((o) => o.securityCode === options.code);
 
-      // 因果买卖撮合委托下达 (Next-Bar 撮合，本 Bar 收盘下达)
       if (simSig.isBuy || kSig.signalKind === 'entry') {
         const availableCash = broker.getAccount().availableCash;
         const buyShares =
@@ -933,43 +1080,66 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
           }
         }
       }
-    }
-
-    // 风控裁决器检查 (仅当明确开启止损时生效)
-    const hasPendingOrderForArbiter = broker
-      .getOpenOrders()
-      .some((o) => o.securityCode === options.code);
-    if (
-      arbiter &&
-      !hasPendingOrderForArbiter &&
-      position.getStatus() === 'HOLDING'
-    ) {
-      const arbiterSellDto = arbiter.arbitrate({
-        bar,
-        position: position.getSnapshot(),
-        availableCash: broker.getAccount().availableCash,
-      });
-      if (arbiterSellDto) {
-        broker.submitOrder(arbiterSellDto);
+    },
+    // onBar（仅求值周期）：跨日日结 / Next-Bar 撮合 / 持仓盯市 / 风控裁决
+    async (bar: StrategyBar) => {
+      evalBarCount += 1;
+      const currentDateStr = formatShanghaiDateString(bar.timestamp);
+      if (lastDateStr !== null && currentDateStr !== lastDateStr) {
+        broker.settleDayClose(lastDateStr);
+        if (lastEvalBar !== null) {
+          position.onDayClose(lastEvalBar);
+        }
       }
-    }
+      lastDateStr = currentDateStr;
 
-    if (i % 500 === 0 && i > 0) {
-      console.log(
-        `📊 [Backtest] ${options.code} 步进游标: ${i}/${bars.length} (${bar.timestamp.toISOString().slice(0, 10)})`,
-      );
-    }
+      const fills = broker.onBar(bar);
+      for (const fill of fills) {
+        position.onOrderFilled(fill);
+      }
+      position.onBar(bar);
 
-    // 异步让渡事件循环，确保单线程 Node.js 维持 HTTP 响应流畅
-    if (i % 50 === 0) {
-      await new Promise<void>((r) => setImmediate(r));
-    }
-  }
+      // 风控裁决器检查（仅当明确开启止损时生效）。注：drive 序为 push → onBar →
+      // onSignal，同 Bar 上风控单先于信号单下达（旧循环相反）；两者皆为清仓卖单，
+      // 经济结果等价，仅 entryReason 归因可能不同。
+      const hasPendingOrderForArbiter = broker
+        .getOpenOrders()
+        .some((o) => o.securityCode === options.code);
+      if (
+        arbiter &&
+        !hasPendingOrderForArbiter &&
+        position.getStatus() === 'HOLDING'
+      ) {
+        const arbiterSellDto = arbiter.arbitrate({
+          bar,
+          position: position.getSnapshot(),
+          availableCash: broker.getAccount().availableCash,
+        });
+        if (arbiterSellDto) {
+          broker.submitOrder(arbiterSellDto);
+        }
+      }
+
+      lastEvalBar = bar;
+      if (evalBarCount % 500 === 0) {
+        console.log(
+          `📊 [Backtest] ${options.code} 步进游标: ${evalBarCount} 根求值 Bar (${bar.timestamp.toISOString().slice(0, 10)})`,
+        );
+      }
+    },
+    // onPushed：异步让渡事件循环，确保单线程 Node.js 维持 HTTP 响应流畅
+    async () => {
+      pushCount += 1;
+      if (pushCount % 50 === 0) {
+        await new Promise<void>((r) => setImmediate(r));
+      }
+    },
+  );
 
   // 最后一根 Bar 的日终结算
-  if (lastBar !== null && lastDateStr !== null) {
+  if (lastEvalBar !== null && lastDateStr !== null) {
     broker.settleDayClose(lastDateStr);
-    position.onDayClose(lastBar);
+    position.onDayClose(lastEvalBar);
   }
 
   // 提取净值时序与平仓交易
@@ -1001,6 +1171,8 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
           endDate: scenarioDef.endDate,
           mode: options.mode,
           pluginId: options.pluginId,
+          strategyDefinitionId: options.strategyDefinitionId,
+          enableStopLoss: options.enableStopLoss,
           initialCash,
           runStressSuite: false,
         });
@@ -1029,7 +1201,12 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     };
   }
 
-  if (!options.runStressSuite && !options.mode && !options.pluginId) {
+  if (
+    !options.runStressSuite &&
+    !options.mode &&
+    !options.pluginId &&
+    !options.strategyDefinitionId
+  ) {
     backtestSignalsCache.set(cacheKey, collectedSignals);
   }
 
@@ -1040,6 +1217,8 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     closedTrades,
     performance,
     stressReport,
+    replay: replaySummary,
+    ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
   };
 }
 
@@ -1704,7 +1883,7 @@ const server = http.createServer(async (req, res) => {
           body.noStopLoss !== true);
 
       // 统一走策略树仿真引擎计算
-      const { signals, performance, stressReport, closedTrades } =
+      const { signals, performance, stressReport, closedTrades, replay } =
         await runUnifiedSimulationBacktest({
           code: symbol,
           period,
@@ -1807,6 +1986,17 @@ const server = http.createServer(async (req, res) => {
           trades: closedTrades,
           stressReport,
           signalCount: signals.length,
+          ...(replay
+            ? {
+                replay: {
+                  prewarmStatus: replay.prewarmStatus,
+                  prewarmActual: replay.prewarmActual,
+                  barCount: replay.barCount,
+                  publicBarCount: replay.publicBarCount,
+                  perPeriodPrewarm: replay.perPeriodPrewarm,
+                },
+              }
+            : {}),
           pollUrl: `/v1/strategy-backtests/${newRun.id}`,
           acceptedAt: newRun.createdAt,
         },
@@ -1814,7 +2004,23 @@ const server = http.createServer(async (req, res) => {
       );
     } catch (err: any) {
       console.error(`[POST /v1/strategy-backtests] 错误:`, err.message);
-      sendJson(res, { error: err.message }, 500);
+      if (err instanceof DevBacktestRequestError) {
+        sendJson(res, { error: err.message, code: err.code }, err.statusCode);
+      } else if (err instanceof StoredDefinitionCompileError) {
+        sendJson(
+          res,
+          { error: err.message, code: err.code },
+          DEV_HTTP_STATUS.UNPROCESSABLE_ENTITY,
+        );
+      } else if (err instanceof ReplaySeriesMissingError) {
+        sendJson(
+          res,
+          { error: err.message, code: 'DATA_MISSING' },
+          DEV_HTTP_STATUS.UNPROCESSABLE_ENTITY,
+        );
+      } else {
+        sendJson(res, { error: err.message }, 500);
+      }
     }
     return;
   }
@@ -1926,49 +2132,56 @@ const server = http.createServer(async (req, res) => {
   sendJson(res, { error: 'Not Found', path: pathname }, 404);
 });
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(
-    `\n🚀 [Mist Dev Server] 本地开发服务已就绪: http://localhost:${PORT}`,
-  );
-  console.log(`已就绪契约:`);
-  console.log(`  - POST /v1/indicators/k       (读取本地离线/快照行情)`);
-  console.log(`  - POST /v1/chan/merge-k       (现算包含合并 K 线)`);
-  console.log(`  - GET  /v1/visual/commands    (现算纯几何指令流，笔/段/中枢)`);
-  console.log(`  - POST /v1/simulation/start   (创建流式推演仿真会话)`);
-  console.log(`  - GET  /v1/simulation/stream  (SSE 事件流长连接推流)`);
-  console.log(
-    `  - POST /v1/simulation/control (播放/暂停/步进/调速/Seek 控制)`,
-  );
-  console.log(`  - GET  /v1/simulation/dump    (导出仿真队列与渲染数据快照)`);
-  console.log(`  - GET  /v1/strategies         (策略清单与版本)`);
-  console.log(`  - GET  /v1/strategy-backtests (策略树回测记录与归因详情)\n`);
+// 会话级单测经 DEV_SERVER_AUTOSTART=false 复用本模块导出，不启动 HTTP 监听
+if (process.env.DEV_SERVER_AUTOSTART !== 'false') {
+  server.listen(PORT, '0.0.0.0', () => {
+    console.log(
+      `\n🚀 [Mist Dev Server] 本地开发服务已就绪: http://localhost:${PORT}`,
+    );
+    console.log(`已就绪契约:`);
+    console.log(`  - POST /v1/indicators/k       (读取本地离线/快照行情)`);
+    console.log(`  - POST /v1/chan/merge-k       (现算包含合并 K 线)`);
+    console.log(
+      `  - GET  /v1/visual/commands    (现算纯几何指令流，笔/段/中枢)`,
+    );
+    console.log(`  - POST /v1/simulation/start   (创建流式推演仿真会话)`);
+    console.log(`  - GET  /v1/simulation/stream  (SSE 事件流长连接推流)`);
+    console.log(
+      `  - POST /v1/simulation/control (播放/暂停/步进/调速/Seek 控制)`,
+    );
+    console.log(`  - GET  /v1/simulation/dump    (导出仿真队列与渲染数据快照)`);
+    console.log(`  - GET  /v1/strategies         (策略清单与版本)`);
+    console.log(`  - GET  /v1/strategy-backtests (策略树回测记录与归因详情)\n`);
 
-  setTimeout(async () => {
-    try {
-      if (process.env.SKIP_DEV_PREHEAT === 'true') {
-        console.log(
-          `⏩ [预热] 检测到环境变量 SKIP_DEV_PREHEAT=true，跳过启动全量预热。`,
-        );
-        return;
+    setTimeout(async () => {
+      try {
+        if (process.env.SKIP_DEV_PREHEAT === 'true') {
+          console.log(
+            `⏩ [预热] 检测到环境变量 SKIP_DEV_PREHEAT=true，跳过启动全量预热。`,
+          );
+          return;
+        }
+        console.log(`🔄 [预热] 正在后台基于策略树预热决策流回测数据...`);
+        for (const run of mockRuns) {
+          const symbol = run.targetUniverse[0] || '000001';
+          const { signals } = await runUnifiedSimulationBacktest({
+            code: symbol,
+            period: run.period,
+            startDate: run.startDate,
+            endDate: run.endDate,
+            enableStopLoss: false,
+          });
+          backtestRunSignalsMap.set(run.id, signals);
+          run.signalCount = signals.length;
+          console.log(
+            `✅ [预热] ${symbol} ${run.period === 1440 ? '日线' : run.period + 'm'} 决策流推演就绪！(runId: ${run.id}, 信号数: ${signals.length})`,
+          );
+        }
+      } catch (e: any) {
+        console.error(`⚠️ [预热] 后台预热遇到问题:`, e.message);
       }
-      console.log(`🔄 [预热] 正在后台基于策略树预热决策流回测数据...`);
-      for (const run of mockRuns) {
-        const symbol = run.targetUniverse[0] || '000001';
-        const { signals } = await runUnifiedSimulationBacktest({
-          code: symbol,
-          period: run.period,
-          startDate: run.startDate,
-          endDate: run.endDate,
-          enableStopLoss: false,
-        });
-        backtestRunSignalsMap.set(run.id, signals);
-        run.signalCount = signals.length;
-        console.log(
-          `✅ [预热] ${symbol} ${run.period === 1440 ? '日线' : run.period + 'm'} 决策流推演就绪！(runId: ${run.id}, 信号数: ${signals.length})`,
-        );
-      }
-    } catch (e: any) {
-      console.error(`⚠️ [预热] 后台预热遇到问题:`, e.message);
-    }
-  }, 100);
-});
+    }, 100);
+  });
+}
+
+export { runUnifiedSimulationBacktest };

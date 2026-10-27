@@ -6,7 +6,10 @@ import {
 import { compileStoredStrategyRuleWithNormalized } from '../rules/strategy-rule.compiler';
 import type { StrategySignalKind } from '../rules/strategy-rule.types';
 import { ensureStandardPluginsRegistered } from '../factor/standard-plugins';
-import { factorPluginRegistry } from '../factor/factor-plugin-registry';
+import {
+  factorPluginRegistry,
+  type FactorPluginRegistry,
+} from '../factor/factor-plugin-registry';
 
 export type StoredDefinitionSourceKind =
   | 'rule_dsl'
@@ -59,10 +62,13 @@ const DECISION_FLOW_DEFAULT_REQUIRED_BAR_COUNT = 50;
  *   （插件内复用同一 DSL 求值器，字段/算子语义不变）；
  * - chan_bsp：结构化校验后经 LegacyStrategyCompiler 套 plugin.chan.bsp GUARD 树。
  *
+ * `registry` 缺省时使用全局单例注册表（生产编译路径）；显式传入时
+ * （dev server 本地会话，含外部私有插件）以传入注册表解析插件引用。
  * 调用方（signal registry / 回测命令服务 / dev-server 会话）禁止各自实现分派。
  */
 export function compileStoredDefinitionVersion(
   input: StoredDefinitionCompileInput,
+  registry: FactorPluginRegistry = factorPluginRegistry,
 ): CompiledStoredDefinition {
   switch (input.kind) {
     case 'decision_flow': {
@@ -85,7 +91,7 @@ export function compileStoredDefinitionVersion(
           typeof input.rule.requiredBarCount === 'number'
             ? input.rule.requiredBarCount
             : DECISION_FLOW_DEFAULT_REQUIRED_BAR_COUNT,
-        contextRequirements: deriveContextRequirements(flow),
+        contextRequirements: deriveContextRequirements(flow, registry),
         sourceKind: 'decision_flow',
         ruleSnapshot: input.rule,
       };
@@ -103,7 +109,7 @@ export function compileStoredDefinitionVersion(
         return {
           flow,
           requiredBarCount: compilation.plan.requiredBarCount,
-          contextRequirements: deriveContextRequirements(flow),
+          contextRequirements: deriveContextRequirements(flow, registry),
           sourceKind: 'rule_dsl',
           ruleSnapshot: compilation.normalizedRule as Readonly<
             Record<string, unknown>
@@ -124,7 +130,7 @@ export function compileStoredDefinitionVersion(
         flow,
         requiredBarCount:
           chanPlan.requiredBarCount ?? DEFAULT_REQUIRED_BAR_COUNT,
-        contextRequirements: deriveContextRequirements(flow),
+        contextRequirements: deriveContextRequirements(flow, registry),
         sourceKind: 'chan_bsp',
         ruleSnapshot: input.rule,
       };
@@ -230,16 +236,22 @@ function collectPluginReferences(
  * 遍历树内插件节点，从插件注册表取 `resolveContextRequirements(params)`，
  * 按 period 取 max 合并。插件未注册或声明非法 → 编译失败（fail-closed）。
  * 未声明 context 的插件不产生任何需求（等价现状）。
+ *
+ * `registry` 缺省时使用全局单例注册表（存量编译路径，自动补注册标准插件）；
+ * 显式传入时（dev server 本地会话等）以传入注册表为准，不做模块级补注册。
  */
-function deriveContextRequirements(
+export function deriveContextRequirements(
   flow: DecisionFlowNode,
+  registry: FactorPluginRegistry = factorPluginRegistry,
 ): Readonly<Record<number, number>> {
   const references = collectPluginReferences(flow);
   if (references.size === 0) return {};
-  ensureStandardPluginsRegistered();
+  if (registry === factorPluginRegistry) {
+    ensureStandardPluginsRegistered();
+  }
   const merged: Record<number, number> = {};
   for (const [pluginId, params] of references) {
-    const plugin = factorPluginRegistry.get(pluginId);
+    const plugin = registry.get(pluginId);
     if (!plugin) {
       throw new StoredDefinitionCompileError(
         'DECISION_FLOW_RULE_INVALID',

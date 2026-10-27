@@ -9,6 +9,11 @@ export interface KLineLoadOptions {
   code?: string;
   /** 周期，如 '1d', '30m', '5m', '1m' 或数字 (1440, 30, 5, 1) */
   period?: string | number;
+  /**
+   * 精确周期匹配（多周期回放用）：禁用"同 symbol 任意数据集"静默回退，
+   * 缺失即抛错（fail-closed，杜绝 30m 数据冒充 1440 context 的数据污染）。
+   */
+  exact?: boolean;
 }
 
 export interface AvailableDataset {
@@ -121,6 +126,12 @@ export function loadCanonicalKlines(options: KLineLoadOptions): ChanK[] {
     }
 
     if (!targetFile) {
+      if (options.exact) {
+        throw new Error(
+          `本地未找到 ${options.code} (${pStr}) 的 K 线数据缓存（exact 模式禁用回退）。` +
+            `请先执行同步: pnpm dev:sync --code ${options.code} --periods ${pStr}`,
+        );
+      }
       // 尝试在快照里按代码找对应用例
       const foundInFixture = findFixtureByCodeAndPeriod(options.code, pStr);
       if (foundInFixture) {
@@ -169,7 +180,11 @@ export function loadCanonicalKlines(options: KLineLoadOptions): ChanK[] {
       item.amount !== undefined && item.amount !== null
         ? String(item.amount)
         : null,
-  }));
+    // 透传真实分段来源（dev:sync 落盘的 source 列），供 StrategyBar 审计对齐
+    ...(item.source !== undefined && item.source !== null
+      ? { source: String(item.source) }
+      : {}),
+  })) as ChanK[];
 }
 
 /**

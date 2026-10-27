@@ -41,6 +41,22 @@ describe('Dev Server Architecture & Boundary Guard (本地开发服务门禁)', 
       expect(serverSource).not.toMatch(/function\s+detectDivergence/);
     });
 
+    it('多周期回放必须复用 HistoricalBarSource，严禁自写跨周期归并/可用时刻计算', () => {
+      // k 路归并、预热切片、availability 计算统一由生产适配器承担（三链路同构）
+      expect(serverSource).toMatch(/HistoricalBarSource/);
+      expect(serverSource).not.toMatch(/mergeByAvailability/);
+      expect(serverSource).not.toMatch(
+        /from\s+['"][^'"]*kernel\/availability['"]/,
+      );
+      // 多周期 context 一律经编译边界推导，严禁硬编码 contextRequirements 字面量
+      expect(serverSource).not.toMatch(/contextRequirements:\s*\{[^}]*\d/);
+    });
+
+    it('dev server 严禁直连数据库（数据只经 dev:sync 落盘文件）', () => {
+      expect(serverSource).not.toMatch(/execSync|createConnection|mysql2?\//i);
+      expect(serverSource).not.toMatch(/docker\s+exec/i);
+    });
+
     it('绘图指令接口 (/v1/visual/commands) 必须回归纯几何，严禁私自拼接注入 backtest_signals', () => {
       // 严禁私自在 commands 中注入 backtest_signals 图元
       expect(serverSource).not.toMatch(/layer:\s*['"]backtest_signals['"]/);

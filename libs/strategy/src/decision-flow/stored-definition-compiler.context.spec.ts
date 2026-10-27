@@ -1,6 +1,12 @@
 import type { DecisionFlowNode } from './decision-flow.types';
-import { compileStoredDefinitionVersion } from './stored-definition-compiler';
-import { factorPluginRegistry } from '../factor/factor-plugin-registry';
+import {
+  compileStoredDefinitionVersion,
+  deriveContextRequirements,
+} from './stored-definition-compiler';
+import {
+  factorPluginRegistry,
+  InMemoryFactorPluginRegistry,
+} from '../factor/factor-plugin-registry';
 import type { FactorPlugin } from '../factor/factor.types';
 
 function guardNode(
@@ -136,5 +142,66 @@ describe('stored definition compiler — context requirements derivation', () =>
       },
     });
     expect(chan.contextRequirements).toEqual({});
+  });
+});
+
+describe('deriveContextRequirements — explicit registry (dev-server lane)', () => {
+  it('derives from the provided registry without touching the module singleton', () => {
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(pluginWith('plugin.local.a', { 30: 100, 1440: 10 }));
+    registry.register(pluginWith('plugin.local.b', { 30: 200, 5: 40 }));
+
+    const flow = {
+      id: 'guard-a',
+      type: 'GUARD',
+      name: 'a',
+      pluginId: 'plugin.local.a',
+      requiredAction: 'BUY',
+      onPass: {
+        id: 'guard-b',
+        type: 'GUARD',
+        name: 'b',
+        pluginId: 'plugin.local.b',
+        requiredAction: 'BUY',
+        onPass: { id: 't', type: 'TERMINAL', action: 'BUY', reason: 'x' },
+      },
+    } as unknown as DecisionFlowNode;
+
+    expect(deriveContextRequirements(flow, registry)).toEqual({
+      5: 40,
+      30: 200,
+      1440: 10,
+    });
+  });
+
+  it('fails closed on unknown plugin in the provided registry', () => {
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(pluginWith('plugin.local.a'));
+
+    const flow = guardNode('plugin.local.missing');
+    expect(() => deriveContextRequirements(flow, registry)).toThrow(
+      /unknown factor plugin: plugin\.local\.missing/,
+    );
+  });
+
+  it('fails closed on invalid declaration in the provided registry', () => {
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(pluginWith('plugin.local.bad', { 30: 0 }));
+
+    const flow = guardNode('plugin.local.bad');
+    expect(() => deriveContextRequirements(flow, registry)).toThrow(
+      /invalid context requirement/,
+    );
+  });
+
+  it('yields an empty map for flows without plugin references', () => {
+    const registry = new InMemoryFactorPluginRegistry();
+    const flow = {
+      id: 't',
+      type: 'TERMINAL',
+      action: 'BUY',
+      reason: 'leaf',
+    } as unknown as DecisionFlowNode;
+    expect(deriveContextRequirements(flow, registry)).toEqual({});
   });
 });
