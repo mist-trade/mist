@@ -66,14 +66,20 @@
 - [x] 5.2 `pnpm -C mist typecheck` 全绿；三大守卫 +
   `dev-server-api-boundary.guard.spec.ts` 全绿（21/21）；触及文件 eslint 零违规；
   `test:ci` 全量结果见 change evidence（提交前附）
-- [ ] 5.3 数据同步（操作）：`pnpm dev:sync --code 000001 --periods 1d,30m,5m`
-  （limit 0 全量），核对三份文件起止时间戳 = 2005-01-04 → 最新收盘
-- [ ] 5.4 同构对账（验收）：`pnpm dev:sync --definition <run48定义id>` 导出存量
-  定义 → 本地重放（`strategyDefinitionId` 编译路径，与生产同源），dev HTTP 回测
-  2005-01-04 → 2026-10-20，信号与生产 run 48（2008-03-03 / 2012-06-14 段级三卖）
-  逐条一致；`evidence.degraded` 不为 true
-  - 注意：对账前重建私仓 `mist-alpha-private` dist（run 48 教训：旧 dist 会导致
-    插件行为不一致）
+- [x] 5.3 数据同步（操作，2026-10-27）：`pnpm dev:sync --code 000001 --periods 1d,30m,5m` 全量
+  - 30m 41,335 行（2005-01-04 → 2026-10-26，vendor_a 38,855 + qmt 2,480）
+  - 5m 248,005 行（同区间，紧凑 JSON）；1d 7,464 行（1996→2026-10-15，qmt——生产库日线即此范围）
+  - 数据落点已迁私仓 `mist-alpha-private/market-data/kline/`（随私仓提交 ac4dac9）
+- [x] 5.4 同构对账（验收，2026-10-27 PASS）：`pnpm dev:sync --definition 23` 导出
+  （run 48 = strategyVersionId 23 → definition 23 v1）→ 私仓 dist 重建 → dev HTTP
+  回测 2005-01-04T00:00+08 → 2026-10-20T23:59+08（strategyDefinitionId=23，
+  编译路径与生产同源）→ 信号逐条一致：
+  - ① signalTime 2008-03-03 10:00(+08) / pivot 02-29 11:00 / third_sell(3卖) /
+    tag E2E_MULTI_PERIOD / confidence 90 —— 与 run 48 落库行全等
+  - ② signalTime 2012-06-14 14:30(+08) / pivot 06-13 15:00 —— 全等
+  - 决策证据链 degraded=true 节点数 = 0（extractor_bull/extractor_bear 均 live）
+  - 预热诊断：插件声明 5=40 / 30=200 / 1440=10，与 run 48 记录逐字一致
+  - 复算耗时 ~14 分钟/全窗（42k 求值 Bar + 3 周期归并）
 - [ ] 5.5 `openspec validate add-dev-server-multi-period-backtest --strict` 通过；
   按 governance guide 逐项校对后归档
 
