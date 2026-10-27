@@ -442,4 +442,95 @@ describe('SimulatedBroker', () => {
     expect(fills[0].side).toBe('SELL');
     expect(fills[0].exitReason).toBe('HARD_STOP_LOSS');
   });
+
+  it('TC-10: T+1 盘中边界（30m 序列）——D 日盘中买入当日禁卖，结算后 D+1 可卖', () => {
+    // D 日 10:30 30m bar 成交买入（signalTime 为其前一 30m bar）
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-16T02:00:00.000Z'),
+    });
+    const buyFills = broker.onBar(
+      createBar('2026-10-16T02:30:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+    expect(buyFills).toHaveLength(1);
+    expect(broker.getAccount().positions.get('600519')?.frozenQuantity).toBe(
+      1000,
+    );
+
+    // D 日 13:00 30m bar 报卖单：当日买入份额仍冻结，submitOrder 阶段直接拒绝
+    const intradaySell = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-16T05:00:00.000Z'),
+    });
+    expect(intradaySell.status).toBe('REJECTED');
+    expect(intradaySell.rejectReason).toBe('T1_LOCKED_SHARES');
+
+    // D 日结算解锁
+    broker.settleDayClose('2026-10-16');
+    expect(broker.getAccount().positions.get('600519')?.availableQuantity).toBe(
+      1000,
+    );
+
+    // D+1 首根 30m bar：卖单受理并成交
+    const sell = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-17T01:30:00.000Z'),
+    });
+    expect(sell.status).toBe('PENDING');
+    const sellFills = broker.onBar(
+      createBar('2026-10-17T01:35:00.000Z', 10.2, 10.2, 10.2, 10.2, '600519'),
+    );
+    expect(sellFills).toHaveLength(1);
+    expect(sellFills[0].fillTime.getTime()).toBe(
+      new Date('2026-10-17T01:35:00.000Z').getTime(),
+    );
+  });
+
+  it('TC-11: registerSecurity 注入 preClose 后，首日一字涨停买入被拒（昨收基准生效）', () => {
+    broker.registerSecurity('600519', { name: '贵州茅台', preClose: 10.0 });
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-16T02:00:00.000Z'),
+    });
+    // 四价合一 11.00 = 10.00 × 1.10 → 一字涨停，流动性为 0，拒单
+    const fills = broker.onBar(
+      createBar('2026-10-16T02:30:00.000Z', 11.0, 11.0, 11.0, 11.0, '600519'),
+    );
+    expect(fills).toHaveLength(0);
+    expect(broker.getAccount().positions.size).toBe(0);
+  });
+
+  it('TC-12: 无 preClose 注入时首日回退 bar.open 作昨收——同根一字板不判涨停（对照）', () => {
+    // 未注册 security → meta 无 preClose → 昨收回退首根 bar.open（= 11.0）
+    // → limitUp = 11.0 × 1.10 = 12.1 > 11.0 → 不判一字涨停 → 正常成交
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-16T02:00:00.000Z'),
+    });
+    const fills = broker.onBar(
+      createBar('2026-10-16T02:30:00.000Z', 11.0, 11.0, 11.0, 11.0, '600519'),
+    );
+    expect(fills).toHaveLength(1);
+    expect(fills[0].fillPrice).toBeGreaterThan(11.0);
+  });
 });

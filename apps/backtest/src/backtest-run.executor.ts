@@ -33,6 +33,7 @@ import {
   PositionStateMachine,
   SimulatedBroker,
   StrategyEvaluationKernel,
+  shanghaiMidnight,
   type CompiledStoredDefinition,
   type DailyNavSnapshot,
   type PositionClosedRecord,
@@ -435,8 +436,23 @@ export class BacktestRunExecutor {
       requiredBars: compiled.requiredBarCount,
     });
 
+    // 首日涨跌停基准：回放起点前一交易日收盘（日线标签边界截断，与预热同构）。
+    // 无前置 bar 时保持 broker 的 bar.open 回退，不造数。
+    const preCloseWindow = await this.marketData.loadReplayWindow({
+      securityId,
+      securityCode,
+      selection,
+      period: 1440,
+      endAt: shanghaiMidnight(preWarmEndAt),
+      requiredBars: 1,
+    });
+    const preCloseBar = preCloseWindow.bars.at(-1);
+
     const broker = new SimulatedBroker(DEFAULT_BROKER_INITIAL_CASH);
-    broker.registerSecurity(securityCode, { name: securityName });
+    broker.registerSecurity(securityCode, {
+      name: securityName,
+      ...(preCloseBar ? { preClose: preCloseBar.close } : {}),
+    });
     const positionMachine = new PositionStateMachine(
       securityId,
       securityCode,
@@ -444,7 +460,6 @@ export class BacktestRunExecutor {
     );
     const arbiter = new ExecutionRiskArbiter({
       hardStopLossRatio: -0.08,
-      defaultCooldownBars: 3,
       cashAllocationRatio: 0.995,
       lotSize: TRADING_RULES.MAIN_BOARD_LOT_SIZE,
     });

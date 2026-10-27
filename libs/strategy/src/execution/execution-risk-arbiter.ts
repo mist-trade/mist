@@ -33,8 +33,6 @@ export interface MacroRegimeSnapshot {
 export interface ExecutionRiskArbiterOptions {
   /** 硬止损阈值（负数，如 -0.08 代表亏损 8% 斩仓），默认 -0.08 */
   readonly hardStopLossRatio?: number;
-  /** 硬止损后触发的冷静期 Bar/周期根数，默认 3 */
-  readonly defaultCooldownBars?: number;
   /** 开仓可用资金分配比例（预留滑点及手续费），默认 0.995 */
   readonly cashAllocationRatio?: number;
   /** 单笔开仓最小一手股数，默认 100 股 */
@@ -59,43 +57,13 @@ export interface ArbitrateContext {
  */
 export class ExecutionRiskArbiter {
   private readonly hardStopLossRatio: number;
-  private readonly defaultCooldownBars: number;
   private readonly cashAllocationRatio: number;
   private readonly lotSize: number;
 
-  private cooldownRemainingBars = 0;
-  private lastProcessedBarMs: number | null = null;
-
   constructor(options?: ExecutionRiskArbiterOptions) {
     this.hardStopLossRatio = options?.hardStopLossRatio ?? -0.08;
-    this.defaultCooldownBars = options?.defaultCooldownBars ?? 3;
     this.cashAllocationRatio = options?.cashAllocationRatio ?? 0.995;
     this.lotSize = options?.lotSize ?? TRADING_RULES.MAIN_BOARD_LOT_SIZE;
-  }
-
-  /**
-   * 触发开仓冷静期（用于止损斩仓或高频磨损后冷却防抽打）
-   */
-  public triggerCooldown(bars?: number): void {
-    this.cooldownRemainingBars = Math.max(
-      this.cooldownRemainingBars,
-      bars ?? this.defaultCooldownBars,
-    );
-  }
-
-  /**
-   * 查询当前剩余冷静期 Bar 数
-   */
-  public getCooldownRemainingBars(): number {
-    return this.cooldownRemainingBars;
-  }
-
-  /**
-   * 重置裁决器内部状态（冷静期、游标等）
-   */
-  public reset(): void {
-    this.cooldownRemainingBars = 0;
-    this.lastProcessedBarMs = null;
   }
 
   /**
@@ -103,19 +71,6 @@ export class ExecutionRiskArbiter {
    */
   public arbitrate(context: ArbitrateContext): CreateOrderDto | null {
     const { bar, signal, position, macroRegime, availableCash } = context;
-
-    // 推进 Bar 时钟与冷静期衰减（每个新时间戳最多递减 1 次，避免同 Bar 多次调用被多扣）
-    const barMs = bar.timestamp.getTime();
-    const isNewBar =
-      this.lastProcessedBarMs === null || barMs > this.lastProcessedBarMs;
-    const isCooldownActive = this.cooldownRemainingBars > 0;
-
-    if (isNewBar) {
-      if (this.cooldownRemainingBars > 0) {
-        this.cooldownRemainingBars -= 1;
-      }
-      this.lastProcessedBarMs = barMs;
-    }
 
     const regime = macroRegime?.regime ?? MarketRiskRegime.NORMAL;
     const isHolding =
@@ -150,7 +105,6 @@ export class ExecutionRiskArbiter {
       );
 
       if (effectivePnlRatio <= this.hardStopLossRatio) {
-        this.triggerCooldown();
         return {
           securityId: position.securityId,
           securityCode: position.securityCode,
@@ -186,16 +140,11 @@ export class ExecutionRiskArbiter {
       position.holdingQuantity === 0;
 
     if (isAvailableForEntry && signal?.signalKind === SIGNAL_KINDS.ENTRY) {
-      // 开仓风控检查 A：大盘处于高危雪崩期或流动性冻结，直接 Veto 否决
+      // 开仓风控检查：大盘处于高危雪崩期或流动性冻结，直接 Veto 否决
       if (
         regime === MarketRiskRegime.SYSTEMIC_CRUNCH ||
         macroRegime?.isLiquidityFrozen === true
       ) {
-        return null;
-      }
-
-      // 开仓风控检查 B：处于频繁磨损或硬止损冷静期，暂缓开仓
-      if (isCooldownActive) {
         return null;
       }
 

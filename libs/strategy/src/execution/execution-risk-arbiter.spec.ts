@@ -104,7 +104,6 @@ describe('ExecutionRiskArbiter (统一动作与风控裁决器)', () => {
   beforeEach(() => {
     arbiter = new ExecutionRiskArbiter({
       hardStopLossRatio: -0.08,
-      defaultCooldownBars: 3,
       cashAllocationRatio: 0.995,
       lotSize: 100,
     });
@@ -257,12 +256,10 @@ describe('ExecutionRiskArbiter (统一动作与风控裁决器)', () => {
       expect(order?.signalTime).toEqual(bar.timestamp);
     });
 
-    it('优先级 2 (持仓风控级)：个股浮亏跌破硬止损阈值 (-8%)，执行止损斩仓并激活冷静期', () => {
+    it('优先级 2 (持仓风控级)：个股浮亏跌破硬止损阈值 (-8%)，执行止损斩仓', () => {
       // 成本 10.0，跌至 9.10 元 (-9% 浮亏)
       const bar = createBar('2026-10-15T10:00:00.000Z', 9.1);
       const pos = createHoldingPosition(1000, 10.0, 9.1);
-
-      expect(arbiter.getCooldownRemainingBars()).toBe(0);
 
       const order = arbiter.arbitrate({
         bar,
@@ -279,8 +276,6 @@ describe('ExecutionRiskArbiter (统一动作与风控裁决器)', () => {
       expect(order?.side).toBe(ORDER_SIDES.SELL);
       expect(order?.quantity).toBe(1000);
       expect(order?.exitReason).toBe('HARD_STOP_LOSS');
-      // 成功触发 3 根 Bar 冷静期
-      expect(arbiter.getCooldownRemainingBars()).toBe(3);
     });
 
     it('优先级 3 (策略逻辑级)：在正常大盘且未触及止损时，收到反向 EXIT 信号正常平仓', () => {
@@ -374,8 +369,8 @@ describe('ExecutionRiskArbiter (统一动作与风控裁决器)', () => {
     });
   });
 
-  describe('3. 冷静期衰减与时序因果 (Cooldown Dynamics)', () => {
-    it('触发硬止损后进入冷静期，期间即使收到合法 ENTRY 信号亦被拦截，直到冷却归零', () => {
+  describe('3. 止损后再入场（无强制冷却）', () => {
+    it('硬止损斩仓后，下一根 bar 的合法 ENTRY 信号立即放行（不错过开仓点）', () => {
       // 1. 触发硬止损斩仓
       const stopBar = createBar('2026-10-15T10:00:00.000Z', 9.0);
       const pos = createHoldingPosition(1000, 10.0, 9.0);
@@ -385,77 +380,17 @@ describe('ExecutionRiskArbiter (统一动作与风控裁决器)', () => {
         availableCash: 10_000,
       });
       expect(sellOrder?.exitReason).toBe('HARD_STOP_LOSS');
-      expect(arbiter.getCooldownRemainingBars()).toBe(3);
 
-      const emptyPos = createEmptyPosition();
-      const buySignal = createSignal(SIGNAL_KINDS.ENTRY);
-
-      // 2. Bar 1 进入（时戳推进），冷静期衰减至 2 根，BUY 被拒
-      const bar1 = createBar('2026-10-15T10:30:00.000Z', 9.2);
-      const orderBar1 = arbiter.arbitrate({
-        bar: bar1,
-        signal: buySignal,
-        position: emptyPos,
+      // 2. 下一根 bar 出现 ENTRY 信号（买点重现）——立即放行，无冷却拦截
+      const reentryBar = createBar('2026-10-15T10:30:00.000Z', 9.2);
+      const buyOrder = arbiter.arbitrate({
+        bar: reentryBar,
+        signal: createSignal(SIGNAL_KINDS.ENTRY),
+        position: createEmptyPosition(),
         availableCash: 100_000,
       });
-      expect(orderBar1).toBeNull();
-      expect(arbiter.getCooldownRemainingBars()).toBe(2);
-
-      // 3. Bar 2 进入，冷静期衰减至 1 根，BUY 仍被拒
-      const bar2 = createBar('2026-10-15T11:00:00.000Z', 9.5);
-      const orderBar2 = arbiter.arbitrate({
-        bar: bar2,
-        signal: buySignal,
-        position: emptyPos,
-        availableCash: 100_000,
-      });
-      expect(orderBar2).toBeNull();
-      expect(arbiter.getCooldownRemainingBars()).toBe(1);
-
-      // 4. Bar 3 进入，冷静期衰减至 0 根，BUY 依然拦截（刚归零该周期）
-      const bar3 = createBar('2026-10-15T11:30:00.000Z', 9.8);
-      const orderBar3 = arbiter.arbitrate({
-        bar: bar3,
-        signal: buySignal,
-        position: emptyPos,
-        availableCash: 100_000,
-      });
-      expect(orderBar3).toBeNull();
-      expect(arbiter.getCooldownRemainingBars()).toBe(0);
-
-      // 5. Bar 4 进入，完全脱离冷静期，BUY 信号恢复放行并下单
-      const bar4 = createBar('2026-10-15T13:00:00.000Z', 10.0);
-      const orderBar4 = arbiter.arbitrate({
-        bar: bar4,
-        signal: buySignal,
-        position: emptyPos,
-        availableCash: 100_000,
-      });
-      expect(orderBar4).not.toBeNull();
-      expect(orderBar4?.side).toBe(ORDER_SIDES.BUY);
-    });
-
-    it('同根 Bar 多次调用不会多扣冷静期', () => {
-      arbiter.triggerCooldown(3);
-      expect(arbiter.getCooldownRemainingBars()).toBe(3);
-
-      const bar = createBar('2026-10-15T10:00:00.000Z', 10.0);
-      const pos = createEmptyPosition();
-
-      // 第一次调用（推进到该 Bar，从 3 扣到 2）
-      arbiter.arbitrate({ bar, position: pos, availableCash: 100_000 });
-      expect(arbiter.getCooldownRemainingBars()).toBe(2);
-
-      // 同一时间戳第二次调用（如 onSignal 随后到达）
-      arbiter.arbitrate({ bar, position: pos, availableCash: 100_000 });
-      expect(arbiter.getCooldownRemainingBars()).toBe(2);
-    });
-
-    it('reset() 清空内部全部状态', () => {
-      arbiter.triggerCooldown(5);
-      expect(arbiter.getCooldownRemainingBars()).toBe(5);
-      arbiter.reset();
-      expect(arbiter.getCooldownRemainingBars()).toBe(0);
+      expect(buyOrder).not.toBeNull();
+      expect(buyOrder?.side).toBe(ORDER_SIDES.BUY);
     });
   });
 });

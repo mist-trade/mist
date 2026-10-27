@@ -6,6 +6,7 @@ import {
 } from '@app/shared-data';
 import {
   compileStoredDefinitionVersion,
+  shanghaiMidnight,
   type DailyNavSnapshot,
 } from '@app/strategy';
 import type { StrategyBar } from '@app/market-data';
@@ -1049,6 +1050,35 @@ describe('BacktestRunExecutor 绩效口径（underwater duration + 组合夏普�
     );
     expect(multiCompleted(multi).maxUnderwaterDuration).toBe(
       completedUpdateCall(single).maxUnderwaterDuration,
+    );
+  });
+
+  it('seeds the first-day price-limit basis from the previous daily close', async () => {
+    const fixture = stopLossFixture(
+      ['600000.SH'],
+      [{ id: 9, code: '600000.SH' }],
+    );
+    fixture.dependencies.marketData.loadReplayWindow.mockResolvedValue({
+      bars: [],
+    });
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValue({
+      bars: [],
+      nextAfterTimestamp: null,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    // preClose 读取必须以上海零点为日线边界（与日线预热同构）：
+    // 若用原始 startDate 作 endAt，startDate 当日的日线收盘会泄漏进首日基准（未来函数）
+    expect(
+      fixture.dependencies.marketData.loadReplayWindow,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        securityId: 9,
+        period: 1440,
+        requiredBars: 1,
+        endAt: shanghaiMidnight(new Date('2026-01-01T00:00:00.000Z')),
+      }),
     );
   });
 });
