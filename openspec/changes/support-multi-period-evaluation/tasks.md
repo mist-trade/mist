@@ -110,3 +110,8 @@
 - [ ] 6.9 分阶段启用：B 上线后先 enable 一条 30m + 5m/1440 上下文策略（shadow 观察一轮），
   确认 `evidence.degraded=false` 与信号归因后再放开存量 disabled 策略
   （生产 22 条定义当前全部 disabled，无现网回归面）
+  - 进度（2026-10-27）：策略 23（E2E 多周期验收 30m，含 5m/1440 context 插件）已 enable；
+    `REALTIME_STRATEGY_MODE` 由 on 切为 shadow（workflow 40427739735，signal registry 装载
+    definitionCount=1 / lastRefreshOutcome=success）；诊断策略 24 及其 runs 46/47 已删除；
+    shadow 观察待下一实盘时段（signal shadow candidate 证据 + degraded 归因复核），
+    通过后再放开存量 disabled 策略并勾选本项
