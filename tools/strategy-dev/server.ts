@@ -870,7 +870,10 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     flow = compiled.flow;
     requiredBarCount = compiled.requiredBarCount;
     definitionVersionLabel = storedDefinition.versionLabel;
-  } else if (typeof options.strategyDefinitionId === 'number') {
+  } else if (
+    typeof options.strategyDefinitionId === 'number' &&
+    !isLegacyPresetId
+  ) {
     throw new DevBacktestRequestError(
       422,
       'DEFINITION_NOT_FOUND',
