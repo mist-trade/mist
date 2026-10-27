@@ -29,7 +29,12 @@ interface BacktestResult {
 
 const WORKTREE_ROOT = path.resolve(__dirname, '../..');
 const KLINE_DIR = path.join(WORKTREE_ROOT, 'tools/strategy-dev/data/kline');
-const DEFINITIONS_DIR = path.join(WORKTREE_ROOT, '.data/strategy-definitions');
+// 与 server.ts 的私仓落点一致（mist-alpha-private peer 约定）
+const DEFINITIONS_DIR = path.join(
+  path.resolve(__dirname, '../../../mist-alpha-private/market-data'),
+  'strategy-definitions',
+);
+const FIXTURE_DEFINITION_FILE = path.join(DEFINITIONS_DIR, '9001_v1.json');
 
 const SYMBOL = 'TESTDP';
 const TRADING_DAYS = 60;
@@ -163,7 +168,7 @@ describe('dev server multi-period backtest (session level)', () => {
     loader.resetConfiguration();
     fs.rmSync(path.join(KLINE_DIR, `${SYMBOL}_30m.json`), { force: true });
     fs.rmSync(path.join(KLINE_DIR, `${SYMBOL}_1d.json`), { force: true });
-    fs.rmSync(DEFINITIONS_DIR, { recursive: true, force: true });
+    fs.rmSync(FIXTURE_DEFINITION_FILE, { force: true });
     fs.rmSync(pluginTmpDir, { recursive: true, force: true });
   });
 
@@ -292,10 +297,7 @@ describe('dev server multi-period backtest (session level)', () => {
         },
       },
     };
-    fs.writeFileSync(
-      path.join(DEFINITIONS_DIR, `${9001}_v1.json`),
-      JSON.stringify(definition),
-    );
+    fs.writeFileSync(FIXTURE_DEFINITION_FILE, JSON.stringify(definition));
 
     const result = await serverModule.runUnifiedSimulationBacktest({
       code: SYMBOL,

@@ -55,6 +55,7 @@ import type { StrategySignalKind } from '../../libs/strategy/src/rules/strategy-
 import {
   loadCanonicalKlines,
   PERIOD_NAME_MAP,
+  PRIVATE_DATA_DIR,
   REVERSE_PERIOD_MAP,
 } from './provider';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
@@ -447,9 +448,10 @@ class DevBacktestRequestError extends Error {
  * 存量定义本地重放目录（`.data/` 已 gitignore）：
  * 导出文件含私有插件参数与树形态，仅存本地，严禁提交/外传。
  */
-const LOCAL_DEFINITIONS_DIR = path.resolve(
-  __dirname,
-  '../../.data/strategy-definitions',
+// 存量定义重放目录：私有仓 market-data/strategy-definitions（含私有插件参数）
+const LOCAL_DEFINITIONS_DIR = path.join(
+  PRIVATE_DATA_DIR,
+  'strategy-definitions',
 );
 
 interface LocalStoredDefinition {

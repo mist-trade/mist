@@ -47,7 +47,7 @@
 ## Phase 4: sync 保真（tools/strategy-dev/sync.ts + provider.ts）
 
 - [x] 4.0 `--definition <id>` 模式：导出 `strategy_definitions` + 最新
-  `strategy_versions.rule` 至 `mist/.data/strategy-definitions/<id>_v<n>.json`
+  `strategy_versions.rule` 至私仓 `mist-alpha-private/market-data/strategy-definitions/<id>_v<n>.json`
   （gitignored，含私有参数仅存本地）；README 注明保密红线
 - [x] 4.1 SQL：`LEFT JOIN k_quality`；**默认裸值透传（生产回测不消费掩码，对账
   同数据）**；`--mask-quality` opt-in：OHLC 任一掩码失效 → 整行丢弃、量/额失效 →

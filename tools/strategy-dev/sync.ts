@@ -15,7 +15,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { resolveSegments } from '@app/market-data';
 import { CanonicalPolicyLoader } from '@app/strategy';
-import { PERIOD_NAME_MAP } from './provider';
+import { PERIOD_NAME_MAP, PRIVATE_DATA_DIR } from './provider';
 
 interface SyncCliOptions {
   code: string;
@@ -311,7 +311,7 @@ async function syncSinglePeriod(
     source: r.source,
   }));
 
-  const outDir = path.resolve(__dirname, 'data/kline');
+  const outDir = path.join(PRIVATE_DATA_DIR, 'kline');
   fs.mkdirSync(outDir, { recursive: true });
   const outFile = path.join(outDir, `${options.code}_${periodName}.json`);
   const compact = outRows.length > COMPACT_JSON_ROW_THRESHOLD;
@@ -371,7 +371,7 @@ async function exportDefinition(
   }
 
   const versionNumber = Number(latest[col('version_number')]) || 1;
-  const outDir = path.resolve(__dirname, '../../.data/strategy-definitions');
+  const outDir = path.join(PRIVATE_DATA_DIR, 'strategy-definitions');
   fs.mkdirSync(outDir, { recursive: true });
   const outFile = path.join(outDir, `${definitionId}_v${versionNumber}.json`);
   fs.writeFileSync(

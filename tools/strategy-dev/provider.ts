@@ -26,7 +26,19 @@ export interface AvailableDataset {
 }
 
 const ROOT_DIR = path.resolve(__dirname, '../../..');
+/**
+ * 行情数据落点（优先级序）：
+ * 1. 私有仓 mist-alpha-private/market-data/kline（权威落点，随私仓提交备份）；
+ * 2. tools/strategy-dev/data/kline（历史兼容，.gitkeep）；
+ * 3. .data/kline（本地运行时缓存，历史兼容）。
+ * 可用 MIST_PRIVATE_DATA_DIR 覆盖私仓数据根（默认 peer 工作区约定）。
+ */
+const PRIVATE_DATA_DIR =
+  process.env.MIST_PRIVATE_DATA_DIR ||
+  path.resolve(__dirname, '../../../mist-alpha-private/market-data');
+export { PRIVATE_DATA_DIR };
 const LOCAL_CACHE_DIRS = [
+  path.join(PRIVATE_DATA_DIR, 'kline'),
   path.resolve(__dirname, 'data/kline'),
   path.resolve(__dirname, '../../.data/kline'),
 ];
