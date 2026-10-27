@@ -29,7 +29,10 @@ import { SimulatedBroker } from '../../libs/strategy/src/execution/simulated-bro
 import { PositionStateMachine } from '../../libs/strategy/src/position/position-state-machine';
 import { ExecutionRiskArbiter } from '../../libs/strategy/src/execution/execution-risk-arbiter';
 import { formatShanghaiDateString } from '@app/timezone';
-import { computePerformanceSummary } from '@app/indicators';
+import {
+  computePerformanceSummary,
+  computeUnderwaterDuration,
+} from '@app/indicators';
 import { StressTestingSuiteOrchestrator } from '../../libs/strategy/src/stress-testing';
 import { InMemoryFactorPluginRegistry } from '../../libs/strategy/src/factor/factor-plugin-registry';
 import { ensureStandardPluginsRegistered } from '../../libs/strategy/src/factor/standard-plugins';
@@ -906,6 +909,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       performance: null,
       stressReport: null,
       replay: undefined,
+      maxUnderwaterDuration: undefined,
     };
   }
 
@@ -1152,6 +1156,8 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   const performance = computePerformanceSummary(navSeries, closedTrades, {
     initialCash,
   });
+  // 最长挫跌时期（连续 underwater 交易日数，Polars 向量化）
+  const maxUnderwaterDuration = computeUnderwaterDuration(navSeries);
 
   // 极端压力测试联动
   let stressReport: any = undefined;
@@ -1218,6 +1224,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     navSeries,
     closedTrades,
     performance,
+    maxUnderwaterDuration,
     stressReport,
     replay: replaySummary,
     ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
@@ -1885,19 +1892,25 @@ const server = http.createServer(async (req, res) => {
           body.noStopLoss !== true);
 
       // 统一走策略树仿真引擎计算
-      const { signals, performance, stressReport, closedTrades, replay } =
-        await runUnifiedSimulationBacktest({
-          code: symbol,
-          period,
-          mode,
-          pluginId,
-          strategyDefinitionId,
-          startDate,
-          endDate,
-          initialCash,
-          runStressSuite,
-          enableStopLoss,
-        });
+      const {
+        signals,
+        performance,
+        stressReport,
+        closedTrades,
+        replay,
+        maxUnderwaterDuration,
+      } = await runUnifiedSimulationBacktest({
+        code: symbol,
+        period,
+        mode,
+        pluginId,
+        strategyDefinitionId,
+        startDate,
+        endDate,
+        initialCash,
+        runStressSuite,
+        enableStopLoss,
+      });
 
       // 计算更细致的交易盈亏统计（区分 Profit Factor 获利因子 与 Payoff Ratio 单笔盈亏比）
       const winTrades = (closedTrades || []).filter(
@@ -1967,6 +1980,7 @@ const server = http.createServer(async (req, res) => {
             totalReturnRatio: performance?.totalReturn ?? 0,
             annualizedReturnRatio: performance?.annualizedReturn ?? 0,
             maxDrawdown: performance?.maxDrawdown ?? 0,
+            maxUnderwaterDuration: maxUnderwaterDuration ?? 0,
             winRate: performance?.winRate ?? 0,
             profitFactor: performance?.profitLossRatio ?? 0,
             payoffRatio,
