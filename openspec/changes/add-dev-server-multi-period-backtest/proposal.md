@@ -36,8 +36,12 @@
    - fail-closed：context 周期本地数据文件缺失 → 有界错误 + `dev:sync` 提示，
      严禁空窗兜底静默求值。
 2. **本地同步工具保真（`tools/strategy-dev/sync.ts`）**：
-   - SQL 关联 `k_quality`，按六个掩码将无效字段置 `null`（volume/amount 可空，
-     透传给 `StrategyBar`，由因子插件按既有 null 契约降级/拒判）；
+   - SQL 关联 `k_quality` 并落盘每行真实 `source`（vendor_a/qmt 分段），dev 回放
+     透传进 `StrategyBar.source`（信号审计与生产对齐）；
+   - **质量口径（对账修正）**：生产回测不消费 k_quality（裸值回放）——本地默认
+     同为裸值透传保证 run 对账同数据；`--mask-quality` 可选开启掩码降级
+     （OHLC 废 → 丢行、量/额废 → `null`，因子插件按 null 契约降级），
+     供非对账场景的本地因子调试；
    - 每行落盘真实 `source`（vendor_a/qmt 分段），dev 回放透传进 `StrategyBar.source`
      （信号审计与生产对齐）；
    - 大序列写盘改紧凑 JSON（971k 行 pretty-print 不可接受）；SSH 拉取分段化，

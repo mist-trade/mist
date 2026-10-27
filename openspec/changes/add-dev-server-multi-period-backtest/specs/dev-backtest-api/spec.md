@@ -48,10 +48,11 @@ The dev server backtest plan SHALL derive `contextRequirements` from factor plug
 ### Requirement: Local Synced Market Data Shall Preserve Source And Quality Semantics
 The dev sync tool (`tools/strategy-dev/sync.ts`) SHALL persist each row's real `k.source` and SHALL consume `k_quality` masks: invalid volume/amount fields SHALL be persisted as `null` (delegating degradation to factor-plugin null contracts), and rows with any invalid OHLC mask SHALL be dropped. Large series SHALL be persisted as compact JSON and pulled in bounded chunks to avoid unbounded buffering.
 
-#### Scenario: Quality-masked sync
-- **WHEN** syncing rows whose `k_quality` marks volume or amount invalid
-- **THEN** synced rows MUST carry `null` for the invalid field
-- **AND** rows with any invalid OHLC mask MUST be dropped entirely
+#### Scenario: Quality semantics preserved with production parity
+- **WHEN** syncing rows alongside `k_quality` masks
+- **THEN** the default MUST persist raw values (production backtest replay does not consume quality masks; masking would fork local-vs-run parity)
+- **AND** an explicit opt-in (`--mask-quality`) MUST drop rows with any invalid OHLC mask and persist `null` for invalid volume/amount
+- **AND** each row MUST carry its real segment source
 
 #### Scenario: Source provenance preserved
 - **WHEN** synced rows span multiple canonical segments (e.g. vendor_a then qmt)

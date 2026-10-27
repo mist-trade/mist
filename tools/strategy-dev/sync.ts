@@ -22,6 +22,8 @@ interface SyncCliOptions {
   periods: string[];
   limit: number;
   definitionId?: number;
+  /** k_quality 掩码降级（默认关：裸值透传 = 与生产回测对账口径一致） */
+  maskQuality?: boolean;
   /** 用户是否显式传了 --code / --periods（决定 --definition 模式是否附带行情同步） */
   codeExplicit: boolean;
   periodsExplicit: boolean;
@@ -82,6 +84,7 @@ function parseCliArgs(): SyncCliOptions {
     periods,
     limit,
     ...(rawDefinition ? { definitionId: Number(rawDefinition) } : {}),
+    ...(hasArg('mask-quality') ? { maskQuality: true } : {}),
     codeExplicit,
     periodsExplicit,
     boxHost,
@@ -125,12 +128,17 @@ interface QualityRawRow {
 }
 
 /**
- * k_quality 掩码行处理（与 candle finalizer 入库闸门口径一致）：
- * - 任一 OHLC 掩码失效 → 整行丢弃；
- * - volume/amount 掩码失效 → 字段置 null（因子插件按 null 契约降级）；
+ * k_quality 掩码行处理：
+ * - 默认（maskQuality=false）裸值透传 —— 与生产回测完全一致（生产 canonical
+ *   回放不消费 k_quality，掩码会与 run 对账分叉）；
+ * - `--mask-quality` 时按掩码降级：任一 OHLC 掩码失效 → 整行丢弃；
+ *   volume/amount 掩码失效 → 字段置 null（因子插件按 null 契约降级）；
  * - 无 k_quality 行（LEFT JOIN 为 NULL）→ 全字段有效。
  */
-function mapQualityRow(parts: string[]): QualityRawRow | null {
+function mapQualityRow(
+  parts: string[],
+  maskQuality: boolean,
+): QualityRawRow | null {
   const [
     timeMsStr,
     open,
@@ -150,31 +158,29 @@ function mapQualityRow(parts: string[]): QualityRawRow | null {
   const validOrOne = (v: string | undefined): number =>
     v === undefined || v === '' || v === 'NULL' ? 1 : Number(v);
   if (
-    validOrOne(openValid) === 0 ||
-    validOrOne(highValid) === 0 ||
-    validOrOne(lowValid) === 0 ||
-    validOrOne(closeValid) === 0
+    maskQuality &&
+    (validOrOne(openValid) === 0 ||
+      validOrOne(highValid) === 0 ||
+      validOrOne(lowValid) === 0 ||
+      validOrOne(closeValid) === 0)
   ) {
     return null;
   }
+  const nullIfInvalid = (
+    raw: string | undefined,
+    valid: string | undefined,
+  ): string | null => {
+    if (!maskQuality) return raw && raw !== 'NULL' ? raw : null;
+    return validOrOne(valid) === 0 ? null : raw && raw !== 'NULL' ? raw : null;
+  };
   return {
     timeMs: Number(timeMsStr),
     open: Number(open),
     high: Number(high),
     low: Number(low),
     close: Number(close),
-    volume:
-      validOrOne(volumeValid) === 0
-        ? null
-        : volume && volume !== 'NULL'
-          ? volume
-          : null,
-    amount:
-      validOrOne(amountValid) === 0
-        ? null
-        : amount && amount !== 'NULL'
-          ? amount
-          : null,
+    volume: nullIfInvalid(volume, volumeValid),
+    amount: nullIfInvalid(amount, amountValid),
     source: source && source !== 'NULL' ? source : 'unknown',
   };
 }
@@ -267,7 +273,7 @@ async function syncSinglePeriod(
       if (!line.trim()) continue;
       const cols = line.split('\t');
       if (cols.length < 8) continue;
-      const row = mapQualityRow(cols);
+      const row = mapQualityRow(cols, options.maskQuality === true);
       if (!row) continue;
       const timeKey = String(row.timeMs);
       if (seenTime.has(timeKey)) continue;

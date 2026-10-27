@@ -18,8 +18,9 @@ pnpm dev:sync --code 000001 --periods 1d,30m,5m
 pnpm dev:sync --definition 23
 ```
 
-- **k_quality 质量掩码**：任一 OHLC 掩码失效 → 整行丢弃；volume/amount 掩码失效
-  → 字段落盘为 `null`（因子插件按 null 契约降级）；
+- **k_quality 质量口径**：默认**裸值透传**（与生产回测对账一致——生产 canonical
+  回放不消费质量掩码）；`--mask-quality` 可选降级（OHLC 废 → 丢行、量/额废 →
+  `null`，供非对账场景的因子调试）；
 - **source 透传**：每行携带真实分段来源（vendor_a/qmt），回放时进入
   `StrategyBar.source`，与生产信号审计对齐；
 - **紧凑 JSON**：单文件 >50,000 行自动改为无缩进序列化；

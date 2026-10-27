@@ -49,8 +49,9 @@
 - [x] 4.0 `--definition <id>` 模式：导出 `strategy_definitions` + 最新
   `strategy_versions.rule` 至 `mist/.data/strategy-definitions/<id>_v<n>.json`
   （gitignored，含私有参数仅存本地）；README 注明保密红线
-- [x] 4.1 SQL：`LEFT JOIN k_quality`；OHLC 任一掩码失效 → 整行丢弃；
-  volume/amount 失效 → NULL；SELECT 增加 `k.source` 并落盘每行
+- [x] 4.1 SQL：`LEFT JOIN k_quality`；**默认裸值透传（生产回测不消费掩码，对账
+  同数据）**；`--mask-quality` opt-in：OHLC 任一掩码失效 → 整行丢弃、量/额失效 →
+  NULL；SELECT 增加 `k.source` 并落盘每行
 - [x] 4.2 分段拉取：canonical 分段 ∩ 年份桶分片循环 + 本地时间戳合并去重
   （5m 一年 ≈ 46k 行，maxBuffer 安全）
 - [x] 4.3 大序列紧凑 JSON（>50k 行无缩进）；README 用法补记

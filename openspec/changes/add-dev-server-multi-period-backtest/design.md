@@ -52,14 +52,15 @@ context 周期取插件声明值）。`prewarmStatus` 聚合进响应诊断字�
 
 ### D4 `sync.ts` 保真与容量
 
-- **k_quality 关联**：SQL `LEFT JOIN k_quality q ON q.k_id = k.id`，按
-  `volume_valid=0 → volume 置 NULL`、`amount_valid=0 → amount 置 NULL`（六掩码中
-  OHLC 掩码命中即整行丢弃——与 finalizer 入库闸门口径一致）；
+- **k_quality 关联（对账口径修正，2026-10-27）**：SQL `LEFT JOIN k_quality` 取
+  掩码列，但**默认裸值透传**——已查证生产回测（canonical 回放）不消费
+  k_quality，本地掩码会与 run 对账分叉（2008-03-03 信号位于 000001 量额废段内）。
+  `--mask-quality` 可选开启降级（OHLC 废 → 丢行、量/额废 → NULL）；
 - **source 列**：`SELECT k.source` 落盘每行，dev 回放透传 `StrategyBar.source`；
 - **紧凑 JSON**：大文件（>50k 行）`JSON.stringify(rows)` 无缩进；provider 解析缓存
   已按 mtime/size 失效，直接受益；
-- **分段拉取**：按 `k_quality.caliber_epoch` / 年份分片循环拉取后本地合并，消除
-  单次 `maxBuffer` 100MB 上限；分片边界以时间戳严格递增去重。
+- **分段拉取**：canonical 分段 ∩ 年份桶分片循环拉取后本地合并，消除单次
+  `maxBuffer` 上限；分片边界以时间戳严格去重。
 
 ### D5 缓存与幂等
 
