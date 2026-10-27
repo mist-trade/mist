@@ -8,6 +8,7 @@ import type {
   LiquidityDelayTradeInput,
   PerformanceSummaryOptions,
   PerformanceSummaryResult,
+  PortfolioSharpeInput,
   SharpeRatioOptions,
 } from './risk-performance.types';
 
@@ -39,6 +40,7 @@ const COL_MAX_LEN = 'max_len';
 const COL_SLIPPAGE = 'slippage';
 const COL_TOTAL = 'total';
 const COL_VAR = 'var';
+const COL_PORTFOLIO_RET = 'portfolio_ret';
 
 /**
  * 基于 Rust nodejs-polars 向量化计算每日收益率时序。
@@ -154,6 +156,53 @@ export function computeSharpeRatio(
 
   const sharpe = ((mean - dailyRf) / std) * Math.sqrt(tradingDaysPerYear);
   return Math.round(sharpe * RATIO_ROUNDING_SCALE) / RATIO_ROUNDING_SCALE;
+}
+
+/**
+ * 计算多品种等权组合的年化综合夏普比率（协方差口径）。
+ *
+ * 数学等价性：等权组合收益 r_p(t) = (1/N)·Σr_i(t) 的样本方差（ddof=1）
+ * 恒等于 w'Σw（w = (1/N)·**1**，Σ 为日收益协方差矩阵），故对组合序列
+ * 直接求 mean/std 与显式协方差矩阵合成严格等价，且规避 pairwise 协方差
+ * 在日期错位下的非正定风险。
+ *
+ * 契约：所有序列等长、无 null（调用方保证按同一日期轴对齐且缺失日 0 填充）。
+ * rf/年化/rounding 全部继承 computeSharpeRatio 约定；N=1 时退化为单序列夏普。
+ */
+export function computePortfolioSharpeRatio(
+  series: readonly PortfolioSharpeInput[],
+  options?: SharpeRatioOptions,
+): number {
+  const count = series.length;
+  if (count === 0) return 0;
+
+  const length = series[0].returns.length;
+  if (length < 2) return 0;
+
+  for (const item of series) {
+    if (item.returns.length !== length) {
+      throw new IndicatorInputError(
+        `portfolio series "${item.securityCode}" length ${item.returns.length} != ${length}`,
+      );
+    }
+  }
+
+  const columns = series.map((item) =>
+    pl
+      .Series(item.securityCode, item.returns as unknown as number[])
+      .cast(pl.Float64),
+  );
+  const df = pl.DataFrame(columns);
+  const portfolioExpr = pl
+    .sumHorizontal(columns.map((col) => pl.col(col.name)))
+    .div(count)
+    .alias(COL_PORTFOLIO_RET);
+
+  const res = df.select(portfolioExpr);
+  const portfolioReturns = res
+    .getColumn(COL_PORTFOLIO_RET)
+    .toArray() as number[];
+  return computeSharpeRatio(portfolioReturns, options);
 }
 
 /**

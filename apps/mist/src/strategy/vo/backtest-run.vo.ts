@@ -45,6 +45,8 @@ export class BacktestRunVo {
   @ApiPropertyOptional({ nullable: true })
   maxDrawdown?: number | null;
   @ApiPropertyOptional({ nullable: true })
+  maxUnderwaterDuration?: number | null;
+  @ApiPropertyOptional({ nullable: true })
   sharpeRatio?: number | null;
   @ApiPropertyOptional({ nullable: true })
   calmarRatio?: number | null;

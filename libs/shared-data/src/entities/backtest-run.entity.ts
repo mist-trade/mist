@@ -115,6 +115,13 @@ export class BacktestRun {
   maxDrawdown?: number | null;
 
   @Column({
+    name: 'max_underwater_duration',
+    type: 'int',
+    nullable: true,
+  })
+  maxUnderwaterDuration?: number | null;
+
+  @Column({
     name: 'sharpe_ratio',
     type: 'decimal',
     precision: 10,

@@ -42,7 +42,12 @@ import type {
   StrategyBar,
   StrategyHistorySource,
 } from '@app/market-data';
-import { computePerformanceSummary } from '@app/indicators';
+import {
+  computePerformanceSummary,
+  computePortfolioSharpeRatio,
+  computeUnderwaterDuration,
+  type PortfolioSharpeInput,
+} from '@app/indicators';
 import { formatShanghaiDateString, isSessionCloseBar } from '@app/timezone';
 import { TRADING_RULES } from '@app/constants';
 import { DataSource as TypeOrmDataSource, In, Repository } from 'typeorm';
@@ -323,9 +328,17 @@ export class BacktestRunExecutor {
     await this.flushResults(results);
     await this.flushTrades(trades);
 
+    const sortedDates = collectSortedDates(allNavHistories);
     const { navSeries: combinedNavSeries, navPoints } =
       combineDailyNavHistories(allNavHistories, DEFAULT_BROKER_INITIAL_CASH);
     const summary = computePerformanceSummary(combinedNavSeries, trades);
+    // sharpe_ratio 统一等权组合（协方差口径）估计量：单标的 N=1 与原单序列
+    // 夏普逐位一致（equity 环比 + 丢首行同构构造），多标的按日期轴对齐等权
+    // 平均（缺失日 0 = 持现金）。
+    const sharpeRatio = computePortfolioSharpeRatio(
+      alignEquityReturns(allNavHistories, sortedDates),
+    );
+    const maxUnderwaterDuration = computeUnderwaterDuration(combinedNavSeries);
 
     const prewarmMinActual =
       prewarmActuals.length > 0 ? Math.min(...prewarmActuals) : null;
@@ -349,11 +362,12 @@ export class BacktestRunExecutor {
         totalReturn: summary.totalReturn,
         annualizedReturn: summary.annualizedReturn,
         maxDrawdown: summary.maxDrawdown,
-        sharpeRatio: summary.sharpeRatio,
+        sharpeRatio,
         calmarRatio: summary.calmarRatio,
         winRate: summary.winRate,
         profitLossRatio: summary.profitLossRatio,
         tradeCount: summary.tradeCount,
+        maxUnderwaterDuration,
         navSeries: navPoints,
         prewarmStatus,
         prewarmMinActual,
@@ -676,6 +690,66 @@ function errorTrace(error: unknown): string | undefined {
   return error instanceof Error ? error.stack : undefined;
 }
 
+/**
+ * 汇总全部标的 NAV 快照出现的交易日（去重升序）。
+ * combineDailyNavHistories 与 alignDailyReturns 共用同一日期轴。
+ */
+export function collectSortedDates(
+  allNavHistories: readonly (readonly DailyNavSnapshot[])[],
+): string[] {
+  const dateSet = new Set<string>();
+  for (const history of allNavHistories) {
+    for (const item of history) {
+      dateSet.add(item.date);
+    }
+  }
+  return Array.from(dateSet).sort();
+}
+
+/**
+ * 将各标的逐日盯市权益按统一日期轴派生环比收益，并丢弃首行（建仓期无收益
+ * 语义）。估计量与单标的 computeDailyReturns(navSeries) 同构：N=1 且无缺失
+ * 日时与现有单序列夏普逐位一致。
+ *
+ * 语义：快照间缺失日权益 fill-forward 不变 → 环比 0（子账户持现金）；
+ * 首个快照前视为未开始 → 环比 0；首行丢弃与单标的 NAV 环比（begIndex=1）
+ * 对齐。
+ */
+export function alignEquityReturns(
+  allNavHistories: readonly (readonly DailyNavSnapshot[])[],
+  sortedDates: readonly string[],
+): PortfolioSharpeInput[] {
+  const aligned: PortfolioSharpeInput[] = [];
+  for (const history of allNavHistories) {
+    if (history.length === 0) continue;
+    const equityByDate = new Map<string, number>();
+    for (const item of history) {
+      equityByDate.set(item.date, item.totalEquity);
+    }
+    const returns: number[] = [];
+    let prevEquity: number | undefined = undefined;
+    for (const date of sortedDates) {
+      const equity = equityByDate.get(date);
+      if (equity === undefined) {
+        // 缺失日：权益 fill-forward 不变（持现金），环比 0
+        returns.push(0);
+        continue;
+      }
+      returns.push(
+        prevEquity !== undefined && prevEquity > 0
+          ? (equity - prevEquity) / prevEquity
+          : 0, // 首个快照无前值（建仓期），与状态机首日 dailyReturn=0 一致
+      );
+      prevEquity = equity;
+    }
+    aligned.push({
+      securityCode: history[0].securityCode,
+      returns: returns.slice(1),
+    });
+  }
+  return aligned;
+}
+
 function combineDailyNavHistories(
   allNavHistories: readonly (readonly DailyNavSnapshot[])[],
   initialCashPerSecurity: number,
@@ -696,13 +770,7 @@ function combineDailyNavHistories(
     };
   }
 
-  const dateSet = new Set<string>();
-  for (const history of allNavHistories) {
-    for (const item of history) {
-      dateSet.add(item.date);
-    }
-  }
-  const sortedDates = Array.from(dateSet).sort();
+  const sortedDates = collectSortedDates(allNavHistories);
 
   const dateMaps = allNavHistories.map((history) => {
     const map = new Map<string, DailyNavSnapshot>();

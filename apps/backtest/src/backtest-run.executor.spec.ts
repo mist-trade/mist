@@ -4,11 +4,19 @@ import {
   Period,
   StrategyRuleSchemaVersion,
 } from '@app/shared-data';
-import { compileStoredDefinitionVersion } from '@app/strategy';
+import {
+  compileStoredDefinitionVersion,
+  type DailyNavSnapshot,
+} from '@app/strategy';
 import type { StrategyBar } from '@app/market-data';
+import { computeUnderwaterDuration } from '@app/indicators';
 import { createChanFullOutputFixture } from '../../../libs/chancore/src/chan-full-output.characterization.fixture';
 import { HealthStateService } from './health/health-state.service';
-import { BacktestRunExecutor } from './backtest-run.executor';
+import {
+  alignEquityReturns,
+  BacktestRunExecutor,
+  collectSortedDates,
+} from './backtest-run.executor';
 
 function run() {
   return {
@@ -717,3 +725,336 @@ describe('BacktestRunExecutor 统一内核回放', () => {
     );
   });
 });
+
+describe('BacktestRunExecutor 绩效口径（underwater duration + 组合夏普）', () => {
+  function navSnapshot(
+    securityCode: string,
+    date: string,
+    totalEquity: number,
+    dailyReturn: number,
+  ): DailyNavSnapshot {
+    return {
+      date,
+      securityCode,
+      closePrice: 10,
+      holdingQuantity: 0,
+      marketValue: 0,
+      cash: totalEquity,
+      totalEquity,
+      dailyReturn,
+    };
+  }
+
+  function stopLossBars(
+    securityId: number,
+    securityCode: string,
+  ): StrategyBar[] {
+    return [
+      {
+        securityId,
+        securityCode,
+        source: 'tdx',
+        period: 1440,
+        timestamp: new Date('2026-01-02T15:00:00.000Z'),
+        open: 10.0,
+        high: 10.0,
+        low: 10.0,
+        close: 10.0, // 触发 ENTRY 信号
+        volume: '1000',
+        amount: '10000',
+        type: 'complete',
+      },
+      {
+        securityId,
+        securityCode,
+        source: 'tdx',
+        period: 1440,
+        timestamp: new Date('2026-01-05T15:00:00.000Z'),
+        open: 10.0,
+        high: 10.0,
+        low: 10.0,
+        close: 10.0, // Next-Bar 撮合买入
+        volume: '1000',
+        amount: '10000',
+        type: 'complete',
+      },
+      {
+        securityId,
+        securityCode,
+        source: 'tdx',
+        period: 1440,
+        timestamp: new Date('2026-01-06T15:00:00.000Z'),
+        open: 9.2,
+        high: 9.3,
+        low: 9.0,
+        close: 9.1, // -9% 触发硬止损裁决
+        volume: '1000',
+        amount: '9100',
+        type: 'complete',
+      },
+      {
+        securityId,
+        securityCode,
+        source: 'tdx',
+        period: 1440,
+        timestamp: new Date('2026-01-07T15:00:00.000Z'),
+        open: 9.0,
+        high: 9.1,
+        low: 8.9,
+        close: 9.0, // Next-Bar 撮合卖出
+        volume: '1000',
+        amount: '9000',
+        type: 'complete',
+      },
+    ];
+  }
+
+  function stopLossFixture(
+    targetUniverse: string[],
+    securities: { id: number; code: string }[],
+  ) {
+    const fixture = executor();
+    const run = {
+      ...fixture.current,
+      targetUniverse,
+      period: 1440,
+      startDate: new Date('2026-01-01T00:00:00.000Z'),
+      endDate: new Date('2026-01-31T00:00:00.000Z'),
+      kind: 'rule_dsl',
+    };
+    fixture.dependencies.runRepository.findOne.mockResolvedValue(run);
+    fixture.dependencies.versionRepository.findOne.mockResolvedValue({
+      id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
+      rule: { field: 'k.close', operator: 'gt', value: 5 },
+      signalKind: 'entry',
+    });
+    fixture.dependencies.securityRepository.find.mockResolvedValue(
+      securities.map((s) => ({ ...s, name: s.code })),
+    );
+    fixture.dependencies.marketData.loadReplayWindow.mockResolvedValue({
+      bars: [],
+    });
+    return fixture;
+  }
+
+  it('aligns per-security daily returns on the union date axis with zero fill', () => {
+    const histories = [
+      [
+        navSnapshot('A', '2026-01-02', 100, 0),
+        navSnapshot('A', '2026-01-06', 103, 0.03),
+      ],
+      [
+        navSnapshot('B', '2026-01-03', 200, 0),
+        navSnapshot('B', '2026-01-06', 198, -0.01),
+      ],
+    ];
+    const sortedDates = collectSortedDates(histories);
+    expect(sortedDates).toEqual(['2026-01-02', '2026-01-03', '2026-01-06']);
+
+    const aligned = alignEquityReturns(histories, sortedDates);
+    expect(aligned).toEqual([
+      {
+        securityCode: 'A',
+        // 行0（建仓期）丢弃；01-03 缺失 fill-forward → 0；01-06 环比 3%
+        returns: [0, 0.03],
+      },
+      {
+        securityCode: 'B',
+        // 首快照 01-03 无前值 → 0；01-06 环比 -1%
+        returns: [0, -0.01],
+      },
+    ]);
+  });
+
+  it('skips empty nav histories when aligning', () => {
+    const histories = [[], [navSnapshot('B', '2026-01-02', 200, 0)]];
+    const sortedDates = collectSortedDates(histories);
+    expect(alignEquityReturns(histories, sortedDates)).toEqual([
+      { securityCode: 'B', returns: [] },
+    ]);
+  });
+
+  it('multi-security run records underwater duration on the combined NAV basis', async () => {
+    const fixture = stopLossFixture(
+      ['600000.SH', '000001.SZ'],
+      [
+        { id: 9, code: '600000.SH' },
+        { id: 10, code: '000001.SZ' },
+      ],
+    );
+    fixture.dependencies.marketData.readReplayPage
+      .mockResolvedValueOnce({
+        bars: stopLossBars(9, '600000.SH'),
+        nextAfterTimestamp: undefined,
+      })
+      .mockResolvedValueOnce({
+        bars: stopLossBars(10, '000001.SZ'),
+        nextAfterTimestamp: undefined,
+      });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    const completedUpdate = completedUpdateCall(fixture);
+    expect(completedUpdate.status).toBe(BacktestRunStatus.COMPLETED);
+    const navPoints = completedUpdate.navSeries as {
+      date: string;
+      totalEquity: number;
+    }[];
+    expect(navPoints.length).toBeGreaterThanOrEqual(4);
+    // 回撤场景必然存在 underwater 时段，且与 max_drawdown 同源（合成 NAV）
+    expect(completedUpdate.maxUnderwaterDuration).toBeGreaterThan(0);
+    expect(completedUpdate.maxUnderwaterDuration).toBe(
+      computeUnderwaterDuration(navPoints.map((p) => p.totalEquity)),
+    );
+    expect(Number.isFinite(completedUpdate.sharpeRatio as number)).toBe(true);
+  });
+
+  it('keeps portfolio Sharpe invariant when duplicating identical constituents', async () => {
+    const two = stopLossFixture(
+      ['600000.SH', '000001.SZ'],
+      [
+        { id: 9, code: '600000.SH' },
+        { id: 10, code: '000001.SZ' },
+      ],
+    );
+    two.dependencies.marketData.readReplayPage
+      .mockResolvedValueOnce({
+        bars: stopLossBars(9, '600000.SH'),
+        nextAfterTimestamp: undefined,
+      })
+      .mockResolvedValueOnce({
+        bars: stopLossBars(10, '000001.SZ'),
+        nextAfterTimestamp: undefined,
+      });
+    await two.instance.execute(two.current.id);
+
+    const three = stopLossFixture(
+      ['600000.SH', '000001.SZ', '600036.SH'],
+      [
+        { id: 9, code: '600000.SH' },
+        { id: 10, code: '000001.SZ' },
+        { id: 11, code: '600036.SH' },
+      ],
+    );
+    three.dependencies.marketData.readReplayPage
+      .mockResolvedValueOnce({
+        bars: stopLossBars(9, '600000.SH'),
+        nextAfterTimestamp: undefined,
+      })
+      .mockResolvedValueOnce({
+        bars: stopLossBars(10, '000001.SZ'),
+        nextAfterTimestamp: undefined,
+      })
+      .mockResolvedValueOnce({
+        bars: stopLossBars(11, '600036.SH'),
+        nextAfterTimestamp: undefined,
+      });
+    await three.instance.execute(three.current.id);
+
+    // 完全同构的标的互相复制：等权组合收益序列不变（(r+r)/2 = (r+r+r)/3 = r）
+    // → 同一估计量、同一输入 → 综合夏普与回撤时长逐位相等
+    expect(multiCompleted(three).sharpeRatio).toBe(
+      multiCompleted(two).sharpeRatio,
+    );
+    expect(multiCompleted(three).maxUnderwaterDuration).toBe(
+      multiCompleted(two).maxUnderwaterDuration,
+    );
+  });
+
+  it('a non-trading constituent dilutes the portfolio Sharpe (zero-return cash days)', async () => {
+    const flatBars = (
+      securityId: number,
+      securityCode: string,
+    ): StrategyBar[] =>
+      stopLossBars(securityId, securityCode).map((bar) => ({
+        ...bar,
+        close: 1.0, // 规则 close > 5 永不触发 → 该标的全程持现金
+        open: 1.0,
+        high: 1.0,
+        low: 1.0,
+      }));
+
+    const single = stopLossFixture(
+      ['600000.SH'],
+      [{ id: 9, code: '600000.SH' }],
+    );
+    single.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars: stopLossBars(9, '600000.SH'),
+      nextAfterTimestamp: undefined,
+    });
+    await single.instance.execute(single.current.id);
+
+    const multi = stopLossFixture(
+      ['600000.SH', '000001.SZ'],
+      [
+        { id: 9, code: '600000.SH' },
+        { id: 10, code: '000001.SZ' },
+      ],
+    );
+    multi.dependencies.marketData.readReplayPage
+      .mockResolvedValueOnce({
+        bars: stopLossBars(9, '600000.SH'),
+        nextAfterTimestamp: undefined,
+      })
+      .mockResolvedValueOnce({
+        bars: flatBars(10, '000001.SZ'),
+        nextAfterTimestamp: undefined,
+      });
+    await multi.instance.execute(multi.current.id);
+
+    // 组合收益 = r_A/2（B 全零），rf 不随缩放减半 → 综合夏普严格偏离单标的口径
+    expect(Number.isFinite(multiCompleted(multi).sharpeRatio as number)).toBe(
+      true,
+    );
+    expect(multiCompleted(multi).sharpeRatio).not.toBe(
+      completedUpdateCall(single).sharpeRatio,
+    );
+  });
+
+  it('unified estimator: a single-security run keeps the exact single-series Sharpe value', async () => {
+    // 统一后单标的也走组合算子（N=1 退化）：equity 环比 + 丢首行构造与
+    // computeDailyReturns(navSeries) 同构 → 数值与原单序列夏普逐位一致（无回归）
+    const single = stopLossFixture(
+      ['600000.SH'],
+      [{ id: 9, code: '600000.SH' }],
+    );
+    single.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars: stopLossBars(9, '600000.SH'),
+      nextAfterTimestamp: undefined,
+    });
+    await single.instance.execute(single.current.id);
+
+    const multi = stopLossFixture(
+      ['600000.SH', '000001.SZ'],
+      [
+        { id: 9, code: '600000.SH' },
+        { id: 10, code: '000001.SZ' },
+      ],
+    );
+    multi.dependencies.marketData.readReplayPage
+      .mockResolvedValueOnce({
+        bars: stopLossBars(9, '600000.SH'),
+        nextAfterTimestamp: undefined,
+      })
+      .mockResolvedValueOnce({
+        bars: stopLossBars(10, '000001.SZ'),
+        nextAfterTimestamp: undefined,
+      });
+    await multi.instance.execute(multi.current.id);
+
+    // 完全同构标的：等权组合收益 = 单标的收益 → 两条路径数值一致（量尺统一）
+    expect(multiCompleted(multi).sharpeRatio).toBe(
+      completedUpdateCall(single).sharpeRatio,
+    );
+    expect(multiCompleted(multi).maxUnderwaterDuration).toBe(
+      completedUpdateCall(single).maxUnderwaterDuration,
+    );
+  });
+});
+
+function multiCompleted(fixture: {
+  dependencies: { runRepository: { update: { mock: { calls: unknown[][] } } } };
+}): Record<string, unknown> {
+  return completedUpdateCall(fixture);
+}

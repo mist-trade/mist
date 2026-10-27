@@ -10,6 +10,12 @@ export interface SharpeRatioOptions {
   readonly tradingDaysPerYear?: number;
 }
 
+/** 多品种等权组合夏普的输入序列（调用方保证已按同一日期轴对齐、缺失日 0 填充） */
+export interface PortfolioSharpeInput {
+  readonly securityCode: string;
+  readonly returns: readonly number[];
+}
+
 export interface DrawdownSeriesResult {
   readonly maxDrawdown: number;
   readonly peakSeries: number[];

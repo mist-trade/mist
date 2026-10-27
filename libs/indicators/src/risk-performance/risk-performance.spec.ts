@@ -9,11 +9,13 @@ import {
   computeMaxDrawdown,
   computeOverfittingRatio,
   computePerformanceSummary,
+  computePortfolioSharpeRatio,
   computeSharpeRatio,
   computeUnderwaterDuration,
   computeValueAtRisk,
   MAX_CALMAR_RATIO_CAP,
 } from './risk-performance';
+import type { PortfolioSharpeInput } from './risk-performance.types';
 
 describe('Risk & Performance Analytics Engine (Rust Polars SIMD)', () => {
   describe('computeDailyReturns', () => {
@@ -67,6 +69,65 @@ describe('Risk & Performance Analytics Engine (Rust Polars SIMD)', () => {
       const sharpe = computeSharpeRatio(returns);
       expect(sharpe).toBeGreaterThan(0);
       expect(Number.isFinite(sharpe)).toBe(true);
+    });
+  });
+
+  describe('computePortfolioSharpeRatio (多品种协方差口径综合夏普)', () => {
+    it('degenerates to single-series Sharpe when N=1 (exact equality)', () => {
+      const returns = [0.01, -0.005, 0.02, 0.015, -0.01, 0.025, 0.005];
+      const series: PortfolioSharpeInput[] = [
+        { securityCode: '000001.SZ', returns },
+      ];
+      expect(computePortfolioSharpeRatio(series)).toBe(
+        computeSharpeRatio(returns),
+      );
+    });
+
+    it('reduces portfolio volatility via covariance offset (negatively correlated assets)', () => {
+      // 两资产均值同为 0.005、样本 std 同为 ~0.0238，但负相关：
+      // 等权组合波动 = σ·sqrt((1+ρ)/2) < σ → 组合夏普必然高于任一单资产夏普
+      const a = [0.02, -0.01, 0.03, -0.02];
+      const b = [-0.02, 0.03, -0.01, 0.02];
+      const portfolioSharpe = computePortfolioSharpeRatio([
+        { securityCode: 'A', returns: a },
+        { securityCode: 'B', returns: b },
+      ]);
+      expect(portfolioSharpe).toBeGreaterThan(computeSharpeRatio(a));
+      expect(portfolioSharpe).toBeGreaterThan(computeSharpeRatio(b));
+
+      // 精确值：组合序列 [0, 0.01, 0.01, 0]，mean=0.005，var(ddof=1)=1e-4/3
+      const expected =
+        ((0.005 - 0.02 / 250) / Math.sqrt(1e-4 / 3)) * Math.sqrt(250);
+      expect(portfolioSharpe).toBeCloseTo(expected, 3);
+    });
+
+    it('dilutes returns with zero-filled missing days (cash semantics)', () => {
+      // A 中间日停牌按 0 收益（持现金）填充，组合收益被稀释
+      const series: PortfolioSharpeInput[] = [
+        { securityCode: 'A', returns: [0.01, 0, 0.01] },
+        { securityCode: 'B', returns: [0.01, 0.01, 0.01] },
+      ];
+      // 组合序列 = [0.01, 0.005, 0.01]
+      const portfolio = [0.01, 0.005, 0.01];
+      expect(computePortfolioSharpeRatio(series)).toBe(
+        computeSharpeRatio(portfolio),
+      );
+    });
+
+    it('returns 0 for empty input or single-point returns, and rejects length mismatch', () => {
+      expect(computePortfolioSharpeRatio([])).toBe(0);
+      expect(
+        computePortfolioSharpeRatio([
+          { securityCode: 'A', returns: [0.01] },
+          { securityCode: 'B', returns: [0.02] },
+        ]),
+      ).toBe(0);
+      expect(() =>
+        computePortfolioSharpeRatio([
+          { securityCode: 'A', returns: [0.01, 0.02, 0.03] },
+          { securityCode: 'B', returns: [0.01, 0.02] },
+        ]),
+      ).toThrow(IndicatorInputError);
     });
   });
 

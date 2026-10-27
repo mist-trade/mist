@@ -260,6 +260,7 @@ function mapRun(run: BacktestRun): BacktestRunVo {
     totalReturn: toNumberOrNull(run.totalReturn),
     annualizedReturn: toNumberOrNull(run.annualizedReturn),
     maxDrawdown: toNumberOrNull(run.maxDrawdown),
+    maxUnderwaterDuration: run.maxUnderwaterDuration ?? null,
     sharpeRatio: toNumberOrNull(run.sharpeRatio),
     calmarRatio: toNumberOrNull(run.calmarRatio),
     winRate: toNumberOrNull(run.winRate),
