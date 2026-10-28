@@ -205,15 +205,20 @@ export class TemporalWindowEngine {
       this.activeSetupStates.set(key, action);
     }
 
-    // 若收到空头/破位信号（如熊市确立），立即清洗未决多头观察窗（避险斩断）
-    if (action === 'SELL') {
+    // 若收到空头/逃命风控信号（如熊市确立或极速逃命卖点），立即清洗未决多头观察窗（避险斩断）
+    if (action === 'SELL' || signal.signalKind === 'exit') {
       this.activeWindows = this.activeWindows.filter((win) => {
-        if (!win.rule.requiredSetupTag) return true;
         const targetAction = win.rule.action ?? 'BUY';
         if (targetAction === 'BUY') {
-          return !keys.some((k) =>
-            this.tagMatches(k, win.rule.requiredSetupTag!),
+          const isSetupMatch = win.rule.requiredSetupTag
+            ? keys.some((k) => this.tagMatches(k, win.rule.requiredSetupTag!))
+            : false;
+          const isBearExit = keys.some((k) =>
+            this.tagMatches(k, 'plugin.tactics.bear-left-right-bsp'),
           );
+          if (isSetupMatch || isBearExit) {
+            return false;
+          }
         }
         return true;
       });

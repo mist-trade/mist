@@ -117,6 +117,15 @@ export const DEFAULT_TACTICAL_AGGREGATOR_CONFIG: TacticalAggregatorConfig =
         ]),
         compositeBadgeText: '专属战术+放量确认',
       }),
+      // 规则 3：极速逃命风控（专属微观空头逃命卖点直出，0 延迟发射清仓，即刻清退所有未决多头观察窗）
+      Object.freeze({
+        triggerTag: 'plugin.tactics.bear-left-right-bsp',
+        windowBars: 0,
+        requiredConfirmationTags: Object.freeze([]),
+        compositeBadgeText: '熊市极速逃命',
+        action: 'SELL',
+        kind: 'RISK_CUT',
+      }),
     ]),
     cooldownBars: 3,
   });

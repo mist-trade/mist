@@ -6,6 +6,8 @@ import {
   DuanStatus,
   DuanType,
   FenxingType,
+  TrendDirection,
+  type ChanBi,
   type ChanBspUnit,
   type ChanDivergenceZhongshu,
   type ChanK,
@@ -60,6 +62,41 @@ export interface ChanBspDetectedEvent {
   readonly zg: number | null;
   readonly zd: number | null;
   readonly unitIndex: number;
+}
+
+export interface ChanZhongshuGeometry {
+  readonly index: number;
+  readonly zg: number;
+  readonly zd: number;
+  readonly gg: number;
+  readonly dd: number;
+  readonly startTime?: string;
+  readonly endTime?: string;
+  readonly trend?: string;
+  readonly direction?: 'UP' | 'DOWN' | 'NONE';
+  readonly expanded?: boolean;
+  readonly extended?: boolean;
+}
+
+export interface ChanBiGeometry {
+  readonly index: number;
+  readonly type?: string;
+  readonly status?: number;
+  readonly high: number;
+  readonly low: number;
+  readonly startPrice: number;
+  readonly endPrice: number;
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly trend?: string;
+}
+
+export interface ChanGeometryPayload {
+  readonly channels: readonly ChanZhongshuGeometry[];
+  readonly bis: readonly ChanBiGeometry[];
+  readonly fenxings?: readonly unknown[];
+  readonly latestChannel?: ChanZhongshuGeometry;
+  readonly latestBi?: ChanBiGeometry;
 }
 
 interface ScopeCursorRecord {
@@ -135,7 +172,18 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     }
 
     const units = params.units ?? CHAN_BSP_UNITS.BI;
+    const geometry = this.extractGeometry(klines, units);
     const allEvents = this.detectEvents(klines, units);
+
+    // 将客观几何形态全量注入黑板上下文，供后续决策流节点（例如私有战术插件）全量读取
+    if (
+      context.attributes &&
+      typeof (context.attributes as any).set === 'function'
+    ) {
+      context.attributes.set('chan.geometry', geometry);
+      context.attributes.set('chan.channels', geometry.channels);
+    }
+
     const matchedEvents = allEvents.filter((event) =>
       this.matchesFilter(event, params),
     );
@@ -145,6 +193,9 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         action: DECISION_ACTIONS.NEUTRAL,
         confidence: 0.0,
         reason: '未检测到满足条件的缠论买卖点',
+        evidence: {
+          geometry,
+        },
       };
     }
 
@@ -287,6 +338,7 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         zhongshuIndex: latestEvent.zhongshuIndex,
         unitIndex: latestEvent.unitIndex,
         allCandidatesCount: finalCandidates.length,
+        geometry,
         candidateEvents: finalCandidates.map((e) => ({
           eventType: e.type,
           units: e.units,
@@ -329,6 +381,74 @@ export class ChanBspFactorPlugin implements FactorPlugin {
           : undefined,
       deduplicate: params?.deduplicate !== false,
       requireConfirmedFenxing: params?.requireConfirmedFenxing === true,
+    };
+  }
+
+  private extractGeometry(
+    klines: readonly ChanK[],
+    units: ChanBspUnitLevel,
+  ): ChanGeometryPayload {
+    const bis = ChanCore.createBi(klines);
+    const phaseB = bis.phaseB;
+
+    let zhongshus: readonly ChanDivergenceZhongshu[] = [];
+    let validBis: readonly ChanBi[] = [];
+
+    if (units === CHAN_BSP_UNITS.DUAN) {
+      const duans = ChanCore.createDuan(phaseB);
+      const duanChannels = ChanCore.createDuanChannels(duans);
+      zhongshus = duanChannels.phaseB.map((ch) => {
+        const zs = ChanCore.toZhongshu(ch);
+        const difRetracedToZero = checkZhongshuZeroRetracement(klines, zs);
+        return ChanCore.toZhongshu(ch, difRetracedToZero);
+      });
+    } else {
+      validBis = phaseB.filter(
+        (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
+      );
+      const channels = ChanCore.createBiChannels(klines);
+      zhongshus = channels.phaseB.map(ChanCore.toZhongshu);
+    }
+
+    const channelsGeometry: ChanZhongshuGeometry[] = zhongshus.map(
+      (zs, idx) => ({
+        index: idx,
+        zg: zs.zg,
+        zd: zs.zd,
+        gg: zs.gg,
+        dd: zs.dd,
+        startTime: zs.firstUnitTime
+          ? zs.firstUnitTime.toISOString()
+          : undefined,
+        endTime: zs.lastUnitTime ? zs.lastUnitTime.toISOString() : undefined,
+        direction: zs.gg >= zs.dd ? 'UP' : 'DOWN',
+      }),
+    );
+
+    const bisGeometry: ChanBiGeometry[] = validBis.map((b, idx) => ({
+      index: idx,
+      type: b.type,
+      status: b.status,
+      high: b.high,
+      low: b.low,
+      startPrice: b.trend === TrendDirection.Up ? b.low : b.high,
+      endPrice: b.trend === TrendDirection.Up ? b.high : b.low,
+      startTime: b.startTime.toISOString(),
+      endTime: b.endTime.toISOString(),
+      trend: b.trend,
+    }));
+
+    return {
+      channels: channelsGeometry,
+      bis: bisGeometry,
+      latestChannel:
+        channelsGeometry.length > 0
+          ? channelsGeometry[channelsGeometry.length - 1]
+          : undefined,
+      latestBi:
+        bisGeometry.length > 0
+          ? bisGeometry[bisGeometry.length - 1]
+          : undefined,
     };
   }
 
