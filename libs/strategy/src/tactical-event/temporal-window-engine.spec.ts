@@ -31,6 +31,7 @@ describe('TemporalWindowEngine', () => {
     pivotTime?: string | null;
     pivotPrice?: number | null;
     time?: Date;
+    confidence?: number;
   }): KernelSignal {
     const signalTime = params.time ?? new Date('2026-10-28T09:30:00.000Z');
     return {
@@ -44,7 +45,7 @@ describe('TemporalWindowEngine', () => {
       pivotTime: params.pivotTime ?? null,
       pivotPrice: params.pivotPrice ?? null,
       signalType: params.signalType,
-      confidence: 0.95,
+      confidence: params.confidence ?? 0.95,
       confidenceLevel: 'HIGH',
       badgeText: params.badgeText,
       displayTag: params.displayTag,
@@ -228,5 +229,106 @@ describe('TemporalWindowEngine', () => {
 
     engine.reset();
     expect(engine.getActiveWindows()).toHaveLength(0);
+  });
+
+  it('rejects opening window when requiredSetupTag is not in matching state', () => {
+    const rules: TacticalWindowRule[] = [
+      {
+        requiredSetupTag: 'plugin.regime.shanghai-index',
+        triggerTag: 'chan_1b',
+        windowBars: 3,
+        requiredConfirmationTags: ['vpci_surge'],
+        compositeBadgeText: '牛市1买+放量',
+      },
+    ];
+    const engine = new TemporalWindowEngine(rules);
+
+    // 未收到宏观牛市信号前，触发信号拒绝开窗
+    const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0);
+    const triggerSignal = createSignal({
+      signalType: 'chan_1b',
+      displayTag: 'chan_1b',
+      time: bar0.timestamp,
+    });
+
+    const events0 = engine.push(triggerSignal, bar0, 0);
+    expect(events0).toHaveLength(0);
+    expect(engine.getActiveWindows()).toHaveLength(0);
+
+    // 收到宏观牛市信号 (BUY)
+    const regimeBullSignal = createSignal({
+      signalType: 'plugin.regime.shanghai-index',
+      displayTag: 'REGIME_BULL',
+      action: 'BUY',
+      time: bar0.timestamp,
+    });
+    engine.push(regimeBullSignal, bar0, 0);
+    expect(engine.getActiveSetupState('plugin.regime.shanghai-index')).toBe(
+      'BUY',
+    );
+
+    // 宏观达标后，再次触发即可成功开启观察窗
+    const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.1);
+    const events1 = engine.push(triggerSignal, bar1, 1);
+    expect(events1).toHaveLength(0);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+
+    // 若突发宏观转熊 (SELL)，未决买入观察窗立即作废斩断
+    const bar2 = createBar('2026-10-28T09:40:00.000Z', 9.8);
+    const regimeBearSignal = createSignal({
+      signalType: 'plugin.regime.shanghai-index',
+      displayTag: 'REGIME_BEAR',
+      action: 'SELL',
+      time: bar2.timestamp,
+    });
+    engine.push(regimeBearSignal, bar2, 2);
+    expect(engine.getActiveWindows()).toHaveLength(0); // 观察窗被避险清理
+  });
+
+  it('boosts confidence and appends badge when optionalBoostTags is captured without blocking confirmation', () => {
+    const rules: TacticalWindowRule[] = [
+      {
+        triggerTag: 'chan_1b',
+        windowBars: 3,
+        requiredConfirmationTags: ['vpci_surge'],
+        optionalBoostTags: ['squeeze_fire'],
+        compositeBadgeText: '战术买点',
+      },
+    ];
+    const engine = new TemporalWindowEngine(rules);
+
+    const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0);
+    const triggerSignal = createSignal({
+      signalType: 'chan_1b',
+      displayTag: 'chan_1b',
+      time: bar0.timestamp,
+      confidence: 0.8,
+    });
+
+    engine.push(triggerSignal, bar0, 0);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+
+    // t=1: 捕获可选加成标签 squeeze_fire
+    const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.1);
+    const boostSignal = createSignal({
+      signalType: 'squeeze_fire',
+      displayTag: 'squeeze_fire',
+      time: bar1.timestamp,
+    });
+    engine.push(boostSignal, bar1, 1);
+    expect(engine.getActiveWindows()[0].boostSignals).toHaveLength(1);
+
+    // t=2: 捕获必选确认标签 vpci_surge，成功合成并触发加成
+    const bar2 = createBar('2026-10-28T09:40:00.000Z', 10.3);
+    const confirmSignal = createSignal({
+      signalType: 'vpci_surge',
+      displayTag: 'vpci_surge',
+      time: bar2.timestamp,
+    });
+    const events = engine.push(confirmSignal, bar2, 2);
+    expect(events).toHaveLength(1);
+    expect(events[0].badgeText).toBe('战术买点+爆发');
+    expect(events[0].confidence).toBeGreaterThan(0.8);
+    expect(events[0].confirmingSignals).toHaveLength(2); // vpci_surge + squeeze_fire
   });
 });

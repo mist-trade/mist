@@ -1,6 +1,9 @@
 import type { StrategyBar } from '@app/market-data';
 import type { KernelSignal } from '../kernel/kernel.types';
-import type { TacticalAggregatorConfig } from './tactical-event.types';
+import {
+  DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+  type TacticalAggregatorConfig,
+} from './tactical-event.types';
 import { TacticalEventAggregator } from './tactical-event-aggregator';
 
 describe('TacticalEventAggregator', () => {
@@ -258,5 +261,52 @@ describe('TacticalEventAggregator', () => {
     // reset 后再次放行
     aggregator.reset();
     expect(aggregator.push([entry0], bar1)).toHaveLength(1);
+  });
+
+  it('works seamlessly with DEFAULT_TACTICAL_AGGREGATOR_CONFIG for both chan.bsp and bull-left-right-bsp', () => {
+    const aggregator = new TacticalEventAggregator(
+      DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+    );
+
+    // Bar 0: 宏观牛市跃迁 (BUY) + 专属战术买点触发
+    const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0);
+    const regimeSignal = createSignal({
+      signalType: 'plugin.regime.shanghai-index',
+      displayTag: 'REGIME_BULL',
+      action: 'BUY',
+      securityCode: '600519',
+      time: bar0.timestamp,
+    });
+    const tacticsSignal = createSignal({
+      signalType: 'plugin.tactics.bull-left-right-bsp',
+      displayTag: 'BUY_SUB_CROSS_ZERO_RIGHT',
+      badgeText: '次级别零轴穿越买点',
+      pivotPrice: 9.8,
+      pivotTime: '2026-10-28T09:15:00.000Z',
+      securityCode: '600519',
+      time: bar0.timestamp,
+    });
+
+    const events0 = aggregator.push([regimeSignal, tacticsSignal], bar0);
+    // 观察窗开启，等待确认，当前不产生战术开仓
+    // 注意：regime 信号通过边沿跃迁透传（若无窗口拦截）
+    const entryEvents0 = events0.filter((e) => e.kind === 'ENTRY');
+    expect(entryEvents0).toHaveLength(0);
+
+    // Bar 1: VPCI 放量确认到来，成功合成专属战术事件
+    const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.2);
+    const vpciSignal = createSignal({
+      signalType: 'plugin.tactics.volume-price-confirmation',
+      displayTag: 'plugin.tactics.volume-price-confirmation',
+      securityCode: '600519',
+      time: bar1.timestamp,
+    });
+
+    const events1 = aggregator.push([vpciSignal], bar1);
+    const entryEvents1 = events1.filter((e) => e.kind === 'ENTRY');
+    expect(entryEvents1).toHaveLength(1);
+    expect(entryEvents1[0].badgeText).toBe('专属战术+放量确认');
+    expect(entryEvents1[0].triggerPrice).toBe(10.2);
+    expect(entryEvents1[0].pivotPrice).toBe(9.8);
   });
 });

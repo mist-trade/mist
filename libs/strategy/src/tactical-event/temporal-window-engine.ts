@@ -12,6 +12,12 @@ export class TemporalWindowEngine {
   private activeWindows: ActiveObservationWindow[] = [];
   private readonly rules: readonly TacticalWindowRule[];
   private readonly allConfirmationTags: Set<string>;
+  private readonly allBoostTags: Set<string>;
+  private readonly allSetupTags: Set<string>;
+  private readonly activeSetupStates = new Map<
+    string,
+    TacticalAction | 'NEUTRAL'
+  >();
   private windowCounter = 0;
   private eventCounter = 0;
 
@@ -20,6 +26,14 @@ export class TemporalWindowEngine {
     this.allConfirmationTags = new Set(
       rules.flatMap((r) => r.requiredConfirmationTags),
     );
+    this.allBoostTags = new Set(
+      rules.flatMap((r) => r.optionalBoostTags ?? []),
+    );
+    this.allSetupTags = new Set(
+      rules
+        .map((r) => r.requiredSetupTag)
+        .filter((t): t is string => typeof t === 'string' && t.length > 0),
+    );
   }
 
   public push(
@@ -27,15 +41,28 @@ export class TemporalWindowEngine {
     bar: StrategyBar,
     currentBarIndex: number,
   ): TacticalEvent[] {
+    // 0. 更新环境门禁状态，并在空头/破位时即时清洗未决多头观察窗
+    this.updateSetupState(signal);
+
     // 1. 先修剪已过期的窗口
     this.pruneExpired(currentBarIndex);
 
-    // 2. 检查当前信号是否命中已开启观察窗的确认条件
+    // 2. 检查当前信号是否命中已开启观察窗的确认条件或可选加成
     const completedEvents: TacticalEvent[] = [];
     let confirmedAnyWindow = false;
     const remainingWindows: ActiveObservationWindow[] = [];
 
     for (const win of this.activeWindows) {
+      // 检查可选加成标签
+      if (win.rule.optionalBoostTags) {
+        for (const boostTag of win.rule.optionalBoostTags) {
+          if (this.signalMatchesTag(signal, boostTag)) {
+            win.boostSignals.push(signal);
+            break;
+          }
+        }
+      }
+
       let matchedTag: string | undefined;
       for (const tag of win.pendingTags) {
         if (this.signalMatchesTag(signal, tag)) {
@@ -70,6 +97,14 @@ export class TemporalWindowEngine {
 
     if (matchedRules.length > 0) {
       for (const rule of matchedRules) {
+        // 若配置了前置宏观门禁，校验当前环境是否达标（如牛市）；不达标严禁开窗
+        if (
+          rule.requiredSetupTag &&
+          !this.isSetupSatisfied(rule.requiredSetupTag, rule.action ?? 'BUY')
+        ) {
+          continue;
+        }
+
         if (
           rule.requiredConfirmationTags.length === 0 ||
           rule.windowBars <= 0
@@ -94,6 +129,7 @@ export class TemporalWindowEngine {
             openTimestamp: bar.timestamp,
             confirmingSignals: [],
             pendingTags: new Set(rule.requiredConfirmationTags),
+            boostSignals: [],
           });
         }
       }
@@ -105,8 +141,11 @@ export class TemporalWindowEngine {
       return completedEvents;
     }
 
-    // 若属于仅确认标签（如纯放量因子），无对应开窗时静默过滤
-    if (this.isConfirmationOnlySignal(signal)) {
+    // 若属于环境门禁标签（如宏观体制）或确认/加成标签，静默记录状态，不作为独立开仓事件发射
+    if (
+      this.isSetupOnlySignal(signal) ||
+      this.isConfirmationOrBoostOnlySignal(signal)
+    ) {
       return completedEvents;
     }
 
@@ -121,12 +160,89 @@ export class TemporalWindowEngine {
 
   public reset(): void {
     this.activeWindows = [];
+    this.activeSetupStates.clear();
     this.windowCounter = 0;
     this.eventCounter = 0;
   }
 
   public getActiveWindows(): readonly ActiveObservationWindow[] {
     return this.activeWindows;
+  }
+
+  public getActiveSetupState(
+    setupTag: string,
+  ): TacticalAction | 'NEUTRAL' | undefined {
+    for (const [key, state] of this.activeSetupStates.entries()) {
+      if (this.tagMatches(key, setupTag)) {
+        return state;
+      }
+    }
+    return undefined;
+  }
+
+  private isSetupSatisfied(
+    setupTag: string,
+    targetAction: TacticalAction = 'BUY',
+  ): boolean {
+    const state = this.getActiveSetupState(setupTag);
+    if (state !== undefined) {
+      return state === targetAction;
+    }
+    return false;
+  }
+
+  private updateSetupState(signal: KernelSignal): void {
+    const action = this.extractSignalAction(signal);
+    const keys = [
+      signal.signalType,
+      signal.displayTag,
+      signal.badgeText,
+      signal.decisionTrace?.pluginId,
+      (signal as any).pluginId,
+    ].filter((k): k is string => typeof k === 'string' && k.length > 0);
+
+    for (const key of keys) {
+      this.activeSetupStates.set(key, action);
+    }
+
+    // 若收到空头/破位信号（如熊市确立），立即清洗未决多头观察窗（避险斩断）
+    if (action === 'SELL') {
+      this.activeWindows = this.activeWindows.filter((win) => {
+        if (!win.rule.requiredSetupTag) return true;
+        const targetAction = win.rule.action ?? 'BUY';
+        if (targetAction === 'BUY') {
+          return !keys.some((k) =>
+            this.tagMatches(k, win.rule.requiredSetupTag!),
+          );
+        }
+        return true;
+      });
+    }
+  }
+
+  private extractSignalAction(
+    signal: KernelSignal,
+  ): TacticalAction | 'NEUTRAL' {
+    if (typeof (signal as any).action === 'string') {
+      const act = (signal as any).action.toUpperCase();
+      if (act === 'BUY' || act === 'SELL') return act;
+      if (act === 'NEUTRAL') return 'NEUTRAL';
+    }
+    if (typeof signal.decisionTrace?.action === 'string') {
+      const act = signal.decisionTrace.action.toUpperCase();
+      if (act === 'BUY' || act === 'SELL') return act;
+      if (act === 'NEUTRAL') return 'NEUTRAL';
+    }
+    if (signal.signalKind === 'exit') return 'SELL';
+    if (signal.signalKind === 'entry') return 'BUY';
+    return 'BUY';
+  }
+
+  private tagMatches(actualTag: string, expectedTag: string): boolean {
+    if (actualTag === expectedTag) return true;
+    if (actualTag.includes(expectedTag) || expectedTag.includes(actualTag))
+      return true;
+    return false;
   }
 
   private pruneExpired(currentBarIndex: number): void {
@@ -154,8 +270,22 @@ export class TemporalWindowEngine {
     return false;
   }
 
-  private isConfirmationOnlySignal(signal: KernelSignal): boolean {
+  private isSetupOnlySignal(signal: KernelSignal): boolean {
+    for (const tag of this.allSetupTags) {
+      if (this.signalMatchesTag(signal, tag)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private isConfirmationOrBoostOnlySignal(signal: KernelSignal): boolean {
     for (const tag of this.allConfirmationTags) {
+      if (this.signalMatchesTag(signal, tag)) {
+        return true;
+      }
+    }
+    for (const tag of this.allBoostTags) {
       if (this.signalMatchesTag(signal, tag)) {
         return true;
       }
@@ -176,6 +306,16 @@ export class TemporalWindowEngine {
     const defaultKind: TacticalEventKind =
       trigger.signalKind === 'exit' ? 'EXIT' : 'ENTRY';
 
+    const hasBoost = (win.boostSignals?.length ?? 0) > 0;
+    const confidence = hasBoost
+      ? Math.min(1.0, Number((trigger.confidence * 1.05).toFixed(4)))
+      : trigger.confidence;
+    const badgeText = hasBoost
+      ? `${win.rule.compositeBadgeText}+爆发`
+      : win.rule.compositeBadgeText;
+
+    const allSignals = [...win.confirmingSignals, ...(win.boostSignals ?? [])];
+
     return {
       eventId: `evt_${trigger.definitionId}_${bar.timestamp.getTime()}_${++this.eventCounter}`,
       definitionId: trigger.definitionId,
@@ -191,13 +331,13 @@ export class TemporalWindowEngine {
       triggerPrice: bar.close,
       pivotTime: trigger.pivotTime,
       pivotPrice: trigger.pivotPrice,
-      confidence: trigger.confidence,
-      badgeText: win.rule.compositeBadgeText,
+      confidence,
+      badgeText,
       displayTag: win.rule.triggerTag,
       triggerSignal: trigger,
-      confirmingSignals: [...win.confirmingSignals],
+      confirmingSignals: allSignals,
       elapsedBars,
-      reason: `Trigger [${win.rule.triggerTag}] confirmed by [${win.confirmingSignals.map((s) => s.displayTag ?? s.signalType).join(', ')}] after ${elapsedBars} bars`,
+      reason: `Trigger [${win.rule.triggerTag}] confirmed by [${win.confirmingSignals.map((s) => s.displayTag ?? s.signalType).join(', ')}]${hasBoost ? ' with squeeze fire boost' : ''} after ${elapsedBars} bars`,
       styleMeta: trigger.styleMeta,
     };
   }
