@@ -85,7 +85,11 @@
 
 ## Phase 6: 评测报告（操作，非代码）
 
-- [ ] 6.1 经 `POST /v1/strategy-backtests` 重跑评测矩阵：单因子消融组 + 复合决策流组
-  （30m 求值，context 由插件推导），区间 2005-01-04 → 最新
-- [ ] 6.2 `runStressSuite=true` 跑五大历史压力沙盒，输出生存评级
-- [ ] 6.3 汇总更新版夏普率对比报告（对比矩阵 + 消融增益 + caveats），完整贴对话界面
+- [x] 6.1 评测矩阵 9/9 组重跑完成（2026-10-28）：基准纯缠论 / 5 单因子消融 /
+  复合 composite / 全增强树 def3 / 定义23树，全窗 2005-01-04→2026-10-26；
+  结果 + 信号明细 + 复用 manifest 存档私仓
+  `market-data/backtest-results/2026-10-28-multilevel-30m/`
+- [x] 6.2 五大压力沙盒（⑦ composite 载体）：ROBUST / 健康分 75 / 无破产 /
+  最差单日 −2.53%（CRASH_2015 SAFE 3.36%、CIRCUIT_2016 SAFE 0%、BEAR_2018
+  WARNING 11.53%、SQUEEZE_2024 SAFE 1.55%、PULSE_2024 SAFE 0%）
+- [x] 6.3 更新版夏普率对比报告已贴对话界面（2026-10-28 最终版，含 caveats）
