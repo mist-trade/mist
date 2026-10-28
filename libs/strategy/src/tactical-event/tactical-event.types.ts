@@ -1,5 +1,9 @@
 import type { KernelSignal } from '../kernel/kernel.types';
 
+export const DEFAULT_TACTICAL_WINDOW_BARS = 3;
+export const DEFAULT_MAX_CONTAINMENT_HOLD_BARS = 2;
+export const DEFAULT_TACTICAL_COOLDOWN_BARS = 3;
+
 export type TacticalAction = 'BUY' | 'SELL';
 
 export type TacticalEventKind = 'ENTRY' | 'EXIT' | 'RISK_CUT';
@@ -34,22 +38,15 @@ export interface TacticalEvent {
 
 export interface TacticalWindowRule {
   readonly triggerTag: string;
+  readonly requiredSetupTag?: string;
   readonly windowBars: number;
+  readonly maxContainmentHoldBars?: number;
+  readonly invalidateOnPivotBreak?: boolean;
   readonly requiredConfirmationTags: readonly string[];
+  readonly optionalBoostTags?: readonly string[];
   readonly compositeBadgeText: string;
   readonly action?: TacticalAction;
   readonly kind?: TacticalEventKind;
-  /**
-   * 可选的前置宏观/环境门禁标识（例如 'plugin.regime.shanghai-index' 或 'REGIME_BULL'）。
-   * 若配置，则只有在当前环境门禁处于匹配状态（如多头）时才允许开启观察窗；
-   * 若观察窗等待期间环境转熊，未决观察窗立即作废清退。
-   */
-  readonly requiredSetupTag?: string;
-  /**
-   * 可选的置信度加成标识（例如 'plugin.tactics.volatility-squeeze-fire'）。
-   * 观察窗期间若捕获该标签，触发置信度与徽标加成，但不作为硬阻断门禁。
-   */
-  readonly optionalBoostTags?: readonly string[];
 }
 
 export interface TacticalAggregatorConfig {
@@ -67,6 +64,13 @@ export interface ActiveObservationWindow {
   readonly confirmingSignals: KernelSignal[];
   readonly pendingTags: Set<string>;
   readonly boostSignals: KernelSignal[];
+  readonly targetWindowBars: number;
+  readonly maxContainmentHoldBars: number;
+  readonly stopLossPrice: number | null;
+  elapsedEffectiveBars: number;
+  heldContainmentBars: number;
+  lastBarRange: { high: number; low: number };
+  lastEvaluatedBarIndex?: number;
 }
 
 /**
@@ -95,7 +99,7 @@ export const DEFAULT_TACTICAL_AGGREGATOR_CONFIG: TacticalAggregatorConfig =
       Object.freeze({
         requiredSetupTag: 'plugin.regime.shanghai-index',
         triggerTag: 'plugin.chan.bsp',
-        windowBars: 3,
+        windowBars: DEFAULT_TACTICAL_WINDOW_BARS,
         requiredConfirmationTags: Object.freeze([
           'plugin.tactics.volume-price-confirmation',
         ]),
@@ -108,7 +112,7 @@ export const DEFAULT_TACTICAL_AGGREGATOR_CONFIG: TacticalAggregatorConfig =
       Object.freeze({
         requiredSetupTag: 'plugin.regime.shanghai-index',
         triggerTag: 'plugin.tactics.bull-left-right-bsp',
-        windowBars: 3,
+        windowBars: DEFAULT_TACTICAL_WINDOW_BARS,
         requiredConfirmationTags: Object.freeze([
           'plugin.tactics.volume-price-confirmation',
         ]),
@@ -127,5 +131,5 @@ export const DEFAULT_TACTICAL_AGGREGATOR_CONFIG: TacticalAggregatorConfig =
         kind: 'RISK_CUT',
       }),
     ]),
-    cooldownBars: 3,
+    cooldownBars: DEFAULT_TACTICAL_COOLDOWN_BARS,
   });

@@ -1,11 +1,13 @@
 import type { StrategyBar } from '@app/market-data';
 import type { KernelSignal } from '../kernel/kernel.types';
-import type {
-  ActiveObservationWindow,
-  TacticalAction,
-  TacticalEvent,
-  TacticalEventKind,
-  TacticalWindowRule,
+import {
+  DEFAULT_MAX_CONTAINMENT_HOLD_BARS,
+  DEFAULT_TACTICAL_WINDOW_BARS,
+  type ActiveObservationWindow,
+  type TacticalAction,
+  type TacticalEvent,
+  type TacticalEventKind,
+  type TacticalWindowRule,
 } from './tactical-event.types';
 
 export class TemporalWindowEngine {
@@ -44,8 +46,8 @@ export class TemporalWindowEngine {
     // 0. 更新环境门禁状态，并在空头/破位时即时清洗未决多头观察窗
     this.updateSetupState(signal);
 
-    // 1. 先修剪已过期的窗口
-    this.pruneExpired(currentBarIndex);
+    // 1. 步进并修剪活跃观察窗（破位、孕线保活、超时清退）
+    this.advanceWindows(bar, currentBarIndex);
 
     // 2. 检查当前信号是否命中已开启观察窗的确认条件或可选加成
     const completedEvents: TacticalEvent[] = [];
@@ -105,9 +107,26 @@ export class TemporalWindowEngine {
           continue;
         }
 
+        const targetWindowBars =
+          (typeof (signal as any).evidence?.windowBars === 'number'
+            ? (signal as any).evidence.windowBars
+            : undefined) ??
+          rule.windowBars ??
+          DEFAULT_TACTICAL_WINDOW_BARS;
+
+        const maxContainmentHoldBars =
+          (typeof (signal as any).evidence?.maxContainmentHoldBars === 'number'
+            ? (signal as any).evidence.maxContainmentHoldBars
+            : undefined) ??
+          rule.maxContainmentHoldBars ??
+          DEFAULT_MAX_CONTAINMENT_HOLD_BARS;
+
+        const stopLossPrice =
+          typeof signal.pivotPrice === 'number' ? signal.pivotPrice : null;
+
         if (
           rule.requiredConfirmationTags.length === 0 ||
-          rule.windowBars <= 0
+          targetWindowBars <= 0
         ) {
           // 0 窗口或无需确认：直接发射
           completedEvents.push(
@@ -130,6 +149,13 @@ export class TemporalWindowEngine {
             confirmingSignals: [],
             pendingTags: new Set(rule.requiredConfirmationTags),
             boostSignals: [],
+            targetWindowBars,
+            maxContainmentHoldBars,
+            stopLossPrice,
+            elapsedEffectiveBars: 0,
+            heldContainmentBars: 0,
+            lastBarRange: { high: bar.high, low: bar.low },
+            lastEvaluatedBarIndex: currentBarIndex,
           });
         }
       }
@@ -153,8 +179,8 @@ export class TemporalWindowEngine {
     return [...completedEvents, this.createSinglePointEvent(signal, bar)];
   }
 
-  public onBar(_bar: StrategyBar, currentBarIndex: number): TacticalEvent[] {
-    this.pruneExpired(currentBarIndex);
+  public onBar(bar: StrategyBar, currentBarIndex: number): TacticalEvent[] {
+    this.advanceWindows(bar, currentBarIndex);
     return [];
   }
 
@@ -250,10 +276,51 @@ export class TemporalWindowEngine {
     return false;
   }
 
-  private pruneExpired(currentBarIndex: number): void {
-    this.activeWindows = this.activeWindows.filter(
-      (win) => currentBarIndex - win.triggerBarIndex <= win.rule.windowBars,
-    );
+  private advanceWindows(bar: StrategyBar, currentBarIndex: number): void {
+    const remaining: ActiveObservationWindow[] = [];
+
+    for (const win of this.activeWindows) {
+      if (win.lastEvaluatedBarIndex === currentBarIndex) {
+        remaining.push(win);
+        continue;
+      }
+
+      // 1. 结构破位清退：若 win.stopLossPrice != null && bar.close < win.stopLossPrice，立即作废注销
+      const action =
+        win.rule.action ??
+        (win.triggerSignal.signalKind === 'exit' ? 'SELL' : 'BUY');
+      const isBroken =
+        action === 'SELL'
+          ? win.stopLossPrice != null && bar.close > win.stopLossPrice
+          : win.stopLossPrice != null && bar.close < win.stopLossPrice;
+
+      if (win.rule.invalidateOnPivotBreak !== false && isBroken) {
+        continue;
+      }
+
+      // 2. 孕线包含判断
+      const isContained =
+        bar.high <= win.lastBarRange.high && bar.low >= win.lastBarRange.low;
+
+      // 3. 倒计时推进
+      if (isContained && win.heldContainmentBars < win.maxContainmentHoldBars) {
+        win.heldContainmentBars += 1;
+        // 触发形态停顿保活，不递增 elapsedEffectiveBars
+      } else {
+        win.elapsedEffectiveBars += 1;
+        win.lastBarRange = { high: bar.high, low: bar.low };
+      }
+
+      // 4. 超时判定：若 win.elapsedEffectiveBars > win.targetWindowBars，则窗口超时注销
+      if (win.elapsedEffectiveBars > win.targetWindowBars) {
+        continue;
+      }
+
+      win.lastEvaluatedBarIndex = currentBarIndex;
+      remaining.push(win);
+    }
+
+    this.activeWindows = remaining;
   }
 
   private signalMatchesTag(signal: KernelSignal, tag: string): boolean {

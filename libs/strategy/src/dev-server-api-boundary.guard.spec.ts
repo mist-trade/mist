@@ -4,12 +4,22 @@ import { join } from 'node:path';
 describe('Dev Server API & Confidentiality Boundary Guard (本地开发服务器与保密门禁)', () => {
   const repositoryRoot = process.cwd();
   const serverPath = join(repositoryRoot, 'tools', 'strategy-dev', 'server.ts');
-  const openspecDir = join(
+  const activeOpenspecDir = join(
     repositoryRoot,
     'openspec',
     'changes',
     'evaluate-private-tactical-strategies',
   );
+  const archivedOpenspecDir = join(
+    repositoryRoot,
+    'openspec',
+    'changes',
+    'archive',
+    '2026-10-28-evaluate-private-tactical-strategies',
+  );
+  const openspecDir = existsSync(activeOpenspecDir)
+    ? activeOpenspecDir
+    : archivedOpenspecDir;
 
   it('1. server.ts 必须存在且提供标准 POST /v1/strategy-backtests 接口', () => {
     expect(existsSync(serverPath)).toBe(true);

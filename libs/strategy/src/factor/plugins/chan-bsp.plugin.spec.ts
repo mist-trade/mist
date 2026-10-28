@@ -302,4 +302,84 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
     expect(op.evidence?.pivotTime).toBe(pivotTime.toISOString());
     expect(op.evidence?.pivotPrice).toBe(3900);
   });
+
+  it('透传官方合并K线 geometry.mergedKs，并正确计算 latestMergedIndex 与 isLatestContained', async () => {
+    const baseTime = new Date('2025-09-15T09:30:00.000Z');
+    // 构造 60 根连续 K 线，最后一根不包含（突破新高）
+    const barsNonContained = Array.from({ length: 60 }, (_, i) => {
+      const time = new Date(baseTime.getTime() + i * 60000);
+      const bar = makeMockProjectedBar(time, 5);
+      const high = 10 + i * 0.1;
+      const low = 9 + i * 0.1;
+      const close = 9.5 + i * 0.1;
+      bar.ohlc.effective = { open: low, high, low, close };
+      bar.ohlc.raw = { open: low, high, low, close };
+      return bar;
+    });
+
+    const attributesNonContained = new Map<string, any>();
+    const contextNonContained = {
+      securityId: 1,
+      securityCode: '000001',
+      timestamp: new Date(baseTime.getTime() + 60 * 60000),
+      period: 5,
+      bars: barsNonContained,
+      attributes: attributesNonContained,
+    };
+
+    await plugin.evaluate(contextNonContained as any);
+    const geometry1 = attributesNonContained.get('chan.geometry');
+    expect(geometry1).toBeDefined();
+    expect(geometry1.mergedKs).toBeDefined();
+    expect(Array.isArray(geometry1.mergedKs)).toBe(true);
+    expect(geometry1.mergedKs.length).toBeGreaterThan(0);
+    expect(geometry1.latestMergedIndex).toBe(geometry1.mergedKs.length - 1);
+    expect(geometry1.isLatestContained).toBe(false);
+
+    const firstMerged = geometry1.mergedKs[0];
+    expect(typeof firstMerged.index).toBe('number');
+    expect(typeof firstMerged.high).toBe('number');
+    expect(typeof firstMerged.low).toBe('number');
+    expect(typeof firstMerged.startTime).toBe('string');
+    expect(typeof firstMerged.endTime).toBe('string');
+    expect(typeof firstMerged.trend).toBe('string');
+    expect(typeof firstMerged.mergedCount).toBe('number');
+
+    // 构造第 60 根为孕线（完全落在第 59 根的 high 与 low 之内）
+    const barsContained = Array.from({ length: 60 }, (_, i) => {
+      const time = new Date(baseTime.getTime() + i * 60000);
+      const bar = makeMockProjectedBar(time, 5);
+      if (i === 58) {
+        // 第 59 根：宽幅包容线
+        bar.ohlc.effective = { open: 15, high: 20, low: 10, close: 16 };
+      } else if (i === 59) {
+        // 第 60 根：孕线包含在第 59 根内
+        bar.ohlc.effective = { open: 14, high: 16, low: 13, close: 15 };
+      } else {
+        const high = 10 + i * 0.05;
+        const low = 9 + i * 0.05;
+        bar.ohlc.effective = { open: low, high, low, close: high };
+      }
+      bar.ohlc.raw = bar.ohlc.effective;
+      return bar;
+    });
+
+    const attributesContained = new Map<string, any>();
+    const contextContained = {
+      securityId: 1,
+      securityCode: '000001',
+      timestamp: new Date(baseTime.getTime() + 60 * 60000),
+      period: 5,
+      bars: barsContained,
+      attributes: attributesContained,
+    };
+
+    await plugin.evaluate(contextContained as any);
+    const geometry2 = attributesContained.get('chan.geometry');
+    expect(geometry2).toBeDefined();
+    expect(geometry2.isLatestContained).toBe(true);
+    expect(
+      geometry2.mergedKs[geometry2.latestMergedIndex].mergedCount,
+    ).toBeGreaterThan(1);
+  });
 });

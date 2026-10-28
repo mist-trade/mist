@@ -91,12 +91,25 @@ export interface ChanBiGeometry {
   readonly trend?: string;
 }
 
+export interface ChanMergedKGeometry {
+  readonly index: number;
+  readonly high: number;
+  readonly low: number;
+  readonly startTime: string;
+  readonly endTime: string;
+  readonly trend: string;
+  readonly mergedCount: number;
+}
+
 export interface ChanGeometryPayload {
   readonly channels: readonly ChanZhongshuGeometry[];
   readonly bis: readonly ChanBiGeometry[];
   readonly fenxings?: readonly unknown[];
   readonly latestChannel?: ChanZhongshuGeometry;
   readonly latestBi?: ChanBiGeometry;
+  readonly mergedKs?: readonly ChanMergedKGeometry[];
+  readonly latestMergedIndex?: number;
+  readonly isLatestContained?: boolean;
 }
 
 interface ScopeCursorRecord {
@@ -438,6 +451,27 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       trend: b.trend,
     }));
 
+    const mergedKsRaw = ChanCore.mergeK(klines);
+    const mergedKs: ChanMergedKGeometry[] = mergedKsRaw.map((mk, idx) => ({
+      index: idx,
+      high: mk.high,
+      low: mk.low,
+      startTime: mk.startTime.toISOString(),
+      endTime: mk.endTime.toISOString(),
+      trend: mk.trend,
+      mergedCount: mk.mergedCount,
+    }));
+    const latestMergedIndex = mergedKs.length > 0 ? mergedKs.length - 1 : 0;
+    const lastK = klines.length > 0 ? klines[klines.length - 1] : undefined;
+    const lastMerged =
+      mergedKsRaw.length > 0 ? mergedKsRaw[mergedKsRaw.length - 1] : undefined;
+    const isLatestContained = Boolean(
+      lastMerged &&
+        lastK &&
+        lastMerged.mergedIds.length > 1 &&
+        lastMerged.mergedIds[lastMerged.mergedIds.length - 1] === lastK.id,
+    );
+
     return {
       channels: channelsGeometry,
       bis: bisGeometry,
@@ -449,6 +483,9 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         bisGeometry.length > 0
           ? bisGeometry[bisGeometry.length - 1]
           : undefined,
+      mergedKs,
+      latestMergedIndex,
+      isLatestContained,
     };
   }
 

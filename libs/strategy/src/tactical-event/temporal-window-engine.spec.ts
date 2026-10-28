@@ -4,7 +4,12 @@ import type { TacticalWindowRule } from './tactical-event.types';
 import { TemporalWindowEngine } from './temporal-window-engine';
 
 describe('TemporalWindowEngine', () => {
-  function createBar(timestamp: string, close = 10.0): StrategyBar {
+  function createBar(
+    timestamp: string,
+    close = 10.0,
+    high?: number,
+    low?: number,
+  ): StrategyBar {
     return {
       securityId: 1,
       securityCode: '600519',
@@ -12,8 +17,8 @@ describe('TemporalWindowEngine', () => {
       period: 5,
       timestamp: new Date(timestamp),
       open: close - 0.1,
-      high: close + 0.2,
-      low: close - 0.2,
+      high: high ?? close + 0.2,
+      low: low ?? close - 0.2,
       close,
       volume: '10000',
       amount: '100000',
@@ -32,6 +37,7 @@ describe('TemporalWindowEngine', () => {
     pivotPrice?: number | null;
     time?: Date;
     confidence?: number;
+    evidence?: Record<string, unknown>;
   }): KernelSignal {
     const signalTime = params.time ?? new Date('2026-10-28T09:30:00.000Z');
     return {
@@ -52,9 +58,10 @@ describe('TemporalWindowEngine', () => {
       decisionTrace: {
         action: params.action ?? 'BUY',
       },
+      evidence: params.evidence,
       contextSnapshot: {},
       ruleSnapshot: {},
-    };
+    } as any;
   }
 
   it('directly generates single-point TacticalEvent if trigger signal has no configured observation window', () => {
@@ -330,5 +337,221 @@ describe('TemporalWindowEngine', () => {
     expect(events[0].badgeText).toBe('战术买点+爆发');
     expect(events[0].confidence).toBeGreaterThan(0.8);
     expect(events[0].confirmingSignals).toHaveLength(2); // vpci_surge + squeeze_fire
+  });
+
+  it('holds window alive on inside bars without consuming effective window bars, and synthesizes event when confirmed', () => {
+    // 规则：windowBars: 2, maxContainmentHoldBars: 2
+    const rules: TacticalWindowRule[] = [
+      {
+        triggerTag: 'chan_1b',
+        windowBars: 2,
+        maxContainmentHoldBars: 2,
+        requiredConfirmationTags: ['vpci_surge'],
+        compositeBadgeText: '1买+放量',
+      },
+    ];
+    const engine = new TemporalWindowEngine(rules);
+
+    // t=0: 开窗基准 Bar (high: 10.5, low: 9.5, close: 10.0)
+    const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0, 10.5, 9.5);
+    const triggerSignal = createSignal({
+      signalType: 'chan_1b',
+      displayTag: 'chan_1b',
+      time: bar0.timestamp,
+      pivotPrice: 9.2,
+    });
+    engine.push(triggerSignal, bar0, 0);
+
+    expect(engine.getActiveWindows()).toHaveLength(1);
+    const win = engine.getActiveWindows()[0];
+    expect(win.elapsedEffectiveBars).toBe(0);
+    expect(win.heldContainmentBars).toBe(0);
+
+    // t=1: 孕线十字星 1 (high: 10.2, low: 9.8, close: 10.0)
+    const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.0, 10.2, 9.8);
+    engine.onBar(bar1, 1);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+    expect(win.heldContainmentBars).toBe(1);
+    expect(win.elapsedEffectiveBars).toBe(0);
+
+    // t=2: 孕线十字星 2 (high: 10.1, low: 9.9, close: 10.0)
+    const bar2 = createBar('2026-10-28T09:40:00.000Z', 10.0, 10.1, 9.9);
+    engine.onBar(bar2, 2);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+    expect(win.heldContainmentBars).toBe(2);
+    expect(win.elapsedEffectiveBars).toBe(0);
+
+    // t=3: 第 3 根突破放量确认 (high: 10.8, low: 9.9, close: 10.6)
+    // 此时物理已过 3 根，若无保活机制 (windowBars=2) 早已超时注销；
+    // 但因前 2 根为孕线保活，此处 elapsedEffectiveBars 仅为 1 <= 2，成功合成！
+    const bar3 = createBar('2026-10-28T09:45:00.000Z', 10.6, 10.8, 9.9);
+    const confirmSignal = createSignal({
+      signalType: 'vpci_surge',
+      displayTag: 'vpci_surge',
+      time: bar3.timestamp,
+    });
+    const events = engine.push(confirmSignal, bar3, 3);
+    expect(events).toHaveLength(1);
+    expect(events[0].badgeText).toBe('1买+放量');
+    expect(events[0].elapsedBars).toBe(3);
+    expect(engine.getActiveWindows()).toHaveLength(0);
+  });
+
+  it('starts deducting effective bars when containment hold quota is exhausted and cancels on timeout', () => {
+    // 规则：windowBars: 1, maxContainmentHoldBars: 2
+    const rules: TacticalWindowRule[] = [
+      {
+        triggerTag: 'chan_1b',
+        windowBars: 1,
+        maxContainmentHoldBars: 2,
+        requiredConfirmationTags: ['vpci_surge'],
+        compositeBadgeText: '1买+放量',
+      },
+    ];
+    const engine = new TemporalWindowEngine(rules);
+
+    // t=0: 开窗基准 Bar (high: 10.5, low: 9.5, close: 10.0)
+    const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0, 10.5, 9.5);
+    const triggerSignal = createSignal({
+      signalType: 'chan_1b',
+      displayTag: 'chan_1b',
+      time: bar0.timestamp,
+    });
+    engine.push(triggerSignal, bar0, 0);
+
+    const win = engine.getActiveWindows()[0];
+
+    // t=1: 孕线 1 (held=1, elapsed=0)
+    const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.0, 10.3, 9.7);
+    engine.onBar(bar1, 1);
+    expect(win.heldContainmentBars).toBe(1);
+    expect(win.elapsedEffectiveBars).toBe(0);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+
+    // t=2: 孕线 2 (held=2, elapsed=0) - 达到配额上限 2
+    const bar2 = createBar('2026-10-28T09:40:00.000Z', 10.0, 10.2, 9.8);
+    engine.onBar(bar2, 2);
+    expect(win.heldContainmentBars).toBe(2);
+    expect(win.elapsedEffectiveBars).toBe(0);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+
+    // t=3: 孕线 3 (虽仍为包含，但配额已耗尽，开始消耗有效步长 elapsed=1 <= windowBars=1)
+    const bar3 = createBar('2026-10-28T09:45:00.000Z', 10.0, 10.1, 9.9);
+    engine.onBar(bar3, 3);
+    expect(win.heldContainmentBars).toBe(2);
+    expect(win.elapsedEffectiveBars).toBe(1);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+
+    // t=4: 无论是否包含，步长累计为 elapsed=2 > windowBars=1，超时清退！
+    const bar4 = createBar('2026-10-28T09:50:00.000Z', 10.0, 10.05, 9.95);
+    engine.onBar(bar4, 4);
+    expect(engine.getActiveWindows()).toHaveLength(0);
+  });
+
+  it('invalidates observation window immediately when close drops below pivotPrice and rejects subsequent confirmations', () => {
+    const rules: TacticalWindowRule[] = [
+      {
+        triggerTag: 'chan_1b',
+        windowBars: 3,
+        requiredConfirmationTags: ['vpci_surge'],
+        compositeBadgeText: '1买+放量',
+      },
+    ];
+    const engine = new TemporalWindowEngine(rules);
+
+    // t=0: 一买扳机开窗 (pivotPrice: 9.8, close: 10.0)
+    const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0, 10.2, 9.8);
+    const triggerSignal = createSignal({
+      signalType: 'chan_1b',
+      displayTag: 'chan_1b',
+      pivotPrice: 9.8,
+      triggerPrice: 10.0,
+      time: bar0.timestamp,
+    });
+    engine.push(triggerSignal, bar0, 0);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+
+    // t=1: 突发破位大阴线，收盘价 9.5 跌破 pivotPrice 9.8
+    const bar1 = createBar('2026-10-28T09:35:00.000Z', 9.5, 9.9, 9.4);
+    engine.onBar(bar1, 1);
+    // 窗口应被立即清退作废
+    expect(engine.getActiveWindows()).toHaveLength(0);
+
+    // t=2: 即使后续出现反弹放量，也绝不触发合成事件
+    const bar2 = createBar('2026-10-28T09:40:00.000Z', 10.2, 10.3, 9.6);
+    const confirmSignal = createSignal({
+      signalType: 'vpci_surge',
+      displayTag: 'vpci_surge',
+      time: bar2.timestamp,
+    });
+    const events = engine.push(confirmSignal, bar2, 2);
+    expect(events).toHaveLength(0);
+    expect(engine.getActiveWindows()).toHaveLength(0);
+  });
+
+  it('allows signal.evidence to autonomously override rule windowBars and maxContainmentHoldBars', () => {
+    const rules: TacticalWindowRule[] = [
+      {
+        triggerTag: 'chan_1b',
+        windowBars: 2, // 默认规则为 2
+        maxContainmentHoldBars: 1, // 默认规则为 1
+        requiredConfirmationTags: ['vpci_surge'],
+        compositeBadgeText: '自适应买点+放量',
+      },
+    ];
+    const engine = new TemporalWindowEngine(rules);
+
+    // t=0: 扳机信号通过 evidence 自主携带策略
+    const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0, 10.5, 9.5);
+    const triggerSignal = createSignal({
+      signalType: 'chan_1b',
+      displayTag: 'chan_1b',
+      time: bar0.timestamp,
+      evidence: {
+        windowBars: 5,
+        maxContainmentHoldBars: 3,
+      },
+    });
+
+    engine.push(triggerSignal, bar0, 0);
+    expect(engine.getActiveWindows()).toHaveLength(1);
+
+    const win = engine.getActiveWindows()[0];
+    expect(win.targetWindowBars).toBe(5);
+    expect(win.maxContainmentHoldBars).toBe(3);
+
+    // 连续 3 根孕线保活 (held=1, 2, 3，均在自主配额 3 范围内)
+    const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.0, 10.3, 9.7);
+    engine.onBar(bar1, 1);
+    expect(win.heldContainmentBars).toBe(1);
+    expect(win.elapsedEffectiveBars).toBe(0);
+
+    const bar2 = createBar('2026-10-28T09:40:00.000Z', 10.0, 10.2, 9.8);
+    engine.onBar(bar2, 2);
+    expect(win.heldContainmentBars).toBe(2);
+    expect(win.elapsedEffectiveBars).toBe(0);
+
+    const bar3 = createBar('2026-10-28T09:45:00.000Z', 10.0, 10.1, 9.9);
+    engine.onBar(bar3, 3);
+    expect(win.heldContainmentBars).toBe(3);
+    expect(win.elapsedEffectiveBars).toBe(0);
+
+    // 随后持续推进 5 根有效非包含 Bar (elapsed 1..5 <= 5，窗口持续存活)
+    for (let i = 1; i <= 5; i++) {
+      const bar = createBar(
+        `2026-10-28T09:${45 + i * 5}:00.000Z`,
+        10.0 + i * 0.2,
+        10.5 + i * 0.2,
+        9.5 + i * 0.2,
+      );
+      engine.onBar(bar, 3 + i);
+      expect(win.elapsedEffectiveBars).toBe(i);
+      expect(engine.getActiveWindows()).toHaveLength(1);
+    }
+
+    // 第 6 根有效非包含 Bar：elapsed = 6 > 5，超时注销
+    const bar9 = createBar('2026-10-28T10:15:00.000Z', 11.5, 12.0, 11.0);
+    engine.onBar(bar9, 9);
+    expect(engine.getActiveWindows()).toHaveLength(0);
   });
 });
