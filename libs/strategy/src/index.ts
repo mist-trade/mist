@@ -55,6 +55,7 @@ export * from './factor';
 export * from './decision-flow';
 export * from './simulation';
 export * from './kernel';
+export * from './tactical-event';
 export * from './execution';
 export * from './position';
 export * from './stress-testing';

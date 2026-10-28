@@ -1,5 +1,31 @@
 import type { KernelSignal } from '../kernel/kernel.types';
+import type { TacticalEvent } from '../tactical-event/tactical-event.types';
 import type { SimulationSignal } from './strategy-simulation.types';
+
+/**
+ * 战术事件 → 推演会话展示信号（SimulationSignal）。
+ * 用于前端图表战术买卖点展示层。
+ */
+export function mapTacticalEventToSimulationSignal(
+  event: TacticalEvent,
+  options: { readonly securityCode: string; readonly period: number },
+): SimulationSignal {
+  const isBuy = event.action === 'BUY';
+  return {
+    signalTime: event.timestamp.toISOString(),
+    triggerTime: event.timestamp.toISOString(),
+    pivotTime: event.pivotTime ?? event.timestamp.toISOString(),
+    pivotPrice: event.pivotPrice ?? event.triggerPrice,
+    triggerPrice: event.triggerPrice,
+    signalType: event.displayTag,
+    badgeText: event.badgeText,
+    isBuy,
+    confidence: event.confidence,
+    decisionTrace: event.triggerSignal.decisionTrace,
+    securityCode: options.securityCode,
+    period: options.period,
+  };
+}
 
 /**
  * 内核信号 → 推演会话展示信号（SimulationSignal）。
