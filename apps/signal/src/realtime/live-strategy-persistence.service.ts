@@ -34,7 +34,9 @@ export class LiveStrategyPersistenceService {
 
   async persist(
     candidate: ShadowStrategyCandidate,
+    options?: { isTacticalEvent?: boolean },
   ): Promise<LiveStrategyPersistenceOutcome> {
+    const isTactical = options?.isTacticalEvent ?? true;
     let alertEventId: number | null = null;
     try {
       await this.dataSource.transaction(async (manager) => {
@@ -63,21 +65,27 @@ export class LiveStrategyPersistenceService {
           ruleSnapshot: payload.ruleSnapshot,
         });
         const savedSignal = await manager.save(StrategySignal, signal);
-        const alert = manager.create(StrategyAlertEvent, {
-          strategySignalId: savedSignal.id,
-          status: StrategyAlertStatus.PENDING,
-          dedupeKey: liveStrategyAlertDedupeKey(candidate),
-          cooldownUntil: null,
-          deliveryResult: null,
-          acknowledgedAt: null,
-        });
-        const savedAlert = await manager.save(StrategyAlertEvent, alert);
-        alertEventId = savedAlert.id;
+
+        // 仅经战术事件汇聚层确认的有效战术买卖事件才生成告警事件，杜绝状态类插件引发通知风暴
+        if (isTactical) {
+          const alert = manager.create(StrategyAlertEvent, {
+            strategySignalId: savedSignal.id,
+            status: StrategyAlertStatus.PENDING,
+            dedupeKey: liveStrategyAlertDedupeKey(candidate),
+            cooldownUntil: null,
+            deliveryResult: null,
+            acknowledgedAt: null,
+          });
+          const savedAlert = await manager.save(StrategyAlertEvent, alert);
+          alertEventId = savedAlert.id;
+        }
       });
       // Post-commit enqueue (best-effort): the Signal/AlertEvent is already
       // committed; an enqueue failure MUST NOT fail persist. The event remains
       // PENDING for a later reconciliation sweep (dual-write window accepted).
-      await this.enqueueDelivery(alertEventId);
+      if (alertEventId !== null) {
+        await this.enqueueDelivery(alertEventId);
+      }
       return 'created';
     } catch (error) {
       if (isUniqueConstraintViolation(error, ALERT_DEDUPE_CONSTRAINT)) {

@@ -1,3 +1,8 @@
+/**
+ * @deprecated 存量规则 DSL 求值器。
+ * 仅供 LegacyRuleDslPlugin 内部在决策流门禁节点中作为叶子适配执行。
+ * 统一执行管线严禁直接绕过内核调用此求值器。
+ */
 import { Decimal8, type Decimal8Comparison } from '@app/decimal';
 import type {
   CompiledStrategyCondition,

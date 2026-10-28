@@ -57,7 +57,10 @@ import {
   mapKernelSignalToSimulationSignal,
   mapTacticalEventToSimulationSignal,
 } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
-import { TacticalEventAggregator } from '../../libs/strategy/src/tactical-event';
+import {
+  TacticalEventAggregator,
+  DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+} from '../../libs/strategy/src/tactical-event';
 import type { StrategySignalKind } from '../../libs/strategy/src/rules/strategy-rule.types';
 import {
   loadCanonicalKlines,
@@ -1052,32 +1055,9 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   let evalBarCount = 0;
   let pushCount = 0;
 
-  const tacticalAggregator = new TacticalEventAggregator({
-    edgePlugins: [
-      'plugin.regime.shanghai-index',
-      'plugin.tactics.bull-left-right-bsp',
-      'plugin.tactics.bear-left-right-bsp',
-      'plugin.tactics.volume-price-confirmation',
-    ],
-    windows: [
-      {
-        triggerTag: 'plugin.chan.bsp',
-        windowBars: 5,
-        requiredConfirmationTags: [
-          'plugin.tactics.volume-price-confirmation',
-          'plugin.tactics.volatility-squeeze-fire',
-        ],
-        compositeBadgeText: '战术共振买点',
-      },
-      {
-        triggerTag: 'plugin.tactics.bull-left-right-bsp',
-        windowBars: 3,
-        requiredConfirmationTags: ['plugin.tactics.volume-price-confirmation'],
-        compositeBadgeText: '多头战术+放量确认',
-      },
-    ],
-    cooldownBars: 3,
-  });
+  const tacticalAggregator = new TacticalEventAggregator(
+    DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+  );
 
   const replaySummary = await replaySource.drive(
     kernel,

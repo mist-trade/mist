@@ -33,6 +33,8 @@ import {
   PositionStateMachine,
   SimulatedBroker,
   StrategyEvaluationKernel,
+  TacticalEventAggregator,
+  DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
   shanghaiMidnight,
   type CompiledStoredDefinition,
   type DailyNavSnapshot,
@@ -463,6 +465,9 @@ export class BacktestRunExecutor {
       cashAllocationRatio: 0.995,
       lotSize: TRADING_RULES.MAIN_BOARD_LOT_SIZE,
     });
+    const tacticalAggregator = new TacticalEventAggregator(
+      DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+    );
     let lastSeenBar: StrategyBar | null = null;
 
     const outcome = await source.drive(
@@ -500,17 +505,21 @@ export class BacktestRunExecutor {
         matchedCodes.add(securityCode);
         onSignal();
 
-        const orderDraft = arbiter.arbitrate({
-          bar,
-          signal,
-          position: positionMachine.getSnapshot(),
-          availableCash: positionMachine.getCash(),
-        });
-        if (
-          orderDraft &&
-          !broker.getOpenOrders().some((o) => o.securityCode === securityCode)
-        ) {
-          broker.submitOrder(orderDraft);
+        // 经战术事件汇聚层过滤/合成后下达交易撮合指令
+        const tacticalEvents = tacticalAggregator.push([signal], bar);
+        for (const te of tacticalEvents) {
+          const orderDraft = arbiter.arbitrate({
+            bar,
+            signal: te.triggerSignal,
+            position: positionMachine.getSnapshot(),
+            availableCash: positionMachine.getCash(),
+          });
+          if (
+            orderDraft &&
+            !broker.getOpenOrders().some((o) => o.securityCode === securityCode)
+          ) {
+            broker.submitOrder(orderDraft);
+          }
         }
 
         if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
@@ -519,6 +528,23 @@ export class BacktestRunExecutor {
       async (bar) => {
         budget.consume();
         lastSeenBar = bar;
+
+        // 窗口引擎超时修剪与延迟合成事件
+        const timeoutEvents = tacticalAggregator.onBar(bar);
+        for (const te of timeoutEvents) {
+          const orderDraft = arbiter.arbitrate({
+            bar,
+            signal: te.triggerSignal,
+            position: positionMachine.getSnapshot(),
+            availableCash: positionMachine.getCash(),
+          });
+          if (
+            orderDraft &&
+            !broker.getOpenOrders().some((o) => o.securityCode === securityCode)
+          ) {
+            broker.submitOrder(orderDraft);
+          }
+        }
 
         const fills = broker.onBar(bar);
         for (const fill of fills) {

@@ -56,3 +56,38 @@ export interface ActiveObservationWindow {
   readonly confirmingSignals: KernelSignal[];
   readonly pendingTags: Set<string>;
 }
+
+/**
+ * 全系统标准战术汇聚层默认配置。
+ * 供回测运行时（apps/backtest）、实时告警（apps/signal）与推演开发网关（tools/strategy-dev）共用，
+ * 保持三链路同构。
+ */
+export const DEFAULT_TACTICAL_AGGREGATOR_CONFIG: TacticalAggregatorConfig =
+  Object.freeze({
+    edgePlugins: Object.freeze([
+      'plugin.regime.shanghai-index',
+      'plugin.tactics.bull-left-right-bsp',
+      'plugin.tactics.bear-left-right-bsp',
+      'plugin.tactics.volume-price-confirmation',
+    ]),
+    windows: Object.freeze([
+      Object.freeze({
+        triggerTag: 'plugin.chan.bsp',
+        windowBars: 5,
+        requiredConfirmationTags: Object.freeze([
+          'plugin.tactics.volume-price-confirmation',
+          'plugin.tactics.volatility-squeeze-fire',
+        ]),
+        compositeBadgeText: '战术共振买点',
+      }),
+      Object.freeze({
+        triggerTag: 'plugin.tactics.bull-left-right-bsp',
+        windowBars: 3,
+        requiredConfirmationTags: Object.freeze([
+          'plugin.tactics.volume-price-confirmation',
+        ]),
+        compositeBadgeText: '多头战术+放量确认',
+      }),
+    ]),
+    cooldownBars: 3,
+  });

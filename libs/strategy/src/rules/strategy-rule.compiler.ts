@@ -1,3 +1,8 @@
+/**
+ * @deprecated 存量规则 DSL 编译适配器。
+ * 仅用于兼容旧版规则向决策流树（Decision Flow Tree）的平滑过渡。
+ * 全系统核心计算引擎现已统一收敛至 StrategyEvaluationKernel 与 DecisionFlowEvaluator。
+ */
 import { Decimal8, normalizeExternalDecimalText } from '@app/decimal';
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);

@@ -1,7 +1,7 @@
 # tactical-event-pipeline Specification
 
 ## Purpose
-TBD - created by archiving change add-tactical-event-aggregation-layer. Update Purpose after archive.
+Defines the dedicated Tactical Event Aggregation Layer between the pure mathematical signal layer (StrategyEvaluationKernel) and downstream consumers (trading execution broker, notification alerts, and frontend visualization), providing edge-detection, temporal window consensus, and tactical cooldown.
 ## Requirements
 ### Requirement: Dedicated Tactical Event Aggregation Layer
 The system SHALL provide an independent `TacticalEventAggregator` between the raw signal output of `StrategyEvaluationKernel` and downstream consumers (`SimulatedBroker`, `ExecutionRiskArbiter`, `LiveStrategyPersistenceService`, and frontend visualization). The raw signal layer SHALL remain 100% pure without delivery-level suppression or hidden mutation.
