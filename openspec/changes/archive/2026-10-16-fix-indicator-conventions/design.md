@@ -2,7 +2,7 @@
 
 ## 审计基线
 
-- 范围：`mist@master dae510fb`（工作区含未提交改动）+ `mist-alpha-private@master 3d4a24b`，只读审计。
+- 范围：`mist@master dae510fb`（工作区含未提交改动）+ `external-plugins@master 3d4a24b`，只读审计。
 - 影响链：DB/Redis bars → `k-strategy-bar-mapper` → 内核滑窗（`StrategySeriesImputer`）→ `volume-features.extractor` → 内核黑板 `volumeFeatures` → 因子插件（squeeze / VPCI）与决策流字段（`indicator.kdj.*` / `indicator.macd.*`）。
 - 审计输出为 A 组（算法口径）/ B 组（数据口径）/ C 组（规范缺口）Findings；本 change 仅承接 A 组。
 

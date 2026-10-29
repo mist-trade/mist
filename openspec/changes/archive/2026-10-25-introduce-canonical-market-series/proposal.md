@@ -43,7 +43,7 @@
 | 仓库 | 影响 |
 |---|---|
 | `mist` | 新增 canonical 读取层；回测/指标/可视化 DTO 去掉 `source`；迁移 031（run 记录策略版本、`canonical` 标记值） |
-| `mist-alpha-private` | 新增 `marketDataPolicy` 配置与 provider |
+| `external-plugins` | 新增 `marketDataPolicy` 配置与 provider |
 | `mist-fe` | 回测/缠论/K 线页面移除数据源选择器 |
 | `mist-deploy` | 私有策略目录已挂载（`/app/private-plugins`），无需新增 |
 | 数据库 | 不新增拼接数据行；仅加列与枚举值 |

@@ -1762,10 +1762,10 @@ All HTTP endpoints return responses in a unified format with `success`, `statusC
 | string | `SYSTEMIC_RISK_MELTDOWN` | `libs/strategy/src/execution/execution-risk-arbiter.ts:138:23` | `exitReason: 'SYSTEMIC_RISK_MELTDOWN'` |
 | string | `HARD_STOP_LOSS` | `libs/strategy/src/execution/execution-risk-arbiter.ts:161:23` | `exitReason: 'HARD_STOP_LOSS'` |
 | number | `0.5` | `libs/strategy/src/execution/execution-risk-arbiter.ts:209:40` | `this.cashAllocationRatio * 0.5` |
-| string | `..` | `libs/strategy/src/factor/external-plugin-loader.ts:147:53` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
-| string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:147:59` | `path.resolve(process.cwd(), '..', 'mist-alpha-private')` |
-| string | `../../../../..` | `libs/strategy/src/factor/external-plugin-loader.ts:152:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
-| string | `mist-alpha-private` | `libs/strategy/src/factor/external-plugin-loader.ts:153:7` | `path.resolve( __dirname, '../../../../..', 'mist-alpha-private', )` |
+| string | `..` | `libs/strategy/src/factor/external-plugin-loader.ts:147:53` | `path.resolve(process.cwd(), '..', 'external-plugins')` |
+| string | `external-plugins` | `libs/strategy/src/factor/external-plugin-loader.ts:147:59` | `path.resolve(process.cwd(), '..', 'external-plugins')` |
+| string | `../../../../..` | `libs/strategy/src/factor/external-plugin-loader.ts:152:7` | `path.resolve( __dirname, '../../../../..', 'external-plugins', )` |
+| string | `external-plugins` | `libs/strategy/src/factor/external-plugin-loader.ts:153:7` | `path.resolve( __dirname, '../../../../..', 'external-plugins', )` |
 | string | `require` | `libs/strategy/src/factor/external-plugin-loader.ts:248:18` | `eval('require')` |
 | number | `50` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:152:35` | `bars.length > 50` |
 | number | `-50` | `libs/strategy/src/factor/helpers/volume-features.extractor.ts:152:51` | `bars.slice(-50)` |
@@ -2204,7 +2204,7 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `guard_bull_tactics` | `tools/strategy-dev/server.ts:527:17` | `id: 'guard_bull_tactics'` |
 | string | `GUARD` | `tools/strategy-dev/server.ts:528:19` | `type: 'GUARD'` |
 | string | `牛市微观左右侧战术增强` | `tools/strategy-dev/server.ts:529:19` | `name: '牛市微观左右侧战术增强'` |
-| string | `plugin.tactics.bull-left-right-bsp` | `tools/strategy-dev/server.ts:530:23` | `pluginId: 'plugin.tactics.bull-left-right-bsp'` |
+| string | `plugin.tactics.external-bull-bsp` | `tools/strategy-dev/server.ts:530:23` | `pluginId: 'plugin.tactics.external-bull-bsp'` |
 | string | `BOTH` | `tools/strategy-dev/server.ts:532:29` | `requiredAction: 'BOTH'` |
 | number | `0.5` | `tools/strategy-dev/server.ts:533:28` | `minConfidence: 0.5` |
 | string | `term_bull_tactics_pass` | `tools/strategy-dev/server.ts:535:19` | `id: 'term_bull_tactics_pass'` |
@@ -2226,7 +2226,7 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `guard_bear_tactics` | `tools/strategy-dev/server.ts:560:15` | `id: 'guard_bear_tactics'` |
 | string | `GUARD` | `tools/strategy-dev/server.ts:561:17` | `type: 'GUARD'` |
 | string | `熊市左右侧战术研判门禁` | `tools/strategy-dev/server.ts:562:17` | `name: '熊市左右侧战术研判门禁'` |
-| string | `plugin.tactics.bear-left-right-bsp` | `tools/strategy-dev/server.ts:563:21` | `pluginId: 'plugin.tactics.bear-left-right-bsp'` |
+| string | `plugin.tactics.external-bear-bsp` | `tools/strategy-dev/server.ts:563:21` | `pluginId: 'plugin.tactics.external-bear-bsp'` |
 | string | `BOTH` | `tools/strategy-dev/server.ts:565:27` | `requiredAction: 'BOTH'` |
 | number | `0.5` | `tools/strategy-dev/server.ts:566:26` | `minConfidence: 0.5` |
 | string | `term_bear_tactics_pass` | `tools/strategy-dev/server.ts:568:17` | `id: 'term_bear_tactics_pass'` |
@@ -2269,7 +2269,7 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `guard_bull_tactics` | `tools/strategy-dev/server.ts:629:15` | `id: 'guard_bull_tactics'` |
 | string | `GUARD` | `tools/strategy-dev/server.ts:630:17` | `type: 'GUARD'` |
 | string | `牛市微观左右侧战术增强` | `tools/strategy-dev/server.ts:631:17` | `name: '牛市微观左右侧战术增强'` |
-| string | `plugin.tactics.bull-left-right-bsp` | `tools/strategy-dev/server.ts:632:21` | `pluginId: 'plugin.tactics.bull-left-right-bsp'` |
+| string | `plugin.tactics.external-bull-bsp` | `tools/strategy-dev/server.ts:632:21` | `pluginId: 'plugin.tactics.external-bull-bsp'` |
 | string | `BOTH` | `tools/strategy-dev/server.ts:634:27` | `requiredAction: 'BOTH'` |
 | number | `0.5` | `tools/strategy-dev/server.ts:635:26` | `minConfidence: 0.5` |
 | string | `term_bull_tactics_pass` | `tools/strategy-dev/server.ts:637:17` | `id: 'term_bull_tactics_pass'` |
@@ -2291,7 +2291,7 @@ Caused by: ` | `libs/transport/src/rpc/rpc-exception.filter.ts:91:22` | `traces.
 | string | `guard_bear_tactics` | `tools/strategy-dev/server.ts:661:15` | `id: 'guard_bear_tactics'` |
 | string | `GUARD` | `tools/strategy-dev/server.ts:662:17` | `type: 'GUARD'` |
 | string | `熊市左右侧战术研判门禁` | `tools/strategy-dev/server.ts:663:17` | `name: '熊市左右侧战术研判门禁'` |
-| string | `plugin.tactics.bear-left-right-bsp` | `tools/strategy-dev/server.ts:664:21` | `pluginId: 'plugin.tactics.bear-left-right-bsp'` |
+| string | `plugin.tactics.external-bear-bsp` | `tools/strategy-dev/server.ts:664:21` | `pluginId: 'plugin.tactics.external-bear-bsp'` |
 | string | `BOTH` | `tools/strategy-dev/server.ts:666:27` | `requiredAction: 'BOTH'` |
 | number | `0.5` | `tools/strategy-dev/server.ts:667:26` | `minConfidence: 0.5` |
 | string | `term_bear_tactics_pass` | `tools/strategy-dev/server.ts:669:17` | `id: 'term_bear_tactics_pass'` |

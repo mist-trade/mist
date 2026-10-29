@@ -24,9 +24,9 @@ The local development gateway (`tools/strategy-dev/server.ts`) SHALL expose a st
 - **AND** MUST NOT silently evaluate with an empty context window
 
 #### Scenario: Stored definition replay via local export
-- **WHEN** a backtest request references a `strategyDefinitionId` whose definition version JSON has been exported to the private-repo definitions directory (`mist-alpha-private/market-data/strategy-definitions/`)
+- **WHEN** a backtest request references a `strategyDefinitionId` whose definition version JSON has been exported to the external definitions directory
 - **THEN** server MUST compile it via the shared stored-definition compile boundary (producing flow and `contextRequirements` identically to the production backtest runtime)
-- **AND** exported definition files MUST live only in the private repo (they may contain proprietary plugin parameters)
+- **AND** exported definition files MUST live only in external storage to preserve proprietary parameter confidentiality
 
 ### Requirement: Dev Server Shall Support Five Preset Stress Scenarios
 When `runStressSuite` is requested or configured, the local development gateway SHALL execute the five standard historical A-share stress scenarios (`CRASH_2015`, `CIRCUIT_2016`, `BEAR_2018`, `SQUEEZE_2024`, `PULSE_2024`) via `StressTestingSuiteOrchestrator` and return the consolidated health card.

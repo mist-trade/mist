@@ -134,7 +134,7 @@ export class CanonicalPolicyLoader {
 }
 ```
 
-- 候选路径复用现有约定：`MIST_PRIVATE_PLUGINS_DIR` → 同级 `../mist-alpha-private`；
+- 候选路径复用现有约定：`MIST_PRIVATE_PLUGINS_DIR` → 同级 `../external-plugins`；
 - 私有入口导出约定：`export const marketDataPolicy: SplicePolicyProvider`（或 `marketDataPolicies: SplicePolicyProvider[]`，取 id 匹配）；
 - 与 `ExternalFactorPluginLoader` 共用"路径解析"小工具（把现有 `getCandidatePaths` 抽成 `private-module-paths.ts`，现有加载器改为调用它，行为不变）。
 
@@ -264,7 +264,7 @@ export interface StrategyReplayPageCriteria {
 - `BacktestConfigPanel.tsx`、`DualTimeframeChanPage.tsx`、`KLineLivePage.tsx`：移除数据源下拉；
 - 保留 `DataSourceValue` 给实时订阅页。
 
-## 8. 私有仓（`mist-alpha-private`）
+## 8. 私有仓（`external-plugins`）
 
 ```
 src/market-data/policy.ts        // SplicePolicy 常量（5m/30m/1d 三段规则）

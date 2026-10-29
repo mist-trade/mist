@@ -7,7 +7,7 @@
 > `Validate backend` + `Build linux/amd64` 双绿佐证。本次落地仅复核。
 
 - [x] 1.1 `libs/strategy/src/factor/external-plugin-loader.spec.ts` 的
-  "automatically discovers peer workspace mist-alpha-private plugins when present" 测试改为
+  "automatically discovers peer workspace external-plugins plugins when present" 测试改为
   私有仓目录存在性守卫（存在 → 断言发现机制有效且不硬编码私有清单；不存在 → 断言 `toEqual([])` 优雅降级）
 - [x] 1.2 本地验证：`npx jest libs/strategy/src/factor/external-plugin-loader.spec.ts` 全绿；
   用 `MIST_PRIVATE_PLUGINS_DIR=/nonexistent` 或临时目录改名复核降级分支

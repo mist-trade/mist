@@ -47,7 +47,7 @@
 ## Phase 4: sync 保真（tools/strategy-dev/sync.ts + provider.ts）
 
 - [x] 4.0 `--definition <id>` 模式：导出 `strategy_definitions` + 最新
-  `strategy_versions.rule` 至私仓 `mist-alpha-private/market-data/strategy-definitions/<id>_v<n>.json`
+  `strategy_versions.rule` 至外部策略目录 `<id>_v<n>.json`
   （gitignored，含私有参数仅存本地）；README 注明保密红线
 - [x] 4.1 SQL：`LEFT JOIN k_quality`；**默认裸值透传（生产回测不消费掩码，对账
   同数据）**；`--mask-quality` opt-in：OHLC 任一掩码失效 → 整行丢弃、量/额失效 →
@@ -69,7 +69,7 @@
 - [x] 5.3 数据同步（操作，2026-10-27）：`pnpm dev:sync --code 000001 --periods 1d,30m,5m` 全量
   - 30m 41,335 行（2005-01-04 → 2026-10-26，vendor_a 38,855 + qmt 2,480）
   - 5m 248,005 行（同区间，紧凑 JSON）；1d 7,464 行（1996→2026-10-15，qmt——生产库日线即此范围）
-  - 数据落点已迁私仓 `mist-alpha-private/market-data/kline/`（随私仓提交 ac4dac9）
+  - 数据落点已迁移外部私有数据目录
 - [x] 5.4 同构对账（验收，2026-10-27 PASS）：`pnpm dev:sync --definition 23` 导出
   （run 48 = strategyVersionId 23 → definition 23 v1）→ 私仓 dist 重建 → dev HTTP
   回测 2005-01-04T00:00+08 → 2026-10-20T23:59+08（strategyDefinitionId=23，

@@ -107,9 +107,8 @@ resolveContextRequirements?(
   无 context 插件的 plan 语义与现状完全一致；
 - rule JSON、DTO、数据库 schema 零改动。
 
-私有仓适配（非公共 spec 范围）：`bull/bear-left-right-bsp` 声明各自需求
-（如 `{5: 120, 1440: 10}`），`resolveSubBars` 改读 `series.5`，日线派生值
-（`daily.ma5` / `prevDailyLow`）由插件从 `series.1440` 自算——策略语义留在私有仓。
+外部插件适配：下游因子插件声明各自多周期需求
+（如 `{5: 120, 1440: 10}`），改读 `series.<period>`，特定衍生指标由插件从相应周期序列自算。
 
 ## 4. 多序列合并推流（回测/推演）
 

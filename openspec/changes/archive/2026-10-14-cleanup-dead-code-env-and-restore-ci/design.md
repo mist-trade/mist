@@ -8,7 +8,7 @@
 push to master
   → docker.yml: validate job (lint/typecheck/test:ci/coverage/ci:contracts)
   → test:ci FAIL: libs/strategy/src/factor/external-plugin-loader.spec.ts
-    "automatically discovers peer workspace mist-alpha-private plugins when present"
+    "automatically discovers peer workspace external-plugins plugins when present"
     expect(plugins.length).toBeGreaterThanOrEqual(3)   ← 公开 CI 返回 0
   → validate FAIL
   → build linux/amd64 被 skip（needs: validate）
@@ -16,8 +16,8 @@ push to master
 ```
 
 - 本地通过/CI 失败的行为差异来自 loader 的候选路径解析（`external-plugin-loader.ts:135-155`）：
-  `process.env.MIST_PRIVATE_PLUGINS_DIR` → `cwd/../mist-alpha-private` → `__dirname/../../../../mist-alpha-private`。
-  本地工作区三路均可命中 `mist-alpha-private`（4 个插件），公开 CI 全部 miss。
+  `process.env.MIST_PRIVATE_PLUGINS_DIR` → `cwd/../external-plugins` → `__dirname/../../../../external-plugins`。
+  本地工作区三路均可命中 `external-plugins`（4 个插件），公开 CI 全部 miss。
 - 受影响提交区间：`98207eed`(10-12) .. `3fafd26a`(10-13)，共 5 个失败 run。
 
 ### 1.2 修复设计（测试守卫）
@@ -26,7 +26,7 @@ push to master
 
 ```ts
 it('discovers peer workspace plugins when the private workspace is present', () => {
-  const peerDir = path.resolve(process.cwd(), '..', 'mist-alpha-private');
+  const peerDir = path.resolve(process.cwd(), '..', 'external-plugins');
   const plugins = ExternalFactorPluginLoader.loadPlugins();
 
   if (!fs.existsSync(peerDir)) {
@@ -115,7 +115,7 @@ it('discovers peer workspace plugins when the private workspace is present', () 
 
 ## 4. 茅台残留清除
 
-### 4.1 替换口径（沿用 shanghai-regime change 的既定口径）
+### 4.1 替换口径（沿用 regime change 的既定口径）
 
 | 原值 | 新值 |
 |------|------|
@@ -170,7 +170,7 @@ SH 限定符号（上证指数 000001.SH），所有替换点均为示例/夹具
   造成 spec-实现脱钩：`RealtimeCandleHealthObservation`/`degradedReasons` 零消费、
   `REALTIME_CANDLE_DEGRADED_RECOVERY_WINDOW_MS` 零读取、`mist_realtime_candle_health` 指标缺位。
   需单独立项决策「在 OO/OTel 范式下恢复判定」或「down-grade live spec」，本 change 只记录。
-- **AGENTS.md 过期项**：workspace 根 `AGENTS.md` 的活跃 change 表（shanghai-regime 0/18、hydration 0/17 等）
+- **AGENTS.md 过期项**：workspace 根 `AGENTS.md` 的活跃 change 表（regime 0/18、hydration 0/17 等）
   与实际状态不符——该文件不在 git 仓内，由用户自行维护，此处仅提示。
 
 ## 6. 验收命令

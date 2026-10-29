@@ -18,7 +18,7 @@
 `HistoricalBarSource` 绑死一个 `(securityId, source, period)`；`RealtimeKernelPool`
 按 `(securityId, source, period)` 分组、组间互不感知。
 
-而下游私有战术策略（`bull/bear-left-right-bsp`）需要**本级别 + 次级别 + 日线**
+而下游多级别因子插件需要**本级别 + 次级别 + 日线**
 三个周期的同步推进：它们从共享黑板 `attributes` 读取 `subBars` / `subBars5m` /
 `daily.ma5` / `prevDailyLow` 等键——但**全仓没有任何地方写入这些键**，插件在回测与
 实盘中永远静默返回 `NEUTRAL + degraded`（不报错、不告警、信号永不出现），单测因手工
@@ -102,8 +102,6 @@
   - `apps/mist`（signal adapter）：`loadRealtimeWindow` 历史段走 canonical。
   - `apps/backtest`：多周期 replay、预算计数、`onBar` 仅求值周期。
   - `libs/market-data`：Polars 序列质检纯函数。
-  - `mist-alpha-private`（私有仓，非本 spec 范围）：战术插件改读 `series.<period>`、
-    声明 `contextRequirements`；`marketDataPolicy` 补 1m 段。
 - **Non-Goals**:
   - 不改 `FactorContext` 字段契约（多周期走既有 `attributes` 黑板）。
   - 不新增数据库表/列；不新增回测 API 字段（context 由策略版本编译推导）。

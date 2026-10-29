@@ -18,9 +18,9 @@
 2. **实现通用的外部因子插件加载机制 (`ExternalFactorPluginLoader`)**：
    - 在 `libs/strategy/src/factor/` 中实现通用的外部插件加载器；
    - 面向公共标准契约 `FactorPlugin`（`id`, `name`, `category`, `evaluate(context, params)`）动态加载外部插件；
-   - 探测外部路径（环境变量 `MIST_PRIVATE_PLUGINS_DIR` 或平级目录 `../mist-alpha-private`）；
+   - 探测外部路径（环境变量 `MIST_PRIVATE_PLUGINS_DIR` 或平级目录 `../external-plugins`）；
    - 在外部插件不存在时（开源环境/公共 CI），平滑降级，零报错。
-3. **专有策略完整收敛于独立私有仓 (`mist-alpha-private`)**：
+3. **专有策略完整收敛于独立私有仓 (`external-plugins`)**：
    - 专有策略的所有架构设计、买卖点划分逻辑与核心算法全部移入平级独立私有仓；
    - 私有仓自行实现其专有逻辑，并封装导出标准的 `FactorPlugin` 供公共引擎反射加载。
 4. **CI 架构防泄漏门禁**：

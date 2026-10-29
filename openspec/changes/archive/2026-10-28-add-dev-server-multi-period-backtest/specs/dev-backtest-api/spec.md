@@ -26,7 +26,7 @@ The local development gateway (`tools/strategy-dev/server.ts`) SHALL expose a st
 - **AND** MUST NOT silently evaluate with an empty context window
 
 #### Scenario: Stored definition replay via local export
-- **WHEN** a backtest request references a `strategyDefinitionId` whose definition version JSON has been exported to the private-repo definitions directory (`mist-alpha-private/market-data/strategy-definitions/`)
+- **WHEN** a backtest request references a `strategyDefinitionId` whose definition version JSON has been exported to the external definitions directory
 - **THEN** server MUST compile it via the shared stored-definition compile boundary (producing flow and `contextRequirements` identically to the production backtest runtime)
 - **AND** exported definition files MUST live only in the private repo (they may contain proprietary plugin parameters)
 

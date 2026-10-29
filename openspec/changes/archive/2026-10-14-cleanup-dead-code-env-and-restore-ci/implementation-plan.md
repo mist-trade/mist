@@ -52,7 +52,7 @@
 - `libs/strategy/src/decision-flow/index.ts`：删 `:2` `export * from './flow-blackboard';`
 - `libs/strategy/src/decision-flow/decision-flow-evaluator.spec.ts`：
   删 `:6` import 行 + `:61-80` `describe('FlowBlackboard', …)` 整块
-- 验证：`grep -rn "FlowBlackboard" apps libs tools mist-fe ../mist-alpha-private` = 0；
+- 验证：`grep -rn "FlowBlackboard" apps libs tools mist-fe ../external-plugins` = 0；
   `npx jest libs/strategy/src/decision-flow`
 - 风险：中低（曾为 `@app/strategy` 公开导出面；主仓/私仓零消费，git 历史可回溯）
 

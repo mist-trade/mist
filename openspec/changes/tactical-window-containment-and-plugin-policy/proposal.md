@@ -32,10 +32,10 @@
 3. **插件级战术策略自洽下沉 (Autonomous Tactical Policy)**：
    - 抽离全局语义基准常量（`DEFAULT_TACTICAL_WINDOW_BARS = 3`、`DEFAULT_MAX_CONTAINMENT_HOLD_BARS = 2`、`DEFAULT_TACTICAL_COOLDOWN_BARS = 3`）；
    - `TemporalWindowEngine` 开窗时，**优先读取触发信号自身携带的策略**（`signal.evidence?.windowBars`、`signal.evidence?.maxContainmentHoldBars`）；
-   - 触发插件（如 `bull-left-right-bsp`）通过 `paramSchema` 暴露参数，并在输出信号时在 `evidence` 中自主下发当前买点形态（1买/2买/3买）的自适应参数，系统汇聚层零侵入。
+   - 触发插件通过 `paramSchema` 暴露参数，并在输出信号时在 `evidence` 中自主下发形态自适应参数，系统汇聚层零侵入。
 
-4. **私有仓消费统一与死代码清理**：
-   - `bull-left-right-bsp.plugin.ts` 废弃私仓手写的 `processInclusion()`，100% 消费黑板官方 `geometry.mergedKs`；
+4. **形态消费统一与死代码清理**：
+   - 统一消费黑板官方 `geometry.mergedKs`；
    - 统一对齐全量单元测试与门禁。
 
 ## Capabilities

@@ -14,7 +14,7 @@
 2. **建 worktree**：`mist/.worktrees/fix-indicator-conventions`（从提交后的 master 建），
    `ln -s ../../node_modules node_modules`（新 worktree 无 node_modules；`pnpm run` 的 .bin 依赖该链接）。
 3. **实施顺序**：A 组指标修正 → 提取器 → 斐波那契插件 → 可视化 → 测试与门禁。
-4. **不做**：mist-alpha-private 无改动（vwap 缺省隐患已由提取器 fail-closed 消解）；无 DB / migration / 部署改动。
+4. **不做**：external-plugins 无改动（vwap 缺省隐患已由提取器 fail-closed 消解）；无 DB / migration / 部署改动。
 
 ---
 

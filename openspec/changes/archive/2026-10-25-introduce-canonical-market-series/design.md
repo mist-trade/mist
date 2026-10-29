@@ -59,7 +59,7 @@ effective_i = [from_i, before_i) − union(覆盖区间)
 | 位置 | 内容 |
 |---|---|
 | `mist`（公共） | `SplicePolicy` 类型、校验、`CanonicalSeriesPlan`、跨段组合读取器、私有目录加载器 |
-| `mist-alpha-private` | 具体 policy JSON + `marketDataPolicy` provider（数行） |
+| `external-plugins` | 具体 policy JSON + `marketDataPolicy` provider（数行） |
 
 加载复用现有 `/app/private-plugins` 通道（`MIST_PRIVATE_PLUGINS_DIR`），与外部因子插件同源。公共仓**不含任何日期边界、源优先级或标的名单**。
 

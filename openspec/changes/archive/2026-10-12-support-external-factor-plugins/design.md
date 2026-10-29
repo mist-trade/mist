@@ -14,7 +14,7 @@
 │       ├── factor-plugin-registry.ts      <-- 因子插件注册表
 │       └── external-isolation.guard.spec.ts<-- 架构防泄漏门禁
 │
-└── mist-alpha-private/                    <-- 【Private 独立私有仓】(与 mist 平级，专有策略)
+└── external-plugins/                    <-- 【Private 独立私有仓】(与 mist 平级，专有策略)
     ├── .git/
     └── src/
         ├── index.ts                       <-- 导出私有 FactorPlugin[] 数组
@@ -44,7 +44,7 @@
 * 职责：负责在运行时发现并向 `FactorPluginRegistry` 批量注册外部私有因子插件。
 * 探测优先级链：
   1. 环境变量：`process.env.MIST_PRIVATE_PLUGINS_DIR` 或 `process.env.MIST_PRIVATE_PLUGINS_PATH`；
-  2. 工作区平级目录：`../mist-alpha-private`；
+  2. 工作区平级目录：`../external-plugins`；
   3. 未探测到或加载失败时：安全降级，不中断主进程，控制台输出调试日志。
 * 批量多插件识别机制：
   - 支持私有仓同时存在任意多个 Plugin；
@@ -54,13 +54,13 @@
     3. 具名或默认导出的单一 `FactorPlugin` 实例；
   - 自动完成类型校验（`isFactorPlugin(obj)`），合法实例统一以其 `plugin.id` 注册进策略树内核。
 
-### 2.3 私有专有仓骨架与导出规范 (`mist-alpha-private`)
+### 2.3 私有专有仓骨架与导出规范 (`external-plugins`)
 * **仅搭建纯净骨架原则（Shell-Only Skeleton）**：
   - 本次变更**绝不私自实现任何未定论的具体交易算法或假想规则**；
   - 私有仓仅搭建符合 `FactorPlugin` 契约的标准可编译插件骨架（Stub），内部逻辑留白，供后续独立评估与编写；
 * **多插件目录结构示例**：
   ```
-  mist-alpha-private/
+  external-plugins/
   ├── src/
   │   ├── plugins/          <-- 存放任意多个私有插件骨架
   │   └── index.ts          <-- 统一导出 plugins 数组
@@ -80,7 +80,7 @@
 
 1. **AST 静态扫描门禁 (`external-isolation.guard.spec.ts`)**：
    - 静态遍历 `mist` 仓库内所有 TypeScript 源码文件；
-   - 断言不存在任何包含 `mist-alpha-private` 或指向私有目录的静态 `import` 或 `export`；
+   - 断言不存在任何包含 `external-plugins` 或指向私有目录的静态 `import` 或 `export`；
    - 扫描 Git Index，断言私有代码文件未被暂存或追踪。
 2. **开源环境独立构建与回归**：
    - 在私有目录被移除或禁用的状态下，`mist` 的 `build`、`typecheck` 与 `test:ci` 必须 100% 独立绿灯通过。

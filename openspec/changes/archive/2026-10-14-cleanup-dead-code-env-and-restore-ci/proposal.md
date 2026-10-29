@@ -8,9 +8,9 @@
 
 `Build Docker Images` workflow 自 2026-10-12 起连续失败（运行 38268699489 / 38271123339 / 38433259999 / 38434853196 / 38435291784）。失败点恒定为
 `libs/strategy/src/factor/external-plugin-loader.spec.ts:212` 的
-"automatically discovers peer workspace mist-alpha-private plugins when present" 测试：
+"automatically discovers peer workspace external-plugins plugins when present" 测试：
 
-- 它无条件断言 `plugins.length >= 3` 并检查具体私有插件 ID，**硬依赖本地多仓工作区的 `../mist-alpha-private` 私有仓**；
+- 它无条件断言 `plugins.length >= 3` 并检查具体私有插件 ID，**硬依赖本地多仓工作区的 `../external-plugins` 私有仓**；
 - 公开仓 CI 只 checkout 单仓，该目录不存在 → `loadPlugins()` 返回空数组 → 断言必失败；
 - validate job 失败 → `build linux/amd64` job 被 skip → **自 10-12 起无新 backend 镜像被构建/推送**（部署链路受直接影响）。
 
@@ -43,9 +43,9 @@
   「TDX WebSocket timing is centralized」明确要求 *configured 时 MUST use the configured values*，
   但 TDX 客户端把心跳硬编码为 `30_000`，config 声明与实现脱钩（spec 违规）。
 
-### 4. shanghai-regime change 的茅台残留清除未完成
+### 4. regime change 的茅台残留清除未完成
 
-已归档 change `add-shanghai-regime-and-left-right-bsp-plugins` 任务 §1.4/§5.4 声称「清理全仓测试、注释与配置中的 600519 与『茅台』字样」「全仓无任何茅台残留」，实际残留：
+已归档 change `add-external-regime-and-tactical-plugins` 任务 §1.4/§5.4 声称「清理全仓测试、注释与配置中的 600519 与『茅台』字样」「全仓无任何茅台残留」，实际残留：
 
 - mist 仓：153 处 `600519`（26 文件）+ 9 处「贵州茅台」（realtime-subscriptions DTO/服务，测试数据与 Swagger 示例）；
 - mist-fe 仓：89 处 `600519`（8 文件，含带 sha256 的契约 fixtures.json）+ 12 处「茅台/maotai」。

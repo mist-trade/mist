@@ -72,17 +72,6 @@
 - 三大架构守卫 + `pnpm -C mist typecheck && pnpm -C mist test:ci` + `pnpm -C mist-fe typecheck && pnpm -C mist-fe test:ci` + `check:magic`；
 - E2E：000001 30m + 5m/1440 上下文，canonical 回测 2005-01-04→2026-10-20；
 - 分阶段启用：enable 一条 30m+5m/1440 策略（shadow），确认 `evidence.degraded=false` 后再放开存量。
-
-## 私有仓适配（`mist-alpha-private`，随 Phase 2/4 联动，不在公共 spec 内）
-
-- `src/plugins/{bull,bear}-left-right-bsp.plugin.ts`：`resolveSubBars` 改读 `series.5`（`readContextSeries` 同构逻辑）；日线派生值（`daily.ma5`/`prevDailyLow`）从 `series.1440` 自算；缺键抛 `MissingContextSeriesError`（`code='MISSING_CONTEXT_SERIES'`），**删除静默 NEUTRAL 降级路径**；
-- 插件元数据 + `resolveContextRequirements`，**数值定案 `{5: 40, '1440': 10}`**（用户确认"与之前一致"：
-  实测单测注入 subBars 25~32 根、主级别 30~39 根、硬下限 15/20；40 覆盖 MACD(12,26,9) 热身；
-  日线侧此前从未有真实供给，10 根满足 MA5+前低）；
-- **日线来源边界（用户确认）**：历史日线 100% QMT 原生（canonical 1440 单段、零合成）；实时仅
-  当天日线由 1m 聚合，且只在当日内存窗口存在——次日 hydration 读 canonical 原生值，合成值
-  不落库不回读；接缝 ≤0.01（与 QMT 内部一致性同量级，实测）；
-- `src/market-data/policy.ts`：补 `'1': [{source:'qmt'}]`（15/60 如需），升 version；
 - 同步 dist 到 `F:\MistDocker\private-plugins`。
 
 ## 不做的改动（边界）

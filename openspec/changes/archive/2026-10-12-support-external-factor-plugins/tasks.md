@@ -7,14 +7,14 @@
 
 ## 2. 通用外部因子插件动态加载器 (`libs/strategy/src/factor/`)
 - [x] 2.1 新建 `libs/strategy/src/factor/external-plugin-loader.ts`：
-  - 实现通用探测逻辑（优先级：`process.env.MIST_PRIVATE_PLUGINS_DIR` -> `../mist-alpha-private`）
+  - 实现通用探测逻辑（优先级：`process.env.MIST_PRIVATE_PLUGINS_DIR` -> `../external-plugins`）
   - 动态 import 并提取导出的 `FactorPlugin` 实例，提供安全容错与类型校验
   - 在无外部插件时平滑降级，零报错
 - [x] 2.2 在 `libs/strategy/src/factor/standard-plugins.ts` 中集成外部插件自动发现与注册
 - [x] 2.3 在 `libs/strategy/src/strategy-boundary.guard.spec.ts` 中针对 `external-plugin-loader.ts` 的环境变量探测配置合法白名单豁免
 
-## 3. 私有专有仓多插件骨架与导出规范 (`mist-alpha-private/`)
-- [x] 3.1 整理平级独立私有仓 `mist-alpha-private/` 目录结构、`package.json` 与 `tsconfig.json`
+## 3. 私有专有仓多插件骨架与导出规范 (`external-plugins/`)
+- [x] 3.1 整理平级独立私有仓 `external-plugins/` 目录结构、`package.json` 与 `tsconfig.json`
 - [x] 3.2 搭建可扩展的多插件骨架目录结构（`src/plugins/`），仅构建符合 `FactorPlugin` 契约的标准空壳/骨架（Stub），不写入任何未确认的具体算法
 - [x] 3.3 在私有仓入口 `src/index.ts` 中实现批量导出规范（`export const plugins: readonly FactorPlugin[] = [...]`），支持加载器自动遍历挂载多个独立私有插件
 

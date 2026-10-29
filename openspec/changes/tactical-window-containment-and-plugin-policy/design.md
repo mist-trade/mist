@@ -10,7 +10,7 @@
 ```mermaid
 flowchart TD
     subgraph TriggerPhase ["1. 扳机开窗期 (Bar t)"]
-        TriggerPlugin["触发插件 (如 bull-left-right-bsp)"] -->|emit Signal with evidence| WinEngine["时序观察窗引擎 (TemporalWindowEngine)"]
+        TriggerPlugin["触发插件 (Trigger Factor Plugin)"] -->|emit Signal with evidence| WinEngine["时序观察窗引擎 (TemporalWindowEngine)"]
         WinEngine --> ReadPolicy["动态提取策略:<br/>windowBars = signal.evidence?.windowBars ?? 3<br/>maxHold = signal.evidence?.maxContainmentHoldBars ?? 2<br/>pivotPrice = signal.pivotPrice"]
         ReadPolicy --> OpenWin["开辟活跃观察窗 (ActiveObservationWindow)"]
     end
