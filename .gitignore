@@ -86,6 +86,7 @@ handoff-prompts-*.md
 libs/strategy/src/tactics/private/
 *.private.ts
 *.secret.ts
+openspec/changes/implement-cys-rapid-swing-plugin/
 
 # Local offline market data cache (never commit raw market bars)
 .data/
@@ -96,4 +97,5 @@ tools/strategy-dev/data/signals/
 tools/strategy-dev/*.log
 *.log
 scratch/
+scratch_*.ts
 AGENTS.md

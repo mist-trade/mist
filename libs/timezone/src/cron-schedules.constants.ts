@@ -11,6 +11,9 @@ export const CRON_PRE_MARKET_INSPECTION_0905 = '0 5 9 * * 1-5';
 /** 09:15 Asia/Shanghai on exchange trading days (Monday - Friday). Subscription lifecycle Read-Before-Reset barrier. */
 export const CRON_SUBSCRIPTION_RESET_0915 = '0 15 9 * * 1-5';
 
+/** 21:30 Asia/Shanghai on exchange trading days (Monday - Friday). Nightly post-close market breadth & panic gauge aggregation. */
+export const CRON_MARKET_BREADTH_NIGHTLY_2130 = '30 21 * * 1-5';
+
 /** 22:30 Asia/Shanghai on exchange trading days (Monday - Friday). Nightly primary post-close market data sync. */
 export const CRON_POST_CLOSE_SYNC_NIGHTLY_2230 = '30 22 * * 1-5';
 

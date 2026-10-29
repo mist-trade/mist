@@ -59,26 +59,39 @@ export class DecisionFlowEvaluator {
         const plugin = this.getPlugin(node.pluginId);
         const opinion = await plugin.evaluate(context, node.params);
 
-        trace.push({
-          nodeId: node.id,
-          type: 'GUARD',
-          name: node.name,
-          action: opinion.action,
-          confidence: opinion.confidence,
-          reason: opinion.reason,
-          evidence: opinion.evidence,
-          badgeText: opinion.badgeText,
-          displayTag: opinion.displayTag,
-          styleMeta: opinion.styleMeta,
-        });
-
         const minConf = node.minConfidence ?? 0.0;
         const actionMatches =
           node.requiredAction === 'BOTH' || node.requiredAction === 'ANY'
             ? opinion.action === DECISION_ACTIONS.BUY ||
               opinion.action === DECISION_ACTIONS.SELL
             : opinion.action === node.requiredAction;
-        const passed = actionMatches && opinion.confidence >= minConf;
+
+        // 方向隔离守门：若上游已确立买卖方向（inheritedAction 为 BUY 或 SELL），
+        // 且当下门禁要求了特定方向（node.requiredAction 非 BOTH/ANY），
+        // 则上游方向必须与门禁期望方向严格一致，绝对禁止将 SELL 信号送入 BUY 门禁或反向篡改。
+        const directionConsistent =
+          !inheritedAction ||
+          node.requiredAction === 'BOTH' ||
+          node.requiredAction === 'ANY' ||
+          node.requiredAction === inheritedAction;
+
+        const passed =
+          actionMatches && directionConsistent && opinion.confidence >= minConf;
+
+        trace.push({
+          nodeId: node.id,
+          type: 'GUARD',
+          name: node.name,
+          action: opinion.action,
+          confidence: opinion.confidence,
+          reason: directionConsistent
+            ? opinion.reason
+            : `方向隔离阻断：上游已确立【${inheritedAction}】决策，与本门禁要求【${node.requiredAction}】方向冲突`,
+          evidence: opinion.evidence,
+          badgeText: opinion.badgeText,
+          displayTag: opinion.displayTag,
+          styleMeta: opinion.styleMeta,
+        });
 
         const nextScore =
           currentScore ?? Number((opinion.confidence * 100).toFixed(1));

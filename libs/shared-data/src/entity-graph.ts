@@ -2,6 +2,7 @@ import {
   BacktestRun,
   BacktestSignalResult,
   BacktestTradeResult,
+  MarketMacroIndicator,
   K,
   KExtensionEf,
   KExtensionQmt,
@@ -49,4 +50,5 @@ export const MIST_ENTITIES = [
   BacktestRun,
   BacktestSignalResult,
   BacktestTradeResult,
+  MarketMacroIndicator,
 ] as const;

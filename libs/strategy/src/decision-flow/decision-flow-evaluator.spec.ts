@@ -192,6 +192,87 @@ describe('Phase 2: Decision Flow Engine', () => {
       expect(result.signalTag).toBe('CHAN_BSP_SIGNAL');
       expect(result.confidence).toBe(90);
     });
+
+    it('enforces directional isolation: prevents SELL signal from entering BUY guard and routes to onFail with SELL preserved', async () => {
+      registry.register({
+        id: 'plugin.guard.upstream_sell',
+        name: 'Upstream Sell Plugin',
+        category: 'CHAN',
+        version: '1.0.0',
+        description: '',
+        evaluate: async () => ({
+          action: 'SELL',
+          confidence: 0.9,
+          badgeText: '3卖',
+          reason: '缠论笔级三卖确认',
+        }),
+      });
+
+      registry.register({
+        id: 'plugin.guard.downstream_buy',
+        name: 'Downstream Buy Enhancer',
+        category: 'TECHNICAL',
+        version: '1.0.0',
+        description: '',
+        evaluate: async () => ({
+          action: 'BUY',
+          confidence: 0.85,
+          badgeText: '量价真实确认买',
+          reason: '放量共振',
+        }),
+      });
+
+      const flow: DecisionFlowNode = {
+        id: 'guard_upstream',
+        type: 'GUARD',
+        name: '上游主形态门禁(BOTH)',
+        pluginId: 'plugin.guard.upstream_sell',
+        requiredAction: 'BOTH',
+        minConfidence: 0.5,
+        onPass: {
+          id: 'guard_downstream',
+          type: 'GUARD',
+          name: '下游量价买入增强(BUY)',
+          pluginId: 'plugin.guard.downstream_buy',
+          requiredAction: 'BUY',
+          minConfidence: 0.5,
+          onPass: {
+            id: 'term_enhanced_buy',
+            type: 'TERMINAL',
+            action: 'INHERIT',
+            signalTag: 'ENHANCED_BUY',
+          },
+          onFail: {
+            id: 'term_standard_fallback',
+            type: 'TERMINAL',
+            action: 'INHERIT',
+            signalTag: 'STANDARD_FALLBACK',
+          },
+        },
+      };
+
+      const context: FactorContext = {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date(),
+        period: 5,
+        bars: [],
+        attributes: new Map(),
+      };
+
+      const result = await evaluator.evaluate(flow, context);
+      // 必须阻止 SELL 被反向篡改为 BUY，顺利走入 onFail 兜底并继承 SELL 动作与原形态徽标
+      expect(result.status).toBe('SIGNAL_EMITTED');
+      expect(result.action).toBe('SELL');
+      expect(result.signalTag).toBe('STANDARD_FALLBACK');
+      expect(result.badgeText).toBe('3卖');
+
+      // 验证白盒轨迹中记录了方向阻断信息
+      const downstreamTrace = result.trace.find(
+        (t) => t.nodeId === 'guard_downstream',
+      );
+      expect(downstreamTrace?.reason).toContain('方向隔离阻断');
+    });
   });
 
   describe('BranchNode (Condition Routing)', () => {

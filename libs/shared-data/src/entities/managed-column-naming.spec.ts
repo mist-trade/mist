@@ -5,6 +5,7 @@ import { KExtensionTdx } from './k-extension-tdx.entity';
 import { K } from './k.entity';
 import { SecuritySourceConfig } from './security-source-config.entity';
 import { RealtimeSubscriptionAssignment } from './realtime-subscription-assignment.entity';
+import { MarketMacroIndicator } from './market-macro-indicator.entity';
 
 describe('managed physical column naming metadata', () => {
   const storage = getMetadataArgsStorage();
@@ -36,6 +37,29 @@ describe('managed physical column naming metadata', () => {
     [KExtensionQmt, 'preClose', 'pre_close'],
     [KExtensionQmt, 'suspendFlag', 'suspend_flag'],
     [KExtensionQmt, 'openInterest', 'open_interest'],
+    [MarketMacroIndicator, 'tradingDate', 'trading_date'],
+    [
+      MarketMacroIndicator,
+      'breadthCys13OversoldRatio',
+      'breadth_cys13_oversold_ratio',
+    ],
+    [
+      MarketMacroIndicator,
+      'breadthAboveMa250Ratio',
+      'breadth_above_ma250_ratio',
+    ],
+    [MarketMacroIndicator, 'allATurnoverRate', 'all_a_turnover_rate'],
+    [
+      MarketMacroIndicator,
+      'allATurnoverPercentile10y',
+      'all_a_turnover_percentile_10y',
+    ],
+    [MarketMacroIndicator, 'china10yBondYield', 'china_10y_bond_yield'],
+    [MarketMacroIndicator, 'indexPeTtm', 'index_pe_ttm'],
+    [MarketMacroIndicator, 'erpRatio', 'erp_ratio'],
+    [MarketMacroIndicator, 'erpPercentile10y', 'erp_percentile_10y'],
+    [MarketMacroIndicator, 'erpZScore10y', 'erp_zscore_10y'],
+    [MarketMacroIndicator, 'sampleCount', 'sample_count'],
   ])('%s.%s maps to %s', (target, propertyName, physicalColumnName) => {
     const column = storage.columns.find(
       (candidate) =>
