@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MarketMacroIndicator } from '@app/shared-data';
-import { TimezoneService } from '@app/timezone';
+import { TimezoneService, formatShanghaiDateString } from '@app/timezone';
 import {
   computeCysMarketBreadth,
   computeBinaryMarketBreadth,
@@ -123,7 +123,7 @@ export class MarketBreadthCollectionService {
       return null;
     }
 
-    const tradingDate = now.toISOString().slice(0, 10);
+    const tradingDate = formatShanghaiDateString(now);
     try {
       const aggregated = this.aggregateBreadth(tradingDate, quotes);
       return await this.saveMacroIndicator({
