@@ -211,9 +211,16 @@ describe('ExternalFactorPluginLoader', () => {
 
     it('discovers peer workspace plugins when the private workspace is present', () => {
       const peerDir = path.resolve(process.cwd(), '..', 'mist-alpha-private');
+      const hasPrivateWorkspace =
+        fs.existsSync(peerDir) &&
+        (fs.existsSync(path.join(peerDir, 'src', 'index.ts')) ||
+          fs.existsSync(path.join(peerDir, 'dist', 'index.js')) ||
+          fs.existsSync(path.join(peerDir, 'index.ts')) ||
+          fs.existsSync(path.join(peerDir, 'index.js')));
+
       const plugins = ExternalFactorPluginLoader.loadPlugins();
 
-      if (!fs.existsSync(peerDir)) {
+      if (!hasPrivateWorkspace) {
         // 单仓 checkout（公开 CI）：发现机制必须静默降级，公开套件不得失败。
         expect(plugins).toEqual([]);
         return;
