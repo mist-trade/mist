@@ -3,6 +3,7 @@ import { StrategySeriesImputer } from '@app/market-data';
 import type {
   ConfidenceLevel,
   DecisionResult,
+  DecisionExecutionTraceItem,
 } from '../decision-flow/decision-flow.types';
 import { DecisionFlowEvaluator } from '../decision-flow/decision-flow-evaluator';
 import {
@@ -11,7 +12,6 @@ import {
 } from '../decision-flow/decision-pivot-evidence';
 import type { FactorContext } from '../factor/factor.types';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
-import { extractVolumeFeatures } from '../factor/helpers/volume-features.extractor';
 import { contextSeriesKey, isMissingContextSeriesError } from './availability';
 import type {
   KernelConfig,
@@ -40,29 +40,6 @@ import type {
  * 严禁降级为 NEUTRAL。orderKey 只影响供给方（归并/到达序），内核与信号
  * 发射侧不感知、不受影响。
  */
-class LazyAttributeMap extends Map<string, unknown> {
-  constructor(private readonly computeLazy: (key: string) => unknown) {
-    super();
-  }
-
-  override get(key: string): unknown {
-    if (super.has(key)) {
-      return super.get(key);
-    }
-    const computed = this.computeLazy(key);
-    if (computed !== undefined && computed !== null) {
-      super.set(key, computed);
-      return computed;
-    }
-    return undefined;
-  }
-
-  override has(key: string): boolean {
-    if (super.has(key)) return true;
-    return this.get(key) !== undefined;
-  }
-}
-
 export class StrategyEvaluationKernel {
   public readonly securityId: number;
   public readonly securityCode: string;
@@ -262,20 +239,7 @@ export class StrategyEvaluationKernel {
 
   private buildContext(timestamp: Date, evalPeriod: number): FactorContext {
     const bars = this.windows.get(evalPeriod)!.read();
-    let cachedVf: ReturnType<typeof extractVolumeFeatures> | undefined =
-      undefined;
-    let vfComputed = false;
-
-    const attributes = new LazyAttributeMap((key) => {
-      if (key === 'volumeFeatures') {
-        if (!vfComputed) {
-          cachedVf = extractVolumeFeatures(bars) ?? undefined;
-          vfComputed = true;
-        }
-        return cachedVf;
-      }
-      return undefined;
-    });
+    const attributes = new Map<string, unknown>();
 
     // 多周期注入：全部声明周期的只读快照（push 序即因果序，无未来数据）。
     for (const period of this.periods) {
@@ -400,7 +364,9 @@ export class StrategyEvaluationKernel {
     };
   }
 
-  private findBadgeTextFromTrace(trace?: readonly any[]): string | undefined {
+  private findBadgeTextFromTrace(
+    trace?: readonly DecisionExecutionTraceItem[],
+  ): string | undefined {
     if (!Array.isArray(trace)) return undefined;
     for (let i = trace.length - 1; i >= 0; i--) {
       const item = trace[i];

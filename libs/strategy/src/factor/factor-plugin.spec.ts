@@ -129,6 +129,22 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       expect(opinion.confidence).toBe(0.95);
       expect(opinion.evidence?.passed).toBe(false);
     });
+
+    it('returns NEUTRAL when financial data is completely missing', async () => {
+      const context: FactorContext = {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date(),
+        period: 1440,
+        bars: [],
+        attributes: new Map(),
+      };
+
+      const opinion = await plugin.evaluate(context);
+      expect(opinion.action).toBe('NEUTRAL');
+      expect(opinion.confidence).toBe(0.0);
+      expect(opinion.evidence?.bypassed).toBe(true);
+    });
   });
 
   describe('NorthboundCapitalPlugin', () => {

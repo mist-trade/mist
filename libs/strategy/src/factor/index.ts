@@ -7,4 +7,3 @@ export * from './plugins/northbound-capital.plugin';
 export * from './plugins/fibonacci.plugin';
 export * from './standard-plugins';
 export * from './external-plugin-loader';
-export * from './helpers/volume-features.extractor';

@@ -88,12 +88,12 @@ export class FinancialSafetyGuardPlugin implements FactorPlugin {
       debtRatio = rawParams.mockDebtRatio;
     }
 
-    // 若数据完全缺失，默认中立弃权或保守通过
+    // 若数据完全缺失，默认中立弃权
     if (roe === undefined && debtRatio === undefined) {
       return {
-        action: 'BUY',
-        confidence: 0.5,
-        reason: '未配置财务数据源，基本面门禁默认中立放行',
+        action: 'NEUTRAL',
+        confidence: 0.0,
+        reason: '未配置财务数据源，基本面门禁中立弃权',
         evidence: { bypassed: true },
       };
     }
