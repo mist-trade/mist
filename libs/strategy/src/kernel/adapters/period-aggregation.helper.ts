@@ -115,6 +115,9 @@ export function reduceDaily(
     securityCode: securityCode ?? first.securityCode,
     source,
     period: 1440,
+    // 时间戳约定（三链路一致）：交易日 D 的日线戳 = shanghaiMidnightOf(D)
+    // = 北京 D 日 00:00（UTC 字符串呈现为 D-1 T16:00Z）。与采集存储、
+    // hydration 聚合（deriveDaily）同约定；连续交易日戳严格递增，无碰撞。
     timestamp: new Date(tradingDayMs),
     open: first.open,
     high: Math.max(...ordered.map((bar) => bar.high)),
