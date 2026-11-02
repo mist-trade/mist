@@ -50,22 +50,27 @@ describe('availability key', () => {
 });
 
 describe('context series accessors', () => {
-  it('builds the shared blackboard key', () => {
+  it('builds the shared blackboard key (series.<code>.<period>)', () => {
     expect(SERIES_ATTRIBUTE_PREFIX).toBe('series.');
-    expect(contextSeriesKey(5)).toBe('series.5');
-    expect(contextSeriesKey(1440)).toBe('series.1440');
+    expect(contextSeriesKey('000001', 5)).toBe('series.000001.5');
+    expect(contextSeriesKey('880003', 1440)).toBe('series.880003.1440');
   });
 
   it('reads injected series and returns undefined for missing keys', () => {
-    const attributes = new Map<string, unknown>([
-      ['series.5', [{ rawBar: { period: 5 } }]],
-      ['garbage', 1],
+    const context = {
+      securityCode: '000001',
+      attributes: new Map<string, unknown>([
+        [contextSeriesKey('000001', 5), [{ rawBar: { period: 5 } }]],
+        [contextSeriesKey('880003', 1440), [{ rawBar: { period: 1440 } }]],
+        ['garbage', 1],
+      ]),
+    };
+    expect(readContextSeries(context, 5)).toEqual([{ rawBar: { period: 5 } }]);
+    expect(readContextSeries(context, 1440, '880003')).toEqual([
+      { rawBar: { period: 1440 } },
     ]);
-    expect(readContextSeries(attributes, 5)).toEqual([
-      { rawBar: { period: 5 } },
-    ]);
-    expect(readContextSeries(attributes, 1440)).toBeUndefined();
-    expect(readContextSeries(attributes, 30)).toBeUndefined();
+    expect(readContextSeries(context, 1440)).toBeUndefined();
+    expect(readContextSeries(context, 30)).toBeUndefined();
   });
 
   it('recognizes missing-context errors across module boundaries', () => {

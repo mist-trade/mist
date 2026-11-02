@@ -1,5 +1,6 @@
 {
   "id": "strategy_preset_pure_chan_bsp",
+  "legacyDefinitionId": 1,
   "name": "纯原典缠论买卖点策略树",
   "version": "1.0.0",
   "kind": "decision_flow",

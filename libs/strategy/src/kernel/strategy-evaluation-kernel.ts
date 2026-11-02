@@ -12,6 +12,12 @@ import {
 } from '../decision-flow/decision-pivot-evidence';
 import type { FactorContext } from '../factor/factor.types';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
+import { collectVirtualExitBindings } from '../virtual-exit/collect-bindings';
+import type {
+  VirtualExitChannelSpec,
+  VirtualExitPolicyPort,
+  VirtualExitProposal,
+} from '../virtual-exit/virtual-exit.port';
 import { contextSeriesKey, isMissingContextSeriesError } from './availability';
 import type {
   KernelConfig,
@@ -20,6 +26,8 @@ import type {
   KernelPlan,
   KernelSignal,
   PrewarmStatus,
+  SignalChannelRef,
+  SignalIntent,
 } from './kernel.types';
 
 /**
@@ -50,6 +58,16 @@ export class StrategyEvaluationKernel {
   private readonly plans: readonly KernelPlan[];
   private readonly evaluator: DecisionFlowEvaluator;
   private readonly windows = new Map<number, StrategySeriesImputer>();
+
+  private readonly externalWindows = new Map<string, ExternalWindowState>();
+  private readonly externalBySecurityId = new Map<
+    number,
+    ExternalWindowState[]
+  >();
+  private readonly externalBySecurityCode = new Map<
+    string,
+    ExternalWindowState[]
+  >();
   private readonly budgets = new Map<number, number>();
   private readonly cursors = new Map<number, number>();
   private readonly preWarmActual = new Map<number, number>();
@@ -59,6 +77,7 @@ export class StrategyEvaluationKernel {
   private publicBarCount = 0;
   private emittedSignalCount = 0;
   private planSkips = 0;
+  private readonly virtualExitPolicy?: VirtualExitPolicyPort;
 
   constructor(config: KernelConfig) {
     if (config.plans.length === 0) {
@@ -101,8 +120,64 @@ export class StrategyEvaluationKernel {
       this.budgets.set(period, budget);
       this.windows.set(period, new StrategySeriesImputer());
     }
+    // 跨标的上下文窗口：按声明创建独立滑窗（与自身窗口同机制，仅落窗不求值）
+    for (const plan of config.plans) {
+      for (const req of plan.externalContextRequirements ?? []) {
+        assertPositiveInteger(req.period, 'externalContextRequirements.period');
+        assertPositiveInteger(
+          req.minBars,
+          'externalContextRequirements.minBars',
+        );
+        if (
+          typeof req.securityCode !== 'string' ||
+          req.securityCode.length === 0
+        ) {
+          throw new TypeError(
+            'externalContextRequirements.securityCode is required',
+          );
+        }
+        const key = externalWindowKey(req.securityCode, req.period);
+        if (this.externalWindows.has(key)) continue;
+        const state: ExternalWindowState = {
+          securityCode: req.securityCode,
+          period: req.period,
+          imputer: new StrategySeriesImputer(),
+          budget: req.minBars,
+          preWarmActual: 0,
+        };
+        this.externalWindows.set(key, state);
+        const byId = req.securityId ?? -1;
+        const listId = this.externalBySecurityId.get(byId) ?? [];
+        listId.push(state);
+        this.externalBySecurityId.set(byId, listId);
+        const listCode =
+          this.externalBySecurityCode.get(req.securityCode) ?? [];
+        listCode.push(state);
+        this.externalBySecurityCode.set(req.securityCode, listCode);
+      }
+    }
+
     const registry = config.registry ?? new InMemoryFactorPluginRegistry();
     this.evaluator = new DecisionFlowEvaluator({ registry });
+
+    // 通道级虚拟出场：收集各插件声明的规则，一次性交给外部策略实现。
+    this.virtualExitPolicy = config.virtualExitPolicy;
+    if (this.virtualExitPolicy) {
+      const specs: VirtualExitChannelSpec[] = [];
+      for (const plan of this.plans) {
+        const bindings = collectVirtualExitBindings(plan.flow, registry);
+        if (bindings.length === 0) continue;
+        specs.push({
+          channel: {
+            definitionId: plan.definitionId,
+            versionId: plan.versionId,
+            period: plan.period,
+          },
+          bindings,
+        });
+      }
+      this.virtualExitPolicy.configure(specs);
+    }
   }
 
   /**
@@ -110,6 +185,12 @@ export class StrategyEvaluationKernel {
    * 重复/乱序 Bar（同周期内 timestamp <= 游标）静默忽略并返回空数组。
    */
   public async push(bar: StrategyBar): Promise<readonly KernelSignal[]> {
+    // 跨标的路由：外部标的的 bar 只落窗不求值；未声明的外部 bar 静默忽略。
+    if (bar.securityId !== this.securityId) {
+      this.pushExternal(bar);
+      return [];
+    }
+
     const window = this.windowOf(bar.period);
     const cursor = this.cursors.get(bar.period);
     if (cursor !== undefined && bar.timestamp.getTime() <= cursor) {
@@ -161,8 +242,68 @@ export class StrategyEvaluationKernel {
     }
 
     const signals = await this.evaluatePublic(bar);
-    this.emittedSignalCount += signals.length;
-    return signals;
+    const virtualExits = this.advanceVirtualExits(bar, signals);
+    const emitted =
+      virtualExits.length === 0 ? signals : [...signals, ...virtualExits];
+    this.emittedSignalCount += emitted.length;
+    return emitted;
+  }
+
+  /**
+   * 推进虚拟出场：先消费本 bar 的真实信号，再由策略实现推进并返回出场提案。
+   */
+  private advanceVirtualExits(
+    bar: StrategyBar,
+    signals: readonly KernelSignal[],
+  ): readonly KernelSignal[] {
+    const policy = this.virtualExitPolicy;
+    if (!policy) return [];
+    for (const signal of signals) {
+      policy.onSignal(signal);
+    }
+    const proposals = policy.onBar(bar, bar.period);
+    if (proposals.length === 0) return [];
+    return proposals.map((proposal) =>
+      this.buildVirtualExitSignal(proposal, bar),
+    );
+  }
+
+  private buildVirtualExitSignal(
+    proposal: VirtualExitProposal,
+    bar: StrategyBar,
+  ): KernelSignal {
+    const { channel } = proposal;
+    return {
+      definitionId: channel.definitionId,
+      versionId: channel.versionId,
+      signalKind: 'exit',
+      channel,
+      intent: 'EXIT',
+      originPluginId: proposal.ownerPluginId,
+      signalTime: bar.timestamp,
+      triggerTime: bar.timestamp.toISOString(),
+      triggerPrice: bar.close,
+      pivotTime: null,
+      pivotPrice: null,
+      signalType: 'VIRTUAL_EXIT',
+      confidence: proposal.confidence ?? 0.9,
+      confidenceLevel: 'HIGH',
+      badgeText: proposal.badgeText,
+      displayTag: `VIRTUAL_EXIT_${proposal.exitKind}`,
+      decisionTrace: {
+        status: 'SIGNAL_EMITTED',
+        action: 'SELL',
+        ruleId: proposal.ruleId,
+        exitKind: proposal.exitKind,
+        reason: proposal.reason,
+      },
+      contextSnapshot: {
+        exitKind: proposal.exitKind,
+        ruleId: proposal.ruleId,
+        ...(proposal.evidence ?? {}),
+      },
+      ruleSnapshot: {},
+    };
   }
 
   /** 读取指定周期的滑窗矫正视图（会话层 Frame 与诊断用）。 */
@@ -206,7 +347,14 @@ export class StrategyEvaluationKernel {
     for (const ms of this.cursors.values()) {
       if (lastPushed === null || ms > lastPushed) lastPushed = ms;
     }
+    const externalWindows = [...this.externalWindows.values()].map((w) => ({
+      securityCode: w.securityCode,
+      period: w.period,
+      windowSize: w.imputer.read().length,
+      budget: w.budget,
+    }));
     return {
+      externalWindows,
       lastPushedTimestamp:
         lastPushed === null ? null : new Date(lastPushed).toISOString(),
       prewarmStatus: worstStatus,
@@ -217,6 +365,30 @@ export class StrategyEvaluationKernel {
       planSkips: this.planSkips,
       perPeriod,
     };
+  }
+
+  private pushExternal(bar: StrategyBar): void {
+    const states =
+      this.externalBySecurityId.get(bar.securityId) ??
+      (bar.securityCode
+        ? this.externalBySecurityCode.get(bar.securityCode)
+        : undefined);
+    if (!states) return;
+    const state = states.find((w) => w.period === bar.period);
+    if (!state) return;
+    const ts = bar.timestamp.getTime();
+    if (state.cursor !== undefined && ts <= state.cursor) return;
+    state.imputer.append(bar);
+    while (state.imputer.read().length > state.budget) state.imputer.trim();
+    if (ts < this.publicFrom.getTime()) state.preWarmActual += 1;
+    state.cursor = ts;
+  }
+
+  private externalWindowOf(
+    securityCode: string,
+    period: number,
+  ): ExternalWindowState | undefined {
+    return this.externalWindows.get(externalWindowKey(securityCode, period));
   }
 
   private windowOf(period: number): StrategySeriesImputer {
@@ -238,14 +410,20 @@ export class StrategyEvaluationKernel {
   }
 
   private buildContext(timestamp: Date, evalPeriod: number): FactorContext {
-    const bars = this.windows.get(evalPeriod)!.read();
     const attributes = new Map<string, unknown>();
 
-    // 多周期注入：全部声明周期的只读快照（push 序即因果序，无未来数据）。
+    // 窗口注入（统一键）：series.<securityCode>.<period>，本标的与外部标的同规则。
+    // 全部是窗口已 push 内容（push 序即因果序，无未来数据）。
     for (const period of this.periods) {
       attributes.set(
-        contextSeriesKey(period),
+        contextSeriesKey(this.securityCode, period),
         Object.freeze(this.windows.get(period)!.read()),
+      );
+    }
+    for (const state of this.externalWindows.values()) {
+      attributes.set(
+        contextSeriesKey(state.securityCode, state.period),
+        Object.freeze(state.imputer.read()),
       );
     }
 
@@ -254,7 +432,6 @@ export class StrategyEvaluationKernel {
       securityCode: this.securityCode,
       timestamp,
       period: evalPeriod,
-      bars,
       attributes,
     };
   }
@@ -266,6 +443,12 @@ export class StrategyEvaluationKernel {
     )) {
       const window = this.windows.get(Number(rawPeriod));
       if (!window || window.read().length < required) {
+        return false;
+      }
+    }
+    for (const req of plan.externalContextRequirements ?? []) {
+      const state = this.externalWindowOf(req.securityCode, req.period);
+      if (!state || state.imputer.read().length < req.minBars) {
         return false;
       }
     }
@@ -327,10 +510,20 @@ export class StrategyEvaluationKernel {
       extractPivotEvidenceFromReason(decision);
     const badgeText =
       decision.badgeText ?? this.findBadgeTextFromTrace(decision.trace);
+    const channel: SignalChannelRef = {
+      definitionId: plan.definitionId,
+      versionId: plan.versionId,
+      period: plan.period,
+    };
+    const intent: SignalIntent = isBuy ? 'ENTRY' : 'EXIT';
+    const originPluginId = this.findOriginPluginId(decision);
     return {
       definitionId: plan.definitionId,
       versionId: plan.versionId,
       signalKind: plan.signalKind ?? (isBuy ? 'entry' : 'exit'),
+      channel,
+      intent,
+      ...(originPluginId ? { originPluginId } : {}),
       signalTime: bar.timestamp,
       triggerTime: bar.timestamp.toISOString(),
       triggerPrice,
@@ -380,6 +573,45 @@ export class StrategyEvaluationKernel {
     }
     return undefined;
   }
+
+  /**
+   * 归属插件：取轨迹中最后一个与最终 action 一致的插件节点。
+   * 仅用于归因观测；通道归属始终按 (definitionId, period)，与插件无关。
+   */
+  private findOriginPluginId(decision: DecisionResult): string | undefined {
+    const trace = decision.trace;
+    if (!Array.isArray(trace)) return undefined;
+    for (let i = trace.length - 1; i >= 0; i--) {
+      const item = trace[i];
+      if (!item?.pluginId) continue;
+      if (item.action === undefined || item.action === decision.action) {
+        return item.pluginId;
+      }
+    }
+    return undefined;
+  }
+}
+
+interface ExternalWindowState {
+  readonly securityCode: string;
+  readonly period: number;
+  readonly imputer: StrategySeriesImputer;
+  readonly budget: number;
+  cursor?: number;
+  preWarmActual: number;
+}
+
+interface ExternalWindowState {
+  readonly securityCode: string;
+  readonly period: number;
+  readonly imputer: StrategySeriesImputer;
+  readonly budget: number;
+  cursor?: number;
+  preWarmActual: number;
+}
+
+function externalWindowKey(securityCode: string, period: number): string {
+  return `${securityCode}\u0000${period}`;
 }
 
 function assertPositiveInteger(value: unknown, label: string): void {

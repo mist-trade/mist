@@ -16,6 +16,7 @@ export class TemporalWindowEngine {
   private readonly allConfirmationTags: Set<string>;
   private readonly allBoostTags: Set<string>;
   private readonly allSetupTags: Set<string>;
+  private readonly riskCutTags: readonly string[];
   private readonly activeSetupStates = new Map<
     string,
     TacticalAction | 'NEUTRAL'
@@ -36,6 +37,10 @@ export class TemporalWindowEngine {
         .map((r) => r.requiredSetupTag)
         .filter((t): t is string => typeof t === 'string' && t.length > 0),
     );
+    // 风控清仓型规则（RISK_CUT）的触发标签，由配置声明，引擎内不硬编码任何插件身份
+    this.riskCutTags = rules
+      .filter((r) => r.kind === 'RISK_CUT')
+      .map((r) => r.triggerTag);
   }
 
   public push(
@@ -231,18 +236,18 @@ export class TemporalWindowEngine {
       this.activeSetupStates.set(key, action);
     }
 
-    // 若收到空头/逃命风控信号（如熊市确立或极速逃命卖点），立即清洗未决多头观察窗（避险斩断）
+    // 若收到空头/逃命风控信号（宏观走熊或 RISK_CUT 规则触发），立即清洗未决多头观察窗（避险斩断）
     if (action === 'SELL' || signal.signalKind === 'exit') {
+      const isRiskCut = this.riskCutTags.some((tag) =>
+        keys.some((k) => this.tagMatches(k, tag)),
+      );
       this.activeWindows = this.activeWindows.filter((win) => {
         const targetAction = win.rule.action ?? 'BUY';
         if (targetAction === 'BUY') {
           const isSetupMatch = win.rule.requiredSetupTag
             ? keys.some((k) => this.tagMatches(k, win.rule.requiredSetupTag!))
             : false;
-          const isBearExit = keys.some((k) =>
-            this.tagMatches(k, 'plugin.tactics.bear-left-right-bsp'),
-          );
-          if (isSetupMatch || isBearExit) {
+          if (isSetupMatch || isRiskCut) {
             return false;
           }
         }

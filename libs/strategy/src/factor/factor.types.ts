@@ -1,5 +1,3 @@
-import type { ProjectedStrategyBar } from '@app/market-data';
-
 export type FactorCategory =
   | 'REGIME'
   | 'FUNDAMENTAL'
@@ -59,7 +57,6 @@ export interface FactorContext {
    * 100% 复用底层已有的 StrategySeriesImputer（停牌缺口补齐与时段对齐）与 KPriceProjector，
    * 因子插件直接消费处理完毕的纯净行情序列，绝不重复解析或造轮子做填补。
    */
-  readonly bars: readonly ProjectedStrategyBar[];
 
   /**
    * 共享黑板 (BlackBoard)：
@@ -97,6 +94,28 @@ export interface FactorPluginMetadata {
   resolveContextRequirements?(
     params?: Record<string, unknown>,
   ): Readonly<Record<number, number>>;
+
+  /**
+   * 声明跨标的上下文依赖（可选）：内核为外部标的维护独立窗口，
+   * 并以 `series.<securityCode>.<period>` 注入黑板。窗口不足 → fail-closed。
+   */
+  resolveExternalContextRequirements?(
+    params?: Record<string, unknown>,
+  ): readonly {
+    securityCode: string;
+    securityId?: number;
+    period: number;
+    minBars: number;
+  }[];
+
+  /**
+   * 声明通道级虚拟出场规则（可选，信号侧）。
+   * 规则由聚合层的 VirtualExitGovernor 依据通道虚拟持仓求值，
+   * 插件本身保持无状态——只声明"什么条件算出场"，不持有持仓。
+   */
+  virtualExitRules?(
+    params?: Record<string, unknown>,
+  ): readonly import('../virtual-exit/virtual-exit.port').VirtualExitRule[];
 }
 
 export interface FactorPlugin extends FactorPluginMetadata {

@@ -1,4 +1,5 @@
 import type { DecisionFlowNode } from './decision-flow.types';
+import type { ExternalContextRequirement } from '../kernel/kernel.types';
 import {
   LegacyStrategyCompiler,
   type LegacyChanBspPlanLike,
@@ -29,6 +30,8 @@ export interface CompiledStoredDefinition {
   readonly requiredBarCount: number;
   /** context 周期 → 最少保留根数（由插件元数据推导，可能为空对象） */
   readonly contextRequirements: Readonly<Record<number, number>>;
+  /** 跨标的上下文依赖（由插件元数据推导，可能为空数组） */
+  readonly externalContextRequirements: readonly ExternalContextRequirement[];
   readonly sourceKind: StoredDefinitionSourceKind;
   /** 快照：rule_dsl 为归一化规则，其余为原 rule */
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
@@ -92,6 +95,10 @@ export function compileStoredDefinitionVersion(
             ? input.rule.requiredBarCount
             : DECISION_FLOW_DEFAULT_REQUIRED_BAR_COUNT,
         contextRequirements: deriveContextRequirements(flow, registry),
+        externalContextRequirements: deriveExternalContextRequirements(
+          flow,
+          registry,
+        ),
         sourceKind: 'decision_flow',
         ruleSnapshot: input.rule,
       };
@@ -110,6 +117,10 @@ export function compileStoredDefinitionVersion(
           flow,
           requiredBarCount: compilation.plan.requiredBarCount,
           contextRequirements: deriveContextRequirements(flow, registry),
+          externalContextRequirements: deriveExternalContextRequirements(
+            flow,
+            registry,
+          ),
           sourceKind: 'rule_dsl',
           ruleSnapshot: compilation.normalizedRule as Readonly<
             Record<string, unknown>
@@ -131,6 +142,10 @@ export function compileStoredDefinitionVersion(
         requiredBarCount:
           chanPlan.requiredBarCount ?? DEFAULT_REQUIRED_BAR_COUNT,
         contextRequirements: deriveContextRequirements(flow, registry),
+        externalContextRequirements: deriveExternalContextRequirements(
+          flow,
+          registry,
+        ),
         sourceKind: 'chan_bsp',
         ruleSnapshot: input.rule,
       };
@@ -278,4 +293,67 @@ export function deriveContextRequirements(
     }
   }
   return merged;
+}
+
+/**
+ * 收集决策流所引用插件的跨标的上下文依赖（resolveExternalContextRequirements）。
+ * 同一 (securityCode, period) 取 minBars 最大值；声明非法 → 编译失败（fail-closed）。
+ */
+export function deriveExternalContextRequirements(
+  flow: DecisionFlowNode,
+  registry: FactorPluginRegistry = factorPluginRegistry,
+): readonly ExternalContextRequirement[] {
+  const references = collectPluginReferences(flow);
+  if (references.size === 0) return [];
+  if (registry === factorPluginRegistry) {
+    ensureStandardPluginsRegistered();
+  }
+  const merged = new Map<string, ExternalContextRequirement>();
+  for (const [pluginId, params] of references) {
+    const plugin = registry.get(pluginId);
+    if (!plugin) {
+      throw new StoredDefinitionCompileError(
+        'DECISION_FLOW_RULE_INVALID',
+        `decision flow references unknown factor plugin: ${pluginId}`,
+      );
+    }
+    const resolved = plugin.resolveExternalContextRequirements?.(params);
+    if (!resolved) continue;
+    for (const req of resolved) {
+      const securityCode =
+        typeof req.securityCode === 'string' ? req.securityCode.trim() : '';
+      if (!securityCode) {
+        throw new StoredDefinitionCompileError(
+          'DECISION_FLOW_RULE_INVALID',
+          `factor plugin ${pluginId} declared an external context requirement without securityCode`,
+        );
+      }
+      const period = Number(req.period);
+      const minBars = Number(req.minBars);
+      if (
+        !Number.isSafeInteger(period) ||
+        period <= 0 ||
+        !Number.isSafeInteger(minBars) ||
+        minBars <= 0
+      ) {
+        throw new StoredDefinitionCompileError(
+          'DECISION_FLOW_RULE_INVALID',
+          `factor plugin ${pluginId} declared an invalid external context requirement: ${securityCode}@${String(req.period)} x${String(req.minBars)}`,
+        );
+      }
+      const securityId = Number.isSafeInteger(req.securityId)
+        ? req.securityId
+        : undefined;
+      const key = `${securityCode}|${period}`;
+      const existing = merged.get(key);
+      if (!existing || minBars > existing.minBars) {
+        merged.set(key, { securityCode, securityId, period, minBars });
+      }
+    }
+  }
+  return [...merged.values()].sort(
+    (left, right) =>
+      left.securityCode.localeCompare(right.securityCode) ||
+      left.period - right.period,
+  );
 }

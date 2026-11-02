@@ -74,62 +74,9 @@ export interface ActiveObservationWindow {
 }
 
 /**
- * 全系统标准战术汇聚层默认配置。
- * 供回测运行时（apps/backtest）、实时告警（apps/signal）与推演开发网关（tools/strategy-dev）共用，
- * 保持三链路同构。
+ * 战术汇聚层配置不含任何默认实现。
  *
- * 核心设计（Setup -> Trigger -> Confirmation 三段论）：
- * 1. 宏观体制门禁（Setup）：以 'plugin.regime.shanghai-index' 为一票否决前置条件；
- * 2. 结构形态扳机（Trigger 双轨制）：
- *    - 规则 1（开源基线）：'plugin.chan.bsp' 标准 1/2/3 类买卖点直出；
- *    - 规则 2（私有增强）：'plugin.tactics.bull-left-right-bsp' 专属微观多级别买卖点直出；
- * 3. 时序观察窗（Confirmation）：3 根 Bar 内只需 VPCI 放量确认即可成交；
- *    挤压点火（Squeeze）降级为可选加成项，杜绝极低频因子扼杀有效信号。
+ * 组合根（apps/backtest、apps/signal、tools/strategy-dev）必须显式注入配置，
+ * 由 `loadTacticalAggregatorConfig` 从私有挂载目录解析，未挂载时降级为空配置。
+ * 开源仓不得出现任何私有插件 id、战术名称或参数。
  */
-export const DEFAULT_TACTICAL_AGGREGATOR_CONFIG: TacticalAggregatorConfig =
-  Object.freeze({
-    edgePlugins: Object.freeze([
-      'plugin.regime.shanghai-index',
-      'plugin.tactics.bull-left-right-bsp',
-      'plugin.tactics.bear-left-right-bsp',
-      'plugin.tactics.volume-price-confirmation',
-    ]),
-    windows: Object.freeze([
-      // 规则 1：开源基线（标准缠论 1/2/3 买直出 + 宏观牛市前置门禁 + VPCI 放量确认）
-      Object.freeze({
-        requiredSetupTag: 'plugin.regime.shanghai-index',
-        triggerTag: 'plugin.chan.bsp',
-        windowBars: DEFAULT_TACTICAL_WINDOW_BARS,
-        requiredConfirmationTags: Object.freeze([
-          'plugin.tactics.volume-price-confirmation',
-        ]),
-        optionalBoostTags: Object.freeze([
-          'plugin.tactics.volatility-squeeze-fire',
-        ]),
-        compositeBadgeText: '缠论多头+放量确认',
-      }),
-      // 规则 2：私有增强（专属微观多级别战术买点直出 + 宏观牛市前置门禁 + VPCI 放量确认）
-      Object.freeze({
-        requiredSetupTag: 'plugin.regime.shanghai-index',
-        triggerTag: 'plugin.tactics.bull-left-right-bsp',
-        windowBars: DEFAULT_TACTICAL_WINDOW_BARS,
-        requiredConfirmationTags: Object.freeze([
-          'plugin.tactics.volume-price-confirmation',
-        ]),
-        optionalBoostTags: Object.freeze([
-          'plugin.tactics.volatility-squeeze-fire',
-        ]),
-        compositeBadgeText: '专属战术+放量确认',
-      }),
-      // 规则 3：极速逃命风控（专属微观空头逃命卖点直出，0 延迟发射清仓，即刻清退所有未决多头观察窗）
-      Object.freeze({
-        triggerTag: 'plugin.tactics.bear-left-right-bsp',
-        windowBars: 0,
-        requiredConfirmationTags: Object.freeze([]),
-        compositeBadgeText: '熊市极速逃命',
-        action: 'SELL',
-        kind: 'RISK_CUT',
-      }),
-    ]),
-    cooldownBars: DEFAULT_TACTICAL_COOLDOWN_BARS,
-  });

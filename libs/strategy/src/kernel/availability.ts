@@ -11,8 +11,8 @@ const LUNCH_TERMINAL_MINUTE = 11 * 60 + 30; // 11:30 终端桶
 const CLOSE_TERMINAL_MINUTE = 15 * 60; // 15:00 终端桶（含收盘集合竞价）
 const DAILY_AVAILABILITY_MINUTES = 15 * 60 + 1; // 日线末成分 = 15:00 终端桶 → 15:01 封存
 
-export function contextSeriesKey(period: number): string {
-  return `${SERIES_ATTRIBUTE_PREFIX}${period}`;
+export function contextSeriesKey(securityCode: string, period: number): string {
+  return `${SERIES_ATTRIBUTE_PREFIX}${securityCode}.${period}`;
 }
 
 /**
@@ -44,12 +44,21 @@ export function availabilityKey(
   return new Date(timestamp);
 }
 
-/** 从共享黑板读取声明周期的只读窗口快照；未注入时返回 undefined。 */
+/**
+ * 从共享黑板读取窗口快照（本标的 = context.securityCode；跨标的显式传 code）。
+ * 未注入时返回 undefined。
+ */
 export function readContextSeries(
-  attributes: ReadonlyMap<string, unknown>,
+  context: {
+    readonly securityCode: string;
+    readonly attributes?: ReadonlyMap<string, unknown>;
+  },
   period: number,
+  securityCode?: string,
 ): readonly ProjectedStrategyBar[] | undefined {
-  const value = attributes.get(contextSeriesKey(period));
+  const value = (context.attributes ?? new Map()).get(
+    contextSeriesKey(securityCode ?? context.securityCode, period),
+  );
   if (value === undefined || value === null || !Array.isArray(value)) {
     return undefined;
   }

@@ -4,6 +4,7 @@ import type {
   StrategySignalKind,
 } from '../../rules/strategy-rule.types';
 import { compileStoredStrategyRule } from '../../rules/strategy-rule.compiler';
+import { readContextSeries } from '../../kernel/availability';
 import { evaluateStrategyPlan } from '../../evaluation/strategy-rule.evaluator';
 import type {
   FactorContext,
@@ -58,7 +59,10 @@ export class LegacyRuleDslPlugin implements FactorPlugin {
       };
     }
 
-    const outcome = evaluateStrategyPlan(plan, context.bars);
+    const outcome = evaluateStrategyPlan(
+      plan,
+      readContextSeries(context, context.period) ?? [],
+    );
 
     if (outcome.status === 'unavailable') {
       return {

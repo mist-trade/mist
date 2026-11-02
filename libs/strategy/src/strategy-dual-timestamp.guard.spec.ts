@@ -1,4 +1,5 @@
 import { StrategyEvaluationKernel } from './kernel/strategy-evaluation-kernel';
+import { contextSeriesKey } from './kernel/availability';
 import type { KernelConfig } from './kernel/kernel.types';
 import { createChanBspDecisionFlow } from './simulation/standard-simulation-flows';
 import { ChanBspFactorPlugin } from './factor/plugins/chan-bsp.plugin';
@@ -93,26 +94,30 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
         securityCode: '000001',
         timestamp: time,
         period: 30,
-        bars: Array.from({ length: 60 }, (_, i) => ({
-          rawBar: makeStrategyBar(new Date(time.getTime() + i * 60000)),
-          tradingDay: '2025-09-15',
-          ohlc: {
-            raw: { open: 10, high: 11, low: 9, close: 10 },
-            effective: { open: 10, high: 11, low: 9, close: 10 },
-            resolution: 'observed' as const,
-          },
-          volume: {
-            raw: '1000',
-            effective: '1000',
-            resolution: 'observed' as const,
-          },
-          amount: {
-            raw: '10000',
-            effective: '10000',
-            resolution: 'observed' as const,
-          },
-        })),
-        attributes: new Map(),
+        attributes: new Map([
+          [
+            contextSeriesKey('000001', 30),
+            Array.from({ length: 60 }, (_, i) => ({
+              rawBar: makeStrategyBar(new Date(time.getTime() + i * 60000)),
+              tradingDay: '2025-09-15',
+              ohlc: {
+                raw: { open: 10, high: 11, low: 9, close: 10 },
+                effective: { open: 10, high: 11, low: 9, close: 10 },
+                resolution: 'observed' as const,
+              },
+              volume: {
+                raw: '1000',
+                effective: '1000',
+                resolution: 'observed' as const,
+              },
+              amount: {
+                raw: '10000',
+                effective: '10000',
+                resolution: 'observed' as const,
+              },
+            })),
+          ],
+        ]),
       });
 
       // 第 1 步：在 time2 发射了 3买
@@ -193,26 +198,30 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
         securityCode: '000001',
         timestamp: timeNow,
         period: 30,
-        bars: Array.from({ length: 60 }, (_, i) => ({
-          rawBar: makeStrategyBar(new Date(timeNow.getTime() + i * 60000)),
-          tradingDay: '2025-10-17',
-          ohlc: {
-            raw: { open: 10, high: 11, low: 9, close: 10 },
-            effective: { open: 10, high: 11, low: 9, close: 10 },
-            resolution: 'observed' as const,
-          },
-          volume: {
-            raw: '1000',
-            effective: '1000',
-            resolution: 'observed' as const,
-          },
-          amount: {
-            raw: '10000',
-            effective: '10000',
-            resolution: 'observed' as const,
-          },
-        })),
-        attributes: new Map(),
+        attributes: new Map([
+          [
+            contextSeriesKey('000001', 30),
+            Array.from({ length: 60 }, (_, i) => ({
+              rawBar: makeStrategyBar(new Date(timeNow.getTime() + i * 60000)),
+              tradingDay: '2025-10-17',
+              ohlc: {
+                raw: { open: 10, high: 11, low: 9, close: 10 },
+                effective: { open: 10, high: 11, low: 9, close: 10 },
+                resolution: 'observed' as const,
+              },
+              volume: {
+                raw: '1000',
+                effective: '1000',
+                resolution: 'observed' as const,
+              },
+              amount: {
+                raw: '10000',
+                effective: '10000',
+                resolution: 'observed' as const,
+              },
+            })),
+          ],
+        ]),
       };
 
       const opinion = await plugin.evaluate(context as any, {

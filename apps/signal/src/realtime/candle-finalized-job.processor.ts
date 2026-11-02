@@ -13,7 +13,6 @@ import {
   RealtimeKernelPool,
   REALTIME_STRATEGY_PERIODS,
   TacticalEventAggregator,
-  DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
   type PreMarketWarmupReport,
   type PreMarketWarmupTarget,
   type RealtimeStrategyExecutionPlan,
@@ -95,7 +94,9 @@ export class CandleFinalizedJobProcessor {
       RuntimeObservabilityService,
       'recordTradingDayRollover' | 'recordConsumerRemoval'
     >,
-    private readonly tacticalConfig: TacticalAggregatorConfig = DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+    // 组合根必须注入由 TacticalAggregatorConfigLoader 解析的配置；
+    // 空配置表示未挂载私仓，此时战术汇聚层只透传信号、不合成观察窗。
+    private readonly tacticalConfig: TacticalAggregatorConfig = {},
   ) {}
 
   async process(
@@ -174,6 +175,16 @@ export class CandleFinalizedJobProcessor {
       derivedPeriods.add(plan.period);
       for (const rawPeriod of Object.keys(plan.contextRequirements ?? {})) {
         derivedPeriods.add(Number(rawPeriod));
+      }
+    }
+    // 空计划的外部标的（自身无策略）：仍按声明依赖派生周期（如 880003 的 1440），
+    // 否则其日线永远派生不出来，跨组扇出也就没有 bar 可投
+    if (executionPlans.length === 0) {
+      for (const period of this.evaluation.externalPeriodsFor(
+        trigger.securityId,
+        trigger.source,
+      )) {
+        derivedPeriods.add(period);
       }
     }
     const emitted = this.periodBuilder.accept(

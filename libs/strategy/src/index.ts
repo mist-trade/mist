@@ -58,6 +58,7 @@ export * from './kernel';
 export * from './tactical-event';
 export * from './execution';
 export * from './position';
+export * from './virtual-exit';
 export * from './stress-testing';
 export * from './wfa';
 export * from './strategy.constants';

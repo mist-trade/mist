@@ -22,6 +22,9 @@ export type PersistableKernelSignal = Pick<
   | 'signalType'
   | 'confidence'
 > & {
+  readonly channel?: KernelSignal['channel'];
+  readonly intent?: KernelSignal['intent'];
+  readonly originPluginId?: KernelSignal['originPluginId'];
   readonly confidenceLevel: KernelSignal['confidenceLevel'] | null;
   readonly triggerTime?: string;
   readonly pivotTime?: string | Date | null;
@@ -39,6 +42,10 @@ export interface SignalPersistencePayload {
   readonly source: string;
   readonly period: number;
   readonly signalKind: 'entry' | 'exit';
+  /** 通道引用：阶段一写入 contextSnapshot 观测，暂不落独立列。 */
+  readonly channel: KernelSignal['channel'];
+  readonly intent: KernelSignal['intent'];
+  readonly originPluginId: KernelSignal['originPluginId'];
   readonly signalTime: Date;
   readonly pivotTime: Date | null;
   readonly triggerTime: string;
@@ -75,6 +82,9 @@ export function mapKernelSignalToPersistencePayload(
     ...signal.contextSnapshot,
     triggerTime,
     triggerPrice,
+    ...(signal.channel ? { channel: signal.channel } : {}),
+    ...(signal.intent ? { intent: signal.intent } : {}),
+    ...(signal.originPluginId ? { originPluginId: signal.originPluginId } : {}),
   };
 
   const ruleSnapshot: Record<string, unknown> = {
@@ -89,6 +99,9 @@ export function mapKernelSignalToPersistencePayload(
     source: context.source,
     period: context.period,
     signalKind: signal.signalKind,
+    channel: signal.channel,
+    intent: signal.intent,
+    originPluginId: signal.originPluginId,
     signalTime,
     pivotTime,
     triggerTime,

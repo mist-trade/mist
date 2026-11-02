@@ -1,3 +1,4 @@
+import { contextSeriesKey } from '../../kernel/availability';
 import { ChanBspFactorPlugin } from './chan-bsp.plugin';
 
 describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
@@ -93,10 +94,14 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
       securityCode: '000001',
       timestamp: timeA,
       period: 30,
-      bars: Array.from({ length: 60 }, (_, i) =>
-        makeMockProjectedBar(new Date(timeA.getTime() + i * 60000), 30),
-      ),
-      attributes: new Map(),
+      attributes: new Map([
+        [
+          contextSeriesKey('000001', 30),
+          Array.from({ length: 60 }, (_, i) =>
+            makeMockProjectedBar(new Date(timeA.getTime() + i * 60000), 30),
+          ),
+        ],
+      ]),
     };
 
     const opinion = await plugin.evaluate(context as any);
@@ -142,10 +147,14 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
       securityCode: '000001',
       timestamp: timeA,
       period: 30,
-      bars: Array.from({ length: 60 }, (_, i) =>
-        makeMockProjectedBar(new Date(timeA.getTime() + i * 60000), 30),
-      ),
-      attributes: new Map(),
+      attributes: new Map([
+        [
+          contextSeriesKey('000001', 30),
+          Array.from({ length: 60 }, (_, i) =>
+            makeMockProjectedBar(new Date(timeA.getTime() + i * 60000), 30),
+          ),
+        ],
+      ]),
     };
 
     const opinion = await plugin.evaluate(context as any);
@@ -166,10 +175,14 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
       securityCode: '000001',
       timestamp: time,
       period: 30,
-      bars: Array.from({ length: 60 }, (_, i) =>
-        makeMockProjectedBar(new Date(time.getTime() + i * 60000), 30),
-      ),
-      attributes: new Map(),
+      attributes: new Map([
+        [
+          contextSeriesKey('000001', 30),
+          Array.from({ length: 60 }, (_, i) =>
+            makeMockProjectedBar(new Date(time.getTime() + i * 60000), 30),
+          ),
+        ],
+      ]),
     });
 
     // 第一次评估：时间 A 出现 3 买
@@ -235,10 +248,14 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
       securityCode: '000001',
       timestamp: timeA,
       period,
-      bars: Array.from({ length: 60 }, (_, i) =>
-        makeMockProjectedBar(new Date(timeA.getTime() + i * 60000), period),
-      ),
-      attributes: new Map(),
+      attributes: new Map([
+        [
+          contextSeriesKey('000001', period),
+          Array.from({ length: 60 }, (_, i) =>
+            makeMockProjectedBar(new Date(timeA.getTime() + i * 60000), period),
+          ),
+        ],
+      ]),
     });
 
     jest.spyOn(plugin as any, 'detectEvents').mockReturnValue([
@@ -272,10 +289,17 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
       securityCode: '000001',
       timestamp: barTime,
       period: 5,
-      bars: Array.from({ length: 60 }, (_, i) =>
-        makeMockProjectedBar(new Date(barTime.getTime() - (60 - i) * 60000), 5),
-      ),
-      attributes: new Map(),
+      attributes: new Map([
+        [
+          contextSeriesKey('000001', 5),
+          Array.from({ length: 60 }, (_, i) =>
+            makeMockProjectedBar(
+              new Date(barTime.getTime() - (60 - i) * 60000),
+              5,
+            ),
+          ),
+        ],
+      ]),
     };
 
     jest.spyOn(plugin as any, 'detectEvents').mockReturnValue([
@@ -318,12 +342,12 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
     });
 
     const attributesNonContained = new Map<string, any>();
+    attributesNonContained.set(contextSeriesKey('000001', 5), barsNonContained);
     const contextNonContained = {
       securityId: 1,
       securityCode: '000001',
       timestamp: new Date(baseTime.getTime() + 60 * 60000),
       period: 5,
-      bars: barsNonContained,
       attributes: attributesNonContained,
     };
 
@@ -365,12 +389,12 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
     });
 
     const attributesContained = new Map<string, any>();
+    attributesContained.set(contextSeriesKey('000001', 5), barsContained);
     const contextContained = {
       securityId: 1,
       securityCode: '000001',
       timestamp: new Date(baseTime.getTime() + 60 * 60000),
       period: 5,
-      bars: barsContained,
       attributes: attributesContained,
     };
 

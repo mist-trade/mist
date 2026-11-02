@@ -5,6 +5,7 @@ import type { FactorOpinion, FactorPlugin } from '../factor/factor.types';
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
 import { DecisionFlowEvaluator } from '../decision-flow/decision-flow-evaluator';
 import { StrategyEvaluationKernel } from '../kernel/strategy-evaluation-kernel';
+import { contextSeriesKey } from '../kernel/availability';
 import { StrategySimulationSession } from './strategy-simulation.session';
 import { mapKernelSignalToSimulationSignal } from './kernel-signal-mapper';
 import { ChanBspFactorPlugin } from '../factor/plugins/chan-bsp.plugin';
@@ -101,8 +102,12 @@ describe('策略推演纯透传专项测试 (Strategy Simulation Pass-Through Sp
       securityCode: '000001',
       timestamp: new Date('2026-08-26T10:00:00.000Z'),
       period: 30,
-      bars: [makeStrategyBar(new Date('2026-08-26T10:00:00.000Z'))] as any,
-      attributes: new Map(),
+      attributes: new Map([
+        [
+          contextSeriesKey('000001', 30),
+          [makeStrategyBar(new Date('2026-08-26T10:00:00.000Z'))] as any,
+        ],
+      ]),
     });
 
     expect(result.status).toBe('SIGNAL_EMITTED');
@@ -269,8 +274,7 @@ describe('策略推演纯透传专项测试 (Strategy Simulation Pass-Through Sp
         securityCode: '000001',
         timestamp: new Date(startTime + (prices.length - 1) * 30 * 60 * 1000),
         period: 30,
-        bars: bars as any,
-        attributes: new Map(),
+        attributes: new Map([[contextSeriesKey('000001', 30), bars as any]]),
       },
       {
         units: CHAN_BSP_UNITS.BI,
@@ -282,6 +286,97 @@ describe('策略推演纯透传专项测试 (Strategy Simulation Pass-Through Sp
     // 若触发买卖点，其 badgeText 必须由插件本身直接产出
     if (opinion.action === 'BUY') {
       expect(opinion.badgeText).toMatch(/^[123]买$/);
+    }
+  });
+});
+
+describe('StrategySimulationSession — 跨标的 bar 因果归并（任务3）', () => {
+  class MacroEchoPlugin implements FactorPlugin {
+    public readonly id = 'plugin.test.macro-echo';
+    public readonly name = '宏观察看器';
+    public readonly category = 'TECHNICAL' as const;
+    public readonly version = '1.0.0';
+    public readonly description = 'test';
+    public readonly paramSchema = {};
+    public lastMacroClose = -1;
+
+    public async evaluate(context: {
+      attributes?: Map<string, unknown>;
+    }): Promise<FactorOpinion> {
+      const raw = context.attributes?.get('series.880003.1440') as
+        | readonly { rawBar: { close: number } }[]
+        | undefined;
+      const last = raw?.[raw.length - 1]?.rawBar.close ?? -1;
+      this.lastMacroClose = last;
+      return { action: 'BUY', confidence: 0.9, reason: `macro=${last}` };
+    }
+  }
+
+  function dayBars(
+    securityId: number,
+    closes: readonly number[],
+    startDay: number,
+  ): readonly StrategyBar[] {
+    return closes.map((close, i) => ({
+      securityId,
+      source: 'qmt' as const,
+      period: 1440,
+      timestamp: new Date(Date.UTC(2026, 0, startDay + i, 16, 0, 0)),
+      open: close - 0.2,
+      high: close + 0.5,
+      low: close - 0.5,
+      close,
+      volume: '1',
+      amount: '1',
+      type: 'complete' as const,
+    }));
+  }
+
+  it('外部 bar 按因果序归并：同日宏观先于标的求值，跨标的窗口逐步填充', async () => {
+    const registry = new InMemoryFactorPluginRegistry();
+    const plugin = new MacroEchoPlugin();
+    registry.register(plugin);
+
+    const targetCloses = [10, 10.2, 10.1, 10.3, 10.2, 10.6];
+    const externalCloses = [20, 21, 22, 23, 24, 26];
+    const allBars = [
+      ...dayBars(1, targetCloses, 5),
+      ...dayBars(12, externalCloses, 5),
+    ];
+    const session = new StrategySimulationSession(allBars, {
+      securityCode: '000001',
+      securityId: 1,
+      period: 1440,
+      windowBudget: 5,
+      flow: {
+        id: 'guard',
+        type: 'GUARD',
+        name: 'gate',
+        pluginId: 'plugin.test.macro-echo',
+        requiredAction: 'BUY',
+        minConfidence: 0.5,
+        onPass: {
+          id: 'term',
+          type: 'TERMINAL',
+          action: 'BUY',
+          signalTag: 'EXT',
+          reason: 'pass',
+        },
+      },
+      externalContextRequirements: [
+        { securityCode: '880003', securityId: 12, period: 1440, minBars: 3 },
+      ],
+      externalBars: dayBars(12, externalCloses, 5),
+      registry,
+    });
+
+    // 逐日步进：窗口满预算(5)后内核才开闸求值（第 5 日起）；外部窗口未满
+    // minBars(3) 前同样 fail-closed。开闸后宏观察看器应看到当日全A 收盘
+    //（同日宏观先于标的入窗 → 因果序）。
+    for (let day = 1; day <= 6; day++) {
+      await session.stepNext();
+      const expected = day >= 5 ? externalCloses[day - 1] : -1;
+      expect(plugin.lastMacroClose).toBe(expected);
     }
   });
 });

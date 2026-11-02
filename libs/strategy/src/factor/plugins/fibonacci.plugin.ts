@@ -3,6 +3,7 @@ import {
   RETRACEMENT_ZONES,
   TRADINGVIEW_FIB_STYLES,
 } from '@app/indicators';
+import { readContextSeries } from '../../kernel/availability';
 import { TrendDirection } from '@app/chancore';
 import {
   findLastCompletedSwing,
@@ -87,15 +88,17 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
       units === CHAN_BSP_UNITS.DUAN
         ? DEFAULT_REQUIRED_BARS_DUAN
         : DEFAULT_REQUIRED_BARS_BI;
-    if (context.bars.length < minBars) {
+    if ((readContextSeries(context, context.period) ?? []).length < minBars) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
         confidence: 0.0,
-        reason: `K线数量不足(${context.bars.length}/${minBars})，无法确立缠论${unitLabel}结构`,
+        reason: `K线数量不足(${(readContextSeries(context, context.period) ?? []).length}/${minBars})，无法确立缠论${unitLabel}结构`,
       };
     }
 
-    const klines = toChanKSeries(context.bars);
+    const klines = toChanKSeries(
+      readContextSeries(context, context.period) ?? [],
+    );
     if (klines.length === 0) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,

@@ -25,16 +25,18 @@ import {
   type BacktestTargetIssue,
 } from '@app/shared-data';
 import {
+  CapitalLedger,
   compileStoredDefinitionVersion,
   DEFAULT_BROKER_INITIAL_CASH,
   ExecutionRiskArbiter,
+  ExternalFactorPluginLoader,
   HistoricalBarSource,
   mapKernelSignalToPersistencePayload,
   PositionStateMachine,
   SimulatedBroker,
   StrategyEvaluationKernel,
   TacticalEventAggregator,
-  DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+  TacticalAggregatorConfigLoader,
   shanghaiMidnight,
   type CompiledStoredDefinition,
   type DailyNavSnapshot,
@@ -407,6 +409,8 @@ export class BacktestRunExecutor {
       securityId,
       securityCode,
       publicFrom: run.startDate,
+      virtualExitPolicy:
+        ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
       plans: [
         {
           definitionId: run.strategyDefinitionId,
@@ -455,18 +459,17 @@ export class BacktestRunExecutor {
       name: securityName,
       ...(preCloseBar ? { preClose: preCloseBar.close } : {}),
     });
-    const positionMachine = new PositionStateMachine(
-      securityId,
-      securityCode,
-      DEFAULT_BROKER_INITIAL_CASH,
-    );
+    const positionMachine = new PositionStateMachine(securityId, securityCode);
+    const capitalLedger = new CapitalLedger({
+      initialCash: DEFAULT_BROKER_INITIAL_CASH,
+    });
     const arbiter = new ExecutionRiskArbiter({
       hardStopLossRatio: -0.08,
       cashAllocationRatio: 0.995,
       lotSize: TRADING_RULES.MAIN_BOARD_LOT_SIZE,
     });
     const tacticalAggregator = new TacticalEventAggregator(
-      DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+      TacticalAggregatorConfigLoader.load(),
     );
     let lastSeenBar: StrategyBar | null = null;
 
@@ -512,7 +515,7 @@ export class BacktestRunExecutor {
             bar,
             signal: te.triggerSignal,
             position: positionMachine.getSnapshot(),
-            availableCash: positionMachine.getCash(),
+            availableCash: capitalLedger.getCash(),
           });
           if (
             orderDraft &&
@@ -536,7 +539,7 @@ export class BacktestRunExecutor {
             bar,
             signal: te.triggerSignal,
             position: positionMachine.getSnapshot(),
-            availableCash: positionMachine.getCash(),
+            availableCash: capitalLedger.getCash(),
           });
           if (
             orderDraft &&
@@ -549,6 +552,7 @@ export class BacktestRunExecutor {
         const fills = broker.onBar(bar);
         for (const fill of fills) {
           positionMachine.onOrderFilled(fill);
+          capitalLedger.applyFill(fill);
         }
 
         positionMachine.onBar(bar);
@@ -556,7 +560,7 @@ export class BacktestRunExecutor {
         const riskOrderDraft = arbiter.arbitrate({
           bar,
           position: positionMachine.getSnapshot(),
-          availableCash: positionMachine.getCash(),
+          availableCash: capitalLedger.getCash(),
         });
         if (
           riskOrderDraft &&
@@ -567,7 +571,7 @@ export class BacktestRunExecutor {
 
         if (isSessionCloseBar(bar.timestamp, run.period)) {
           const dateStr = formatShanghaiDateString(bar.timestamp);
-          positionMachine.onDayClose(bar);
+          capitalLedger.onDayClose(bar, positionMachine.getSnapshot());
           broker.settleDayClose(dateStr);
         }
 
@@ -581,9 +585,9 @@ export class BacktestRunExecutor {
     await budget.checkpoint(true);
 
     const finalBar = lastSeenBar as StrategyBar | null;
-    if (finalBar && positionMachine.getNavHistory().length === 0) {
+    if (finalBar && capitalLedger.getNavHistory().length === 0) {
       const dateStr = formatShanghaiDateString(finalBar.timestamp);
-      positionMachine.onDayClose(finalBar);
+      capitalLedger.onDayClose(finalBar, positionMachine.getSnapshot());
       broker.settleDayClose(dateStr);
     }
 
@@ -592,7 +596,7 @@ export class BacktestRunExecutor {
       prewarmStatus: outcome.prewarmStatus,
       prewarmActual: outcome.prewarmActual,
       trades: positionMachine.getClosedTrades(),
-      navHistory: positionMachine.getNavHistory(),
+      navHistory: capitalLedger.getNavHistory(),
     };
   }
 

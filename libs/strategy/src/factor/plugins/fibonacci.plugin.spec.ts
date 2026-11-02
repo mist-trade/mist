@@ -1,4 +1,5 @@
 import type { ProjectedStrategyBar } from '@app/market-data';
+import { contextSeriesKey } from '../../kernel/availability';
 import type { FactorContext } from '../factor.types';
 import { FibonacciRetracementPlugin } from './fibonacci.plugin';
 
@@ -62,8 +63,7 @@ function makeContext(bars: ProjectedStrategyBar[]): FactorContext {
         ? bars[bars.length - 1].rawBar.timestamp
         : new Date('2026-09-07T01:30:00.000Z'),
     period: 5,
-    bars,
-    attributes: new Map(),
+    attributes: new Map([[contextSeriesKey('000001', 5), bars]]),
   };
 }
 

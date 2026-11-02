@@ -194,3 +194,135 @@ describe('RealtimeKernelPool.warmup（盘前多周期预热）', () => {
     expect(hydratedPeriods).toEqual(expect.arrayContaining([30, 5]));
   });
 });
+
+describe('RealtimeKernelPool — 跨标的依赖（外部窗口预热与扇出）', () => {
+  class MacroReaderPlugin implements FactorPlugin {
+    public readonly id = 'plugin.test.macro-reader';
+    public readonly name = '宏观读取插件';
+    public readonly category = 'TECHNICAL' as const;
+    public readonly version = '1.0.0';
+    public readonly description = 'test';
+    public readonly paramSchema = {};
+    public lastMacroClose = -1;
+
+    public async evaluate(context: {
+      attributes?: Map<string, unknown>;
+    }): Promise<FactorOpinion> {
+      const raw = context.attributes?.get('series.880003.30') as
+        | readonly { rawBar: { close: number } }[]
+        | undefined;
+      const last = raw?.[raw.length - 1]?.rawBar.close ?? -1;
+      this.lastMacroClose = last;
+      return {
+        action: 'BUY',
+        confidence: 0.9,
+        reason: `macro last close = ${last}`,
+      };
+    }
+  }
+
+  function macroRegistry(plugin: MacroReaderPlugin) {
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(plugin);
+    return registry;
+  }
+
+  function barsFor(
+    securityId: number,
+    period: number,
+    closes: readonly number[],
+    startMs: number,
+  ): readonly StrategyBar[] {
+    return closes.map((close, i) => ({
+      securityId,
+      source: 'qmt' as const,
+      period,
+      timestamp: new Date(startMs + i * period * 60_000),
+      open: close - 0.2,
+      high: close + 0.5,
+      low: close - 0.5,
+      close,
+      volume: '1',
+      amount: '1',
+      type: 'complete' as const,
+    }));
+  }
+
+  function localPort(sections: readonly (readonly StrategyBar[])[]) {
+    const all = sections.flat();
+    const loadRealtimeWindow = jest
+      .fn()
+      .mockImplementation((criteria: { securityId: number; period: number }) =>
+        Promise.resolve({
+          bars: all.filter(
+            (bar) =>
+              bar.securityId === criteria.securityId &&
+              bar.period === criteria.period,
+          ),
+        }),
+      );
+    return { loadRealtimeWindow, resolveRealtimeObservation: jest.fn() };
+  }
+
+  it('预热灌入外部标的历史，实时扇出把外部 bar 投递进组内核外部窗口', async () => {
+    const START = Date.UTC(2026, 7, 3, 1, 30);
+    const targetBars = barsFor(7, 30, [10.5, 10.5, 10.5, 10.5, 10.5], START);
+    const extBars = barsFor(12, 30, [20, 21, 22, 23], START + 30 * 60_000);
+    const port = localPort([targetBars, extBars]);
+    const plugin = new MacroReaderPlugin();
+    const registry = macroRegistry(plugin);
+    const pool = new RealtimeKernelPool(port as never, registry);
+
+    const plans = [
+      plan({
+        flow: {
+          id: 'guard',
+          type: 'GUARD',
+          name: 'gate',
+          pluginId: 'plugin.test.macro-reader',
+          requiredAction: 'BUY',
+          minConfidence: 0.5,
+          onPass: {
+            id: 'term',
+            type: 'TERMINAL',
+            action: 'BUY',
+            signalTag: 'EXT',
+            reason: 'pass',
+          },
+        },
+        externalContextRequirements: [
+          { securityCode: '880003', securityId: 12, period: 30, minBars: 3 },
+        ],
+      }),
+    ];
+
+    // 预热：外部 hydration 必须以 securityId=12 发起
+    await pool.warmup([{ securityId: 7, source: 'qmt', plans }], ANCHOR);
+    expect(port.loadRealtimeWindow).toHaveBeenCalledWith(
+      expect.objectContaining({ securityId: 12, period: 30 }),
+    );
+
+    // 触发：宏观察看器应读到预热灌入的外部窗口（最后一根 close = 23）
+    const trigger = {
+      ...targetBars[targetBars.length - 1],
+      timestamp: new Date(ANCHOR.getTime() + 60 * 60_000),
+    };
+    await pool.push(trigger as never, plans);
+    expect(plugin.lastMacroClose).toBe(23);
+
+    // 扇出：外部新 bar（close 24）经 pool.push 投递进组 7 的外部窗口
+    const extNew = barsFor(
+      12,
+      30,
+      [24],
+      trigger.timestamp.getTime() + 30 * 60_000,
+    )[0];
+    await pool.push(extNew as never, plans);
+    const trigger2 = {
+      ...trigger,
+      timestamp: new Date(trigger.timestamp.getTime() + 2 * 60 * 60_000),
+    };
+    await pool.push(trigger2 as never, plans);
+    expect(plugin.lastMacroClose).toBe(24);
+  });
+});

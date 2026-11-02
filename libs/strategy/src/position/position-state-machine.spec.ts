@@ -66,12 +66,11 @@ describe('PositionStateMachine', () => {
   let psm: PositionStateMachine;
 
   beforeEach(() => {
-    psm = new PositionStateMachine(1, '600519', 1_000_000);
+    psm = new PositionStateMachine(1, '600519');
   });
 
-  it('handles entry fills, computes weighted cost and tracks cash accurately', () => {
+  it('handles entry fills and computes weighted cost accurately', () => {
     expect(psm.getStatus()).toBe(POSITION_STATUSES.EMPTY);
-    expect(psm.getCash()).toBe(1_000_000);
 
     // 第一次买入：1000 股 @ 10.00，规费 10 元，净扣除 10010 元
     const t1 = new Date('2026-10-15T09:31:00.000Z');
@@ -81,7 +80,6 @@ describe('PositionStateMachine', () => {
     let snapshot = psm.getSnapshot();
     expect(snapshot.holdingQuantity).toBe(1000);
     expect(snapshot.costPrice).toBe(10.0);
-    expect(psm.getCash()).toBe(989_990);
 
     // 第二次买入加仓：1000 股 @ 11.00，规费 10 元，净扣除 11010 元
     const t2 = new Date('2026-10-15T10:00:00.000Z');
@@ -91,7 +89,6 @@ describe('PositionStateMachine', () => {
     expect(snapshot.holdingQuantity).toBe(2000);
     // 加权成本均价 = (1000*10 + 1000*11) / 2000 = 10.50
     expect(snapshot.costPrice).toBe(10.5);
-    expect(psm.getCash()).toBe(978_980);
   });
 
   it('protects against whipsaw by not triggering hardcoded stop losses during market dips', () => {
@@ -185,44 +182,6 @@ describe('PositionStateMachine', () => {
     expect(trade.holdingBars).toBe(2);
   });
 
-  it('generates accurate daily mark-to-market NAV curve over successive trading days', () => {
-    // 初始买入 1000 股 @ 10.00 元，现金剩余 989,990 元
-    psm.onOrderFilled(
-      createFillEvent(
-        ORDER_SIDES.BUY,
-        10.0,
-        1000,
-        10,
-        new Date('2026-10-12T09:31:00.000Z'),
-      ),
-    );
-
-    // Day 1 收盘价 10.20 元 (市值 10,200 元，总权益 1,000,190 元)
-    const barDay1 = createBar('2026-10-12T15:00:00.000Z', 10.2);
-    const nav1 = psm.onDayClose(barDay1);
-    expect(nav1.date).toBe('2026-10-12');
-    expect(nav1.marketValue).toBe(10_200);
-    expect(nav1.totalEquity).toBe(1_000_190);
-
-    // Day 2 收盘价 10.50 元 (市值 10,500 元，总权益 1,000,490 元)
-    const barDay2 = createBar('2026-10-13T15:00:00.000Z', 10.5);
-    const nav2 = psm.onDayClose(barDay2);
-    expect(nav2.date).toBe('2026-10-13');
-    expect(nav2.marketValue).toBe(10_500);
-    expect(nav2.totalEquity).toBe(1_000_490);
-    // Day 2 收益 = (1000490 - 1000190) / 1000190 = 0.0003
-    expect(nav2.dailyReturn).toBe(0.0003);
-
-    // Day 3 收盘价 10.10 元 (市值 10,100 元，总权益 1,000,090 元)
-    const barDay3 = createBar('2026-10-14T15:00:00.000Z', 10.1);
-    const nav3 = psm.onDayClose(barDay3);
-    expect(nav3.date).toBe('2026-10-14');
-    expect(nav3.totalEquity).toBe(1_000_090);
-
-    const history = psm.getNavHistory();
-    expect(history).toHaveLength(3);
-  });
-
   it('strictly adheres to pure accountant role: onBar never generates exit orders and returns null', () => {
     // 模拟外部出场插件
     const mockPrivateExitPolicy: ExitPolicyPort = {
@@ -241,12 +200,9 @@ describe('PositionStateMachine', () => {
       },
     };
 
-    const customPsm = new PositionStateMachine(
-      1,
-      '600519',
-      1_000_000,
-      mockPrivateExitPolicy,
-    );
+    const customPsm = new PositionStateMachine(1, '600519', {
+      exitPolicy: mockPrivateExitPolicy,
+    });
     customPsm.onOrderFilled(
       createFillEvent(
         ORDER_SIDES.BUY,
@@ -294,7 +250,6 @@ describe('PositionStateMachine', () => {
 
   it('supports custom exitRatio via options and generates partial exit orders', () => {
     const partialPsm = new PositionStateMachine(1, '600519', {
-      initialCash: 1_000_000,
       exitRatio: 0.5,
     });
     expect(partialPsm.getExitRatio()).toBe(0.5);

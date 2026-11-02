@@ -6,8 +6,9 @@ import type {
 import { availabilityKey } from '../availability';
 import { formatShanghaiDateString } from '@app/timezone';
 import type { FactorPluginRegistry } from '../../factor/factor-plugin-registry';
+import { ExternalFactorPluginLoader } from '../../factor/external-plugin-loader';
 import type { DecisionFlowNode } from '../../decision-flow/decision-flow.types';
-import type { KernelSignal } from '../kernel.types';
+import type { ExternalContextRequirement, KernelSignal } from '../kernel.types';
 import { StrategyEvaluationKernel } from '../strategy-evaluation-kernel';
 import { HistoricalBarSource } from '../historical-bar-source';
 import { validateBarSeriesWithPolars } from '@app/indicators';
@@ -32,6 +33,8 @@ export type RealtimeStrategyExecutionPlan = {
   readonly requiredBarCount: number;
   /** context 周期 → 最少保留根数（编译产物） */
   readonly contextRequirements: Readonly<Record<number, number>>;
+  /** 跨标的上下文依赖（编译产物；内核为其维护独立外部窗口） */
+  readonly externalContextRequirements?: readonly ExternalContextRequirement[];
 };
 
 export type RealtimeWindowGroupIdentity = {
@@ -69,6 +72,11 @@ export interface PreMarketWarmupReport {
 interface KernelGroup {
   readonly kernel: StrategyEvaluationKernel;
   readonly planSignature: string;
+  readonly source: StrategyRealtimeSource;
+  /** 本组计划声明的外部标的（跨组扇出路由用） */
+  readonly externalById: ReadonlySet<number>;
+  readonly externalByCode: ReadonlySet<string>;
+  readonly externalDemand: ReadonlyMap<string, ExternalContextRequirement>;
 }
 
 /**
@@ -90,10 +98,42 @@ export class RealtimeKernelPool {
     private readonly registry?: FactorPluginRegistry,
   ) {}
 
+  /** 声明依赖该标的（securityId 或 securityCode）的同源组所需派生周期 */
+  externalPeriodsFor(
+    securityId: number,
+    source: StrategyRealtimeSource,
+  ): readonly number[] {
+    const periods = new Set<number>();
+    for (const group of this.groups.values()) {
+      if (group.source !== source) continue;
+      for (const req of group.externalDemand.values()) {
+        const matches =
+          req.securityId === securityId ||
+          req.securityCode === String(securityId);
+        if (matches) periods.add(req.period);
+      }
+    }
+    return [...periods];
+  }
+
   async push(
     bar: StrategyBar,
     plans: readonly RealtimeStrategyExecutionPlan[],
   ): Promise<readonly KernelSignal[]> {
+    // 跨组扇出先行：与本 bar 自身的计划无关（依赖的是其它组的声明）。
+    // 空计划的 bar 也要扇出——这正是外部标的（自身无策略）进入内核的唯一通路。
+    for (const otherGroup of this.groups.values()) {
+      if (otherGroup.source !== bar.source) continue;
+      const matches =
+        (bar.securityId !== undefined &&
+          otherGroup.externalById.has(bar.securityId)) ||
+        (bar.securityCode !== undefined &&
+          otherGroup.externalByCode.has(bar.securityCode));
+      if (!matches) continue;
+      await otherGroup.kernel.push(bar);
+    }
+    if (plans.length === 0) return [];
+
     const key = groupKey(bar.securityId, bar.source);
     const planSignature = planSignatureOf(plans);
     let group = this.groups.get(key);
@@ -239,6 +279,22 @@ export class RealtimeKernelPool {
       }
     }
 
+    // 跨标的依赖：收集计划声明（同 code|period 取 minBars 最大值）
+    const externalById = new Set<number>();
+    const externalByCode = new Set<string>();
+    const externalDemand = new Map<string, ExternalContextRequirement>();
+    for (const plan of plans) {
+      for (const req of plan.externalContextRequirements ?? []) {
+        if (typeof req.securityId === 'number')
+          externalById.add(req.securityId);
+        if (req.securityCode) externalByCode.add(req.securityCode);
+        const key = `${req.securityCode}|${req.period}`;
+        const existing = externalDemand.get(key);
+        if (!existing || req.minBars > existing.minBars)
+          externalDemand.set(key, req);
+      }
+    }
+
     // 逐周期 hydration：历史（触发日之前）canonical + 当日触发源
     const hydratedByPeriod = new Map<number, StrategyBar[]>();
     let securityCode = bar.securityCode;
@@ -282,11 +338,34 @@ export class RealtimeKernelPool {
       }
     }
 
+    // 外部标的预热：声明的跨标的历史先推入（外部 bar 只落窗不求值，同日宏观在前）
+    const externalPreBars: StrategyBar[] = [];
+    for (const req of externalDemand.values()) {
+      if (typeof req.securityId !== 'number') continue;
+      const hydrated = await this.marketData.loadRealtimeWindow({
+        securityId: req.securityId,
+        source: requireRealtimeSource(bar.source),
+        securityCode: req.securityCode,
+        period: req.period,
+        anchorAt: bar.timestamp,
+        anchorAvailabilityMs: availabilityKey(bar).getTime(),
+        requiredBars: Math.max(1, req.minBars),
+      });
+      externalPreBars.push(
+        ...dedupeHydration(
+          hydrated.bars.filter((candidate) => candidate.period === req.period),
+          bar,
+        ),
+      );
+    }
+
     const kernel = new StrategyEvaluationKernel({
       securityId: bar.securityId,
       securityCode: securityCode ?? String(bar.securityId),
       publicFrom: bar.timestamp,
       registry: this.registry,
+      virtualExitPolicy:
+        ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
       plans: plans.map((plan) => ({
         definitionId: plan.definitionId,
         versionId: plan.versionId,
@@ -296,10 +375,21 @@ export class RealtimeKernelPool {
         period: plan.period,
         requiredBarCount: plan.requiredBarCount,
         contextRequirements: plan.contextRequirements ?? {},
+        externalContextRequirements: plan.externalContextRequirements ?? [],
       })),
     });
-    const group: KernelGroup = { kernel, planSignature };
+    const group: KernelGroup = {
+      kernel,
+      planSignature,
+      source: requireRealtimeSource(bar.source),
+      externalById,
+      externalByCode,
+      externalDemand,
+    };
     // 预热段跨周期按可用时刻归并推进（预热相不评估，周期间顺序不影响内容）
+    for (const externalBar of externalPreBars) {
+      await kernel.push(externalBar);
+    }
     for (const bar of HistoricalBarSource.mergeByAvailability(
       hydratedByPeriod,
     )) {
@@ -430,7 +520,14 @@ function planSignatureOf(
   plans: readonly RealtimeStrategyExecutionPlan[],
 ): string {
   return plans
-    .map((plan) => `${plan.definitionId}:${plan.versionId}`)
+    .map((plan) => {
+      const ext = plan.externalContextRequirements?.length
+        ? `:x${plan.externalContextRequirements
+            .map((req) => `${req.securityCode}@${req.period}x${req.minBars}`)
+            .join('+')}`
+        : '';
+      return `${plan.definitionId}:${plan.versionId}${ext}`;
+    })
     .sort()
     .join(',');
 }

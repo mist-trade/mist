@@ -136,17 +136,26 @@ describe('Strategy domain boundary', () => {
     expect(violations).toEqual([]);
   });
 
-  it('does not read environment configuration except private-plugin loaders', () => {
-    const allowedEnvFiles = new Set([
-      join(sourceRoot, 'factor', 'external-plugin-loader.ts'),
-      join(sourceRoot, 'market-data', 'canonical-policy.loader.ts'),
-    ]);
-    const violations = runtimeFiles
-      .filter((file) => !allowedEnvFiles.has(file))
-      .filter((file) => /\bprocess\.env\b/.test(readFileSync(file, 'utf8')))
+  it('does not read environment configuration outside loader modules', () => {
+    // 约定：只有「从私有挂载目录解析路径」的加载器可以读取环境变量，且必须同时满足两条：
+    // 1. 文件名以 `-loader.ts` / `.loader.ts` 结尾；
+    // 2. 实现上确有文件系统访问（node:fs），即它确实是加载器而非领域逻辑。
+    // 领域代码一律不得触碰 process.env。
+    const loaderModule = /[-.]loader\.ts$/;
+    const readsFileSystem = (file: string): boolean =>
+      importsOf(file).some((source) => source === 'node:fs' || source === 'fs');
+
+    const envReaders = runtimeFiles.filter((file) =>
+      /\bprocess\.env\b/.test(readFileSync(file, 'utf8')),
+    );
+
+    const violations = envReaders
+      .filter((file) => !loaderModule.test(file) || !readsFileSystem(file))
       .map((file) => relative(repositoryRoot, file));
 
     expect(violations).toEqual([]);
+    // 规则自检：命名约定必须真正命中现有加载器，避免正则失效后门禁空转。
+    expect(envReaders.length).toBeGreaterThan(0);
   });
 });
 

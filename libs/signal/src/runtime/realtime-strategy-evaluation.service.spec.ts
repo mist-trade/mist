@@ -124,7 +124,7 @@ describe('RealtimeStrategyEvaluationService（统一内核单通路）', () => {
     expect(candidates[1].signalKind).toBe('exit');
   });
 
-  it('空计划时短路返回，不触碰内核池', async () => {
+  it('空计划仍进池（跨组扇出：外部标的的 bars 进入其它组外部窗口的唯一通路）', async () => {
     const pool = fakePool();
     const service = new RealtimeStrategyEvaluationService(pool);
 
@@ -133,8 +133,10 @@ describe('RealtimeStrategyEvaluationService（统一内核单通路）', () => {
       [],
     );
 
+    // 无候选（外部标的自身无策略），但 pool.push 必须被调用——
+    // 扇出把 bar 投递给声明依赖该标的的其它组内核外部窗口
     expect(candidates).toEqual([]);
-    expect(pool.push).not.toHaveBeenCalled();
+    expect(pool.push).toHaveBeenCalledWith(bar('2026-08-04T06:44:00.000Z'), []);
   });
 
   it('retainRegistryScopes/reset/diagnostics 透传到内核池', () => {

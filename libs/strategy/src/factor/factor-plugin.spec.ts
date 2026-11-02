@@ -1,4 +1,5 @@
 import type { ProjectedStrategyBar } from '@app/market-data';
+import { contextSeriesKey } from '../kernel/availability';
 import { InMemoryFactorPluginRegistry } from './factor-plugin-registry';
 import type { FactorContext, FactorPlugin } from './factor.types';
 import { ChanBspFactorPlugin } from './plugins/chan-bsp.plugin';
@@ -47,6 +48,24 @@ function makeMockBar(
   };
 }
 
+function makeMockProjectedBar(
+  time: Date,
+  open: number,
+  high: number,
+  low: number,
+  close: number,
+) {
+  const rawBar = makeMockBar(time, open, high, low, close);
+  const eff = { open, high, low, close };
+  return {
+    rawBar,
+    tradingDay: time.toISOString().slice(0, 10),
+    ohlc: { raw: eff, effective: eff },
+    volume: { raw: rawBar.volume, effective: rawBar.volume },
+    amount: { raw: rawBar.amount ?? 0, effective: rawBar.amount ?? 0 },
+  };
+}
+
 describe('Phase 1: Factor Plugins & Registry', () => {
   describe('FactorPluginRegistry', () => {
     it('registers and retrieves plugins by id and category', () => {
@@ -90,7 +109,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 1440,
-        bars: [],
         attributes: new Map([
           ['fundamental.roe', 25.5],
           ['fundamental.debtRatio', 32.0],
@@ -113,7 +131,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         securityCode: '000002',
         timestamp: new Date(),
         period: 1440,
-        bars: [],
         attributes: new Map([
           ['fundamental.roe', 3.2],
           ['fundamental.debtRatio', 85.0],
@@ -136,7 +153,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 1440,
-        bars: [],
         attributes: new Map(),
       };
 
@@ -156,7 +172,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 1440,
-        bars: [],
         attributes: new Map([['capital.northbound_inflow_wan', 3500]]),
       };
 
@@ -171,7 +186,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 1440,
-        bars: [],
         attributes: new Map([['capital.northbound_inflow_wan', -2500]]),
       };
 
@@ -190,8 +204,12 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [makeMockBar(new Date(), 10, 11, 9, 10)],
-        attributes: new Map(),
+        attributes: new Map([
+          [
+            contextSeriesKey('000001', 5),
+            [makeMockProjectedBar(new Date(), 10, 11, 9, 10)],
+          ],
+        ]),
       };
 
       const opinion = await plugin.evaluate(context, { requiredBarCount: 50 });
@@ -222,8 +240,7 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         securityCode: '000001',
         timestamp: new Date(baseTime.getTime() + 60000),
         period: 5,
-        bars,
-        attributes: new Map(),
+        attributes: new Map([[contextSeriesKey('000001', 5), bars]]),
       };
 
       // 规则：最新价 > 10.5
@@ -258,8 +275,7 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         securityCode: '000001',
         timestamp: baseTime,
         period: 5,
-        bars,
-        attributes: new Map(),
+        attributes: new Map([[contextSeriesKey('000001', 5), bars]]),
       };
 
       // 规则：最新价 > 20.0 (不匹配)

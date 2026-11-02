@@ -3,11 +3,24 @@ import type {
   ConfidenceLevel,
 } from '../decision-flow/decision-flow.types';
 import type { FactorPluginRegistry } from '../factor/factor-plugin-registry';
+import type { VirtualExitPolicyPort } from '../virtual-exit/virtual-exit.port';
 
 /**
  * 组内单条策略的内核求值计划（编译边界产物，运行时唯一形态）。
  * 三条链路（实时 / 单步推演 / 批量回测）共用同一形态，求值层禁止按 legacy kind 分派。
  */
+/**
+ * 跨标的上下文依赖声明：内核为外部标的维护独立窗口（与自身窗口同机制），
+ * 插件通过 `series.<securityCode>.<period>` 读取。
+ */
+export interface ExternalContextRequirement {
+  readonly securityCode: string;
+  /** 可选：管线按 id 路由 bar（securityCode 在 StrategyBar 上是可选字段） */
+  readonly securityId?: number;
+  readonly period: number;
+  readonly minBars: number;
+}
+
 export interface KernelPlan {
   readonly definitionId: number;
   readonly versionId: number;
@@ -23,6 +36,11 @@ export interface KernelPlan {
    * 任一声明窗口不足 → 该 plan 本次不判定（insufficient_history，fail-closed）。
    */
   readonly contextRequirements: Readonly<Record<number, number>>;
+  /**
+   * 跨标的 context 依赖（可选）：内核为每个外部标的维护独立窗口，
+   * 并以 `series.<securityCode>.<period>` 注入黑板。任一窗口不足 → fail-closed。
+   */
+  readonly externalContextRequirements?: readonly ExternalContextRequirement[];
 }
 
 export interface KernelConfig {
@@ -36,9 +54,35 @@ export interface KernelConfig {
   readonly plans: readonly KernelPlan[];
   readonly registry?: FactorPluginRegistry;
   /**
+   * 虚拟出场策略（可选）：内核只负责收集规则并转发，
+   * 具体算法由外部实现注入（私仓），内核不感知任何持仓细节。
+   */
+  readonly virtualExitPolicy?: VirtualExitPolicyPort;
+  /**
    * 多周期：不再有单值 period——内核周期集合 = ∪ plans 的求值周期 ∪ contextRequirements keys，
    * 每周期一个独立滑窗（StrategySeriesImputer）与单调游标。
    */
+}
+
+/** 通道引用：账本归属的最小单元 = (策略定义, 求值周期)。 */
+export interface SignalChannelRef {
+  readonly definitionId: number;
+  readonly versionId: number;
+  /** 求值周期（该 plan 只在此周期收盘时求值） */
+  readonly period: number;
+}
+
+/**
+ * 信号意图：替代 `signalKind` 的二值重载。
+ * - ENTRY：开仓/加仓
+ * - EXIT：按本通道策略逻辑平仓
+ * - RISK_CUT：风控清仓，可按 scope 跨通道扇出
+ */
+export type SignalIntent = 'ENTRY' | 'EXIT' | 'RISK_CUT';
+
+/** 通道键（内存 Map / 唯一索引 / 日志统一口径）：`definitionId:period`。 */
+export function channelKeyOf(channel: SignalChannelRef): string {
+  return `${channel.definitionId}:${channel.period}`;
 }
 
 /** 双时间戳法定分离契约的内核信号形状（三链路统一，输出适配器各自映射）。 */
@@ -46,6 +90,12 @@ export interface KernelSignal {
   readonly definitionId: number;
   readonly versionId: number;
   readonly signalKind: 'entry' | 'exit';
+  /** 通道引用：账本归属依据。阶段一仅为观测字段，账本仍按标的。 */
+  readonly channel?: SignalChannelRef;
+  /** 信号意图。阶段一由 action 推导（SELL → EXIT），编译期一致性校验在阶段二启用。 */
+  readonly intent?: SignalIntent;
+  /** 产出最终决策 opinion 的插件 id，仅归因，不参与归属判断。 */
+  readonly originPluginId?: string;
   /** 决策确立时刻 = 当前确认 Bar timestamp（纯观点确立时刻） */
   readonly signalTime: Date;
   /** 与 signalTime 严格等价（ISO 字符串） */
@@ -88,6 +138,13 @@ export interface KernelPeriodDiagnostics {
   readonly prewarmExpected: number;
 }
 
+export interface KernelExternalWindowDiagnostics {
+  readonly securityCode: string;
+  readonly period: number;
+  readonly windowSize: number;
+  readonly budget: number;
+}
+
 export interface KernelDiagnostics {
   /** 全周期最大游标（兼容字段） */
   readonly lastPushedTimestamp: string | null;
@@ -101,4 +158,6 @@ export interface KernelDiagnostics {
   /** 因声明 context 不足 / 缺键而被跳过的 plan 求值次数（有界诊断） */
   readonly planSkips: number;
   readonly perPeriod: readonly KernelPeriodDiagnostics[];
+  /** 跨标的上下文窗口（可选，供观测数据断供） */
+  readonly externalWindows?: readonly KernelExternalWindowDiagnostics[];
 }

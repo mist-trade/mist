@@ -5,6 +5,7 @@ import type {
 } from '@app/market-data';
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
 import type { FactorPluginRegistry } from '../factor/factor-plugin-registry';
+import type { ExternalContextRequirement } from '../kernel/kernel.types';
 
 export type SimulationSessionStatus =
   | 'idle'
@@ -61,6 +62,10 @@ export interface SimulationSessionConfig {
   readonly windowBudget?: number;
   /** context 周期 → 最少保留根数（多周期推演用，注入内核 plan） */
   readonly contextRequirements?: Readonly<Record<number, number>>;
+  /** 跨标的上下文依赖（编译产物；注入内核 plan 的 externalContextRequirements） */
+  readonly externalContextRequirements?: readonly ExternalContextRequirement[];
+  /** 外部标的 bar 流（如 880003 日线）：会话按因果序归并推入内核外部窗口 */
+  readonly externalBars?: readonly StrategyBar[];
   readonly registry?: FactorPluginRegistry;
 }
 

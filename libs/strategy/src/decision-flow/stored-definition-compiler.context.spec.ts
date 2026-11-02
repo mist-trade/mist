@@ -205,3 +205,83 @@ describe('deriveContextRequirements — explicit registry (dev-server lane)', ()
     expect(deriveContextRequirements(flow, registry)).toEqual({});
   });
 });
+
+describe('stored definition compiler — external context requirements derivation', () => {
+  afterEach(() => {
+    factorPluginRegistry.clear();
+  });
+
+  function extPluginWith(
+    id: string,
+    ext: readonly Record<string, unknown>[],
+  ): FactorPlugin {
+    return {
+      id,
+      name: id,
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'test plugin',
+      resolveExternalContextRequirements: (() =>
+        ext) as FactorPlugin['resolveExternalContextRequirements'],
+      evaluate: async () => ({
+        action: 'NEUTRAL',
+        confidence: 0,
+        reason: 'noop',
+      }),
+    };
+  }
+
+  function nestedFlow(a: string, b: string): Record<string, unknown> {
+    return {
+      id: 'guard-a',
+      type: 'GUARD',
+      name: 'a',
+      pluginId: a,
+      requiredAction: 'BUY',
+      onPass: {
+        id: 'guard-b',
+        type: 'GUARD',
+        name: 'b',
+        pluginId: b,
+        requiredAction: 'BUY',
+        onPass: { id: 't', type: 'TERMINAL', action: 'BUY', reason: 'x' },
+      },
+    } as unknown as Record<string, unknown>;
+  }
+
+  it('derives external requirements and merges duplicates with max minBars', () => {
+    factorPluginRegistry.register(
+      extPluginWith('plugin.e1', [
+        { securityCode: '880003', securityId: 12, period: 1440, minBars: 500 },
+      ]),
+    );
+    factorPluginRegistry.register(
+      extPluginWith('plugin.e2', [
+        { securityCode: '880003', securityId: 12, period: 1440, minBars: 875 },
+        { securityCode: '000300', period: 1440, minBars: 100 },
+      ]),
+    );
+
+    const compiled = compileStoredDefinitionVersion({
+      kind: 'decision_flow',
+      rule: nestedFlow('plugin.e1', 'plugin.e2'),
+    });
+
+    expect(compiled.externalContextRequirements).toEqual([
+      { securityCode: '000300', period: 1440, minBars: 100 },
+      { securityCode: '880003', securityId: 12, period: 1440, minBars: 875 },
+    ]);
+  });
+
+  it('rejects external declarations without securityCode (fail-closed)', () => {
+    factorPluginRegistry.register(
+      extPluginWith('plugin.bad', [{ period: 1440, minBars: 100 }]),
+    );
+    expect(() =>
+      compileStoredDefinitionVersion({
+        kind: 'decision_flow',
+        rule: nestedFlow('plugin.bad', 'plugin.bad'),
+      }),
+    ).toThrowError(/securityCode/);
+  });
+});

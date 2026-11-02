@@ -2,6 +2,7 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { FactorPlugin } from './factor.types';
 import type { FactorPluginRegistry } from './factor-plugin-registry';
+import type { VirtualExitPolicyPort } from '../virtual-exit/virtual-exit.port';
 
 const CANDIDATE_INDEX_FILES: readonly string[] = Object.freeze([
   'index.ts',
@@ -105,6 +106,55 @@ export class ExternalFactorPluginLoader {
     }
 
     return Array.from(discoveredPlugins.values());
+  }
+
+  /**
+   * 从外部插件包创建虚拟出场策略实例（每个内核实例一份，持有自己的通道虚拟持仓）。
+   * 未挂载私仓或未导出工厂时返回 null，内核退化为不产出虚拟出场信号。
+   */
+  public static createVirtualExitPolicy(): VirtualExitPolicyPort | null {
+    if (this.disabled) {
+      return null;
+    }
+    for (const candPath of this.getCandidatePaths()) {
+      const entryFiles = this.resolveEntryFiles(candPath);
+      for (const entryFile of entryFiles) {
+        const policy = this.tryCreatePolicy(entryFile);
+        if (policy) {
+          return policy;
+        }
+      }
+    }
+    return null;
+  }
+
+  private static tryCreatePolicy(
+    filePath: string,
+  ): VirtualExitPolicyPort | null {
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const dynamicRequire =
+        typeof (globalThis as any).__non_webpack_require__ === 'function'
+          ? (globalThis as any).__non_webpack_require__
+          : eval('require');
+      const mod = dynamicRequire(filePath);
+      const factory = mod?.createVirtualExitPolicy;
+      if (typeof factory !== 'function') {
+        return null;
+      }
+      const policy = factory();
+      if (
+        !policy ||
+        typeof policy.configure !== 'function' ||
+        typeof policy.onSignal !== 'function' ||
+        typeof policy.onBar !== 'function'
+      ) {
+        return null;
+      }
+      return policy as VirtualExitPolicyPort;
+    } catch {
+      return null;
+    }
   }
 
   /**

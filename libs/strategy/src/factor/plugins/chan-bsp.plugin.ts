@@ -20,6 +20,7 @@ import {
   detectLatestConfirmedFenxing,
   type ConfirmedFenxingResult,
 } from '../../analysis/chan-fenxing-trigger';
+import { readContextSeries } from '../../kernel/availability';
 import { toChanKSeries } from '../../analysis/chan-derivation';
 import type {
   FactorContext,
@@ -167,15 +168,17 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         ? DEFAULT_REQUIRED_BARS_DUAN
         : DEFAULT_REQUIRED_BARS_BI);
 
-    if (context.bars.length < minBars) {
+    if ((readContextSeries(context, context.period) ?? []).length < minBars) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
         confidence: 0.0,
-        reason: `K线不足${minBars}根(当前${context.bars.length}根)，无法确立缠论结构`,
+        reason: `K线不足${minBars}根(当前${(readContextSeries(context, context.period) ?? []).length}根)，无法确立缠论结构`,
       };
     }
 
-    const klines = toChanKSeries(context.bars);
+    const klines = toChanKSeries(
+      readContextSeries(context, context.period) ?? [],
+    );
     if (klines.length === 0) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
@@ -325,7 +328,11 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     const badgeText = this.formatBadgeText(latestEvent.type);
 
     const lastBar =
-      context.bars.length > 0 ? context.bars[context.bars.length - 1] : null;
+      (readContextSeries(context, context.period) ?? []).length > 0
+        ? (readContextSeries(context, context.period) ?? [])[
+            (readContextSeries(context, context.period) ?? []).length - 1
+          ]
+        : null;
     const currentBarClose =
       lastBar?.ohlc?.effective?.close ??
       (lastBar?.rawBar as any)?.close ??

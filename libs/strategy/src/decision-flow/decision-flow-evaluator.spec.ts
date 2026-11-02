@@ -1,6 +1,7 @@
 import type { ProjectedStrategyBar } from '@app/market-data';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
 import type { FactorContext } from '../factor/factor.types';
+import { contextSeriesKey } from '../kernel/availability';
 import { DecisionFlowEvaluator } from './decision-flow-evaluator';
 import type { DecisionFlowNode } from './decision-flow.types';
 import { DecisionExecutionTraceBuilder } from './decision-trace-builder';
@@ -92,7 +93,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map(),
       };
 
@@ -138,7 +138,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map(),
       };
 
@@ -182,7 +181,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map(),
       };
 
@@ -256,7 +254,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map(),
       };
 
@@ -307,7 +304,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map([['market.regime', 'BULL']]),
       };
 
@@ -346,7 +342,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map([['market.regime', 'BEAR']]),
       };
 
@@ -408,7 +403,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map(),
       };
 
@@ -488,7 +482,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map(),
       };
 
@@ -521,7 +514,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(),
         period: 5,
-        bars: [],
         attributes: new Map(),
       };
 
@@ -621,8 +613,7 @@ describe('Phase 2: Decision Flow Engine', () => {
         securityCode: '000001',
         timestamp: new Date(baseTime.getTime() + 60000),
         period: 5,
-        bars,
-        attributes: new Map(),
+        attributes: new Map([[contextSeriesKey('000001', 5), bars]]),
       };
 
       const result = await evaluator.evaluate(flow, context);

@@ -25,6 +25,7 @@ import {
   type KernelSignal,
 } from '../../libs/strategy/src/kernel';
 import { mapKernelSignalToSimulationSignal } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
+import { ExternalFactorPluginLoader } from '../../libs/strategy/src/factor/external-plugin-loader';
 import {
   loadCanonicalKlines,
   listAvailableDatasets,
@@ -168,6 +169,8 @@ async function runStrategyDev(): Promise<void> {
     securityId: 1,
     securityCode,
     publicFrom: new Date(-8640000000000000), // 全时序流式推演，无静默截断
+    virtualExitPolicy:
+      ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
     plans: [
       {
         definitionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,

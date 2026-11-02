@@ -129,6 +129,8 @@ export interface ConsensusVoteBreakdown {
 export interface DecisionExecutionTraceItem {
   readonly nodeId: string;
   readonly type: 'GUARD' | 'BRANCH' | 'EXTRACTOR' | 'CONSENSUS' | 'TERMINAL';
+  /** 产出该节点意见的插件 id（BRANCH/TERMINAL 等非插件节点为空） */
+  readonly pluginId?: string;
   readonly name?: string;
   readonly action?: FactorAction | 'ABORT';
   readonly signalTag?: string;

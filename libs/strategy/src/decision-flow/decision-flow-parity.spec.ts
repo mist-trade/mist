@@ -5,6 +5,7 @@ import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
 import { LegacyRuleDslPlugin } from '../factor/plugins/legacy-rule-dsl.plugin';
 import { DecisionFlowEvaluator } from './decision-flow-evaluator';
 import { LegacyStrategyCompiler } from './legacy-strategy-compiler';
+import { contextSeriesKey, readContextSeries } from '../kernel/availability';
 import type { FactorContext } from '../factor/factor.types';
 import type { DecisionFlowNode } from './decision-flow.types';
 
@@ -106,8 +107,9 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
         securityCode: '600000',
         timestamp: currentBar.rawBar.timestamp,
         period: currentBar.rawBar.period,
-        bars: windowSlice,
-        attributes: new Map(),
+        attributes: new Map([
+          [contextSeriesKey('600000', currentBar.rawBar.period), windowSlice],
+        ]),
       };
       const flowResult = await evaluator.evaluate(decisionFlowNode, context);
 
@@ -144,7 +146,8 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
       version: '1.0.0',
       description: '',
       evaluate: async (ctx) => {
-        const lastBar = ctx.bars[ctx.bars.length - 1];
+        const series = readContextSeries(ctx, ctx.period) ?? [];
+        const lastBar = series[series.length - 1];
         const isUp = (lastBar.ohlc.effective?.close ?? 0) > 10.5;
         return {
           action: isUp ? 'BUY' : 'NEUTRAL',
@@ -192,8 +195,7 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
       securityCode: '600000',
       timestamp: barA.rawBar.timestamp,
       period: 5,
-      bars: [barA],
-      attributes: new Map(),
+      attributes: new Map([[contextSeriesKey('600000', 5), [barA]]]),
     };
     const resA = await evaluator.evaluate(compositeTree, ctxA);
     expect(resA.status).toBe('ABORTED');
@@ -204,8 +206,7 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
       securityCode: '600000',
       timestamp: barB.rawBar.timestamp,
       period: 5,
-      bars: [barA, barB],
-      attributes: new Map(),
+      attributes: new Map([[contextSeriesKey('600000', 5), [barA, barB]]]),
     };
     const resB = await evaluator.evaluate(compositeTree, ctxB);
     expect(resB.status).toBe('SIGNAL_EMITTED');

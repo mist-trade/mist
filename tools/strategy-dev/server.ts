@@ -27,6 +27,7 @@ import {
 } from '../../libs/strategy/src/kernel';
 import { SimulatedBroker } from '../../libs/strategy/src/execution/simulated-broker';
 import { PositionStateMachine } from '../../libs/strategy/src/position/position-state-machine';
+import { CapitalLedger } from '../../libs/strategy/src/position/capital-ledger';
 import { ExecutionRiskArbiter } from '../../libs/strategy/src/execution/execution-risk-arbiter';
 import { formatShanghaiDateString } from '@app/timezone';
 import {
@@ -42,6 +43,7 @@ import {
   ORDER_TYPES,
 } from '../../libs/strategy/src/strategy.constants';
 import type { DecisionFlowNode } from '../../libs/strategy/src/decision-flow/decision-flow.types';
+import type { ExternalContextRequirement } from '../../libs/strategy/src/kernel/kernel.types';
 import {
   compileStoredDefinitionVersion,
   deriveContextRequirements,
@@ -59,7 +61,7 @@ import {
 } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
 import {
   TacticalEventAggregator,
-  DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+  TacticalAggregatorConfigLoader,
 } from '../../libs/strategy/src/tactical-event';
 import type { StrategySignalKind } from '../../libs/strategy/src/rules/strategy-rule.types';
 import {
@@ -68,6 +70,7 @@ import {
   PRIVATE_DATA_DIR,
   REVERSE_PERIOD_MAP,
 } from './provider';
+import { loadLegacyPresetFlow } from './preset-loader';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
 import type {
   StrategyBar,
@@ -517,7 +520,62 @@ function loadLocalStoredDefinition(
 }
 
 /**
- * 构造自定义决策流树：支持单因子消融与复合决策流
+ * 构造单因子消融决策流：任意 pluginId 一律包装为 GUARD + TERMINAL。
+ * 插件身份完全来自请求参数，开源仓不内置任何私有插件清单或私有参数。
+ */
+function createSinglePluginFlow(pluginId: string): DecisionFlowNode {
+  const params: Record<string, unknown> = {};
+  if (pluginId === 'plugin.chan.bsp') {
+    params.units = 'bi';
+    params.direction = 'both';
+    params.points = { first: true, second: true, third: true };
+    params.requiredBarCount = 60;
+    params.deduplicate = true;
+  }
+  const safeId = pluginId.replace(/\./g, '_');
+  return {
+    id: `guard_${safeId}`,
+    type: 'GUARD',
+    name: `因子插件评估门禁: ${pluginId}`,
+    pluginId,
+    params,
+    requiredAction: 'BOTH',
+    minConfidence: 0.5,
+    onPass: {
+      id: `term_${safeId}_pass`,
+      type: 'TERMINAL',
+      action: 'INHERIT',
+      signalTag: pluginId,
+      reason: `${pluginId} 触发买卖决策`,
+    },
+    onFail: {
+      id: `term_${safeId}_fail`,
+      type: 'TERMINAL',
+      action: 'ABORT',
+      reason: '未满足因子确认条件',
+    },
+  };
+}
+
+/**
+ * 内置预设编号映射：
+ * 1 = 纯原典缠论（公开预设，开源仓内置）
+ * 2 = 宏观 + 缠论 + 牛熊左右侧战术（私有预设）
+ * 3 = 全共振增强（私有预设）
+ */
+function resolveLegacyDefinitionId(
+  mode?: string,
+  strategyDefinitionId?: number,
+): number {
+  if (typeof strategyDefinitionId === 'number') return strategyDefinitionId;
+  if (mode === 'full_resonance' || mode === 'enhanced') return 3;
+  if (mode === 'composite' || mode === 'tactics') return 2;
+  return 1;
+}
+
+/**
+ * 构造自定义决策流树：单因子消融直出，其余按内置预设编号从预设目录加载。
+ * 预设内容（树形、插件 id、参数）不在开源仓硬编码；缺失时 fail-closed。
  */
 function createCustomDecisionFlow(
   mode?: string,
@@ -525,313 +583,20 @@ function createCustomDecisionFlow(
   strategyDefinitionId?: number,
 ): DecisionFlowNode {
   if (mode === 'single' && pluginId) {
-    const params: Record<string, unknown> = {};
-    if (pluginId === 'plugin.regime.shanghai-index') {
-      params.mode = 'dual_speed';
-    }
-    if (pluginId === 'plugin.chan.bsp') {
-      params.units = 'bi';
-      params.direction = 'both';
-      params.points = { first: true, second: true, third: true };
-      params.requiredBarCount = 60;
-      params.deduplicate = true;
-    }
-    return {
-      id: `guard_${pluginId.replace(/\./g, '_')}`,
-      type: 'GUARD',
-      name: `因子插件评估门禁: ${pluginId}`,
-      pluginId,
-      params,
-      requiredAction: 'BOTH',
-      minConfidence: 0.5,
-      onPass: {
-        id: `term_${pluginId.replace(/\./g, '_')}_pass`,
-        type: 'TERMINAL',
-        action: 'INHERIT',
-        signalTag: pluginId,
-        reason: `${pluginId} 触发买卖决策`,
-      },
-      onFail: {
-        id: `term_${pluginId.replace(/\./g, '_')}_fail`,
-        type: 'TERMINAL',
-        action: 'ABORT',
-        reason: '未满足因子确认条件',
-      },
-    };
+    return createSinglePluginFlow(pluginId);
   }
 
-  if (
-    strategyDefinitionId === 3 ||
-    mode === 'full_resonance' ||
-    mode === 'enhanced'
-  ) {
-    return {
-      id: 'guard_regime_shanghai',
-      type: 'GUARD',
-      name: '上证宏观大周期滤网',
-      pluginId: 'plugin.regime.shanghai-index',
-      params: { mode: 'dual_speed' },
-      requiredAction: 'BUY',
-      minConfidence: 0.6,
-      // 牛市多头环境分支 (onPass: 宏观 BUY)
-      onPass: {
-        id: 'guard_bull_chan_bsp',
-        type: 'GUARD',
-        name: '牛市缠论形态主门禁',
-        pluginId: 'plugin.chan.bsp',
-        params: {
-          units: 'bi',
-          direction: 'both',
-          points: { first: true, second: true, third: true },
-          requiredBarCount: 60,
-          deduplicate: true,
-        },
-        requiredAction: 'BOTH',
-        minConfidence: 0.5,
-        onPass: {
-          id: 'guard_bull_vpci',
-          type: 'GUARD',
-          name: 'VPCI量价共振增强校验',
-          pluginId: 'plugin.tactics.volume-price-confirmation',
-          params: {},
-          requiredAction: 'BUY',
-          minConfidence: 0.5,
-          onPass: {
-            id: 'term_bull_chan_enhanced',
-            type: 'TERMINAL',
-            action: 'INHERIT',
-            signalTag: 'ENHANCED_CHAN_BSP',
-            reason: '牛市顺势下缠论形态结构确立且通过私有量价共振增强确认',
-          },
-          onFail: {
-            id: 'term_bull_chan_standard',
-            type: 'TERMINAL',
-            action: 'INHERIT',
-            signalTag: 'BULL_CHAN_BSP',
-            reason: '牛市顺势下缠论标准形态买卖点确立',
-          },
-        },
-        // 若缠论未出笔形态，由波动率挤压放量爆发增强捕捉额外爆发买点
-        onFail: {
-          id: 'guard_bull_squeeze',
-          type: 'GUARD',
-          name: '私有波动率挤压放量战术买点增强',
-          pluginId: 'plugin.tactics.volatility-squeeze-fire',
-          params: { minVolumeTsRank: 0.65, minEntityAtrRatio: 0.65 },
-          requiredAction: 'BUY',
-          minConfidence: 0.5,
-          onPass: {
-            id: 'term_bull_squeeze_fire',
-            type: 'TERMINAL',
-            action: 'BUY',
-            signalTag: 'TACTICS_FIRE_BUY',
-            reason: '宏观牛市蓄能挤压释放爆发买点',
-          },
-          // 若亦未触发挤压爆发，由牛市微观左右侧战术插件确认买卖点
-          onFail: {
-            id: 'guard_bull_tactics',
-            type: 'GUARD',
-            name: '牛市微观左右侧战术增强',
-            pluginId: 'plugin.tactics.bull-left-right-bsp',
-            params: { fallbackToMainBars: true },
-            requiredAction: 'BOTH',
-            minConfidence: 0.5,
-            onPass: {
-              id: 'term_bull_tactics_pass',
-              type: 'TERMINAL',
-              action: 'INHERIT',
-              signalTag: 'BULL_TACTICS_SIGNAL',
-              reason: '宏观牛市下触发左右侧微观战术信号',
-            },
-            onFail: {
-              id: 'term_bull_abort',
-              type: 'TERMINAL',
-              action: 'ABORT',
-              reason: '牛市环境中未满足缠论形态或战术增强触发条件',
-            },
-          },
-        },
-      },
-      // 熊市/非牛市环境分支 (onFail: 宏观 SELL 或 NEUTRAL)
-      onFail: {
-        id: 'guard_regime_bear_check',
-        type: 'GUARD',
-        name: '上证宏观走熊与防守研判',
-        pluginId: 'plugin.regime.shanghai-index',
-        params: { mode: 'dual_speed' },
-        requiredAction: 'SELL',
-        minConfidence: 0.6,
-        onPass: {
-          id: 'guard_bear_tactics',
-          type: 'GUARD',
-          name: '熊市左右侧战术研判门禁',
-          pluginId: 'plugin.tactics.bear-left-right-bsp',
-          params: { fallbackToMainBars: true },
-          requiredAction: 'BOTH',
-          minConfidence: 0.5,
-          onPass: {
-            id: 'term_bear_tactics_pass',
-            type: 'TERMINAL',
-            action: 'INHERIT',
-            signalTag: 'BEAR_TACTICS_SIGNAL',
-            reason: '熊市左右侧战术买点触发',
-          },
-          onFail: {
-            id: 'term_regime_defend_sell',
-            type: 'TERMINAL',
-            action: 'SELL',
-            signalTag: 'REGIME_DEFEND_SELL',
-            reason: '上证指数宏观走熊清仓防守',
-          },
-        },
-        onFail: {
-          id: 'term_regime_neutral_abort',
-          type: 'TERMINAL',
-          action: 'ABORT',
-          reason: '上证指数震荡纠缠，维持观望',
-        },
-      },
-    };
+  const definitionId = resolveLegacyDefinitionId(mode, strategyDefinitionId);
+  const flow = loadLegacyPresetFlow(definitionId);
+  if (!flow) {
+    throw new DevBacktestRequestError(
+      422,
+      'PRESET_NOT_FOUND',
+      `未找到内置预设 ${definitionId} —— 开源仓仅内置 1（纯原典缠论）。` +
+        `2/3 需挂载私有仓 market-data/presets，或改用 strategyDefinitionId 走存量定义重放`,
+    );
   }
-
-  if (
-    strategyDefinitionId === 2 ||
-    mode === 'composite' ||
-    mode === 'tactics'
-  ) {
-    return {
-      id: 'guard_regime_shanghai',
-      type: 'GUARD',
-      name: '上证宏观大周期滤网',
-      pluginId: 'plugin.regime.shanghai-index',
-      params: { mode: 'dual_speed' },
-      requiredAction: 'BUY',
-      minConfidence: 0.6,
-      // 牛市多头环境分支 (onPass: 宏观 BUY)
-      onPass: {
-        id: 'guard_bull_chan_bsp',
-        type: 'GUARD',
-        name: '牛市缠论形态主门禁',
-        pluginId: 'plugin.chan.bsp',
-        params: {
-          units: 'bi',
-          direction: 'both',
-          points: { first: true, second: true, third: true },
-          requiredBarCount: 60,
-          deduplicate: true,
-        },
-        requiredAction: 'BOTH',
-        minConfidence: 0.5,
-        onPass: {
-          id: 'term_bull_chan_pass',
-          type: 'TERMINAL',
-          action: 'INHERIT',
-          signalTag: 'BULL_CHAN_BSP',
-          reason: '宏观牛市顺势下缠论标准形态买卖点确立',
-        },
-        // 若缠论未出笔形态，由牛市微观左右侧战术插件确认买卖点
-        onFail: {
-          id: 'guard_bull_tactics',
-          type: 'GUARD',
-          name: '牛市微观左右侧战术增强',
-          pluginId: 'plugin.tactics.bull-left-right-bsp',
-          params: { fallbackToMainBars: true },
-          requiredAction: 'BOTH',
-          minConfidence: 0.5,
-          onPass: {
-            id: 'term_bull_tactics_pass',
-            type: 'TERMINAL',
-            action: 'INHERIT',
-            signalTag: 'BULL_TACTICS_SIGNAL',
-            reason: '宏观牛市下触发左右侧微观战术信号',
-          },
-          onFail: {
-            id: 'term_bull_abort',
-            type: 'TERMINAL',
-            action: 'ABORT',
-            reason: '牛市环境中未满足缠论形态或左右侧战术触发条件',
-          },
-        },
-      },
-      // 熊市/非牛市环境分支 (onFail: 宏观 SELL 或 NEUTRAL)
-      onFail: {
-        id: 'guard_regime_bear_check',
-        type: 'GUARD',
-        name: '上证宏观走熊与防守研判',
-        pluginId: 'plugin.regime.shanghai-index',
-        params: { mode: 'dual_speed' },
-        requiredAction: 'SELL',
-        minConfidence: 0.6,
-        onPass: {
-          id: 'guard_bear_tactics',
-          type: 'GUARD',
-          name: '熊市左右侧战术研判门禁',
-          pluginId: 'plugin.tactics.bear-left-right-bsp',
-          params: { fallbackToMainBars: true },
-          requiredAction: 'BOTH',
-          minConfidence: 0.5,
-          onPass: {
-            id: 'term_bear_tactics_pass',
-            type: 'TERMINAL',
-            action: 'INHERIT',
-            signalTag: 'BEAR_TACTICS_SIGNAL',
-            reason: '熊市左右侧战术买点触发',
-          },
-          onFail: {
-            id: 'term_regime_defend_sell',
-            type: 'TERMINAL',
-            action: 'SELL',
-            signalTag: 'REGIME_DEFEND_SELL',
-            reason: '上证指数宏观走熊清仓防守',
-          },
-        },
-        onFail: {
-          id: 'term_regime_neutral_abort',
-          type: 'TERMINAL',
-          action: 'ABORT',
-          reason: '上证指数震荡纠缠，维持观望',
-        },
-      },
-    };
-  }
-
-  return createEnhancedChanDecisionFlow();
-}
-
-/**
- * 构造标准纯原典缠论买卖点决策流树：
- * 彻底移除 volume-price-confirmation 与 volatility-squeeze-fire，
- * 100% 遵照缠论原典形态买卖点。
- */
-function createEnhancedChanDecisionFlow(): DecisionFlowNode {
-  return {
-    id: 'guard_chan_bsp_primary',
-    type: 'GUARD',
-    name: '缠论标准形态买卖点主门禁',
-    pluginId: 'plugin.chan.bsp',
-    params: {
-      units: 'bi',
-      direction: 'both',
-      points: { first: true, second: true, third: true },
-      requiredBarCount: 60,
-      deduplicate: true,
-    },
-    requiredAction: 'BOTH',
-    minConfidence: 0.5,
-    onPass: {
-      id: 'term_chan_bsp_standard',
-      type: 'TERMINAL',
-      action: 'INHERIT',
-      signalTag: 'CHAN_BSP',
-      reason: '缠论原典形态买卖点确立',
-    },
-    onFail: {
-      id: 'term_abort',
-      type: 'TERMINAL',
-      action: 'ABORT',
-      reason: '未满足缠论形态买卖点触发条件',
-    },
-  };
+  return flow;
 }
 
 interface RunBacktestOptions {
@@ -993,6 +758,8 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     securityCode: options.code,
     publicFrom,
     registry,
+    virtualExitPolicy:
+      ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
     plans: [
       {
         definitionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,
@@ -1032,8 +799,8 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   const position = new PositionStateMachine(
     DEFAULT_DEV_SECURITY_ID,
     options.code,
-    initialCash,
   );
+  const capitalLedger = new CapitalLedger({ initialCash });
   const enableStopLoss =
     options.enableStopLoss === true ||
     (options.enableStopLoss !== false &&
@@ -1056,7 +823,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   let pushCount = 0;
 
   const tacticalAggregator = new TacticalEventAggregator(
-    DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
+    TacticalAggregatorConfigLoader.load(),
   );
 
   const replaySummary = await replaySource.drive(
@@ -1118,7 +885,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       if (lastDateStr !== null && currentDateStr !== lastDateStr) {
         broker.settleDayClose(lastDateStr);
         if (lastEvalBar !== null) {
-          position.onDayClose(lastEvalBar);
+          capitalLedger.onDayClose(lastEvalBar, position.getSnapshot());
         }
       }
       lastDateStr = currentDateStr;
@@ -1135,6 +902,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       const fills = broker.onBar(bar);
       for (const fill of fills) {
         position.onOrderFilled(fill);
+        capitalLedger.applyFill(fill);
       }
       position.onBar(bar);
 
@@ -1178,11 +946,11 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   // 最后一根 Bar 的日终结算
   if (lastEvalBar !== null && lastDateStr !== null) {
     broker.settleDayClose(lastDateStr);
-    position.onDayClose(lastEvalBar);
+    capitalLedger.onDayClose(lastEvalBar, position.getSnapshot());
   }
 
   // 提取净值时序与平仓交易
-  const navSeries = position.getNavHistory().map((n) => n.totalEquity);
+  const navSeries = capitalLedger.getNavHistory().map((n) => n.totalEquity);
   const closedTrades = position.getClosedTrades();
 
   // 基于 Rust Polars 计算量化绩效
@@ -1459,6 +1227,9 @@ const server = http.createServer(async (req, res) => {
       const versionId =
         body.versionId ?? SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId;
 
+      let externalContextRequirements:
+        | readonly ExternalContextRequirement[]
+        | undefined;
       if (!flow && body.rule) {
         const compiled = compileStoredDefinitionVersion({
           kind: body.kind ?? 'decision_flow',
@@ -1468,8 +1239,33 @@ const server = http.createServer(async (req, res) => {
         flow = compiled.flow;
         ruleSnapshot = compiled.ruleSnapshot;
         windowBudget = compiled.requiredBarCount;
+        externalContextRequirements = compiled.externalContextRequirements;
       }
-      flow ||= createEnhancedChanDecisionFlow();
+      flow ||= createCustomDecisionFlow();
+
+      // 跨标的依赖：为声明的外部标的加载本地日线（同 period），按因果序归并推入
+      const externalBars = (externalContextRequirements ?? [])
+        .flatMap((req) => {
+          try {
+            return loadCanonicalKlines({
+              code: req.securityCode,
+              period: req.period,
+            }).map((k) => toStrategyBar(k, req.period));
+          } catch {
+            return [];
+          }
+        })
+        .map((bar) =>
+          bar.securityId === undefined
+            ? {
+                ...bar,
+                securityId:
+                  externalContextRequirements?.find(
+                    (req) => req.securityCode === bar.securityCode,
+                  )?.securityId ?? -1,
+              }
+            : bar,
+        );
 
       const session = new StrategySimulationSession(bars, {
         securityCode: code,
@@ -1482,6 +1278,8 @@ const server = http.createServer(async (req, res) => {
         ruleSnapshot,
         windowBudget,
         flow,
+        externalContextRequirements,
+        externalBars,
       });
 
       // 初始化首帧 (cursor 0)，确保会话就绪且首帧在客户端连接前已同步可用

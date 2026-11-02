@@ -241,7 +241,7 @@ describe('TemporalWindowEngine', () => {
   it('rejects opening window when requiredSetupTag is not in matching state', () => {
     const rules: TacticalWindowRule[] = [
       {
-        requiredSetupTag: 'plugin.regime.shanghai-index',
+        requiredSetupTag: 'test.regime',
         triggerTag: 'chan_1b',
         windowBars: 3,
         requiredConfirmationTags: ['vpci_surge'],
@@ -264,15 +264,13 @@ describe('TemporalWindowEngine', () => {
 
     // 收到宏观牛市信号 (BUY)
     const regimeBullSignal = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       displayTag: 'REGIME_BULL',
       action: 'BUY',
       time: bar0.timestamp,
     });
     engine.push(regimeBullSignal, bar0, 0);
-    expect(engine.getActiveSetupState('plugin.regime.shanghai-index')).toBe(
-      'BUY',
-    );
+    expect(engine.getActiveSetupState('test.regime')).toBe('BUY');
 
     // 宏观达标后，再次触发即可成功开启观察窗
     const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.1);
@@ -283,7 +281,7 @@ describe('TemporalWindowEngine', () => {
     // 若突发宏观转熊 (SELL)，未决买入观察窗立即作废斩断
     const bar2 = createBar('2026-10-28T09:40:00.000Z', 9.8);
     const regimeBearSignal = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       displayTag: 'REGIME_BEAR',
       action: 'SELL',
       time: bar2.timestamp,

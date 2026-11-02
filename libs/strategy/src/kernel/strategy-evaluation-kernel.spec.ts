@@ -1,6 +1,14 @@
 import type { StrategyBar } from '@app/market-data';
 import { StrategyEvaluationKernel } from './strategy-evaluation-kernel';
-import type { KernelConfig, KernelPlan } from './kernel.types';
+import type { KernelConfig, KernelPlan, KernelSignal } from './kernel.types';
+import { channelKeyOf } from './kernel.types';
+import { contextSeriesKey } from './availability';
+import type {
+  VirtualExitChannelSpec,
+  VirtualExitPolicyPort,
+  VirtualExitProposal,
+  VirtualExitRule,
+} from '../virtual-exit/virtual-exit.port';
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
 import { createChanBspDecisionFlow } from '../simulation/standard-simulation-flows';
 import { normalizeExternalDecimalText } from '../../../decimal/src/decimal8';
@@ -22,6 +30,45 @@ class AlwaysBuyPlugin implements FactorPlugin {
   }
 }
 
+/** 恒卖测试插件：每根 Bar 都 SELL（验证 intent 由 action 推导，而非 plan 声明）。 */
+class AlwaysSellPlugin implements FactorPlugin {
+  public readonly id = 'plugin.test.always-sell';
+  public readonly name = '恒卖测试插件';
+  public readonly category = 'TECHNICAL' as const;
+  public readonly version = '1.0.0';
+  public readonly description = '测试专用：恒定返回 SELL';
+  public readonly paramSchema = {};
+
+  public async evaluate(): Promise<FactorOpinion> {
+    return { action: 'SELL', confidence: 0.9, reason: 'always sell (test)' };
+  }
+}
+
+function createAlwaysSellFlow(): DecisionFlowNode {
+  return {
+    id: 'guard_sell',
+    type: 'GUARD',
+    name: '恒卖门禁',
+    pluginId: 'plugin.test.always-sell',
+    params: {},
+    requiredAction: 'SELL',
+    minConfidence: 0.5,
+    onPass: {
+      id: 'term_sell',
+      type: 'TERMINAL',
+      action: 'SELL',
+      signalTag: 'ALWAYS_SELL',
+      reason: '恒卖触发',
+    },
+    onFail: {
+      id: 'term_sell_never',
+      type: 'TERMINAL',
+      action: 'ABORT',
+      reason: '永不触发',
+    },
+  };
+}
+
 /**
  * 快照可见性插件：读取 series.<period> 末根时间戳，作为 evidence 回传，
  * 用于断言"高周期求值时子周期窗口已含同刻 bar / 不含未来 bar"。
@@ -37,7 +84,9 @@ class SeriesReaderPlugin implements FactorPlugin {
   public async evaluate(
     context: import('../factor/factor.types').FactorContext,
   ): Promise<FactorOpinion> {
-    const series = context.attributes.get('series.5');
+    const series = context.attributes.get(
+      contextSeriesKey(context.securityCode, 5),
+    );
     if (series === undefined || series === null) {
       throw new MissingContextSeriesError(5);
     }
@@ -306,6 +355,212 @@ describe('StrategyEvaluationKernel（统一 push 内核）', () => {
       expect(count).toBe(1);
     }
     expect(kernel.diagnostics().emittedSignalCount).toBe(11);
+  });
+});
+
+describe('StrategyEvaluationKernel（通道与意图盖章）', () => {
+  function makeChannelKernel(
+    flow: DecisionFlowNode,
+    plugin: FactorPlugin,
+    overrides: Partial<KernelPlan> = {},
+  ): StrategyEvaluationKernel {
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(plugin);
+    return new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: new Date(0),
+      registry,
+      plans: [
+        {
+          definitionId: 23,
+          versionId: 4,
+          flow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 20,
+          contextRequirements: {},
+          ...overrides,
+        },
+      ],
+    });
+  }
+
+  it('BUY 决策盖章 intent=ENTRY、channel=(definition, period)、originPluginId', async () => {
+    const bars = makeMockBars(40);
+    const kernel = makeChannelKernel(
+      createAlwaysMatchedFlow(),
+      new AlwaysBuyPlugin(),
+    );
+
+    const emitted: KernelSignal[] = [];
+    for (const bar of bars) {
+      emitted.push(...(await kernel.push(bar)));
+    }
+
+    expect(emitted.length).toBeGreaterThan(0);
+    const first = emitted[0];
+    expect(first.channel).toEqual({
+      definitionId: 23,
+      versionId: 4,
+      period: 30,
+    });
+    expect(first.intent).toBe('ENTRY');
+    expect(first.originPluginId).toBe('plugin.test.always-buy');
+    expect(channelKeyOf(first.channel!)).toBe('23:30');
+  });
+
+  it('plan 声明 signalKind=entry 但插件产出 SELL 时：intent 仍为 EXIT（旧字段不变）', async () => {
+    const bars = makeMockBars(40);
+    const kernel = makeChannelKernel(
+      createAlwaysSellFlow(),
+      new AlwaysSellPlugin(),
+      { signalKind: 'entry' },
+    );
+
+    const emitted: KernelSignal[] = [];
+    for (const bar of bars) {
+      emitted.push(...(await kernel.push(bar)));
+    }
+
+    expect(emitted.length).toBeGreaterThan(0);
+    const first = emitted[0];
+    expect(first.intent).toBe('EXIT');
+    expect(first.signalKind).toBe('entry');
+    expect(first.originPluginId).toBe('plugin.test.always-sell');
+  });
+});
+
+describe('StrategyEvaluationKernel（虚拟出场端口）', () => {
+  class RuleDeclaringPlugin implements FactorPlugin {
+    public readonly id = 'plugin.test.rule-declaring';
+    public readonly name = '规则声明测试插件';
+    public readonly category = 'TECHNICAL' as const;
+    public readonly version = '1.0.0';
+    public readonly description = '测试专用：声明一条均价止损规则';
+    public readonly paramSchema = {};
+
+    public async evaluate(): Promise<FactorOpinion> {
+      return { action: 'BUY', confidence: 0.9, reason: 'always buy (test)' };
+    }
+
+    public virtualExitRules(): readonly VirtualExitRule[] {
+      return [{ kind: 'stop', lossRatio: -0.03, id: 'avg-stop' }];
+    }
+  }
+
+  class StubPolicy implements VirtualExitPolicyPort {
+    public specs: readonly VirtualExitChannelSpec[] = [];
+    public signals: KernelSignal[] = [];
+    public proposals: readonly VirtualExitProposal[] = [];
+
+    public configure(specs: readonly VirtualExitChannelSpec[]): void {
+      this.specs = specs;
+    }
+
+    public onSignal(signal: KernelSignal): void {
+      this.signals.push(signal);
+    }
+
+    public onBar(): readonly VirtualExitProposal[] {
+      return this.proposals;
+    }
+  }
+
+  function ruleFlow(): DecisionFlowNode {
+    return {
+      id: 'guard_rule',
+      type: 'GUARD',
+      name: '规则声明门禁',
+      pluginId: 'plugin.test.rule-declaring',
+      params: {},
+      requiredAction: 'BUY',
+      minConfidence: 0.5,
+      onPass: {
+        id: 'term_rule',
+        type: 'TERMINAL',
+        action: 'BUY',
+        signalTag: 'RULE_BUY',
+        reason: '规则插件买入',
+      },
+      onFail: {
+        id: 'term_rule_abort',
+        type: 'TERMINAL',
+        action: 'ABORT',
+        reason: '未触发',
+      },
+    };
+  }
+
+  function makeKernel(policy: VirtualExitPolicyPort): StrategyEvaluationKernel {
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new RuleDeclaringPlugin());
+    return new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: new Date(0),
+      registry,
+      virtualExitPolicy: policy,
+      plans: [
+        {
+          definitionId: 7,
+          versionId: 1,
+          flow: ruleFlow(),
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+    });
+  }
+
+  it('构造时把插件声明的规则按通道推送给策略实现', () => {
+    const policy = new StubPolicy();
+    makeKernel(policy);
+
+    expect(policy.specs).toHaveLength(1);
+    expect(policy.specs[0].channel).toEqual({
+      definitionId: 7,
+      versionId: 1,
+      period: 30,
+    });
+    expect(policy.specs[0].bindings).toEqual([
+      {
+        ownerPluginId: 'plugin.test.rule-declaring',
+        rule: { kind: 'stop', lossRatio: -0.03, id: 'avg-stop' },
+      },
+    ]);
+  });
+
+  it('策略返回的提案被转换为 VIRTUAL_EXIT 信号，并带上通道与归因', async () => {
+    const policy = new StubPolicy();
+    const kernel = makeKernel(policy);
+    const bar = makeStrategyBar(new Date('2026-10-12T01:30:00.000Z'), 10.0);
+
+    policy.proposals = [
+      {
+        channel: { definitionId: 7, versionId: 1, period: 30 },
+        ownerPluginId: 'plugin.test.rule-declaring',
+        ruleId: 'avg-stop',
+        exitKind: 'AVERAGE_STOP',
+        reason: '收盘跌破均价止损线',
+        badgeText: '均价止损',
+      },
+    ];
+
+    const signals = await kernel.push(bar);
+    // 本 bar 的真实 BUY 在前，虚拟出场在后
+    expect(signals).toHaveLength(2);
+    expect(policy.signals).toHaveLength(1);
+
+    const exit = signals[1];
+    expect(exit.intent).toBe('EXIT');
+    expect(exit.signalType).toBe('VIRTUAL_EXIT');
+    expect(exit.displayTag).toBe('VIRTUAL_EXIT_AVERAGE_STOP');
+    expect(exit.originPluginId).toBe('plugin.test.rule-declaring');
+    expect(exit.channel).toEqual({ definitionId: 7, versionId: 1, period: 30 });
+    expect(exit.contextSnapshot).toMatchObject({ exitKind: 'AVERAGE_STOP' });
   });
 });
 

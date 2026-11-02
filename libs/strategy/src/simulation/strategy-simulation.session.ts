@@ -1,5 +1,6 @@
 import type { StrategyBar } from '@app/market-data';
 import { StrategyEvaluationKernel } from '../kernel/strategy-evaluation-kernel';
+import { ExternalFactorPluginLoader } from '../factor/external-plugin-loader';
 import { mapKernelSignalToSimulationSignal } from './kernel-signal-mapper';
 import type {
   SimulationControlCommand,
@@ -34,6 +35,9 @@ export class StrategySimulationSession {
   private readonly kernel: StrategyEvaluationKernel;
   private readonly preWarmBars: readonly StrategyBar[];
   private readonly publicBars: readonly StrategyBar[];
+  private readonly externalPreWarmBars: readonly StrategyBar[];
+  private readonly externalPublicBars: readonly StrategyBar[];
+  private externalPublicCursor = 0;
   private readonly frames: (SimulationFrame | undefined)[] = [];
   private readonly accumulatedSignals: SimulationSignal[] = [];
   private pushedPublicCount = 0;
@@ -68,10 +72,25 @@ export class StrategySimulationSession {
     this.publicBars = Object.freeze(
       bounded.filter((bar) => bar.timestamp.getTime() >= publicFrom.getTime()),
     );
+    const externalAll = (config.externalBars ?? []).filter(
+      (bar) => !endAt || bar.timestamp.getTime() <= endAt.getTime(),
+    );
+    this.externalPreWarmBars = Object.freeze(
+      externalAll.filter(
+        (bar) => bar.timestamp.getTime() < publicFrom.getTime(),
+      ),
+    );
+    this.externalPublicBars = Object.freeze(
+      externalAll.filter(
+        (bar) => bar.timestamp.getTime() >= publicFrom.getTime(),
+      ),
+    );
     this.kernel = new StrategyEvaluationKernel({
       securityId: config.securityId ?? 1,
       securityCode: config.securityCode,
       publicFrom,
+      virtualExitPolicy:
+        ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
       plans: [
         {
           definitionId:
@@ -84,6 +103,7 @@ export class StrategySimulationSession {
           period: config.period,
           requiredBarCount: config.windowBudget ?? 600,
           contextRequirements: config.contextRequirements ?? {},
+          externalContextRequirements: config.externalContextRequirements ?? [],
         },
       ],
       registry: config.registry,
@@ -202,8 +222,20 @@ export class StrategySimulationSession {
     }
 
     const bar = this.publicBars[next];
-    const kernelSignals =
-      next >= this.pushedPublicCount ? await this.kernel.push(bar) : [];
+    const fresh = next >= this.pushedPublicCount;
+    if (fresh) {
+      // 公开段同日宏观 bar 先于标的 bar 推入（外部 bar 只落窗不求值）
+      let e = this.externalPublicCursor;
+      while (
+        e < this.externalPublicBars.length &&
+        this.externalPublicBars[e].timestamp.getTime() <=
+          bar.timestamp.getTime()
+      ) {
+        await this.kernel.push(this.externalPublicBars[e++]);
+      }
+      this.externalPublicCursor = e;
+    }
+    const kernelSignals = fresh ? await this.kernel.push(bar) : [];
     this.pushedPublicCount = Math.max(this.pushedPublicCount, next + 1);
 
     const latestSignals = kernelSignals.map((signal) =>
@@ -315,8 +347,20 @@ export class StrategySimulationSession {
   private async seedPreWarm(): Promise<void> {
     if (this.preWarmSeeded) return;
     this.preWarmSeeded = true;
+    // 预热段按时间归并：同日宏观 bar 先于标的 bar（因果序）
+    let e = 0;
     for (const bar of this.preWarmBars) {
+      while (
+        e < this.externalPreWarmBars.length &&
+        this.externalPreWarmBars[e].timestamp.getTime() <=
+          bar.timestamp.getTime()
+      ) {
+        await this.kernel.push(this.externalPreWarmBars[e++]);
+      }
       await this.kernel.push(bar);
+    }
+    while (e < this.externalPreWarmBars.length) {
+      await this.kernel.push(this.externalPreWarmBars[e++]);
     }
   }
 

@@ -1,10 +1,39 @@
 import type { StrategyBar } from '@app/market-data';
 import type { KernelSignal } from '../kernel/kernel.types';
-import {
-  DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
-  type TacticalAggregatorConfig,
-} from './tactical-event.types';
+import type { TacticalAggregatorConfig } from './tactical-event.types';
 import { TacticalEventAggregator } from './tactical-event-aggregator';
+
+/**
+ * 测试专用聚合配置：开源仓不得出现任何私有插件身份，
+ * 生产配置由私有挂载目录经 TacticalAggregatorConfigLoader 注入。
+ */
+const TEST_TACTICAL_CONFIG: TacticalAggregatorConfig = {
+  edgePlugins: [
+    'test.regime',
+    'test.setup.bull',
+    'test.confirm',
+    'test.riskcut.bear',
+  ],
+  windows: [
+    {
+      requiredSetupTag: 'test.regime',
+      triggerTag: 'test.setup.bull',
+      windowBars: 3,
+      requiredConfirmationTags: ['test.confirm'],
+      optionalBoostTags: ['test.boost'],
+      compositeBadgeText: '测试战术+放量确认',
+    },
+    {
+      triggerTag: 'test.riskcut.bear',
+      windowBars: 0,
+      requiredConfirmationTags: [],
+      compositeBadgeText: '测试极速逃命',
+      action: 'SELL',
+      kind: 'RISK_CUT',
+    },
+  ],
+  cooldownBars: 3,
+};
 
 describe('TacticalEventAggregator', () => {
   function createBar(timestamp: string, close = 10.0): StrategyBar {
@@ -68,7 +97,7 @@ describe('TacticalEventAggregator', () => {
 
   it('runs complete pipeline EdgeDetector -> TemporalWindowEngine -> TacticalCooldownTracker', () => {
     const config: TacticalAggregatorConfig = {
-      edgePlugins: ['plugin.regime.shanghai-index'],
+      edgePlugins: ['test.regime'],
       windows: [
         {
           triggerTag: 'chan_1b',
@@ -85,7 +114,7 @@ describe('TacticalEventAggregator', () => {
     // 包含持续态插件信号（第一次 0->1 发射）+ 扳机信号（开窗）
     const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0);
     const regimeSignal0 = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'BUY',
       securityCode: '000001.SH',
       time: bar0.timestamp,
@@ -103,14 +132,14 @@ describe('TacticalEventAggregator', () => {
     const events0 = aggregator.push([regimeSignal0, triggerSignal0], bar0);
     // regimeSignal0 没有观察窗规则，作为单点事件发出；triggerSignal0 开启观察窗，暂不发射
     expect(events0).toHaveLength(1);
-    expect(events0[0].badgeText).toBe('plugin.regime.shanghai-index');
+    expect(events0[0].badgeText).toBe('test.regime');
     expect(events0[0].securityCode).toBe('000001.SH');
 
     // Bar 1:
     // regimeSignal 仍为 BUY，应被 EdgeDetector 抑制；无其它信号
     const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.1);
     const regimeSignal1 = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'BUY',
       securityCode: '000001.SH',
       time: bar1.timestamp,
@@ -263,22 +292,20 @@ describe('TacticalEventAggregator', () => {
     expect(aggregator.push([entry0], bar1)).toHaveLength(1);
   });
 
-  it('works seamlessly with DEFAULT_TACTICAL_AGGREGATOR_CONFIG for both chan.bsp and bull-left-right-bsp', () => {
-    const aggregator = new TacticalEventAggregator(
-      DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
-    );
+  it('按注入配置合成 Setup -> Trigger -> Confirmation 三段论战术事件', () => {
+    const aggregator = new TacticalEventAggregator(TEST_TACTICAL_CONFIG);
 
     // Bar 0: 宏观牛市跃迁 (BUY) + 专属战术买点触发
     const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0);
     const regimeSignal = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       displayTag: 'REGIME_BULL',
       action: 'BUY',
       securityCode: '600519',
       time: bar0.timestamp,
     });
     const tacticsSignal = createSignal({
-      signalType: 'plugin.tactics.bull-left-right-bsp',
+      signalType: 'test.setup.bull',
       displayTag: 'BUY_SUB_CROSS_ZERO_RIGHT',
       badgeText: '次级别零轴穿越买点',
       pivotPrice: 9.8,
@@ -293,11 +320,11 @@ describe('TacticalEventAggregator', () => {
     const entryEvents0 = events0.filter((e) => e.kind === 'ENTRY');
     expect(entryEvents0).toHaveLength(0);
 
-    // Bar 1: VPCI 放量确认到来，成功合成专属战术事件
+    // Bar 1: 放量确认到来，成功合成专属战术事件
     const bar1 = createBar('2026-10-28T09:35:00.000Z', 10.2);
     const vpciSignal = createSignal({
-      signalType: 'plugin.tactics.volume-price-confirmation',
-      displayTag: 'plugin.tactics.volume-price-confirmation',
+      signalType: 'test.confirm',
+      displayTag: 'test.confirm',
       securityCode: '600519',
       time: bar1.timestamp,
     });
@@ -305,27 +332,25 @@ describe('TacticalEventAggregator', () => {
     const events1 = aggregator.push([vpciSignal], bar1);
     const entryEvents1 = events1.filter((e) => e.kind === 'ENTRY');
     expect(entryEvents1).toHaveLength(1);
-    expect(entryEvents1[0].badgeText).toBe('专属战术+放量确认');
+    expect(entryEvents1[0].badgeText).toBe('测试战术+放量确认');
     expect(entryEvents1[0].triggerPrice).toBe(10.2);
     expect(entryEvents1[0].pivotPrice).toBe(9.8);
   });
 
-  it('DEFAULT_TACTICAL_AGGREGATOR_CONFIG: 熊市逃命风控规则 (bear-left-right-bsp) 0 延迟发射、清仓风控 (RISK_CUT) 并不受冷却拦截，同时即刻作废未决多头观察窗', () => {
-    const aggregator = new TacticalEventAggregator(
-      DEFAULT_TACTICAL_AGGREGATOR_CONFIG,
-    );
+  it('RISK_CUT 规则 0 延迟发射、不受冷却拦截，并即刻作废未决多头观察窗', () => {
+    const aggregator = new TacticalEventAggregator(TEST_TACTICAL_CONFIG);
 
     // Bar 0: 牛市环境 + 多头买点开窗
     const bar0 = createBar('2026-10-28T09:30:00.000Z', 10.0);
     const regimeBull = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       displayTag: 'REGIME_BULL',
       action: 'BUY',
       securityCode: '600519',
       time: bar0.timestamp,
     });
     const bullTrigger = createSignal({
-      signalType: 'plugin.tactics.bull-left-right-bsp',
+      signalType: 'test.setup.bull',
       displayTag: 'BUY_1B_EXTREME_LEFT',
       badgeText: '极限左侧1买',
       pivotPrice: 9.8,
@@ -336,10 +361,10 @@ describe('TacticalEventAggregator', () => {
     const events0 = aggregator.push([regimeBull, bullTrigger], bar0);
     expect(events0.filter((e) => e.kind === 'ENTRY')).toHaveLength(0);
 
-    // Bar 1: 突发熊市极速逃命卖点（例如跳空低开或次级破零）
+    // Bar 1: 突发风控清仓卖点
     const bar1 = createBar('2026-10-28T09:35:00.000Z', 9.5);
     const bearEscapeSignal = createSignal({
-      signalType: 'plugin.tactics.bear-left-right-bsp',
+      signalType: 'test.riskcut.bear',
       displayTag: 'BEAR_EXIT_GAP_DOWN',
       badgeText: '跳空低开卖',
       action: 'SELL',
@@ -355,14 +380,14 @@ describe('TacticalEventAggregator', () => {
     const escapeEvent = events1[0];
     expect(escapeEvent.action).toBe('SELL');
     expect(escapeEvent.kind).toBe('RISK_CUT');
-    expect(escapeEvent.badgeText).toBe('熊市极速逃命');
+    expect(escapeEvent.badgeText).toBe('测试极速逃命');
     expect(escapeEvent.triggerPrice).toBe(9.5);
 
-    // Bar 2: 此时即便迟到的 VPCI 放量信号到来，原有的多头观察窗已在 Bar 1 被作废，严禁形成买入
+    // Bar 2: 此时即便迟到的确认信号到来，原有的多头观察窗已在 Bar 1 被作废，严禁形成买入
     const bar2 = createBar('2026-10-28T09:40:00.000Z', 9.6);
     const vpciSignal = createSignal({
-      signalType: 'plugin.tactics.volume-price-confirmation',
-      displayTag: 'plugin.tactics.volume-price-confirmation',
+      signalType: 'test.confirm',
+      displayTag: 'test.confirm',
       securityCode: '600519',
       time: bar2.timestamp,
     });

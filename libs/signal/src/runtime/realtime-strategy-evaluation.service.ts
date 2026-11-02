@@ -46,6 +46,11 @@ export interface RealtimeKernelPoolLike {
   ): Promise<readonly KernelSignal[]>;
   retainGroups(groups: readonly RealtimeWindowGroupIdentity[]): void;
   reset(): void;
+  /** 声明依赖该标的的同源组所需派生周期（外部标的自身无计划时用） */
+  externalPeriodsFor?(
+    securityId: number,
+    source: StrategyRealtimeSource,
+  ): readonly number[];
   warmup?(
     targets: readonly import('@app/strategy').PreMarketWarmupTarget[],
     anchorAt: Date,
@@ -82,7 +87,12 @@ export class RealtimeStrategyEvaluationService {
         left.definitionId - right.definitionId ||
         left.versionId - right.versionId,
     );
-    if (eligible.length === 0) return Object.freeze([]);
+    if (eligible.length === 0) {
+      // 空计划也要进池：跨组扇出把 bar 投递给声明依赖该标的的其它组
+      // （外部标的自身无策略，这是它的 bars 进入内核外部窗口的唯一通路）
+      await this.kernelPool.push(bar, eligible);
+      return Object.freeze([]);
+    }
 
     const signals = await this.kernelPool.push(bar, eligible);
     return Object.freeze(
@@ -92,6 +102,13 @@ export class RealtimeStrategyEvaluationService {
 
   retainRegistryScopes(groups: readonly RealtimeWindowGroupIdentity[]): void {
     this.kernelPool.retainGroups(groups);
+  }
+
+  externalPeriodsFor(
+    securityId: number,
+    source: StrategyRealtimeSource,
+  ): readonly number[] {
+    return this.kernelPool.externalPeriodsFor?.(securityId, source) ?? [];
   }
 
   /** 盘前预热入口（09:20 屏障与启动补热共用）；池不支持时静默跳过。 */

@@ -35,7 +35,7 @@ describe('EdgeDetector', () => {
   }
 
   it('passes unconfigured regular signals through untouched', () => {
-    const detector = new EdgeDetector(['plugin.regime.shanghai-index']);
+    const detector = new EdgeDetector(['test.regime']);
     const regularSignal = createSignal({
       signalType: 'first_buy',
       displayTag: 'chan_1b',
@@ -46,10 +46,10 @@ describe('EdgeDetector', () => {
   });
 
   it('emits single pulse on NONE -> BUY (0 -> 1) and suppresses next 500 consecutive BUY bars', () => {
-    const detector = new EdgeDetector(['plugin.regime.shanghai-index']);
+    const detector = new EdgeDetector(['test.regime']);
 
     const firstSignal = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'BUY',
       time: new Date('2026-10-28T09:30:00.000Z'),
     });
@@ -61,7 +61,7 @@ describe('EdgeDetector', () => {
     // 连续 500 根 Bar 的持续 BUY 状态全被静默抑制
     for (let i = 1; i <= 500; i++) {
       const steadySignal = createSignal({
-        signalType: 'plugin.regime.shanghai-index',
+        signalType: 'test.regime',
         action: 'BUY',
         time: new Date(firstSignal.signalTime.getTime() + i * 60_000),
       });
@@ -71,17 +71,17 @@ describe('EdgeDetector', () => {
   });
 
   it('triggers new edge when status flips to SELL, and triggers again when flipping back to BUY', () => {
-    const detector = new EdgeDetector(['plugin.regime.shanghai-index']);
+    const detector = new EdgeDetector(['test.regime']);
 
     const buySignal1 = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'BUY',
       time: new Date('2026-10-28T09:30:00.000Z'),
     });
     expect(detector.detect(buySignal1)).toBe(buySignal1);
 
     const buySignal2 = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'BUY',
       time: new Date('2026-10-28T09:31:00.000Z'),
     });
@@ -89,7 +89,7 @@ describe('EdgeDetector', () => {
 
     // 翻转为 SELL，触发新边沿
     const sellSignal1 = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'SELL',
       time: new Date('2026-10-28T09:32:00.000Z'),
     });
@@ -97,7 +97,7 @@ describe('EdgeDetector', () => {
 
     // 持续 SELL 抑制
     const sellSignal2 = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'SELL',
       time: new Date('2026-10-28T09:33:00.000Z'),
     });
@@ -105,7 +105,7 @@ describe('EdgeDetector', () => {
 
     // 再次翻回 BUY，再次放行
     const buySignal3 = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'BUY',
       time: new Date('2026-10-28T09:34:00.000Z'),
     });
@@ -113,10 +113,10 @@ describe('EdgeDetector', () => {
   });
 
   it('resets state tracking on reset()', () => {
-    const detector = new EdgeDetector(['plugin.regime.shanghai-index']);
+    const detector = new EdgeDetector(['test.regime']);
 
     const buySignal = createSignal({
-      signalType: 'plugin.regime.shanghai-index',
+      signalType: 'test.regime',
       action: 'BUY',
     });
     expect(detector.detect(buySignal)).toBe(buySignal);

@@ -18,6 +18,7 @@ import { SignalRealtimeStartupService } from './signal-realtime-startup.service'
 import { LiveStrategyPersistenceService } from './live-strategy-persistence.service';
 import { StrategyAlertDeliveryHandoffModule } from './notification/strategy-alert-delivery-handoff.module';
 import { resolveRealtimeStrategyMode } from '@app/config';
+import { TacticalAggregatorConfigLoader } from '@app/strategy';
 import { TimezoneModule } from '@app/timezone';
 import { SignalPreMarketWarmupService } from './signal-pre-market-warmup.service';
 import { RuntimeObservabilityService } from '../observability/runtime-observability.service';
@@ -75,6 +76,7 @@ import { RuntimeObservabilityService } from '../observability/runtime-observabil
           ) as 'shadow' | 'on',
           persistence,
           runtimeObservability,
+          TacticalAggregatorConfigLoader.load(),
         );
       },
     },

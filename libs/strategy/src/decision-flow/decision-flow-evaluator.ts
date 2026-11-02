@@ -81,6 +81,7 @@ export class DecisionFlowEvaluator {
         trace.push({
           nodeId: node.id,
           type: 'GUARD',
+          pluginId: node.pluginId,
           name: node.name,
           action: opinion.action,
           confidence: opinion.confidence,
@@ -172,6 +173,7 @@ export class DecisionFlowEvaluator {
         trace.push({
           nodeId: node.id,
           type: 'EXTRACTOR',
+          pluginId: node.pluginId,
           name: node.name,
           exportedKey: node.exportAttributeKey,
           evidence: opinion.evidence,

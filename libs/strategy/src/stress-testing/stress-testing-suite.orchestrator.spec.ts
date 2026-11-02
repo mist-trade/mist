@@ -5,6 +5,7 @@ import {
 } from '../execution/execution-risk-arbiter';
 import { SimulatedBroker } from '../execution/simulated-broker';
 import { PositionStateMachine } from '../position/position-state-machine';
+import { CapitalLedger } from '../position/capital-ledger';
 import {
   ORDER_SIDES,
   ORDER_STATUSES,
@@ -326,7 +327,8 @@ describe('A 股五大历史极端事件压力测试套件 (Stress Testing Suite)
           initialCash: 1000000,
           slippageRatio: 0.002, // 0.2% 滑点
         });
-        const position = new PositionStateMachine(1, '000001', 1000000);
+        const position = new PositionStateMachine(1, '000001');
+        const capitalLedger = new CapitalLedger({ initialCash: 1000000 });
         const arbiter = new ExecutionRiskArbiter({
           hardStopLossRatio: -0.05, // 浮亏 5% 止损
         });
@@ -364,8 +366,9 @@ describe('A 股五大历史极端事件压力测试套件 (Stress Testing Suite)
         const fills1 = broker.onBar(bar1);
         expect(fills1).toHaveLength(1);
         position.onOrderFilled(fills1[0]);
+        capitalLedger.applyFill(fills1[0]);
         broker.settleDayClose(formatShanghaiDateString(day1));
-        position.onDayClose(bar1);
+        capitalLedger.onDayClose(bar1, position.getSnapshot());
 
         // Day 2: 股价下行至 9.20 元 (浮亏 -8%)，裁决器触发硬止损下达卖单
         const bar2 = {
@@ -395,7 +398,7 @@ describe('A 股五大历史极端事件压力测试套件 (Stress Testing Suite)
         const sellOrder = broker.submitOrder(sellDto!);
         expect(sellOrder.status).toBe(ORDER_STATUSES.PENDING);
         broker.settleDayClose(formatShanghaiDateString(day2));
-        position.onDayClose(bar2);
+        capitalLedger.onDayClose(bar2, position.getSnapshot());
 
         // Day 3: 次日突发一字跌停暴跌至 8.28 元 (-10%)
         // Next-Bar 撮合：由于是一字跌停，卖单被挂起为 BLOCKED，禁止成交！
@@ -418,7 +421,7 @@ describe('A 股五大历史极端事件压力测试套件 (Stress Testing Suite)
         const openOrders = broker.getOpenOrders();
         expect(openOrders[0].status).toBe(ORDER_STATUSES.BLOCKED);
         broker.settleDayClose(formatShanghaiDateString(day3));
-        position.onDayClose(bar3);
+        capitalLedger.onDayClose(bar3, position.getSnapshot());
 
         // Day 4: 跌停板打开，以 7.80 元成交出清，产生顺延额外滑点亏损
         const bar4 = {
@@ -439,10 +442,13 @@ describe('A 股五大历史极端事件压力测试套件 (Stress Testing Suite)
         const fills3 = broker.onBar(bar4);
         expect(fills3).toHaveLength(1);
         position.onOrderFilled(fills3[0]);
+        capitalLedger.applyFill(fills3[0]);
         broker.settleDayClose(formatShanghaiDateString(day4));
-        position.onDayClose(bar4);
+        capitalLedger.onDayClose(bar4, position.getSnapshot());
 
-        const navSeries = position.getNavHistory().map((n) => n.totalEquity);
+        const navSeries = capitalLedger
+          .getNavHistory()
+          .map((n) => n.totalEquity);
         // 将包含延迟标记的已平仓交易注入 ClosedTradeInput
         const trades = position.getClosedTrades().map((t) => ({
           ...t,

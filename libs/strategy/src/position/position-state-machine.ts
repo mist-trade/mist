@@ -1,6 +1,5 @@
 import { TRADING_RULES } from '@app/constants';
 import type { StrategyBar } from '@app/market-data';
-import { formatShanghaiDateString } from '@app/timezone';
 import type {
   CreateOrderDto,
   OrderFilledEvent,
@@ -8,7 +7,6 @@ import type {
 
 import type { KernelSignal } from '../kernel/kernel.types';
 import {
-  DEFAULT_BROKER_INITIAL_CASH,
   EXIT_ACTIONS,
   ORDER_SIDES,
   ORDER_TYPES,
@@ -18,7 +16,6 @@ import {
   SIGNAL_KINDS,
 } from '../strategy.constants';
 import type {
-  DailyNavSnapshot,
   ExitPolicyPort,
   PositionClosedRecord,
   PositionSnapshot,
@@ -37,36 +34,20 @@ export class PositionStateMachine {
   private currentPrice = 0;
   private realizedPnl = 0;
   private accumulatedBuyFees = 0;
-  private cash: number;
   private readonly exitPolicy?: ExitPolicyPort;
   private readonly exitRatio: number;
-  private readonly navHistory: DailyNavSnapshot[] = [];
   private readonly closedTrades: PositionClosedRecord[] = [];
   private entryReason?: string;
 
   constructor(
     securityId: number,
     securityCode: string,
-    initialCashOrOptions?: number | PositionStateMachineOptions,
-    exitPolicy?: ExitPolicyPort,
-    exitRatio = 1.0,
+    options?: PositionStateMachineOptions,
   ) {
     this.securityId = securityId;
     this.securityCode = securityCode;
-
-    if (
-      typeof initialCashOrOptions === 'object' &&
-      initialCashOrOptions !== null
-    ) {
-      this.cash =
-        initialCashOrOptions.initialCash ?? DEFAULT_BROKER_INITIAL_CASH;
-      this.exitPolicy = initialCashOrOptions.exitPolicy;
-      this.exitRatio = initialCashOrOptions.exitRatio ?? 1.0;
-    } else {
-      this.cash = initialCashOrOptions ?? DEFAULT_BROKER_INITIAL_CASH;
-      this.exitPolicy = exitPolicy;
-      this.exitRatio = exitRatio;
-    }
+    this.exitPolicy = options?.exitPolicy;
+    this.exitRatio = options?.exitRatio ?? 1.0;
 
     if (this.exitRatio <= 0 || this.exitRatio > 1.0) {
       throw new Error(
@@ -97,7 +78,6 @@ export class PositionStateMachine {
           : 0;
 
       this.accumulatedBuyFees += event.fees.totalFees;
-      this.cash = Math.round((this.cash + event.netAmount) * 100) / 100;
       this.currentPrice = event.fillPrice;
     } else if (event.side === ORDER_SIDES.SELL) {
       if (this.holdingQuantity <= 0) return;
@@ -115,7 +95,6 @@ export class PositionStateMachine {
         Math.round((netProceeds - costBasis - allocatedBuyFees) * 100) / 100;
 
       this.realizedPnl = Math.round((this.realizedPnl + tradePnl) * 100) / 100;
-      this.cash = Math.round((this.cash + event.netAmount) * 100) / 100;
       this.accumulatedBuyFees = Math.max(
         0,
         this.accumulatedBuyFees - allocatedBuyFees,
@@ -224,41 +203,6 @@ export class PositionStateMachine {
     return null;
   }
 
-  onDayClose(bar: StrategyBar): DailyNavSnapshot {
-    this.currentPrice = bar.close;
-    const marketValue =
-      Math.round(this.holdingQuantity * bar.close * 100) / 100;
-    const totalEquity = Math.round((this.cash + marketValue) * 100) / 100;
-
-    const prevEquity =
-      this.navHistory.length > 0
-        ? this.navHistory[this.navHistory.length - 1].totalEquity
-        : totalEquity;
-
-    const dailyReturn =
-      prevEquity > 0
-        ? Math.round(
-            ((totalEquity - prevEquity) / prevEquity) *
-              POSITION_DECIMAL_PLACES.RATIO_SCALE,
-          ) / POSITION_DECIMAL_PLACES.RATIO_SCALE
-        : 0;
-
-    const date = formatShanghaiDateString(bar.timestamp);
-    const snapshot: DailyNavSnapshot = {
-      date,
-      securityCode: this.securityCode,
-      closePrice: bar.close,
-      holdingQuantity: this.holdingQuantity,
-      marketValue,
-      cash: this.cash,
-      totalEquity,
-      dailyReturn,
-    };
-
-    this.navHistory.push(snapshot);
-    return snapshot;
-  }
-
   getSnapshot(): PositionSnapshot {
     const marketValue =
       Math.round(this.holdingQuantity * this.currentPrice * 100) / 100;
@@ -291,16 +235,8 @@ export class PositionStateMachine {
     };
   }
 
-  getNavHistory(): readonly DailyNavSnapshot[] {
-    return this.navHistory;
-  }
-
   getClosedTrades(): readonly PositionClosedRecord[] {
     return this.closedTrades;
-  }
-
-  getCash(): number {
-    return this.cash;
   }
 
   getStatus(): PositionStatus {
