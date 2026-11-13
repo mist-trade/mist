@@ -1,16 +1,24 @@
 import {
   Controller,
+  Get,
   Post,
   Body,
+  Query,
   HttpCode,
   HttpStatus,
   BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CollectDto } from './dto/collect.dto';
+import { PushBarsDto } from './dto/reconciliation.dto';
 import { CollectionStrategyRegistry } from './strategies/collection-strategy.registry';
 import { SecurityService } from '../security/security.service';
 import { TimezoneService } from '@app/timezone';
+import {
+  ReconciliationCollectorService,
+  SyncManifestResponse,
+  PushBarsResult,
+} from './reconciliation-collector.service';
 
 @ApiTags('collector v1')
 @Controller('v1/collector')
@@ -19,7 +27,26 @@ export class CollectorController {
     private readonly securityService: SecurityService,
     private readonly registry: CollectionStrategyRegistry,
     private readonly timezoneService: TimezoneService,
+    private readonly reconciliationService: ReconciliationCollectorService,
   ) {}
+
+  @Get('sync-manifest')
+  @ApiOperation({ summary: '获取边缘数据源 K 线增量自愈补全清单' })
+  @ApiQuery({ name: 'source', enum: ['tdx', 'qmt'], required: true })
+  async getSyncManifest(
+    @Query('source') source: string,
+  ): Promise<SyncManifestResponse> {
+    return this.reconciliationService.generateManifest(source);
+  }
+
+  @Post('push-bars')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({
+    summary: '接收边缘端推送的 K 线进行4级全景校验、入库与推进水位',
+  })
+  async pushBars(@Body() dto: PushBarsDto): Promise<PushBarsResult> {
+    return this.reconciliationService.pushBars(dto);
+  }
 
   @Post('collect')
   @HttpCode(HttpStatus.OK)

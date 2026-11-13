@@ -12,6 +12,7 @@ import { CollectorController } from './collector.controller';
 import { CollectorService } from './collector.service';
 import { CollectionStrategyRegistry } from './strategies/collection-strategy.registry';
 import { EastMoneyCollectionStrategy } from './strategies/east-money-collection.strategy';
+import { ReconciliationCollectorService } from './reconciliation-collector.service';
 
 describe('Collector HTTP error boundary integration', () => {
   let app: INestApplication;
@@ -59,6 +60,13 @@ describe('Collector HTTP error boundary integration', () => {
           useValue: { resolve: jest.fn().mockReturnValue(strategy) },
         },
         { provide: TimezoneService, useValue: timezoneService },
+        {
+          provide: ReconciliationCollectorService,
+          useValue: {
+            generateManifest: jest.fn(),
+            pushBars: jest.fn(),
+          },
+        },
       ],
     }).compile();
 

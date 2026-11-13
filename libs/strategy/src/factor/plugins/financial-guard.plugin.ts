@@ -34,6 +34,13 @@ export class FinancialSafetyGuardPlugin implements FactorPlugin {
       default: 70.0,
       description: '最高资产负债率百分比',
     },
+    passAction: {
+      type: 'string',
+      enum: ['BUY', 'NEUTRAL'],
+      default: 'BUY',
+      description:
+        '达标通过时的判定动作（默认 BUY 保持既有决策流兼容，亦可设为 NEUTRAL 纯放行）',
+    },
   };
 
   public async evaluate(
@@ -100,10 +107,11 @@ export class FinancialSafetyGuardPlugin implements FactorPlugin {
 
     const isRoeSafe = roe === undefined || roe >= minRoe;
     const isDebtSafe = debtRatio === undefined || debtRatio <= maxDebtRatio;
+    const passAction = rawParams?.passAction === 'NEUTRAL' ? 'NEUTRAL' : 'BUY';
 
     if (isRoeSafe && isDebtSafe) {
       return {
-        action: 'BUY',
+        action: passAction,
         confidence: 0.9,
         reason: `财务基本面达标 (ROE: ${roe ?? 'N/A'}% >= ${minRoe}%, 资产负债率: ${debtRatio ?? 'N/A'}% <= ${maxDebtRatio}%)`,
         evidence: {

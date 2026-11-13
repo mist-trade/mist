@@ -31,8 +31,8 @@ export interface MacroRegimeSnapshot {
 }
 
 export interface ExecutionRiskArbiterOptions {
-  /** 硬止损阈值（负数，如 -0.08 代表亏损 8% 斩仓），默认 -0.08 */
-  readonly hardStopLossRatio?: number;
+  /** 硬止损阈值（负数，如 -0.08 代表亏损 8% 斩仓）；默认 undefined（遵循零死板止损准则，出场由策略形态与风控插件决定） */
+  readonly hardStopLossRatio?: number | null;
   /** 开仓可用资金分配比例（预留滑点及手续费），默认 0.995 */
   readonly cashAllocationRatio?: number;
   /** 单笔开仓最小一手股数，默认 100 股 */
@@ -56,12 +56,15 @@ export interface ArbitrateContext {
  * 3. 持仓状态机（PositionStateMachine）彻底回归纯记账员，平仓动作 100% 由裁决器下达。
  */
 export class ExecutionRiskArbiter {
-  private readonly hardStopLossRatio: number;
+  private readonly hardStopLossRatio?: number;
   private readonly cashAllocationRatio: number;
   private readonly lotSize: number;
 
   constructor(options?: ExecutionRiskArbiterOptions) {
-    this.hardStopLossRatio = options?.hardStopLossRatio ?? -0.08;
+    this.hardStopLossRatio =
+      typeof options?.hardStopLossRatio === 'number'
+        ? options.hardStopLossRatio
+        : undefined;
     this.cashAllocationRatio = options?.cashAllocationRatio ?? 0.995;
     this.lotSize = options?.lotSize ?? TRADING_RULES.MAIN_BOARD_LOT_SIZE;
   }
@@ -94,7 +97,7 @@ export class ExecutionRiskArbiter {
         };
       }
 
-      // 优先级 2 (持仓风控级)：个股浮亏跌破硬止损线 (默认成本价 -8%)
+      // 优先级 2 (持仓风控级)：个股浮亏跌破硬止损线（若已显式配置）
       const currentPnlRatio =
         position.costPrice > 0
           ? (bar.close - position.costPrice) / position.costPrice
@@ -104,7 +107,10 @@ export class ExecutionRiskArbiter {
         currentPnlRatio,
       );
 
-      if (effectivePnlRatio <= this.hardStopLossRatio) {
+      if (
+        this.hardStopLossRatio !== undefined &&
+        effectivePnlRatio <= this.hardStopLossRatio
+      ) {
         return {
           securityId: position.securityId,
           securityCode: position.securityCode,

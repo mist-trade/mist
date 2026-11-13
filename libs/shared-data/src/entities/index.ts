@@ -16,4 +16,5 @@ export * from './backtest-run.entity';
 export * from './backtest-signal-result.entity';
 export * from './backtest-trade-result.entity';
 export * from './market-macro-indicator.entity';
+export * from './collector-sync-event.entity';
 export * from './strategy-signal-parity.interface';

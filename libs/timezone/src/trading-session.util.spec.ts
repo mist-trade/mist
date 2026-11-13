@@ -13,8 +13,7 @@ import {
   CRON_PRE_MARKET_INSPECTION_0905,
   CRON_SUBSCRIPTION_RESET_0915,
   CRON_MARKET_BREADTH_NIGHTLY_2130,
-  CRON_POST_CLOSE_SYNC_NIGHTLY_2230,
-  CRON_POST_CLOSE_SYNC_MORNING_0630,
+  CRON_PRE_MARKET_STRATEGY_WARMUP_0920,
 } from './cron-schedules.constants';
 
 /** Build a Date for a specific Asia/Shanghai wall-clock time (no DST, fixed +8). */
@@ -73,14 +72,12 @@ describe('cron-schedules.const', () => {
     expect(CRON_PRE_MARKET_INSPECTION_0905).toMatch(cronRegex);
     expect(CRON_SUBSCRIPTION_RESET_0915).toMatch(cronRegex);
     expect(CRON_MARKET_BREADTH_NIGHTLY_2130).toMatch(cronRegex);
-    expect(CRON_POST_CLOSE_SYNC_NIGHTLY_2230).toMatch(cronRegex);
-    expect(CRON_POST_CLOSE_SYNC_MORNING_0630).toMatch(cronRegex);
+    expect(CRON_PRE_MARKET_STRATEGY_WARMUP_0920).toMatch(cronRegex);
 
     expect(CRON_PRE_MARKET_INSPECTION_0905).toBe('0 5 9 * * 1-5');
     expect(CRON_SUBSCRIPTION_RESET_0915).toBe('0 15 9 * * 1-5');
     expect(CRON_MARKET_BREADTH_NIGHTLY_2130).toBe('30 21 * * 1-5');
-    expect(CRON_POST_CLOSE_SYNC_NIGHTLY_2230).toBe('30 22 * * 1-5');
-    expect(CRON_POST_CLOSE_SYNC_MORNING_0630).toBe('30 6 * * 2-6');
+    expect(CRON_PRE_MARKET_STRATEGY_WARMUP_0920).toBe('0 20 9 * * 1-5');
   });
 });
 

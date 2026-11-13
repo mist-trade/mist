@@ -278,6 +278,25 @@ describe('ExecutionRiskArbiter (统一动作与风控裁决器)', () => {
       expect(order?.exitReason).toBe('HARD_STOP_LOSS');
     });
 
+    it('默认不配置 hardStopLossRatio 时遵循零死板止损准则，即使浮亏 -9% 也不触发硬斩仓', () => {
+      const defaultArbiter = new ExecutionRiskArbiter();
+      const bar = createBar('2026-10-15T10:00:00.000Z', 9.1);
+      const pos = createHoldingPosition(1000, 10.0, 9.1);
+
+      const order = defaultArbiter.arbitrate({
+        bar,
+        position: pos,
+        availableCash: 50_000,
+        macroRegime: {
+          regime: MarketRiskRegime.NORMAL,
+          marketAtrPercentile: 0.4,
+          isLiquidityFrozen: false,
+        },
+      });
+
+      expect(order).toBeNull();
+    });
+
     it('优先级 3 (策略逻辑级)：在正常大盘且未触及止损时，收到反向 EXIT 信号正常平仓', () => {
       // 成本 10.0，市价 11.0 (+10% 浮盈)，收到顶背驰卖点
       const bar = createBar('2026-10-15T14:30:00.000Z', 11.0);

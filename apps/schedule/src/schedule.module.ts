@@ -17,7 +17,6 @@ import { HealthController } from './health/health.controller';
 import { DataCollectionController } from './data-collection.controller';
 import { PreMarketInspectionService } from './pre-market-inspection.service';
 import { MarketBreadthCollectionService } from './market-breadth/market-breadth-collection.service';
-import { HistoricalCollectorModule } from '../../mist/src/collector/historical-collector.module';
 import { TimezoneModule } from '@app/timezone';
 import * as path from 'path';
 
@@ -67,7 +66,6 @@ import * as path from 'path';
       inject: [ConfigService],
     }),
     NestScheduleModule.forRoot(),
-    HistoricalCollectorModule,
     TimezoneModule,
     TypeOrmModule.forFeature([
       K,

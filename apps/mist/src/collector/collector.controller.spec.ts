@@ -20,13 +20,27 @@ describe('CollectorController collect endpoint (historical only)', () => {
     const timezoneService = {
       parseDateString: jest.fn().mockReturnValue(new Date('2026-01-01')),
     };
+    const reconciliationService = {
+      generateManifest: jest
+        .fn()
+        .mockResolvedValue({ source: 'tdx', items: [] }),
+      pushBars: jest.fn().mockResolvedValue({ success: true, barsSaved: 10 }),
+    };
     const controller = new CollectorController(
       securityService as any,
       registry as any,
       timezoneService as any,
+      reconciliationService as any,
     );
 
-    return { controller, security, securityService, registry, strategy };
+    return {
+      controller,
+      security,
+      securityService,
+      registry,
+      strategy,
+      reconciliationService,
+    };
   };
 
   it('collects via the resolved historical strategy', async () => {
@@ -66,5 +80,25 @@ describe('CollectorController collect endpoint (historical only)', () => {
         endDate: '2026-01-02',
       }),
     ).rejects.toThrow(BadRequestException);
+  });
+
+  it('delegates getSyncManifest to reconciliationService', async () => {
+    const { controller, reconciliationService } = createHarness();
+    const manifest = await controller.getSyncManifest('tdx');
+    expect(reconciliationService.generateManifest).toHaveBeenCalledWith('tdx');
+    expect(manifest).toEqual({ source: 'tdx', items: [] });
+  });
+
+  it('delegates pushBars to reconciliationService', async () => {
+    const { controller, reconciliationService } = createHarness();
+    const dto = {
+      source: 'tdx' as const,
+      symbol: '600000',
+      period: '1d',
+      bars: [],
+    };
+    const result = await controller.pushBars(dto);
+    expect(reconciliationService.pushBars).toHaveBeenCalledWith(dto);
+    expect(result).toEqual({ success: true, barsSaved: 10 });
   });
 });

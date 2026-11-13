@@ -7,6 +7,10 @@ export interface KissStatesOptions {
   readonly fastPeriod?: number;
   readonly slowPeriod?: number;
   readonly windowSize?: number;
+  /** 湿吻缠绕均比阈值，默认 0.003 (0.3%) */
+  readonly wetRatioThreshold?: number;
+  /** 飞吻逼近最大均比阈值，默认 0.006 (0.6%) */
+  readonly flyingRatioThreshold?: number;
 }
 
 export interface KissStatesSeriesResult {
@@ -62,6 +66,9 @@ export function computeKissStatesSeries(
     };
   }
 
+  const wetRatioThreshold = options?.wetRatioThreshold ?? 0.003;
+  const flyingRatioThreshold = options?.flyingRatioThreshold ?? 0.006;
+
   const df = pl.DataFrame({
     close: pl.Series('close', close as any).cast(pl.Float64),
   });
@@ -69,6 +76,7 @@ export function computeKissStatesSeries(
   const fastCol = pl.col('close').rollingMean(fastPeriod);
   const slowCol = pl.col('close').rollingMean(slowPeriod);
   const diff = fastCol.sub(slowCol);
+  const prevDiff = diff.shift(1);
   const mean = fastCol.add(slowCol).mul(0.5);
 
   const stdRel = pl
@@ -81,7 +89,52 @@ export function computeKissStatesSeries(
     .then(diff.div(slowCol))
     .otherwise(pl.lit(0.0));
 
+  const absDiffRatio = diffRatio.abs();
   const mei = pl.lit(1.0).div(pl.lit(1.0).add(stdRel.mul(100.0)));
+
+  // Polars 向量化零交叉统计 (相邻变号)
+  const isCrossing = pl
+    .when(
+      diff
+        .gt(0)
+        .and(prevDiff.lt(0))
+        .or(diff.lt(0).and(prevDiff.gt(0))),
+    )
+    .then(pl.lit(1))
+    .otherwise(pl.lit(0));
+  const crossings = isCrossing.rollingSum({
+    windowSize: Math.max(1, windowSize - 1),
+    minPeriods: 1,
+  });
+
+  // 近 5 根均比与窗口内最小均比
+  const recent5AvgAbsRatio = absDiffRatio.rollingMean({
+    windowSize: 5,
+    minPeriods: 1,
+  });
+  const minAbsRatio = absDiffRatio.rollingMin({
+    windowSize,
+    minPeriods: 1,
+  });
+
+  // Polars 向量化吻态分类 (WET / LIP / FLYING / NONE)
+  const wetCond = crossings
+    .gtEq(2)
+    .or(recent5AvgAbsRatio.lt(wetRatioThreshold));
+  const lipCond = crossings.eq(1);
+  const flyingCond = crossings
+    .eq(0)
+    .and(minAbsRatio.ltEq(flyingRatioThreshold))
+    .and(absDiffRatio.gt(minAbsRatio));
+
+  const kissTypeCol = pl
+    .when(wetCond)
+    .then(pl.lit('WET'))
+    .when(lipCond)
+    .then(pl.lit('LIP'))
+    .when(flyingCond)
+    .then(pl.lit('FLYING'))
+    .otherwise(pl.lit('NONE'));
 
   const computedDf = df.select(
     fastCol.alias('fast'),
@@ -89,6 +142,7 @@ export function computeKissStatesSeries(
     diff.alias('diff'),
     diffRatio.alias('diffRatio'),
     mei.alias('mei'),
+    kissTypeCol.alias('kissType'),
   );
 
   const begIndex = slowPeriod - 1;
@@ -100,71 +154,14 @@ export function computeKissStatesSeries(
     .getColumn('slow')
     .toArray()
     .slice(begIndex) as number[];
-  const diffArr = computedDf
-    .getColumn('diff')
-    .toArray()
-    .slice(begIndex) as number[];
-  const diffRatioArr = computedDf
-    .getColumn('diffRatio')
-    .toArray()
-    .slice(begIndex) as number[];
   const meiArr = computedDf
     .getColumn('mei')
     .toArray()
     .slice(begIndex) as number[];
-
-  const kissTypes: KissType[] = new Array(fastArr.length);
-
-  for (let i = 0; i < fastArr.length; i++) {
-    const startIdx = Math.max(0, i - windowSize + 1);
-    const windowDiff = diffArr.slice(startIdx, i + 1);
-    const windowDiffRatio = diffRatioArr.slice(startIdx, i + 1);
-
-    // Count zero crossings in the window
-    let crossings = 0;
-    for (let j = 1; j < windowDiff.length; j++) {
-      const prev = windowDiff[j - 1];
-      const curr = windowDiff[j];
-      if ((prev > 0 && curr < 0) || (prev < 0 && curr > 0)) {
-        crossings++;
-      }
-    }
-
-    // Recent 5 bars average relative distance
-    const recent5Start = Math.max(0, i - 4);
-    const recent5Ratios = diffRatioArr.slice(recent5Start, i + 1);
-    const recent5AvgAbsRatio =
-      recent5Ratios.reduce((acc, v) => acc + Math.abs(v), 0) /
-      recent5Ratios.length;
-
-    // Minimum absolute distance in window
-    let minAbsRatio = Infinity;
-    for (let j = 0; j < windowDiffRatio.length; j++) {
-      const absVal = Math.abs(windowDiffRatio[j]);
-      if (absVal < minAbsRatio) {
-        minAbsRatio = absVal;
-      }
-    }
-
-    const currAbsRatio = Math.abs(diffRatioArr[i]);
-
-    if (
-      crossings >= 2 ||
-      (recent5Ratios.length >= 3 && recent5AvgAbsRatio < 0.003)
-    ) {
-      kissTypes[i] = 'WET';
-    } else if (crossings === 1) {
-      kissTypes[i] = 'LIP';
-    } else if (
-      crossings === 0 &&
-      minAbsRatio <= 0.006 &&
-      currAbsRatio > minAbsRatio
-    ) {
-      kissTypes[i] = 'FLYING';
-    } else {
-      kissTypes[i] = 'NONE';
-    }
-  }
+  const kissTypes = computedDf
+    .getColumn('kissType')
+    .toArray()
+    .slice(begIndex) as KissType[];
 
   return {
     begIndex,

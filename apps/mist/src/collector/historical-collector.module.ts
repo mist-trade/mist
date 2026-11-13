@@ -16,6 +16,8 @@ import {
   KExtensionTdx,
   Security,
   SecuritySourceConfig,
+  RealtimeSubscriptionAssignment,
+  CollectorSyncEvent,
 } from '@app/shared-data';
 import { CollectorService } from './collector.service';
 import { CollectorController } from './collector.controller';
@@ -29,10 +31,9 @@ import { SourcesModule } from '../sources/sources.module';
 import { UtilsModule } from '@app/utils';
 import { SecurityModule } from '../security/security.module';
 import { TimezoneModule } from '@app/timezone';
-import { PostCloseSyncService } from './post-close-sync.service';
-import { DataFreshnessValidator } from './helpers/data-freshness.validator';
-import { HistoryDownloadClient } from './history-download.client';
-import { PostCloseSyncMetrics } from './observability/post-close-sync-metrics';
+import { SyncCheckpointManager } from './helpers/sync-checkpoint.manager';
+import { KlineVerificationValidator } from './helpers/kline-verification.validator';
+import { ReconciliationCollectorService } from './reconciliation-collector.service';
 import {
   COLLECTION_STRATEGIES,
   CollectionStrategyRegistry,
@@ -62,6 +63,8 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
       KQuality,
       Security,
       SecuritySourceConfig,
+      RealtimeSubscriptionAssignment,
+      CollectorSyncEvent,
     ]),
     SourcesModule,
     UtilsModule,
@@ -70,10 +73,6 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
   ],
   providers: [
     CollectorService,
-    PostCloseSyncService,
-    DataFreshnessValidator,
-    HistoryDownloadClient,
-    PostCloseSyncMetrics,
     EastMoneyCollectionStrategy,
     TdxCollectionStrategy,
     QmtCollectionStrategy,
@@ -82,17 +81,20 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
     QmtSource,
     COLLECTION_STRATEGIES_PROVIDER,
     CollectionStrategyRegistry,
+    SyncCheckpointManager,
+    KlineVerificationValidator,
+    ReconciliationCollectorService,
   ],
   controllers: [CollectorController],
   exports: [
     CollectorService,
-    PostCloseSyncService,
-    DataFreshnessValidator,
-    PostCloseSyncMetrics,
     EastMoneyCollectionStrategy,
     TdxCollectionStrategy,
     QmtCollectionStrategy,
     CollectionStrategyRegistry,
+    SyncCheckpointManager,
+    KlineVerificationValidator,
+    ReconciliationCollectorService,
   ],
 })
 export class HistoricalCollectorModule {}

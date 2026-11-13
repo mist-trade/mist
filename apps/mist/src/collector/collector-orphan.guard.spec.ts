@@ -31,4 +31,39 @@ describe('collector orphan guard', () => {
       false,
     );
   });
+
+  it('keeps retired centralized post-close polling subsystem absent from source', () => {
+    const collectorRoot = join(process.cwd(), 'apps/mist/src/collector');
+    const retiredFiles = [
+      'post-close-sync.service.ts',
+      'post-close-sync.service.spec.ts',
+      'history-download.client.ts',
+      'helpers/data-freshness.validator.ts',
+      'helpers/data-freshness.validator.spec.ts',
+      'observability/post-close-sync-metrics.ts',
+      'observability/post-close-sync-metrics.spec.ts',
+      'types/post-close-sync.types.ts',
+    ];
+
+    for (const file of retiredFiles) {
+      expect(existsSync(join(collectorRoot, file))).toBe(false);
+    }
+
+    const retiredSymbols = [
+      'PostClose' + 'SyncService',
+      'HistoryDownload' + 'Client',
+      'DataFreshness' + 'Validator',
+      'PostClose' + 'SyncMetrics',
+    ];
+
+    const activeSources = sourceFiles(join(process.cwd(), 'apps'))
+      .filter((path) => !path.endsWith('collector-orphan.guard.spec.ts'))
+      .map((path) => readFileSync(path, 'utf8'));
+
+    for (const symbol of retiredSymbols) {
+      expect(activeSources.some((source) => source.includes(symbol))).toBe(
+        false,
+      );
+    }
+  });
 });

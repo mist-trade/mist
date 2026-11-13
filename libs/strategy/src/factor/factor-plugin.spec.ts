@@ -147,6 +147,29 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       expect(opinion.evidence?.passed).toBe(false);
     });
 
+    it('returns NEUTRAL when passAction is set to NEUTRAL and criteria pass', async () => {
+      const context: FactorContext = {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date(),
+        period: 1440,
+        attributes: new Map([
+          ['fundamental.roe', 20.0],
+          ['fundamental.debtRatio', 40.0],
+        ]),
+      };
+
+      const opinion = await plugin.evaluate(context, {
+        minRoe: 10.0,
+        maxDebtRatio: 60.0,
+        passAction: 'NEUTRAL',
+      });
+
+      expect(opinion.action).toBe('NEUTRAL');
+      expect(opinion.confidence).toBe(0.9);
+      expect(opinion.evidence?.passed).toBe(true);
+    });
+
     it('returns NEUTRAL when financial data is completely missing', async () => {
       const context: FactorContext = {
         securityId: 1,
@@ -192,6 +215,23 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       const opinion = await plugin.evaluate(context, { minInflowWan: 2000 });
       expect(opinion.action).toBe('SELL');
       expect(opinion.confidence).toBe(0.85);
+    });
+
+    it('returns BUY based on non-dimensional turnover ratio (minInflowRatio)', async () => {
+      const context: FactorContext = {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date(),
+        period: 1440,
+        attributes: new Map([
+          ['capital.northbound_inflow_wan', 1000], // 1000 万
+          ['bar.amount', 100_000_000], // 1 亿成交额 -> 占比 10%
+        ]),
+      };
+
+      const opinion = await plugin.evaluate(context, { minInflowRatio: 0.05 });
+      expect(opinion.action).toBe('BUY');
+      expect(opinion.evidence?.inflowRatio).toBeCloseTo(0.1);
     });
   });
 
