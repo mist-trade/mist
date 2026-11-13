@@ -14,7 +14,7 @@ import { TimezoneService } from '@app/timezone';
 import { IndicatorService } from '../indicator/indicator.service';
 
 @ApiTags('chan')
-@Controller(['chan', 'v1/chan'])
+@Controller('v1/chan')
 export class ChanController {
   constructor(
     private readonly chanService: ChanService,
