@@ -60,4 +60,4 @@ pnpm run test -- libs/chancore
 
 ## 🔗 上下游边界
 
-- **下游消费方**：`apps/chan`（HTTP API）、`apps/signal`（实时策略扫描）、`apps/backtest`（回测运行时）。
+- **下游消费方**：`apps/mist`（指标/缠论可视化与图元指令）、`apps/signal`（实时策略扫描）、`apps/backtest`（回测运行时）。

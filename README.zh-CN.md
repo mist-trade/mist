@@ -162,12 +162,10 @@ Docker Appliance 容器网格
 ## 📚 目录与文档入口
 
 - **子应用说明书**：
-  - [主业务 API (apps/mist)](./apps/mist/README.md)
-  - [缠论 API (apps/chan)](./apps/chan/README.md)
+  - [主业务 API (apps/mist)](./apps/mist/README.md)（含指标计算、缠论几何图元、盘前巡检）
   - [实时信号引擎 (apps/signal)](./apps/signal/README.md)
   - [隔离回测运行时 (apps/backtest)](./apps/backtest/README.md)
   - [通知服务 (apps/notification)](./apps/notification/README.md)
-  - [收盘同步与定时任务 (apps/schedule)](./apps/schedule/README.md)
   - [实时订阅 HIL 工具 (apps/realtime-subscription-hil)](./apps/realtime-subscription-hil/README.md)
 - **核心算法与库说明**：
   - [缠论算法核心库 (libs/chancore)](./libs/chancore/README.md)

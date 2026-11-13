@@ -34,7 +34,6 @@ assert_file package.json
 assert_file tools/run-migrations.mjs
 assert_file deploy/database/migrations/001_init_core_tables.sql
 assert_file dist/apps/mist/main.js
-assert_file dist/apps/chan/main.js
 assert_path_absent .github/workflows/windows-appliance.yml
 assert_path_absent deploy/windows
 

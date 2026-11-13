@@ -198,7 +198,6 @@ describe('service boundary import graph', () => {
 
   it('blocks app-to-app source imports beyond the exact legacy allowlist', () => {
     const legacyAllowlist = new Set([
-      'apps/chan/src/chan-app.module.ts -> apps/mist/src/chan/chan.module',
       'apps/realtime-subscription-hil/src/main.ts -> apps/mist/src/realtime/hil/realtime-subscription-hil',
     ]);
     const violations = productionFiles

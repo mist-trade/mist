@@ -165,12 +165,10 @@ Production gateway:
 ## 📚 Directory & Documentation
 
 - **Sub-apps**:
-  - [Main business API (apps/mist)](./apps/mist/README.md)
-  - [Chan API (apps/chan)](./apps/chan/README.md)
+  - [Main business API (apps/mist)](./apps/mist/README.md)（含指标、缠论几何图元、盘前巡检）
   - [Realtime signal engine (apps/signal)](./apps/signal/README.md)
   - [Isolated backtest runtime (apps/backtest)](./apps/backtest/README.md)
   - [Notification service (apps/notification)](./apps/notification/README.md)
-  - [Post-close sync & scheduled jobs (apps/schedule)](./apps/schedule/README.md)
   - [Realtime subscription HIL tool (apps/realtime-subscription-hil)](./apps/realtime-subscription-hil/README.md)
 - **Core libs**:
   - [Chan Theory core (libs/chancore)](./libs/chancore/README.md)

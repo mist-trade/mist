@@ -147,15 +147,6 @@
         "tsConfigPath": "libs/decimal/tsconfig.lib.json"
       }
     },
-    "chan": {
-      "type": "application",
-      "root": "apps/chan",
-      "entryFile": "main",
-      "sourceRoot": "apps/chan/src",
-      "compilerOptions": {
-        "tsConfigPath": "apps/chan/tsconfig.app.json"
-      }
-    },
     "notification": {
       "type": "application",
       "root": "apps/notification",
