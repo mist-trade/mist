@@ -73,6 +73,26 @@ export class PreMarketInspectionService {
 
     this.logger.log(`[PreMarketInspection] Starting inspection for ${dateStr}`);
 
+    const safeDimension = async (
+      dimensionName: string,
+      fn: () => Promise<DimensionCheckResult>,
+    ): Promise<DimensionCheckResult> => {
+      try {
+        return await fn();
+      } catch (err) {
+        const errorMsg = toErrorMessage(err);
+        this.logger.error(
+          `[PreMarketInspection] ${dimensionName} check threw unhandled error: ${errorMsg}`,
+        );
+        return {
+          passed: false,
+          summary: `${dimensionName} 检查抛出未捕获异常: ${errorMsg}`,
+          details: [`异常详情: ${errorMsg}`],
+          remediation: ['检查底层数据库或网络服务连接，排查未捕获异常'],
+        };
+      }
+    };
+
     const [
       datasource,
       klines,
@@ -81,12 +101,12 @@ export class PreMarketInspectionService {
       infrastructure,
       pipelineSwitches,
     ] = await Promise.all([
-      this.checkDatasourceControlPlane(),
-      this.checkHistoricalKLines(checkTime),
-      this.checkSubscriptionLifecycle(),
-      this.checkRealtimePipeline(),
-      this.checkInfrastructure(),
-      this.checkPipelineSwitches(),
+      safeDimension('数据源控制面', () => this.checkDatasourceControlPlane()),
+      safeDimension('历史K线', () => this.checkHistoricalKLines(checkTime)),
+      safeDimension('订阅生命周期', () => this.checkSubscriptionLifecycle()),
+      safeDimension('实时行情链路', () => this.checkRealtimePipeline()),
+      safeDimension('基础设施', () => this.checkInfrastructure()),
+      safeDimension('运行时开关', () => this.checkPipelineSwitches()),
     ]);
 
     const overallStatus =

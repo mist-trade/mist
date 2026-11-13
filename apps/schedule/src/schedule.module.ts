@@ -1,9 +1,4 @@
-import {
-  K,
-  Security,
-  RealtimeSubscriptionAssignment,
-  MarketMacroIndicator,
-} from '@app/shared-data';
+import { K, Security, RealtimeSubscriptionAssignment } from '@app/shared-data';
 import { MIST_ENTITIES } from '@app/shared-data';
 import { Module } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
@@ -16,7 +11,6 @@ import { AppController } from './app.controller';
 import { HealthController } from './health/health.controller';
 import { DataCollectionController } from './data-collection.controller';
 import { PreMarketInspectionService } from './pre-market-inspection.service';
-import { MarketBreadthCollectionService } from './market-breadth/market-breadth-collection.service';
 import { TimezoneModule } from '@app/timezone';
 import * as path from 'path';
 
@@ -67,15 +61,10 @@ import * as path from 'path';
     }),
     NestScheduleModule.forRoot(),
     TimezoneModule,
-    TypeOrmModule.forFeature([
-      K,
-      Security,
-      RealtimeSubscriptionAssignment,
-      MarketMacroIndicator,
-    ]),
+    TypeOrmModule.forFeature([K, Security, RealtimeSubscriptionAssignment]),
   ],
   controllers: [AppController, HealthController, DataCollectionController],
-  providers: [PreMarketInspectionService, MarketBreadthCollectionService],
-  exports: [PreMarketInspectionService, MarketBreadthCollectionService],
+  providers: [PreMarketInspectionService],
+  exports: [PreMarketInspectionService],
 })
 export class ScheduleModule {}

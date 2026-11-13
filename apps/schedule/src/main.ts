@@ -5,6 +5,7 @@ import { Logger } from 'nestjs-pino';
 async function bootstrap() {
   const app = await NestFactory.create(ScheduleModule);
   app.useLogger(app.get(Logger));
+  app.enableShutdownHooks();
   await app.listen(process.env.PORT ?? 8003);
 }
 bootstrap();

@@ -629,4 +629,32 @@ describe('PreMarketInspectionService', () => {
       global.fetch = originalFetch;
     }
   });
+
+  it('handles unhandled exception in dimension check gracefully without crashing report delivery', async () => {
+    assignmentRepo.find.mockRejectedValueOnce(
+      new Error('MySQL connection pool timeout'),
+    );
+
+    const originalFetch = global.fetch;
+    global.fetch = jest.fn().mockImplementation(async () => {
+      return Promise.resolve({
+        ok: true,
+        status: 200,
+        json: () => Promise.resolve({ StatusCode: 0 }),
+      }) as unknown as Response;
+    }) as unknown as typeof fetch;
+
+    try {
+      const report = await service.runInspection(
+        new Date('2026-08-25T09:05:00+08:00'),
+      );
+      expect(report.overallStatus).toBe('FAILED');
+      expect(report.dimensions.subscription.passed).toBe(false);
+      expect(report.dimensions.subscription.summary).toContain(
+        'MySQL connection pool timeout',
+      );
+    } finally {
+      global.fetch = originalFetch;
+    }
+  });
 });
