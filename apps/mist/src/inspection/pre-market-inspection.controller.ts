@@ -13,16 +13,14 @@ import {
 } from './pre-market-inspection.service';
 
 /**
- * Data Collection Controller with 09:05 Pre-Market Automated Health Inspection.
+ * Pre-Market Automated Health Inspection Controller.
  *
- * Pre-market health inspection at 09:05 (Monday - Friday on A-share trading days)
- * 6-dimension comprehensive health & readiness probe before 09:15 reset barrier.
- *
- * (Post-close K-line synchronization has been inverted to terminal lifecycle-driven reconciliation).
+ * Runs comprehensive 6-dimension health & readiness probe at 09:05 on A-share trading days,
+ * and pushes inspection report cards directly to Feishu.
  */
-@Controller('schedule')
-export class DataCollectionController {
-  private readonly logger = new Logger(DataCollectionController.name);
+@Controller(['schedule', 'v1/inspection'])
+export class PreMarketInspectionController {
+  private readonly logger = new Logger(PreMarketInspectionController.name);
 
   constructor(
     private readonly timezoneService: TimezoneService,
@@ -30,7 +28,7 @@ export class DataCollectionController {
   ) {}
 
   /**
-   * 盘前主动巡检 HTTP 触发入口（支持运维随时主动巡检并推送到企微）
+   * 盘前主动巡检 HTTP 触发入口（支持运维随时主动巡检并推送到飞书）
    */
   @Post('pre-market-inspection')
   async triggerPreMarketInspection(): Promise<PreMarketInspectionReport> {

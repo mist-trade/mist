@@ -1,6 +1,6 @@
-import { DataCollectionController } from './data-collection.controller';
+import { PreMarketInspectionController } from './pre-market-inspection.controller';
 
-describe('DataCollectionController scheduling', () => {
+describe('PreMarketInspectionController scheduling', () => {
   const createHarness = (
     currentBeijingTime = new Date('2026-08-25T14:30:00Z'),
   ) => {
@@ -19,7 +19,7 @@ describe('DataCollectionController scheduling', () => {
         sentToFeishu: true,
       }),
     };
-    const controller = new DataCollectionController(
+    const controller = new PreMarketInspectionController(
       timezoneService as any,
       preMarketInspectionService as any,
     );

@@ -22,7 +22,6 @@ const REPO_ROOT = path.resolve(__dirname, '../../..');
 
 const ROOT_INCONFIG_FILES = [
   'apps/mist/src/app.module.ts',
-  'apps/schedule/src/schedule.module.ts',
   'apps/chan/src/chan-app.module.ts',
   'apps/signal/src/signal-app.module.ts',
   'apps/backtest/src/backtest-app.module.ts',
