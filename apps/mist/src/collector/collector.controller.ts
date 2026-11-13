@@ -7,6 +7,7 @@ import {
   HttpCode,
   HttpStatus,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiQuery } from '@nestjs/swagger';
 import { CollectDto } from './dto/collect.dto';
@@ -14,6 +15,8 @@ import { PushBarsDto } from './dto/reconciliation.dto';
 import { CollectionStrategyRegistry } from './strategies/collection-strategy.registry';
 import { SecurityService } from '../security/security.service';
 import { TimezoneService } from '@app/timezone';
+import { Period } from '@app/shared-data';
+import { SyncCheckpointManager } from './helpers/sync-checkpoint.manager';
 import {
   ReconciliationCollectorService,
   SyncManifestResponse,
@@ -23,11 +26,14 @@ import {
 @ApiTags('collector v1')
 @Controller('v1/collector')
 export class CollectorController {
+  private readonly logger = new Logger(CollectorController.name);
+
   constructor(
     private readonly securityService: SecurityService,
     private readonly registry: CollectionStrategyRegistry,
     private readonly timezoneService: TimezoneService,
     private readonly reconciliationService: ReconciliationCollectorService,
+    private readonly checkpointManager: SyncCheckpointManager,
   ) {}
 
   @Get('sync-manifest')
@@ -81,6 +87,12 @@ export class CollectorController {
       }
     }
 
+    if (dto.period === Period.ONE_MIN) {
+      this.logger.warn(
+        `Security ${dto.code} requested 1m collection. Per Plan A invariant, 1m historical collection is discouraged to prevent database bloat.`,
+      );
+    }
+
     // 3. Resolve strategy and collect with user-provided dates
     const strategy = this.registry.resolve(dto.source);
     const startDate = this.timezoneService.parseDateString(dto.startDate);
@@ -92,6 +104,23 @@ export class CollectorController {
       startDate,
       endDate,
     );
+
+    // 4. 联动推进检查点水位：若采集了日K (Period.DAY) 且成功入库了数据，推进 SyncCheckpointManager
+    // 消除手动 collect 与后台 sync-manifest 对账自愈体系脱节的隐患，杜绝二次重复拉取
+    if (dto.period === Period.DAY && count > 0) {
+      const verifiedUntil = this.timezoneService.formatTradingDay(endDate);
+      const effectiveSource = (
+        dto.source ||
+        strategy.source ||
+        'qmt'
+      ).toLowerCase();
+      this.checkpointManager.updateCheckpoint(
+        security.id,
+        security.code,
+        effectiveSource,
+        verifiedUntil,
+      );
+    }
 
     return { code: dto.code, period: dto.period, count };
   }
