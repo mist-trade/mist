@@ -2,11 +2,7 @@ import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-const appModulePaths = [
-  'apps/mist/src/app.module.ts',
-  'apps/chan/src/chan-app.module.ts',
-  'apps/schedule/src/schedule.module.ts',
-];
+const appModulePaths = ['apps/mist/src/app.module.ts'];
 
 const typeormConfigPaths = [
   ...appModulePaths,

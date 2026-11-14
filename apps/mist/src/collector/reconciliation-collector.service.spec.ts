@@ -1,5 +1,6 @@
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { DataSource, Security, SecurityStatus } from '@app/shared-data';
+import { toZonedTime } from 'date-fns-tz';
 import { ReconciliationCollectorService } from './reconciliation-collector.service';
 import { KlineVerificationValidator } from './helpers/kline-verification.validator';
 
@@ -52,8 +53,8 @@ describe('ReconciliationCollectorService', () => {
     };
 
     mockTimezoneService = {
-      getCurrentBeijingTime: jest.fn(
-        () => new Date('2026-11-12T16:00:00+08:00'),
+      getCurrentBeijingTime: jest.fn(() =>
+        toZonedTime(new Date('2026-11-12T08:00:00Z'), 'Asia/Shanghai'),
       ),
       isTradingDay: jest.fn(async () => true),
       resolvePreviousTradingDay: jest.fn(

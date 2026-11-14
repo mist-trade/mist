@@ -13,6 +13,7 @@ import { CollectorService } from './collector.service';
 import { CollectionStrategyRegistry } from './strategies/collection-strategy.registry';
 import { EastMoneyCollectionStrategy } from './strategies/east-money-collection.strategy';
 import { ReconciliationCollectorService } from './reconciliation-collector.service';
+import { SyncCheckpointManager } from './helpers/sync-checkpoint.manager';
 
 describe('Collector HTTP error boundary integration', () => {
   let app: INestApplication;
@@ -65,6 +66,13 @@ describe('Collector HTTP error boundary integration', () => {
           useValue: {
             generateManifest: jest.fn(),
             pushBars: jest.fn(),
+          },
+        },
+        {
+          provide: SyncCheckpointManager,
+          useValue: {
+            getCheckpoint: jest.fn(),
+            updateCheckpoint: jest.fn(),
           },
         },
       ],
