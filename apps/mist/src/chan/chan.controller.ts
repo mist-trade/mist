@@ -42,8 +42,8 @@ export class ChanController {
         startDate,
         endDate,
       })
-    ).map((k) => ({
-      id: k.securityId,
+    ).map((k, index) => ({
+      id: index + 1,
       symbol: k.securityCode ?? queryDto.code,
       time: k.timestamp,
       open: k.open,
