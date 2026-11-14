@@ -81,7 +81,10 @@ export const COLLECTION_STRATEGIES_PROVIDER: Provider = {
     QmtSource,
     COLLECTION_STRATEGIES_PROVIDER,
     CollectionStrategyRegistry,
-    SyncCheckpointManager,
+    {
+      provide: SyncCheckpointManager,
+      useFactory: () => new SyncCheckpointManager(),
+    },
     KlineVerificationValidator,
     ReconciliationCollectorService,
   ],

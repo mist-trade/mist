@@ -1,5 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
+import { Test } from '@nestjs/testing';
 import { SyncCheckpointManager } from './sync-checkpoint.manager';
 
 describe('SyncCheckpointManager', () => {
@@ -49,5 +50,15 @@ describe('SyncCheckpointManager', () => {
     expect(manager.getCheckpoint('qmt', '600000')?.verifiedUntil).toBe(
       '2026-11-12',
     );
+  });
+
+  it('resolves cleanly in NestJS DI container without string token error', async () => {
+    const moduleRef = await Test.createTestingModule({
+      providers: [SyncCheckpointManager],
+    }).compile();
+
+    const manager = moduleRef.get<SyncCheckpointManager>(SyncCheckpointManager);
+    expect(manager).toBeDefined();
+    expect(manager).toBeInstanceOf(SyncCheckpointManager);
   });
 });

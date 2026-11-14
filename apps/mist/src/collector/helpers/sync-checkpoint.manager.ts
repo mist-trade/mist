@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -21,7 +21,7 @@ export class SyncCheckpointManager {
   private readonly filePath: string;
   private cache: SyncCheckpointsFile | null = null;
 
-  constructor(filePath?: string) {
+  constructor(@Optional() filePath?: string) {
     this.filePath =
       filePath || path.resolve(process.cwd(), '.data', 'sync-checkpoints.json');
   }
