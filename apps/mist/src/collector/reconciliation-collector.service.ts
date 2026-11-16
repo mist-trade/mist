@@ -103,19 +103,28 @@ export class ReconciliationCollectorService {
     const targetTradingDay = this.timezoneService.formatTradingDay(targetDate);
 
     // 1. 获取池子 B 归属于该 source 的所有活跃订阅标的
+    const dataSourceEnum = source === 'tdx' ? DataSource.TDX : DataSource.QMT;
     const assignments = await this.assignmentRepo.find({
       relations: ['sourceConfig', 'security'],
       where: {
         sourceConfig: {
-          source: source === 'tdx' ? DataSource.TDX : DataSource.QMT,
+          source: dataSourceEnum,
         },
       },
     });
 
-    const securitiesMap = new Map<string, Security>();
+    const securitiesMap = new Map<
+      string,
+      { security: Security; formatCode: string }
+    >();
     for (const a of assignments) {
       if (a.security && a.security.code) {
-        securitiesMap.set(a.security.code, a.security);
+        const formatCode =
+          a.sourceConfig?.formatCode?.trim() || a.security.code;
+        securitiesMap.set(a.security.code, {
+          security: a.security,
+          formatCode,
+        });
       }
     }
 
@@ -126,9 +135,17 @@ export class ReconciliationCollectorService {
       if (!securitiesMap.has(idxCode)) {
         const idxSec = await this.securityRepo.findOne({
           where: { code: idxCode },
+          relations: ['sourceConfigs'],
         });
         if (idxSec) {
-          securitiesMap.set(idxCode, idxSec);
+          const config = idxSec.sourceConfigs?.find(
+            (c) => c.source === dataSourceEnum && c.enabled,
+          );
+          const formatCode = config?.formatCode?.trim() || idxSec.code;
+          securitiesMap.set(idxCode, {
+            security: idxSec,
+            formatCode,
+          });
         }
       }
     }
@@ -145,7 +162,7 @@ export class ReconciliationCollectorService {
 
     // 4. 根据 checkpoint 过滤缺口
     const items: SyncManifestItem[] = [];
-    for (const [code, sec] of securitiesMap.entries()) {
+    for (const [code, entry] of securitiesMap.entries()) {
       const checkpoint = this.checkpointManager.getCheckpoint(source, code);
       if (checkpoint && checkpoint.verifiedUntil >= targetTradingDay) {
         // 已推进到最新，无需补充
@@ -162,8 +179,8 @@ export class ReconciliationCollectorService {
       }
 
       items.push({
-        securityId: sec.id,
-        symbol: code,
+        securityId: entry.security.id,
+        symbol: entry.formatCode,
         code,
         periods,
         startDate,

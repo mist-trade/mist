@@ -134,6 +134,24 @@ describe('ReconciliationCollectorService', () => {
       expect(sec600000?.endDate).toBe('2026-11-12');
     });
 
+    it('prefers formatCode from sourceConfig as symbol when available', async () => {
+      const assignedSec = { id: 10, code: '600519' } as Security;
+      mockAssignmentRepo.find.mockResolvedValue([
+        {
+          security: assignedSec,
+          sourceConfig: { source: DataSource.TDX, formatCode: '600519.SH' },
+        },
+      ]);
+      mockSecurityRepo.findOne.mockResolvedValue(null);
+      mockCheckpointManager.getCheckpoint.mockReturnValue(null);
+
+      const manifest = await service.generateManifest('tdx');
+      const item = manifest.items.find((i) => i.code === '600519');
+      expect(item).toBeDefined();
+      expect(item?.symbol).toBe('600519.SH');
+      expect(item?.code).toBe('600519');
+    });
+
     it('generates manifest for QMT with assigned securities and index bundle (000001, 399006, 000688)', async () => {
       mockAssignmentRepo.find.mockResolvedValue([]);
       mockSecurityRepo.findOne.mockImplementation(async ({ where }: any) => {
