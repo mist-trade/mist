@@ -52,6 +52,7 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=40s --retries=3 \
   CMD curl -f http://localhost:8001/app/hello || exit 1
 
 # Copy and prepare startup script.
+RUN mkdir -p /app/.data && chown -R app:app /app/.data
 COPY --chown=app:app docker-entrypoint.sh ./
 RUN chmod +x docker-entrypoint.sh
 

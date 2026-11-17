@@ -32,8 +32,15 @@ export class SyncCheckpointManager {
     }
 
     try {
-      if (fs.existsSync(this.filePath)) {
-        const raw = fs.readFileSync(this.filePath, 'utf-8');
+      let targetPath = this.filePath;
+      if (!fs.existsSync(targetPath) && !this.filePath.startsWith('/tmp')) {
+        const fallbackPath = path.resolve('/tmp', 'sync-checkpoints.json');
+        if (fs.existsSync(fallbackPath)) {
+          targetPath = fallbackPath;
+        }
+      }
+      if (fs.existsSync(targetPath)) {
+        const raw = fs.readFileSync(targetPath, 'utf-8');
         const parsed = JSON.parse(raw);
         if (
           parsed &&
@@ -60,18 +67,35 @@ export class SyncCheckpointManager {
   private persist(): void {
     if (!this.cache) return;
     try {
-      const dir = path.dirname(this.filePath);
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-      }
-      const tmpPath = `${this.filePath}.tmp.${Date.now()}`;
-      fs.writeFileSync(tmpPath, JSON.stringify(this.cache, null, 2), 'utf-8');
-      fs.renameSync(tmpPath, this.filePath);
+      this.writeToPath(this.filePath);
     } catch (err) {
       this.logger.error(
         `Failed to persist sync checkpoints to ${this.filePath}: ${err}`,
       );
+      if (!this.filePath.startsWith('/tmp')) {
+        try {
+          const fallbackPath = path.resolve('/tmp', 'sync-checkpoints.json');
+          this.writeToPath(fallbackPath);
+          this.logger.log(
+            `Persisted sync checkpoints to fallback path: ${fallbackPath}`,
+          );
+        } catch (fallbackErr) {
+          this.logger.error(
+            `Failed to persist to fallback path: ${fallbackErr}`,
+          );
+        }
+      }
     }
+  }
+
+  private writeToPath(targetPath: string): void {
+    const dir = path.dirname(targetPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    const tmpPath = `${targetPath}.tmp.${Date.now()}`;
+    fs.writeFileSync(tmpPath, JSON.stringify(this.cache, null, 2), 'utf-8');
+    fs.renameSync(tmpPath, targetPath);
   }
 
   public getCheckpoint(

@@ -61,4 +61,19 @@ describe('SyncCheckpointManager', () => {
     expect(manager).toBeDefined();
     expect(manager).toBeInstanceOf(SyncCheckpointManager);
   });
+
+  it('falls back to /tmp if primary path cannot be written', () => {
+    const unwritablePath = '/root/non-existent-subpath/checkpoints.json';
+    const manager = new SyncCheckpointManager(unwritablePath);
+    manager.updateCheckpoint(2, '600519', 'tdx', '2026-11-16');
+
+    expect(manager.getCheckpoint('tdx', '600519')?.verifiedUntil).toBe(
+      '2026-11-16',
+    );
+
+    const fallbackPath = path.resolve('/tmp', 'sync-checkpoints.json');
+    if (fs.existsSync(fallbackPath)) {
+      fs.unlinkSync(fallbackPath);
+    }
+  });
 });
