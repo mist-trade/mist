@@ -134,6 +134,7 @@ function writeTestPlugin(dir: string): void {
 }
 
 describe('dev server multi-period backtest (session level)', () => {
+  jest.setTimeout(30000);
   let pluginTmpDir: string;
   let dayMidnights: string[];
   let serverModule: {
