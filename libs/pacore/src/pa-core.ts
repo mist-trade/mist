@@ -2,6 +2,8 @@ import {
   FairValueGap,
   GapProjection,
   LiquiditySweep,
+  NecklineOptions,
+  NecklineProjection,
   PaAnalysisOptions,
   PaGeometryResult,
   PaK,
@@ -13,6 +15,7 @@ import { assertPaKSeries } from './internal/assert-pa-k-series';
 import { FairValueGapDetector } from './internal/fair-value-gap';
 import { GapProjectionEngine } from './internal/gap-projections';
 import { LiquiditySweepDetector } from './internal/liquidity-sweep';
+import { NecklineProjectionEngine } from './internal/neckline-projections';
 import { PinBarDetector } from './internal/pin-bar';
 import { WickGapDetector } from './internal/wick-gap';
 
@@ -92,6 +95,17 @@ export class PaCore {
   }
 
   /**
+   * 检测形态颈线映射与空间度量投射 (Neckline Projections)
+   */
+  public static findNecklines(
+    klines: readonly PaK[],
+    options?: NecklineOptions,
+  ): readonly NecklineProjection[] {
+    assertPaKSeries(klines);
+    return NecklineProjectionEngine.findProjections(klines, options);
+  }
+
+  /**
    * 执行全量微观价格行为纯几何特征提取
    */
   public static executeFullAnalysis(
@@ -113,12 +127,28 @@ export class PaCore {
       GapProjectionEngine.project(fvg),
     );
 
+    const necklines = NecklineProjectionEngine.findProjections(
+      klines,
+      options?.necklineOptions,
+    );
+
     return {
       fvgs,
       wickGaps,
       pinBars,
       sweeps: [],
       projections,
+      necklines,
     };
+  }
+
+  /**
+   * 语义别名支持: analyze
+   */
+  public static analyze(
+    klines: readonly PaK[],
+    options?: PaAnalysisOptions,
+  ): PaGeometryResult {
+    return this.executeFullAnalysis(klines, options);
   }
 }

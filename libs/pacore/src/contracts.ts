@@ -101,12 +101,89 @@ export interface GapProjection {
   };
 }
 
+export enum NecklinePatternType {
+  DoubleBottom = 'double_bottom', // 双底 (W底, 看涨反转)
+  DoubleTop = 'double_top', // 双顶 (M头, 看跌反转)
+  HeadAndShouldersBottom = 'head_and_shoulders_bottom', // 倒头肩 / 头肩底 (看涨反转)
+  HeadAndShouldersTop = 'head_and_shoulders_top', // 头肩顶 (看跌反转)
+}
+
+export enum NecklineStatus {
+  Forming = 'forming', // 构筑中 (摆动极值已成型，未收盘突破)
+  Breakout = 'breakout', // 确认突破 (收盘价坚决突破颈线)
+  PullbackRetested = 'pullback_retested', // 回抽颈线支阻互换带确认
+  TargetReached = 'target_reached', // 达成 1:1 对称目标或 1.618 扩展目标
+  Invalidated = 'invalidated', // 跌破极值点或假突破深幅破坏失效
+}
+
+/** 局部客观摆动极值点 (Swing Pivot) */
+export interface PaPivotPoint {
+  readonly index: number;
+  readonly time: Date;
+  readonly price: number;
+  readonly type: 'high' | 'low';
+}
+
+/** 颈线突破确立事实 */
+export interface NecklineBreakoutInfo {
+  readonly breakoutIndex: number;
+  readonly breakoutTime: Date;
+  readonly breakoutPrice: number;
+}
+
+/** 空间投射目标矩阵 (基于形态垂直高差 H) */
+export interface NecklineProjectionTargets {
+  readonly baseHeight: number; // 垂直高度 H = |necklinePrice - extremumPrice|
+  readonly necklinePrice: number; // 颈线突破基准价
+  readonly target1_0: number; // 1:1 对称度量目标位 (Measured Move: Neckline ± 1.0 * H)
+  readonly target1_618: number; // 1.618 黄金分割扩展位 (Neckline ± 1.618 * H)
+  readonly target2_0: number; // 2.0 双倍空间目标位 (Neckline ± 2.0 * H)
+}
+
+/** 回抽支阻互换敏感带 (Support/Resistance Flip Zone) */
+export interface NecklineRetestZone {
+  readonly top: number;
+  readonly bottom: number;
+  readonly isRetested: boolean;
+  readonly retestIndex?: number;
+  readonly retestTime?: Date;
+  readonly retestExtreme?: number;
+}
+
+/** 颈线映射核心领域实体 */
+export interface NecklineProjection {
+  readonly id: string;
+  readonly patternType: NecklinePatternType;
+  readonly status: NecklineStatus;
+  readonly direction: 'up' | 'down';
+  readonly pivots: readonly PaPivotPoint[];
+  readonly startTime: Date;
+  readonly startIndex: number;
+  readonly endTime: Date;
+  readonly endIndex: number;
+  readonly necklinePrice: number;
+  readonly extremumPrice: number;
+  readonly targets: NecklineProjectionTargets;
+  readonly retestZone: NecklineRetestZone;
+  readonly breakout?: NecklineBreakoutInfo;
+}
+
+/** 颈线检测门槛配置 */
+export interface NecklineOptions {
+  readonly swingWindow?: number; // Swing Pivot 局域窗口半径 (默认 3，即 7 棒局域)
+  readonly maxTroughDifferenceRatio?: number; // 双底/双顶两端点容差比 (默认 0.03 即 3%)
+  readonly minPatternHeightRatio?: number; // 形态最小高度占均价比例 (默认 0.015)
+  readonly maxBarSpan?: number; // 形态最大横跨 Bar 数 (默认 120)
+  readonly minBarSpan?: number; // 形态最小横跨 Bar 数 (默认 8)
+}
+
 export interface PaGeometryResult {
   readonly fvgs: readonly FairValueGap[];
   readonly wickGaps: readonly WickGap[];
   readonly pinBars: readonly PinBar[];
   readonly sweeps: readonly LiquiditySweep[];
   readonly projections: readonly GapProjection[];
+  readonly necklines: readonly NecklineProjection[];
 }
 
 export interface PaAnalysisOptions {
@@ -114,4 +191,5 @@ export interface PaAnalysisOptions {
   readonly minPinWickRatio?: number; // 默认 0.50
   readonly maxPinBodyRatio?: number; // 默认 0.33
   readonly atrThreshold?: number;
+  readonly necklineOptions?: NecklineOptions;
 }

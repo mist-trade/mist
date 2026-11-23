@@ -3,6 +3,8 @@ import * as path from 'node:path';
 import {
   FvgMitigationStatus,
   FvgType,
+  NecklinePatternType,
+  NecklineStatus,
   PaCore,
   PaK,
   PinBarDirection,
@@ -140,6 +142,75 @@ function inspectPeriod(
     );
     console.log(
       `  - +2.0 SD 机构目标箱体: ${proj.sdTargets.sd2_0.toFixed(2)} 点`,
+    );
+  }
+
+  // 4. 颈线形态与空间映射 (Neckline Projections)
+  const necklines = PaCore.findNecklines(bars);
+  const doubleBottoms = necklines.filter(
+    (n) => n.patternType === NecklinePatternType.DoubleBottom,
+  );
+  const doubleTops = necklines.filter(
+    (n) => n.patternType === NecklinePatternType.DoubleTop,
+  );
+  const invHeadShoulders = necklines.filter(
+    (n) => n.patternType === NecklinePatternType.HeadAndShouldersBottom,
+  );
+  const headShoulders = necklines.filter(
+    (n) => n.patternType === NecklinePatternType.HeadAndShouldersTop,
+  );
+
+  const breakouts = necklines.filter(
+    (n) =>
+      n.status === NecklineStatus.Breakout ||
+      n.status === NecklineStatus.PullbackRetested ||
+      n.status === NecklineStatus.TargetReached,
+  );
+  const formingCount = necklines.filter(
+    (n) => n.status === NecklineStatus.Forming,
+  ).length;
+  const targetReachedCount = necklines.filter(
+    (n) => n.status === NecklineStatus.TargetReached,
+  ).length;
+  const retestedCount = necklines.filter(
+    (n) => n.status === NecklineStatus.PullbackRetested,
+  ).length;
+  const invalidatedCountN = necklines.filter(
+    (n) => n.status === NecklineStatus.Invalidated,
+  ).length;
+
+  console.log(`\n--- 4. 颈线形态与空间映射统计 (Neckline Projections) ---`);
+  console.log(`• 检出形态总数: ${necklines.length} 组`);
+  console.log(
+    `  - 双底(W底): ${doubleBottoms.length} | 双顶(M头): ${doubleTops.length}`,
+  );
+  console.log(
+    `  - 倒头肩底: ${invHeadShoulders.length} | 头肩顶: ${headShoulders.length}`,
+  );
+  console.log(`• 突破与状态推进:`);
+  console.log(
+    `  - 有效收盘突破确立 (Breakout): ${breakouts.length} (${necklines.length > 0 ? ((breakouts.length / necklines.length) * 100).toFixed(1) : '0'}%)`,
+  );
+  console.log(
+    `  - 构筑中/仅影线假刺破 (Forming): ${formingCount} (${necklines.length > 0 ? ((formingCount / necklines.length) * 100).toFixed(1) : '0'}%)`,
+  );
+  console.log(`  - 回抽支阻互换测试确认 (PullbackRetested): ${retestedCount}`);
+  console.log(
+    `  - 1:1 对称测距目标达成 (TargetReached): ${targetReachedCount} (${breakouts.length > 0 ? ((targetReachedCount / breakouts.length) * 100).toFixed(1) : '0'}%)`,
+  );
+  console.log(`  - 假突破反向贯穿失效 (Invalidated): ${invalidatedCountN}`);
+
+  if (breakouts.length > 0) {
+    const recent = breakouts[breakouts.length - 1];
+    console.log(`\n• 最新突破形态样本 [ID: ${recent.id}]:`);
+    console.log(
+      `  - 类型: ${recent.patternType} | 方向: ${recent.direction === 'up' ? '看涨' : '看跌'} | 状态: ${recent.status}`,
+    );
+    console.log(
+      `  - 颈线基准价: ${recent.necklinePrice.toFixed(2)} | 形态高差 H: ${recent.targets.baseHeight.toFixed(2)} 点`,
+    );
+    console.log(
+      `  - 1:1 目标位: ${recent.targets.target1_0.toFixed(2)} | 1.618 黄金扩展位: ${recent.targets.target1_618.toFixed(2)}`,
     );
   }
 }

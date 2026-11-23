@@ -86,6 +86,95 @@ describe('PaVisualAdapter (纯价格行为图元适配器)', () => {
     }
   });
 
+  it('正确将双底形态转换为颈线、骨架、测距标尺与目标位图元', () => {
+    const klines: PaK[] = [
+      createBar(1, 105, 106, 99, 100),
+      createBar(2, 100, 101, 94, 95),
+      createBar(3, 95, 96, 90, 91), // 底1: Low=90
+      createBar(4, 91, 95, 91, 94),
+      createBar(5, 94, 98, 93, 97),
+      createBar(6, 97, 100, 96, 99.5), // 峰值: High=100
+      createBar(7, 99.5, 100, 94, 95),
+      createBar(8, 95, 96, 91, 92),
+      createBar(9, 92, 94, 91, 93.5), // 底2: Low=91
+      createBar(10, 93.5, 97, 93, 96.5),
+      createBar(11, 96.5, 99.8, 96, 99.2),
+      createBar(12, 99.2, 102.5, 98.5, 101.8), // 突破: Close=101.8 > 100
+      createBar(13, 101.8, 111, 101, 110.5), // 达标 1:1 (110)
+    ];
+
+    const commands = PaVisualAdapter.convert(klines, {
+      includeFvg: false,
+      includePinBars: false,
+    });
+
+    // 1. 颈线基准实线 (pa_neckline)
+    const neckLine = commands.find(
+      (c) => c.layer === 'pa_neckline' && c.id.includes('neckline'),
+    );
+    expect(neckLine).toBeDefined();
+    expect(neckLine?.type).toBe('line');
+    if (neckLine && neckLine.type === 'line') {
+      expect(neckLine.startPrice).toBe(100);
+      expect(neckLine.style).toBe('solid');
+      expect(neckLine.color).toBe('#06b6d4'); // 看涨青色
+    }
+
+    // 2. 1:1 对称目标线 (pa_neckline, style dashed, target=110)
+    const target1Line = commands.find(
+      (c) => c.layer === 'pa_neckline' && c.id.includes('t1_0'),
+    );
+    expect(target1Line).toBeDefined();
+    if (target1Line && target1Line.type === 'line') {
+      expect(target1Line.startPrice).toBe(110);
+      expect(target1Line.style).toBe('dashed');
+    }
+
+    // 3. 目标价格文本标签 (pa_neckline)
+    const labelCmd = commands.find(
+      (c) => c.layer === 'pa_neckline' && c.type === 'text',
+    );
+    expect(labelCmd).toBeDefined();
+    if (labelCmd && labelCmd.type === 'text') {
+      expect(labelCmd.text).toContain('1:1目标 110.00');
+    }
+
+    // 4. 回抽敏感带 (band)
+    const retestBand = commands.find(
+      (c) => c.layer === 'pa_neckline' && c.type === 'band',
+    );
+    expect(retestBand).toBeDefined();
+    if (retestBand && retestBand.type === 'band') {
+      expect(retestBand.top).toBeGreaterThan(100);
+      expect(retestBand.bottom).toBeLessThan(100);
+      expect(retestBand.fill).toBe(true);
+    }
+  });
+
+  it('图层过滤测试: 当 includeNecklines=false 时不产生任何 pa_neckline 指令', () => {
+    const klines: PaK[] = [
+      createBar(1, 105, 106, 99, 100),
+      createBar(2, 100, 101, 94, 95),
+      createBar(3, 95, 96, 90, 91),
+      createBar(4, 91, 95, 91, 94),
+      createBar(5, 94, 98, 93, 97),
+      createBar(6, 97, 100, 96, 99.5),
+      createBar(7, 99.5, 100, 94, 95),
+      createBar(8, 95, 96, 91, 92),
+      createBar(9, 92, 94, 91, 93.5),
+      createBar(10, 93.5, 97, 93, 96.5),
+      createBar(11, 96.5, 99.8, 96, 99.2),
+      createBar(12, 99.2, 102.5, 98.5, 101.8),
+    ];
+
+    const commands = PaVisualAdapter.convert(klines, {
+      includeNecklines: false,
+    });
+
+    const necklineCmds = commands.filter((c) => c.layer === 'pa_neckline');
+    expect(necklineCmds).toHaveLength(0);
+  });
+
   it('处理空序列返回空指令集', () => {
     expect(PaVisualAdapter.convert([])).toEqual([]);
   });

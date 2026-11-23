@@ -82,12 +82,14 @@ export class VisualCommandService {
       allCommands.push(...fibCmds);
     }
 
-    // 3. Price Action Layer (FVG, 50% CE, Pin Bar, Projections)
+    // 3. Price Action Layer (FVG, 50% CE, Pin Bar, Projections, Necklines)
+    const hasPaNeckline = layerSet.has('pa_neckline');
     if (
       layerSet.has('pa') ||
       layerSet.has('pa_fvg') ||
       layerSet.has('pa_pin') ||
-      layerSet.has('pa_projection')
+      layerSet.has('pa_projection') ||
+      hasPaNeckline
     ) {
       const paCmds = PaVisualAdapter.convert(klines as any, {
         ...paOptions,
@@ -97,6 +99,7 @@ export class VisualCommandService {
         includeProjections: !layerSet.has('pa')
           ? layerSet.has('pa_projection')
           : true,
+        includeNecklines: !layerSet.has('pa') ? hasPaNeckline : true,
       });
       allCommands.push(...paCmds);
     }
