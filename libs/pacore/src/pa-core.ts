@@ -1,0 +1,124 @@
+import {
+  FairValueGap,
+  GapProjection,
+  LiquiditySweep,
+  PaAnalysisOptions,
+  PaGeometryResult,
+  PaK,
+  PinBar,
+  SweepType,
+  WickGap,
+} from './contracts';
+import { assertPaKSeries } from './internal/assert-pa-k-series';
+import { FairValueGapDetector } from './internal/fair-value-gap';
+import { GapProjectionEngine } from './internal/gap-projections';
+import { LiquiditySweepDetector } from './internal/liquidity-sweep';
+import { PinBarDetector } from './internal/pin-bar';
+import { WickGapDetector } from './internal/wick-gap';
+
+/**
+ * PaCore - 西方微观价格行为 (Price Action) 纯数学/纯几何统一门面
+ *
+ * 继承 Chancore 纯边界原则：零 I/O、无环境依赖、无任何买卖撮合或交易状态机。
+ */
+export class PaCore {
+  /**
+   * 校验输入 K 线序列完整性与单调性
+   */
+  public static assertSeries(klines: readonly PaK[]): void {
+    assertPaKSeries(klines);
+  }
+
+  /**
+   * 检测三棒价格失衡缺口 (Fair Value Gap)
+   */
+  public static findFairValueGaps(
+    klines: readonly PaK[],
+    options?: { readonly minFvgSize?: number },
+  ): FairValueGap[] {
+    assertPaKSeries(klines);
+    return FairValueGapDetector.detect(klines, options);
+  }
+
+  /**
+   * 检测单根 K 线的影线流动性真空区 (Wick-as-Gap)
+   */
+  public static findWickGaps(
+    klines: readonly PaK[],
+    options?: {
+      readonly minWickSize?: number;
+      readonly wickToBodyMultiple?: number;
+    },
+  ): WickGap[] {
+    assertPaKSeries(klines);
+    return WickGapDetector.detect(klines, options);
+  }
+
+  /**
+   * 检测 Pin Bar (长影针)
+   */
+  public static findPinBars(
+    klines: readonly PaK[],
+    options?: {
+      readonly minWickRatio?: number;
+      readonly maxBodyRatio?: number;
+      readonly minRange?: number;
+    },
+  ): PinBar[] {
+    assertPaKSeries(klines);
+    return PinBarDetector.detect(klines, options);
+  }
+
+  /**
+   * 检测当期 Bar 是否对参考关键位形成扫损收回 (Sweep & Reclaim)
+   */
+  public static checkLiquiditySweep(
+    bar: PaK,
+    barIndex: number,
+    levelPrice: number,
+    type: SweepType,
+  ): LiquiditySweep | null {
+    return LiquiditySweepDetector.detectSweep(bar, barIndex, levelPrice, type);
+  }
+
+  /**
+   * 计算失衡缺口的空间对称度量与标准差扩展投射
+   */
+  public static calculateProjection(
+    fvg: FairValueGap,
+    originPrice?: number,
+  ): GapProjection {
+    return GapProjectionEngine.project(fvg, originPrice);
+  }
+
+  /**
+   * 执行全量微观价格行为纯几何特征提取
+   */
+  public static executeFullAnalysis(
+    klines: readonly PaK[],
+    options?: PaAnalysisOptions,
+  ): PaGeometryResult {
+    assertPaKSeries(klines);
+
+    const fvgs = FairValueGapDetector.detect(klines, {
+      minFvgSize: options?.minFvgSize,
+    });
+    const wickGaps = WickGapDetector.detect(klines);
+    const pinBars = PinBarDetector.detect(klines, {
+      minWickRatio: options?.minPinWickRatio,
+      maxBodyRatio: options?.maxPinBodyRatio,
+    });
+
+    const projections: GapProjection[] = fvgs.map((fvg) =>
+      GapProjectionEngine.project(fvg),
+    );
+
+    return {
+      fvgs,
+      wickGaps,
+      pinBars,
+      sweeps: [],
+      projections,
+    };
+  }
+}

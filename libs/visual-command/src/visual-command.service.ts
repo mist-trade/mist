@@ -8,6 +8,10 @@ import {
   FibonacciVisualAdapter,
   type FibonacciVisualOptions,
 } from './adapters/fibonacci-visual.adapter';
+import {
+  PaVisualAdapter,
+  type PaVisualOptions,
+} from './adapters/pa-visual.adapter';
 import type {
   VisualCommand,
   VisualCommandPayload,
@@ -21,6 +25,7 @@ export interface GenerateVisualCommandsInput {
   readonly layers?: readonly string[];
   readonly chanOptions?: ChanVisualOptions;
   readonly fibOptions?: FibonacciVisualOptions;
+  readonly paOptions?: PaVisualOptions;
 }
 
 @Injectable()
@@ -37,6 +42,7 @@ export class VisualCommandService {
       layers = ['chan'],
       chanOptions,
       fibOptions,
+      paOptions,
     } = input;
 
     const layerSet = new Set(layers.map((l) => l.toLowerCase()));
@@ -74,6 +80,25 @@ export class VisualCommandService {
     if (layerSet.has('fibonacci')) {
       const fibCmds = FibonacciVisualAdapter.convert(klines, fibOptions);
       allCommands.push(...fibCmds);
+    }
+
+    // 3. Price Action Layer (FVG, 50% CE, Pin Bar, Projections)
+    if (
+      layerSet.has('pa') ||
+      layerSet.has('pa_fvg') ||
+      layerSet.has('pa_pin') ||
+      layerSet.has('pa_projection')
+    ) {
+      const paCmds = PaVisualAdapter.convert(klines as any, {
+        ...paOptions,
+        includeFvg: !layerSet.has('pa') ? layerSet.has('pa_fvg') : true,
+        includeCeLines: !layerSet.has('pa') ? layerSet.has('pa_fvg') : true,
+        includePinBars: !layerSet.has('pa') ? layerSet.has('pa_pin') : true,
+        includeProjections: !layerSet.has('pa')
+          ? layerSet.has('pa_projection')
+          : true,
+      });
+      allCommands.push(...paCmds);
     }
 
     return {

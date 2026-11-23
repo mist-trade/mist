@@ -544,6 +544,7 @@ export class StrategyEvaluationKernel {
         badgeText,
         reason: decision.reason,
         trace: decision.trace,
+        ...(decision.evidence ? { evidence: decision.evidence } : {}),
       },
       contextSnapshot: {
         action: decision.action,

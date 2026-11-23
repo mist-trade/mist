@@ -5,7 +5,8 @@ export type FactorCategory =
   | 'EVENT'
   | 'TECHNICAL'
   | 'CHAN'
-  | 'AI_SENTIMENT';
+  | 'AI_SENTIMENT'
+  | 'EXIT';
 
 export type FactorAction = 'BUY' | 'SELL' | 'NEUTRAL';
 

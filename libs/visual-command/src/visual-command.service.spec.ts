@@ -139,4 +139,25 @@ describe('VisualCommandService', () => {
 
     expect(result.commands).toEqual([]);
   });
+
+  it('generates PA commands when pa layer is requested', () => {
+    const klines = generateSampleKlines(60);
+    const result = service.generateCommands({
+      code: '000001',
+      period: 5,
+      source: 'tdx',
+      klines,
+      layers: ['pa'],
+    });
+
+    expect(result.commands.length).toBeGreaterThan(0);
+    expect(
+      result.commands.some(
+        (c) =>
+          c.layer === 'pa_fvg' ||
+          c.layer === 'pa_pin' ||
+          c.layer === 'pa_fvg_ce',
+      ),
+    ).toBe(true);
+  });
 });

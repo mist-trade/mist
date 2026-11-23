@@ -70,7 +70,7 @@ import {
   PRIVATE_DATA_DIR,
   REVERSE_PERIOD_MAP,
 } from './provider';
-import { loadLegacyPresetFlow } from './preset-loader';
+import { loadLegacyPresetFlow, loadLegacyPresetMetas } from './preset-loader';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
 import type {
   StrategyBar,
@@ -356,7 +356,18 @@ interface DevBacktestRun {
   startedAt?: string;
   completedAt?: string;
   createdAt: string;
+  performance?: Record<string, any>;
+  trades?: any[];
+  stressReport?: any;
 }
+
+interface PersistedRunMeta {
+  run: DevBacktestRun;
+  signalsFile?: string;
+  trades?: any[];
+}
+
+const persistedRunMap = new Map<number, PersistedRunMeta>();
 
 const mockRuns: DevBacktestRun[] = [
   {
@@ -411,6 +422,116 @@ const mockRuns: DevBacktestRun[] = [
     createdAt: '2026-09-25T04:45:00.000Z',
   },
 ];
+
+function initPersistedBacktestRuns(): void {
+  const resultsBase = path.join(PRIVATE_DATA_DIR, 'backtest-results');
+  if (!fs.existsSync(resultsBase)) return;
+
+  const subdirs = fs
+    .readdirSync(resultsBase, { withFileTypes: true })
+    .filter((d) => d.isDirectory() && !d.name.startsWith('.'))
+    .map((d) => path.join(resultsBase, d.name));
+
+  let runIdCounter = 101;
+  const persistedList: DevBacktestRun[] = [];
+  for (const dir of subdirs) {
+    const manifestPath = path.join(dir, '_manifest.json');
+    if (!fs.existsSync(manifestPath)) continue;
+    try {
+      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
+      const windowStr = manifest.window || '';
+      const [startRaw, endRaw] = windowStr
+        .split('~')
+        .map((s: string) => s.trim());
+      const startDate = startRaw
+        ? new Date(startRaw.replace('+08', '+08:00')).toISOString()
+        : '2005-01-04T00:00:00.000Z';
+      const endDate = endRaw
+        ? new Date(endRaw.replace('+08', '+08:00')).toISOString()
+        : '2026-10-26T23:59:00.000Z';
+      const period = manifest.evaluationPeriod || 30;
+
+      for (const item of manifest.runs || []) {
+        const runId = runIdCounter++;
+        const signalsFilePath = path.join(
+          dir,
+          'signals',
+          `${item.run}_signals.json`,
+        );
+        const runDetailPath = path.join(dir, `${item.run}.json`);
+
+        let detailData: any = null;
+        if (fs.existsSync(runDetailPath)) {
+          try {
+            const rawDetail = JSON.parse(
+              fs.readFileSync(runDetailPath, 'utf8'),
+            );
+            detailData = rawDetail.data;
+          } catch {}
+        }
+
+        const devRun: DevBacktestRun = {
+          id: runId,
+          strategyDefinitionId:
+            item.request?.strategyDefinitionId ||
+            (item.run.includes('def23')
+              ? 23
+              : item.run.includes('def3')
+                ? 3
+                : item.run.includes('squeeze')
+                  ? 5
+                  : item.run.includes('vpci')
+                    ? 6
+                    : 2),
+          strategyName: item.label || item.run,
+          strategyVersionId: 1,
+          status: 'completed',
+          source: 'qmt',
+          targetUniverse: ['000001'],
+          period: detailData?.period || period,
+          startDate,
+          endDate,
+          signalCount: item.signalCount ?? detailData?.signalCount ?? 0,
+          matchedSecurityCount: 1,
+          startedAt: detailData?.acceptedAt || '2026-10-28T10:00:00.000Z',
+          completedAt: detailData?.acceptedAt || '2026-10-28T10:02:00.000Z',
+          createdAt: detailData?.acceptedAt || '2026-10-28T10:00:00.000Z',
+          performance: detailData?.performance || {
+            sharpeRatio: item.sharpe ?? 0,
+            maxDrawdown: item.maxDrawdown ?? 0,
+            totalReturnRatio: item.totalReturn ?? 0,
+            annualizedReturnRatio: item.totalReturn
+              ? Math.round((item.totalReturn / 20) * 10000) / 10000
+              : 0,
+            winRate: detailData?.performance?.winRate ?? 0,
+            profitFactor: detailData?.performance?.profitFactor ?? 0,
+            totalTrades: detailData?.trades?.length || 0,
+          },
+          trades: detailData?.trades || [],
+        };
+
+        persistedList.push(devRun);
+        persistedRunMap.set(runId, {
+          run: devRun,
+          signalsFile: fs.existsSync(signalsFilePath)
+            ? signalsFilePath
+            : undefined,
+          trades: detailData?.trades || [],
+        });
+      }
+    } catch (err: any) {
+      console.warn(
+        `[initPersistedBacktestRuns] 解析 ${dir} 失败:`,
+        err.message,
+      );
+    }
+  }
+
+  // 将真实已有落盘信号的回测任务置顶，使前端秒级加载且买卖点直显
+  mockRuns.unshift(...persistedList);
+}
+
+initPersistedBacktestRuns();
 
 // 活跃仿真推流会话池
 const activeSessions = new Map<string, StrategySimulationSession>();
@@ -622,11 +743,10 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   ensureStandardPluginsRegistered(registry);
   ExternalFactorPluginLoader.registerExternalPlugins(registry);
 
-  // 2. 决策流解析：存量定义本地重放优先（与生产同一编译路径）→ 硬编码预设树
-  //    （内置预设仅 1/2/3；其余 definitionId 必须先导出本地定义，fail-closed）
+  // 2. 决策流解析：存量定义本地重放优先（与生产同一编译路径）→ 预设决策流树
   const isLegacyPresetId =
     typeof options.strategyDefinitionId === 'number' &&
-    [1, 2, 3].includes(options.strategyDefinitionId);
+    loadLegacyPresetFlow(options.strategyDefinitionId) !== null;
   const storedDefinition =
     typeof options.strategyDefinitionId === 'number' && !isLegacyPresetId
       ? loadLocalStoredDefinition(options.strategyDefinitionId)
@@ -653,7 +773,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     throw new DevBacktestRequestError(
       422,
       'DEFINITION_NOT_FOUND',
-      `本地未找到存量定义 ${options.strategyDefinitionId} 的导出文件（内置预设仅支持 1/2/3）` +
+      `本地未找到定义 ${options.strategyDefinitionId} 的预设或导出文件` +
         ` — 请先执行: pnpm dev:sync --definition ${options.strategyDefinitionId}`,
     );
   } else {
@@ -1142,6 +1262,9 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  // 统一绘图指令流内存缓存 (防大时序重复同步阻塞计算)
+  const visualCommandsCache = new Map<string, any>();
+
   // 3. 统一绘图指令流: GET /v1/visual/commands (纯几何，严格遵守架构红线)
   if (pathname.endsWith('/v1/visual/commands') && req.method === 'GET') {
     const code = resolveSecurityCode(
@@ -1153,6 +1276,13 @@ const server = http.createServer(async (req, res) => {
     const filterFenxingContainment =
       parsedUrl.query.filterFenxingContainment === 'true' ||
       parsedUrl.query.filterFenxingContainment === '1';
+
+    const cacheKey = `${code}:${period}:${filterFenxingContainment}:${parsedUrl.query.includeBsp || ''}:${parsedUrl.query.startDate || ''}:${parsedUrl.query.endDate || ''}`;
+    const cached = visualCommandsCache.get(cacheKey);
+    if (cached) {
+      sendJson(res, cached);
+      return;
+    }
 
     try {
       const fullKlines = loadCanonicalKlines({ code, period });
@@ -1182,13 +1312,15 @@ const server = http.createServer(async (req, res) => {
         filterFenxingContainment,
       });
 
-      sendJson(res, {
+      const resultPayload = {
         code,
         period,
         source,
         totalKlines: targetKlines.length,
         commands,
-      });
+      };
+      visualCommandsCache.set(cacheKey, resultPayload);
+      sendJson(res, resultPayload);
     } catch (err: any) {
       console.error(`[/v1/visual/commands] 错误:`, err.message);
       sendJson(res, {
@@ -1576,8 +1708,19 @@ const server = http.createServer(async (req, res) => {
 
   // 5. 策略列表: GET /v1/strategies
   if (pathname.endsWith('/v1/strategies') && req.method === 'GET') {
-    sendJson(res, [
-      {
+    const presetMetas = loadLegacyPresetMetas();
+    const strategies = presetMetas.map((p) => ({
+      id: p.id,
+      name: p.name,
+      description: p.description,
+      kind: p.kind,
+      status: p.status,
+      activeVersionNumber: 1,
+      periods: p.periods,
+      sources: ['qmt', 'tdx'],
+    }));
+    if (!strategies.some((s) => s.id === 1)) {
+      strategies.unshift({
         id: 1,
         name: '纯原典缠论买卖点策略树',
         description:
@@ -1587,30 +1730,9 @@ const server = http.createServer(async (req, res) => {
         activeVersionNumber: 1,
         periods: [1, 5, 15, 30, 60, 1440],
         sources: ['qmt', 'tdx'],
-      },
-      {
-        id: 2,
-        name: '上证大盘宏观+纯缠论+牛熊左右侧战术联动策略树',
-        description:
-          '双频宏观状态机判定大周期牛熊，牛市顺势执行缠论形态主门禁与微观左右侧止盈战术，熊市执行双中枢背驰极限抄底与破位逃命清仓防守',
-        kind: 'decision_flow',
-        status: 'active',
-        activeVersionNumber: 1,
-        periods: [1, 5, 15, 30, 60, 1440],
-        sources: ['qmt', 'tdx'],
-      },
-      {
-        id: 3,
-        name: '上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强策略树',
-        description:
-          '在策略2基础上叠加私有战术增强：牛市缠论买点融合VPCI量价共振增强与通道挤压放量爆发买点，熊市极限背驰抄底与防守清仓',
-        kind: 'decision_flow',
-        status: 'active',
-        activeVersionNumber: 1,
-        periods: [1, 5, 15, 30, 60, 1440],
-        sources: ['qmt', 'tdx'],
-      },
-    ]);
+      });
+    }
+    sendJson(res, strategies);
     return;
   }
 
@@ -1621,48 +1743,29 @@ const server = http.createServer(async (req, res) => {
   ) {
     const idMatch = pathname.match(/\/v1\/strategies\/(\d+)\/versions$/);
     const stratId = idMatch && idMatch[1] ? Number(idMatch[1]) : 1;
-    if (stratId === 3) {
-      sendJson(res, [
-        {
-          id: 3,
-          strategyDefinitionId: 3,
-          versionNumber: 1,
-          signalKind: 'both',
-          status: 'active',
-          description:
-            '上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强决策流 (动态牛熊分流+量价突破增强)',
-          config: { mode: 'full_resonance' },
-          createdAt: new Date('2026-10-19').toISOString(),
-        },
-      ]);
-    } else if (stratId === 2) {
-      sendJson(res, [
-        {
-          id: 2,
-          strategyDefinitionId: 2,
-          versionNumber: 1,
-          signalKind: 'both',
-          status: 'active',
-          description:
-            '上证大盘宏观+纯缠论+牛熊左右侧战术联动决策流 (动态牛熊分流)',
-          config: { mode: 'composite' },
-          createdAt: new Date('2026-10-19').toISOString(),
-        },
-      ]);
-    } else {
-      sendJson(res, [
-        {
-          id: 1,
-          strategyDefinitionId: 1,
-          versionNumber: 1,
-          signalKind: 'both',
-          status: 'active',
-          description: '纯原典缠论标准形态买卖点决策流 (无止损止盈)',
-          config: {},
-          createdAt: new Date('2026-09-01').toISOString(),
-        },
-      ]);
-    }
+    const presetMetas = loadLegacyPresetMetas();
+    const matchedPreset = presetMetas.find((p) => p.id === stratId);
+
+    const description =
+      matchedPreset?.description ||
+      (stratId === 3
+        ? '上证宏观+缠论+牛熊战术+量价共振与挤压突破全增强决策流 (动态牛熊分流+量价突破增强)'
+        : stratId === 2
+          ? '上证大盘宏观+纯缠论+牛熊左右侧战术联动决策流 (动态牛熊分流)'
+          : '纯原典缠论标准形态买卖点决策流 (无止损止盈)');
+
+    sendJson(res, [
+      {
+        id: stratId,
+        strategyDefinitionId: stratId,
+        versionNumber: 1,
+        signalKind: 'both',
+        status: 'active',
+        description,
+        config: { definitionId: stratId },
+        createdAt: new Date('2026-10-19').toISOString(),
+      },
+    ]);
     return;
   }
 
@@ -1765,8 +1868,12 @@ const server = http.createServer(async (req, res) => {
       const payoffRatio =
         avgLoss > 0 ? Math.round((avgWin / avgLoss) * 10000) / 10000 : 0;
 
+      const matchedPreset = loadLegacyPresetMetas().find(
+        (p) => p.id === strategyDefinitionId,
+      );
       const strategyNameStr =
-        strategyDefinitionId === 3 ||
+        matchedPreset?.name ??
+        (strategyDefinitionId === 3 ||
         mode === 'full_resonance' ||
         mode === 'enhanced'
           ? '大盘+缠论+牛熊战术+量价挤压全增强策略'
@@ -1774,7 +1881,7 @@ const server = http.createServer(async (req, res) => {
               mode === 'composite' ||
               mode === 'tactics'
             ? '大盘+缠论+牛熊左右侧战术联动策略'
-            : pluginId || '纯原典缠论策略';
+            : pluginId || '纯原典缠论策略');
       const newId =
         mockRuns.length > 0 ? Math.max(...mockRuns.map((r) => r.id)) + 1 : 1;
       const newRun: DevBacktestRun = {
@@ -1886,6 +1993,37 @@ const server = http.createServer(async (req, res) => {
       /\/v1\/strategy-backtests\/(\d+)\/signals$/,
     );
     const runId = runIdMatch && runIdMatch[1] ? Number(runIdMatch[1]) : 1;
+
+    // 优先读取持久化信号快照 (毫秒级直出，杜绝重跑大时序)
+    const persisted = persistedRunMap.get(runId);
+    if (persisted?.signalsFile && fs.existsSync(persisted.signalsFile)) {
+      try {
+        let rawSignals = JSON.parse(
+          fs.readFileSync(persisted.signalsFile, 'utf8'),
+        );
+        if (
+          rawSignals &&
+          typeof rawSignals === 'object' &&
+          'data' in rawSignals &&
+          rawSignals.data
+        ) {
+          rawSignals = rawSignals.data;
+        }
+        const items = Array.isArray(rawSignals)
+          ? rawSignals
+          : Array.isArray(rawSignals?.items)
+            ? rawSignals.items
+            : [];
+        sendJson(res, {
+          items,
+          nextCursor: rawSignals?.nextCursor ?? null,
+        });
+        return;
+      } catch (err: any) {
+        console.warn(`[GET signals] 读取持久化快照失败:`, err.message);
+      }
+    }
+
     const matchedRun = mockRuns.find((r) => r.id === runId) || mockRuns[0];
 
     try {
@@ -1980,8 +2118,27 @@ const server = http.createServer(async (req, res) => {
   ) {
     const runIdMatch = pathname.match(/\/v1\/strategy-backtests\/(\d+)$/);
     const runId = runIdMatch && runIdMatch[1] ? Number(runIdMatch[1]) : 1;
-    const run = mockRuns.find((r) => r.id === runId) || mockRuns[0];
+    const persisted = persistedRunMap.get(runId);
+    const run =
+      persisted?.run || mockRuns.find((r) => r.id === runId) || mockRuns[0];
     sendJson(res, run);
+    return;
+  }
+
+  // 10. 回测成交明细: GET /v1/strategy-backtests/:id/trades
+  if (
+    pathname.match(/\/v1\/strategy-backtests\/\d+\/trades$/) &&
+    req.method === 'GET'
+  ) {
+    const runIdMatch = pathname.match(
+      /\/v1\/strategy-backtests\/(\d+)\/trades$/,
+    );
+    const runId = runIdMatch && runIdMatch[1] ? Number(runIdMatch[1]) : 1;
+    const persisted = persistedRunMap.get(runId);
+    sendJson(res, {
+      items: persisted?.trades || [],
+      total: (persisted?.trades || []).length,
+    });
     return;
   }
 
@@ -2012,14 +2169,17 @@ if (process.env.DEV_SERVER_AUTOSTART !== 'false') {
 
     setTimeout(async () => {
       try {
-        if (process.env.SKIP_DEV_PREHEAT === 'true') {
+        const shouldPreheat =
+          process.env.DEV_PREHEAT === 'true' &&
+          process.env.SKIP_DEV_PREHEAT !== 'true';
+        if (!shouldPreheat) {
           console.log(
-            `⏩ [预热] 检测到环境变量 SKIP_DEV_PREHEAT=true，跳过启动全量预热。`,
+            `⏩ [预热] 默认跳过启动期耗时推演预热 (如需预热请设置 DEV_PREHEAT=true)。`,
           );
           return;
         }
         console.log(`🔄 [预热] 正在后台基于策略树预热决策流回测数据...`);
-        for (const run of mockRuns) {
+        for (const run of mockRuns.filter((r) => !persistedRunMap.has(r.id))) {
           const symbol = run.targetUniverse[0] || '000001';
           const { signals } = await runUnifiedSimulationBacktest({
             code: symbol,

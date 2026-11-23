@@ -327,6 +327,7 @@ export class DecisionFlowEvaluator {
           inheritedMeta?.badgeText ?? this.findBadgeTextFromTrace(trace);
         const displayTag = inheritedMeta?.displayTag;
         const styleMeta = inheritedMeta?.styleMeta;
+        const evidence = this.findEvidenceFromTrace(trace);
 
         return {
           status: 'SIGNAL_EMITTED',
@@ -341,9 +342,22 @@ export class DecisionFlowEvaluator {
           displayTag,
           styleMeta,
           trace,
+          ...(evidence ? { evidence } : {}),
         };
       }
     }
+  }
+
+  private findEvidenceFromTrace(
+    trace: readonly DecisionExecutionTraceItem[],
+  ): Readonly<Record<string, unknown>> | undefined {
+    for (let i = trace.length - 1; i >= 0; i--) {
+      const ev = trace[i].evidence as Record<string, unknown> | undefined;
+      if (ev && typeof ev === 'object' && Object.keys(ev).length > 0) {
+        return ev;
+      }
+    }
+    return undefined;
   }
 
   private findBadgeTextFromTrace(
@@ -382,7 +396,10 @@ export class DecisionFlowEvaluator {
       return true;
     }
 
-    const actual = context.attributes.get(condition.attributeKey);
+    const actual = this.resolveAttributeValue(
+      context.attributes,
+      condition.attributeKey,
+    );
     const expected = condition.value;
 
     switch (condition.operator) {
@@ -406,6 +423,34 @@ export class DecisionFlowEvaluator {
       default:
         return false;
     }
+  }
+
+  private resolveAttributeValue(
+    attributes: Map<string, unknown>,
+    key: string,
+  ): unknown {
+    if (attributes.has(key)) {
+      return attributes.get(key);
+    }
+    const parts = key.split('.');
+    if (parts.length > 1) {
+      for (let i = parts.length - 1; i >= 1; i--) {
+        const prefix = parts.slice(0, i).join('.');
+        if (attributes.has(prefix)) {
+          let cur: unknown = attributes.get(prefix);
+          const rest = parts.slice(i);
+          for (const p of rest) {
+            if (cur == null || typeof cur !== 'object') {
+              cur = undefined;
+              break;
+            }
+            cur = (cur as Record<string, unknown>)[p];
+          }
+          return cur;
+        }
+      }
+    }
+    return undefined;
   }
 
   public resolveConfidenceLevel(score: number): ConfidenceLevel {

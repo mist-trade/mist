@@ -622,4 +622,144 @@ describe('Phase 2: Decision Flow Engine', () => {
       expect(result.signalTag).toBe('LEGACY_DSL');
     });
   });
+
+  describe('Isomorphic Exit Flow & Position State Routing (出场插件同构与持仓状态路由)', () => {
+    it('routes to exit branch when position is HOLDING and emits SELL with matchedSignalId evidence', async () => {
+      // 注册模拟出场插件 (category = EXIT)
+      registry.register({
+        id: 'plugin.mock.lifecycle_exit',
+        name: 'Mock Lifecycle Exit Plugin',
+        category: 'EXIT',
+        version: '1.0.0',
+        description: 'Mock exit plugin for testing',
+        evaluate: async (ctx: FactorContext) => {
+          const pos = ctx.attributes.get('position.virtual') as any;
+          if (pos?.state === 'HOLDING' && pos.activeEntries?.length > 0) {
+            return {
+              action: 'SELL',
+              confidence: 0.95,
+              reason: '跌破成本防守线',
+              badgeText: '破位止损',
+              displayTag: 'EXIT_STOP',
+              evidence: {
+                matchedSignalId: pos.activeEntries[0].signalId,
+                exitKind: 'STRUCTURAL_BREAKDOWN',
+                triggerPrice: 10.5,
+              },
+            };
+          }
+          return { action: 'NEUTRAL', confidence: 0, reason: '未触发出场' };
+        },
+      });
+
+      // 注册模拟入场插件 (category = CHAN)
+      registry.register({
+        id: 'plugin.mock.entry',
+        name: 'Mock Entry Plugin',
+        category: 'CHAN',
+        version: '1.0.0',
+        description: 'Mock entry plugin',
+        evaluate: async () => ({
+          action: 'BUY',
+          confidence: 0.88,
+          reason: '1买触发',
+          badgeText: '1买',
+        }),
+      });
+
+      // 构造持仓路由决策树: Branch -> (HOLDING -> Exit Guard -> SELL Terminal) / (FLAT -> Entry Guard -> BUY Terminal)
+      const tree: DecisionFlowNode = {
+        id: 'node.root.branch',
+        type: 'BRANCH',
+        name: '持仓状态路由',
+        condition: {
+          attributeKey: 'position.virtual.state',
+          operator: 'eq',
+          value: 'HOLDING',
+        },
+        branches: {
+          true: {
+            id: 'node.exit.guard',
+            type: 'GUARD',
+            name: '出场门禁',
+            pluginId: 'plugin.mock.lifecycle_exit',
+            requiredAction: 'SELL',
+            onPass: {
+              id: 'node.exit.terminal',
+              type: 'TERMINAL',
+              action: 'SELL',
+              signalTag: 'TACTICAL_EXIT',
+            },
+          },
+          false: {
+            id: 'node.entry.guard',
+            type: 'GUARD',
+            name: '入场门禁',
+            pluginId: 'plugin.mock.entry',
+            requiredAction: 'BUY',
+            onPass: {
+              id: 'node.entry.terminal',
+              type: 'TERMINAL',
+              action: 'BUY',
+              signalTag: 'TACTICAL_ENTRY',
+            },
+          },
+        },
+      };
+
+      // 1. 测试 HOLDING 状态: 路由走出场分支，发射 SELL 信号
+      const holdingContext: FactorContext = {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date('2026-11-20T10:00:00Z'),
+        period: 5,
+        attributes: new Map([
+          [
+            'position.virtual',
+            {
+              state: 'HOLDING',
+              totalWeight: 1.0,
+              activeEntries: [
+                { signalId: 'BUY_SIG_20261119_01', entryPrice: 11.0 },
+              ],
+            },
+          ],
+        ]),
+      };
+
+      const holdingResult = await evaluator.evaluate(tree, holdingContext);
+      expect(holdingResult.status).toBe('SIGNAL_EMITTED');
+      expect(holdingResult.action).toBe('SELL');
+      expect(holdingResult.signalTag).toBe('TACTICAL_EXIT');
+      expect(holdingResult.badgeText).toBe('破位止损');
+      expect(holdingResult.evidence?.matchedSignalId).toBe(
+        'BUY_SIG_20261119_01',
+      );
+      expect(holdingResult.evidence?.exitKind).toBe('STRUCTURAL_BREAKDOWN');
+
+      // 2. 测试 FLAT 状态: 路由走入场分支，发射 BUY 信号
+      const flatContext: FactorContext = {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date('2026-11-20T10:00:00Z'),
+        period: 5,
+        attributes: new Map([
+          [
+            'position.virtual',
+            {
+              state: 'FLAT',
+              totalWeight: 0,
+              activeEntries: [],
+            },
+          ],
+        ]),
+      };
+
+      const flatResult = await evaluator.evaluate(tree, flatContext);
+      expect(flatResult.status).toBe('SIGNAL_EMITTED');
+      expect(flatResult.action).toBe('BUY');
+      expect(flatResult.signalTag).toBe('TACTICAL_ENTRY');
+      expect(flatResult.badgeText).toBe('1买');
+    });
+  });
 });

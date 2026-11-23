@@ -138,6 +138,15 @@
         "tsConfigPath": "libs/chancore/tsconfig.lib.json"
       }
     },
+    "pacore": {
+      "type": "library",
+      "root": "libs/pacore",
+      "entryFile": "index",
+      "sourceRoot": "libs/pacore/src",
+      "compilerOptions": {
+        "tsConfigPath": "libs/pacore/tsconfig.lib.json"
+      }
+    },
     "decimal": {
       "type": "library",
       "root": "libs/decimal",

@@ -195,6 +195,39 @@ describe('ExternalFactorPluginLoader', () => {
       expect(secondCount).toBe(0);
     });
 
+    it('discovers and registers category=EXIT factor plugins with equal parity', () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mist-plugin-exit-'));
+      const testFile = path.join(tempDir, 'index.js');
+      fs.writeFileSync(
+        testFile,
+        `
+        exports.plugins = [
+          {
+            id: 'plugin.tactical.test_exit',
+            name: 'Test Tactical Exit Plugin',
+            category: 'EXIT',
+            version: '1.0.0',
+            description: 'Test exit',
+            evaluate: async () => ({ action: 'SELL', confidence: 0.9, reason: 'hit exit' })
+          }
+        ];
+      `,
+        'utf8',
+      );
+
+      ExternalFactorPluginLoader.setCustomPaths([tempDir]);
+      const plugins = ExternalFactorPluginLoader.loadPlugins();
+      expect(plugins.length).toBe(1);
+      expect(plugins[0].category).toBe('EXIT');
+
+      const registry = new InMemoryFactorPluginRegistry();
+      ExternalFactorPluginLoader.registerExternalPlugins(registry);
+      expect(registry.has('plugin.tactical.test_exit')).toBe(true);
+      const exitPlugins = registry.listByCategory('EXIT');
+      expect(exitPlugins.length).toBe(1);
+      expect(exitPlugins[0].id).toBe('plugin.tactical.test_exit');
+    });
+
     it('tolerates broken syntax files without crashing', () => {
       tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mist-plugin-broken-'));
       const testFile = path.join(tempDir, 'index.js');

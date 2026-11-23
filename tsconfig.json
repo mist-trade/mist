@@ -78,6 +78,9 @@
       "@app/chancore": [
         "libs/chancore/src/index.ts"
       ],
+      "@app/pacore": [
+        "libs/pacore/src/index.ts"
+      ],
       "@app/decimal": [
         "libs/decimal/src/index.ts"
       ],

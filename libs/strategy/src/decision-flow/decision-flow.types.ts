@@ -177,4 +177,6 @@ export interface DecisionResult {
   }>;
   /** 白盒执行轨迹 */
   readonly trace: readonly DecisionExecutionTraceItem[];
+  /** 附加证据载荷（如出场匹配的买入 ID、批次快照等） */
+  readonly evidence?: Readonly<Record<string, unknown>>;
 }
