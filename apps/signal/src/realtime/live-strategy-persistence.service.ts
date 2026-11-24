@@ -11,11 +11,9 @@ import {
 } from '@app/shared-data';
 import type { ShadowStrategyCandidate } from '@app/signal';
 import {
-  availabilityKey,
+  groupSignals,
   mapKernelSignalToPersistencePayload,
 } from '@app/strategy';
-import { formatShanghaiDateString } from '@app/timezone';
-import type { AlertDeliveryGroupDescriptor } from '@app/contracts';
 import { DataSource as TypeOrmDataSource } from 'typeorm';
 import {
   STRATEGY_ALERT_DELIVERY_HANDOFF_PORT,
@@ -111,6 +109,7 @@ export class LiveStrategyPersistenceService {
    * no timer/lateness handling is needed. Best-effort: an enqueue failure MUST NOT
    * fail the processor run — the Signal/AlertEvent rows are already committed and
    * the events stay PENDING for the pending-alert sweep.
+   * 分组经由共享纯域函数 groupSignals（REQ-FACADE-03：与门面同一实现）。
    */
   async publishGroupedDeliveries(
     results: readonly LiveStrategyPersistenceResult[],
@@ -119,40 +118,24 @@ export class LiveStrategyPersistenceService {
     const created = results.filter((r) => r.alertEventId !== null);
     if (created.length === 0) return;
 
-    const groups = new Map<
-      string,
-      { descriptor: AlertDeliveryGroupDescriptor; ids: number[] }
-    >();
-    for (const result of created) {
-      const candidate = result.candidate;
-      const effectiveTime = availabilityKey({
-        period: candidate.period,
-        timestamp: candidate.signalTime,
-      });
-      const key = `${candidate.securityId}\u0000${effectiveTime.getTime()}`;
-      let group = groups.get(key);
-      if (!group) {
-        group = {
-          descriptor: {
-            securityId: candidate.securityId,
-            effectiveTime: effectiveTime.toISOString(),
-            tradingDay: formatShanghaiDateString(effectiveTime),
-          },
-          ids: [],
-        };
-        groups.set(key, group);
-      }
-      group.ids.push(result.alertEventId as number);
-    }
+    const groups = groupSignals(created, (result) => result.candidate);
 
-    for (const { descriptor, ids } of groups.values()) {
+    for (const { descriptor, members } of groups.values()) {
+      const ids = members.map((member) => member.alertEventId as number);
       try {
-        await this.deliveryHandoff.publishGroup(descriptor, ids);
+        await this.deliveryHandoff.publishGroup(
+          {
+            securityId: descriptor.securityId,
+            effectiveTime: descriptor.effectiveTime.toISOString(),
+            tradingDay: descriptor.tradingDay,
+          },
+          ids,
+        );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         this.logger.warn(
           `Failed to enqueue grouped alert delivery for securityId=${descriptor.securityId} ` +
-            `effectiveTime=${descriptor.effectiveTime} events=[${ids.join(',')}] ` +
+            `effectiveTime=${descriptor.effectiveTime.toISOString()} events=[${ids.join(',')}] ` +
             `(rows already committed; events stay PENDING for later sweep): ${message}`,
         );
       }

@@ -1,4 +1,4 @@
-import { compileStoredStrategyRule } from '@app/strategy';
+import { LegacyStrategyCompiler } from '@app/strategy';
 import type { StrategyBar } from '@app/market-data';
 import { StrategySignalKind } from '@app/shared-data';
 import type { SignalRegistryDefinition } from '../signal-registry.types';
@@ -27,33 +27,10 @@ describe('CandleFinalizedJobProcessor', () => {
           period: 1,
           ruleSnapshot: { field: 'k.close', operator: 'gt', value: 27 },
           kind: 'decision_flow',
-          flow: {
-            id: 'guard_legacy_rule',
-            type: 'GUARD',
-            name: '存量规则门禁',
-            pluginId: 'plugin.legacy.rule-dsl',
-            params: {
-              plan: compileStoredStrategyRule(
-                { field: 'k.close', operator: 'gt', value: 27 },
-                'entry',
-              ),
-            },
-            requiredAction: 'BUY',
-            minConfidence: 0.5,
-            onPass: {
-              id: 'term_pass',
-              type: 'TERMINAL',
-              action: 'BUY',
-              signalTag: 'LEGACY_DSL',
-              reason: 'matched',
-            },
-            onFail: {
-              id: 'term_fail',
-              type: 'TERMINAL',
-              action: 'ABORT',
-              reason: 'unmatched',
-            },
-          },
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 27 },
+            'entry',
+          ),
           requiredBarCount: 1,
           contextRequirements: {},
         },
@@ -111,33 +88,10 @@ describe('CandleFinalizedJobProcessor', () => {
             value: 'incomplete',
           },
           kind: 'decision_flow',
-          flow: {
-            id: 'guard_legacy_rule',
-            type: 'GUARD',
-            name: '存量规则门禁',
-            pluginId: 'plugin.legacy.rule-dsl',
-            params: {
-              plan: compileStoredStrategyRule(
-                { field: 'k.type', operator: 'eq', value: 'incomplete' },
-                'entry',
-              ),
-            },
-            requiredAction: 'BUY',
-            minConfidence: 0.5,
-            onPass: {
-              id: 'term_pass',
-              type: 'TERMINAL',
-              action: 'BUY',
-              signalTag: 'LEGACY_DSL',
-              reason: 'matched',
-            },
-            onFail: {
-              id: 'term_fail',
-              type: 'TERMINAL',
-              action: 'ABORT',
-              reason: 'unmatched',
-            },
-          },
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.type', operator: 'eq', value: 'incomplete' },
+            'entry',
+          ),
           requiredBarCount: 1,
           contextRequirements: {},
         },
@@ -459,33 +413,10 @@ describe('CandleFinalizedJobProcessor', () => {
           period: 1,
           ruleSnapshot: { field: 'k.volume', operator: 'gt', value: '0' },
           kind: 'decision_flow',
-          flow: {
-            id: 'guard_legacy_rule',
-            type: 'GUARD',
-            name: '存量规则门禁',
-            pluginId: 'plugin.legacy.rule-dsl',
-            params: {
-              plan: compileStoredStrategyRule(
-                { field: 'k.volume', operator: 'gt', value: '0' },
-                'entry',
-              ),
-            },
-            requiredAction: 'BUY',
-            minConfidence: 0.5,
-            onPass: {
-              id: 'term_pass',
-              type: 'TERMINAL',
-              action: 'BUY',
-              signalTag: 'LEGACY_DSL',
-              reason: 'matched',
-            },
-            onFail: {
-              id: 'term_fail',
-              type: 'TERMINAL',
-              action: 'ABORT',
-              reason: 'unmatched',
-            },
-          },
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.volume', operator: 'gt', value: '0' },
+            'entry',
+          ),
           requiredBarCount: 1,
           contextRequirements: {},
         },
@@ -598,33 +529,10 @@ describe('CandleFinalizedJobProcessor', () => {
           period: 1,
           ruleSnapshot: { field: 'k.close', operator: 'gt', value: 27 },
           kind: 'decision_flow',
-          flow: {
-            id: 'guard_legacy_rule',
-            type: 'GUARD',
-            name: '存量规则门禁',
-            pluginId: 'plugin.legacy.rule-dsl',
-            params: {
-              plan: compileStoredStrategyRule(
-                { field: 'k.close', operator: 'gt', value: 27 },
-                'entry',
-              ),
-            },
-            requiredAction: 'BUY',
-            minConfidence: 0.5,
-            onPass: {
-              id: 'term_pass',
-              type: 'TERMINAL',
-              action: 'BUY',
-              signalTag: 'LEGACY_DSL',
-              reason: 'matched',
-            },
-            onFail: {
-              id: 'term_fail',
-              type: 'TERMINAL',
-              action: 'ABORT',
-              reason: 'unmatched',
-            },
-          },
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 27 },
+            'entry',
+          ),
           requiredBarCount: 1,
           contextRequirements: {},
         },
@@ -720,33 +628,10 @@ function modeProcessor(
         period: 1,
         ruleSnapshot: { field: 'k.close', operator: 'gt', value: 27 },
         kind: 'decision_flow',
-        flow: {
-          id: 'guard_legacy_rule',
-          type: 'GUARD',
-          name: '存量规则门禁',
-          pluginId: 'plugin.legacy.rule-dsl',
-          params: {
-            plan: compileStoredStrategyRule(
-              { field: 'k.close', operator: 'gt', value: 27 },
-              'entry',
-            ),
-          },
-          requiredAction: 'BUY',
-          minConfidence: 0.5,
-          onPass: {
-            id: 'term_pass',
-            type: 'TERMINAL',
-            action: 'BUY',
-            signalTag: 'LEGACY_DSL',
-            reason: 'matched',
-          },
-          onFail: {
-            id: 'term_fail',
-            type: 'TERMINAL',
-            action: 'ABORT',
-            reason: 'unmatched',
-          },
-        },
+        flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+          { field: 'k.close', operator: 'gt', value: 27 },
+          'entry',
+        ),
         requiredBarCount: 1,
         contextRequirements: {},
       },

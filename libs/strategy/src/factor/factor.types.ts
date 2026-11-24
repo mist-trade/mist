@@ -6,7 +6,11 @@ export type FactorCategory =
   | 'TECHNICAL'
   | 'CHAN'
   | 'AI_SENTIMENT'
-  | 'EXIT';
+  | 'EXIT'
+  // 私仓插件类别（2026-11-24 结构兼容守卫 REQ-FACADE-06 收敛）：
+  // 私有战术插件的真实类别值，公共展示侧按原样渲染。
+  | 'TACTICAL'
+  | 'TACTICAL_SWING';
 
 export type FactorAction = 'BUY' | 'SELL' | 'NEUTRAL';
 

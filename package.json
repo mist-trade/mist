@@ -132,6 +132,10 @@
     "transform": {
       "^.+\\.(t|j)s$": "ts-jest"
     },
+    "transformIgnorePatterns": [
+      "/node_modules/",
+      "/mist-alpha-private/dist/"
+    ],
     "clearMocks": true,
     "collectCoverageFrom": [
       "**/*.(t|j)s",

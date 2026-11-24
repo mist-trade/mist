@@ -54,6 +54,19 @@ export type {
   VirtualFillSide,
 } from './fill-log.port';
 export { foldVirtualFills } from './account-fold';
+export { groupSignals } from './grouping';
+export type {
+  GroupableSignal,
+  SignalGroup,
+  SignalGroupDescriptor,
+} from './grouping';
+export {
+  buildTradingManual,
+  formatPeriod,
+  formatYuan,
+  renderTraceChainOf,
+} from './manual';
+export type { TradingManualInput } from './manual';
 export type {
   GoldenScenario,
   GoldenEvent,

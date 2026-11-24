@@ -26,6 +26,65 @@ export type VirtualExitRule =
       readonly activationGain: number;
       readonly drawdownRatio: number;
       readonly id?: string;
+    }
+  // ── 以下规则种类由私仓出场插件声明（内核只透传给 VirtualExitPolicyPort
+  // 求值，不解释其字段）——2026-11-24 结构兼容守卫（REQ-FACADE-06）收敛入公共
+  // 联合，消除两侧漂移。 ──
+  | {
+      /** 结构破位（私仓战术出场） */
+      readonly kind: 'structural_breakdown';
+      readonly id?: string;
+    }
+  | {
+      /** 线破位（私仓战术出场） */
+      readonly kind: 'line_break';
+      readonly id?: string;
+    }
+  | {
+      /** 微观顶背离出场（私仓战术出场） */
+      readonly kind: 'micro_divergence_exit';
+      readonly id?: string;
+    }
+  | {
+      /** 宏观线破位（私仓战术出场） */
+      readonly kind: 'macro_line_break';
+      readonly id?: string;
+    }
+  | {
+      /** 持仓超时：持有 Bar 数达上限 */
+      readonly kind: 'time_expired';
+      readonly maxHoldingBars: number;
+      readonly id?: string;
+    }
+  | {
+      /** 熊市跳空低开：跳空幅度超阈值 */
+      readonly kind: 'bear_gap_down';
+      readonly gapThreshold?: number;
+      readonly id?: string;
+    }
+  | {
+      /** 熊市跌破 MA5 */
+      readonly kind: 'bear_break_ma5';
+      readonly id?: string;
+    }
+  | {
+      /** 熊市次级别跌破零轴 */
+      readonly kind: 'bear_sub_break_zero';
+      readonly id?: string;
+    }
+  | {
+      /** 支撑区失守 */
+      readonly kind: 'support_zone_breached';
+      readonly id?: string;
+    }
+  | {
+      /** 斐波那契扩展止盈：T1 保本提损 + T2 黄金止盈 */
+      readonly kind: 'fibonacci_extension_take_profit';
+      readonly enableBreakevenAtT1?: boolean;
+      readonly enableTakeProfitAtT2?: boolean;
+      readonly t1Key?: string;
+      readonly t2Key?: string;
+      readonly id?: string;
     };
 
 export interface VirtualExitRuleBinding {

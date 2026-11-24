@@ -185,12 +185,14 @@ export class ExternalFactorPluginLoader {
 
     const paths: string[] = [];
 
-    // 1. 环境变量配置
+    // 1. 环境变量配置——显式配置独占：设置后不叠加平级约定目录。
+    //    （测试环境借此禁用探测：将 MIST_PRIVATE_PLUGINS_DIR 指向不存在路径，
+    //    避免 require 平级 dist 触发的重量级副作用。）
     const envDir =
       process.env.MIST_PRIVATE_PLUGINS_DIR ||
       process.env.MIST_PRIVATE_PLUGINS_PATH;
     if (envDir && envDir.trim().length > 0) {
-      paths.push(envDir.trim());
+      return [envDir.trim()];
     }
 
     // 2. 多仓库平级约定目录 (peer workspace: ../mist-alpha-private)
