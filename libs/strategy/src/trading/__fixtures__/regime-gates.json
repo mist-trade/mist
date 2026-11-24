@@ -1,0 +1,165 @@
+{
+  "name": "regime 门禁：SYSTEMIC_CRUNCH / LIQUIDITY_FREEZE 拒绝开仓，ELEVATED_RISK 预算减半",
+  "scenario": {
+    "name": "regime-gates",
+    "securityId": 1,
+    "securityCode": "000001",
+    "seedCapitalLi": "1000000000",
+    "events": [
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-05",
+        "effectiveTime": "2026-01-05T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-entry-crunch",
+            "signalKind": "entry",
+            "signalType": "CHAN_SECOND_BUY",
+            "triggerPrice": 10,
+            "confidence": 0.86
+          }
+        ],
+        "macroRegime": {
+          "regime": "SYSTEMIC_CRUNCH",
+          "marketAtrPercentile": 1,
+          "isLiquidityFrozen": false
+        }
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-06",
+        "effectiveTime": "2026-01-06T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-entry-frozen",
+            "signalKind": "entry",
+            "signalType": "CHAN_SECOND_BUY",
+            "triggerPrice": 10,
+            "confidence": 0.86
+          }
+        ],
+        "macroRegime": {
+          "regime": "NORMAL",
+          "marketAtrPercentile": 0.5,
+          "isLiquidityFrozen": true
+        }
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-07",
+        "effectiveTime": "2026-01-07T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-entry-elevated",
+            "signalKind": "entry",
+            "signalType": "CHAN_SECOND_BUY",
+            "triggerPrice": 12.34,
+            "confidence": 0.86
+          }
+        ],
+        "macroRegime": {
+          "regime": "ELEVATED_RISK",
+          "marketAtrPercentile": 0.9,
+          "isLiquidityFrozen": false
+        }
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-08",
+        "effectiveTime": "2026-01-08T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-exit-d4",
+            "signalKind": "exit",
+            "signalType": "CHAN_SECOND_SELL",
+            "triggerPrice": 12.5,
+            "confidence": 0.9
+          }
+        ]
+      }
+    ]
+  },
+  "expected": [
+    {
+      "event": "group@2026-01-05T07:35:00Z",
+      "instructions": [],
+      "rejections": [
+        {
+          "idempotencyKey": "evt-entry-crunch",
+          "reason": "SYSTEMIC_CRUNCH",
+          "detail": "大盘系统性雪崩期，禁止开仓"
+        }
+      ],
+      "accountAfter": {
+        "cashLi": "1000000000",
+        "tradingDay": "2026-01-05",
+        "positions": []
+      }
+    },
+    {
+      "event": "group@2026-01-06T07:35:00Z",
+      "instructions": [],
+      "rejections": [
+        {
+          "idempotencyKey": "evt-entry-frozen",
+          "reason": "LIQUIDITY_FREEZE",
+          "detail": "流动性冻结（跌停潮），禁止开仓"
+        }
+      ],
+      "accountAfter": {
+        "cashLi": "1000000000",
+        "tradingDay": "2026-01-06",
+        "positions": []
+      }
+    },
+    {
+      "event": "group@2026-01-07T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-entry-elevated",
+          "idempotencyKey": "evt-entry-elevated",
+          "action": "BUY",
+          "quantity": 38400,
+          "referencePrice": 12.34,
+          "estimatedValueLi": "473856000",
+          "reason": "CHAN_SECOND_BUY"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "526020797",
+        "tradingDay": "2026-01-07",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 38400,
+            "costPriceLi": "12340",
+            "currentPriceLi": "12340",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-07T07:35:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "event": "group@2026-01-08T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-exit-d4",
+          "idempotencyKey": "evt-exit-d4",
+          "action": "SELL",
+          "quantity": 38400,
+          "referencePrice": 12.5,
+          "estimatedValueLi": "480000000",
+          "reason": "CHAN_SECOND_SELL"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "1005655997",
+        "tradingDay": "2026-01-08",
+        "positions": []
+      }
+    }
+  ]
+}

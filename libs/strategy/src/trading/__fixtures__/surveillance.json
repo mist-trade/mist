@@ -1,0 +1,128 @@
+{
+  "name": "Bar 巡检：硬止损 -8% 触发保护性清仓（指令不推进账本），systemic 清仓，健康持仓零产出",
+  "scenario": {
+    "name": "surveillance",
+    "securityId": 1,
+    "securityCode": "000001",
+    "seedCapitalLi": "1000000000",
+    "riskRules": {
+      "hardStopLossRatio": -0.08
+    },
+    "events": [
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-05",
+        "effectiveTime": "2026-01-05T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-entry-d1",
+            "signalKind": "entry",
+            "signalType": "CHAN_SECOND_BUY",
+            "triggerPrice": 10,
+            "confidence": 0.86
+          }
+        ]
+      },
+      {
+        "kind": "surveil",
+        "timestamp": "2026-01-06T06:00:00Z",
+        "close": 9.19
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-06",
+        "effectiveTime": "2026-01-06T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-exit-d2",
+            "signalKind": "exit",
+            "signalType": "CHAN_SECOND_SELL",
+            "triggerPrice": 9.2,
+            "confidence": 0.9
+          }
+        ]
+      },
+      {
+        "kind": "surveil",
+        "timestamp": "2026-01-07T06:00:00Z",
+        "close": 9,
+        "macroRegime": {
+          "regime": "SYSTEMIC_CRUNCH",
+          "marketAtrPercentile": 1,
+          "isLiquidityFrozen": false
+        }
+      }
+    ]
+  },
+  "expected": [
+    {
+      "event": "group@2026-01-05T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-entry-d1",
+          "idempotencyKey": "evt-entry-d1",
+          "action": "BUY",
+          "quantity": 95000,
+          "referencePrice": 10,
+          "estimatedValueLi": "950000000",
+          "reason": "CHAN_SECOND_BUY"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "49753000",
+        "tradingDay": "2026-01-05",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 95000,
+            "costPriceLi": "10000",
+            "currentPriceLi": "10000",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-05T07:35:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "event": "surveil@2026-01-06T06:00:00Z@9.19",
+      "instructions": [
+        {
+          "instructionId": "ti-risk-000001-1767679200000-hard-stop-loss",
+          "idempotencyKey": "risk-000001-1767679200000-hard-stop-loss",
+          "action": "SELL",
+          "quantity": 95000,
+          "referencePrice": 9.19,
+          "estimatedValueLi": "873050000",
+          "reason": "HARD_STOP_LOSS"
+        }
+      ],
+      "rejections": []
+    },
+    {
+      "event": "group@2026-01-06T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-exit-d2",
+          "idempotencyKey": "evt-exit-d2",
+          "action": "SELL",
+          "quantity": 95000,
+          "referencePrice": 9.2,
+          "estimatedValueLi": "874000000",
+          "reason": "CHAN_SECOND_SELL"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "923088760",
+        "tradingDay": "2026-01-06",
+        "positions": []
+      }
+    },
+    {
+      "event": "surveil@2026-01-07T06:00:00Z@9",
+      "instructions": [],
+      "rejections": []
+    }
+  ]
+}

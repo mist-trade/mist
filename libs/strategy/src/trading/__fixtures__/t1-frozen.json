@@ -1,0 +1,129 @@
+{
+  "name": "T+1 冻结：同日建仓同日出场被拒，次日解冻可卖（REQ-LEDGER-04）",
+  "scenario": {
+    "name": "t1-frozen",
+    "securityId": 1,
+    "securityCode": "000001",
+    "seedCapitalLi": "1000000000",
+    "events": [
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-05",
+        "effectiveTime": "2026-01-05T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-entry-am",
+            "signalKind": "entry",
+            "signalType": "CHAN_SECOND_BUY",
+            "triggerPrice": 10,
+            "confidence": 0.86
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-05",
+        "effectiveTime": "2026-01-05T14:30:00Z",
+        "signals": [
+          {
+            "key": "evt-exit-pm",
+            "signalKind": "exit",
+            "signalType": "CHAN_SECOND_SELL",
+            "triggerPrice": 10.5,
+            "confidence": 0.9
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-06",
+        "effectiveTime": "2026-01-06T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-exit-d2",
+            "signalKind": "exit",
+            "signalType": "CHAN_SECOND_SELL",
+            "triggerPrice": 10.8,
+            "confidence": 0.9
+          }
+        ]
+      }
+    ]
+  },
+  "expected": [
+    {
+      "event": "group@2026-01-05T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-entry-am",
+          "idempotencyKey": "evt-entry-am",
+          "action": "BUY",
+          "quantity": 95000,
+          "referencePrice": 10,
+          "estimatedValueLi": "950000000",
+          "reason": "CHAN_SECOND_BUY"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "49753000",
+        "tradingDay": "2026-01-05",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 95000,
+            "costPriceLi": "10000",
+            "currentPriceLi": "10000",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-05T07:35:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "event": "group@2026-01-05T14:30:00Z",
+      "instructions": [],
+      "rejections": [
+        {
+          "idempotencyKey": "evt-exit-pm",
+          "reason": "T1_FROZEN",
+          "detail": "当日买入股份 T+1 冻结，不可卖出"
+        }
+      ],
+      "accountAfter": {
+        "cashLi": "49753000",
+        "tradingDay": "2026-01-05",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 95000,
+            "costPriceLi": "10000",
+            "currentPriceLi": "10000",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-05T07:35:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "event": "group@2026-01-06T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-exit-d2",
+          "idempotencyKey": "evt-exit-d2",
+          "action": "SELL",
+          "quantity": 95000,
+          "referencePrice": 10.8,
+          "estimatedValueLi": "1026000000",
+          "reason": "CHAN_SECOND_SELL"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "1074973240",
+        "tradingDay": "2026-01-06",
+        "positions": []
+      }
+    }
+  ]
+}

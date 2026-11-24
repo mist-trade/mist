@@ -1,0 +1,90 @@
+{
+  "name": "完整回合：日1入场→日2出场（双边费用、T+1 解冻、实现盈亏）",
+  "scenario": {
+    "name": "round-trip",
+    "securityId": 1,
+    "securityCode": "000001",
+    "seedCapitalLi": "1000000000",
+    "events": [
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-05",
+        "effectiveTime": "2026-01-05T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-entry",
+            "signalKind": "entry",
+            "signalType": "CHAN_SECOND_BUY",
+            "triggerPrice": 12.34,
+            "confidence": 0.88
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-06",
+        "effectiveTime": "2026-01-06T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-exit",
+            "signalKind": "exit",
+            "signalType": "CHAN_SECOND_SELL",
+            "triggerPrice": 13,
+            "confidence": 0.9
+          }
+        ]
+      }
+    ]
+  },
+  "expected": [
+    {
+      "event": "group@2026-01-05T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-entry",
+          "idempotencyKey": "evt-entry",
+          "action": "BUY",
+          "quantity": 76900,
+          "referencePrice": 12.34,
+          "estimatedValueLi": "948946000",
+          "reason": "CHAN_SECOND_BUY"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "50807274",
+        "tradingDay": "2026-01-05",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 76900,
+            "costPriceLi": "12340",
+            "currentPriceLi": "12340",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-05T07:35:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "event": "group@2026-01-06T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-exit",
+          "idempotencyKey": "evt-exit",
+          "action": "SELL",
+          "quantity": 76900,
+          "referencePrice": 13,
+          "estimatedValueLi": "999700000",
+          "reason": "CHAN_SECOND_SELL"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "1049747502",
+        "tradingDay": "2026-01-06",
+        "positions": []
+      }
+    }
+  ]
+}
