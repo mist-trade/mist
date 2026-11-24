@@ -58,9 +58,12 @@ function evaluateCondition(
   observation: StrategyFieldObservation,
 ): boolean {
   if (condition.catalog.valueType === 'decimal') {
-    if (!condition.decimalValue) {
-      throw new Error('compiled decimal condition has no Decimal8 threshold');
-    }
+    // decimalValue 是编译器附带的进程内定点值（快捷路径）；wire 形态（决策流
+    // params 内嵌 plan）不含它——此时从 canonical 字符串（condition.value，
+    // 编译器保证 canonical）按需重建。
+    const threshold =
+      condition.decimalValue ??
+      Decimal8.parseCanonical(requireString(condition.value));
     const current = Decimal8.parseCanonical(requireString(observation.current));
     const previous =
       observation.previous === undefined
@@ -68,8 +71,8 @@ function evaluateCondition(
         : Decimal8.parseCanonical(requireString(observation.previous));
     return compare(
       condition.operator,
-      current.compare(condition.decimalValue),
-      previous?.compare(condition.decimalValue),
+      current.compare(threshold),
+      previous?.compare(threshold),
     );
   }
   if (condition.catalog.valueType === 'finiteNumber') {

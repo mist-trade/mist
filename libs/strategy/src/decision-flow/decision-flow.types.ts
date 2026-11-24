@@ -16,7 +16,12 @@ export interface GuardNode {
   readonly name: string;
   /** 引用的插件标识 */
   readonly pluginId: string;
-  /** 插件参数 */
+  /**
+   * 插件参数。wire-safe 契约：params 会进入黑板缓存键的字符串序列化
+   * （`contextOpinionKey`），必须可 JSON 序列化——进程内定点类型（Decimal8）
+   * 不得入 params；编译边界负责剥除（legacy-strategy-compiler.toWireSafePlan），
+   * 插件求值时从 canonical 字符串重建。违规由 Decimal8.toJSON 哨兵显式抛错。
+   */
   readonly params?: Record<string, unknown>;
   /** 期望通过的动作，通常为 'BUY'，多空并存时可指定为 'BOTH' 或 'ANY' */
   readonly requiredAction: FactorAction | 'BOTH' | 'ANY';

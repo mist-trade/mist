@@ -1,5 +1,6 @@
 import type {
   CompiledStrategyExecutionPlan,
+  CompiledStrategyExpression,
   StrategyRuleExpression,
   StrategySignalKind,
 } from '../rules/strategy-rule.types';
@@ -16,6 +17,29 @@ export interface LegacyChanBspPlanLike {
   };
   readonly requiredBarCount?: number;
   readonly minConfidence?: number;
+}
+
+/**
+ * 决策流 params 的 wire-safe 契约（黑板上 params 会进缓存键字符串序列化）：
+ * 进程内定点类型（Decimal8）不得入 params——剥除条件上的 decimalValue，
+ * 插件求值时从 canonical 字符串（condition.value）按需重建。
+ * 违规者由 Decimal8.toJSON 哨兵在键序列化处显式抛错拦截。
+ */
+function toWireSafePlan(
+  plan: CompiledStrategyExecutionPlan,
+): CompiledStrategyExecutionPlan {
+  const walk = (
+    expr: CompiledStrategyExpression,
+  ): CompiledStrategyExpression => {
+    if (expr.kind === 'condition') {
+      if (expr.decimalValue === undefined) return expr;
+      const { decimalValue: omitted, ...rest } = expr;
+      void omitted;
+      return rest;
+    }
+    return { ...expr, children: expr.children.map(walk) };
+  };
+  return { ...plan, root: walk(plan.root) };
 }
 
 /**
@@ -43,7 +67,7 @@ export class LegacyStrategyCompiler {
       type: 'GUARD',
       name: '存量规则DSL门禁',
       pluginId: 'plugin.legacy.rule-dsl',
-      params: { plan },
+      params: { plan: toWireSafePlan(plan) },
       requiredAction: action,
       minConfidence: 0.5,
       onPass: {

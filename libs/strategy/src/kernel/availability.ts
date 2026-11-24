@@ -21,33 +21,18 @@ export function contextSeriesKey(securityCode: string, period: number): string {
 export const CONTEXT_OPINION_PREFIX = 'contextOpinion.';
 
 /**
- * params 值的稳定序列化：Decimal8（及嵌套持有者）先 formatCanonical 再入串。
- * toJSON 优先于 stringify replacer（Decimal8.toJSON 有意抛错），故必须先深拷贝
- * 替换为 canonical 字符串，再 JSON.stringify。
+ * params 值的稳定序列化。
+ *
+ * wire-safe 契约：决策流 params 必须可 JSON 序列化——进程内定点类型
+ * （Decimal8）不得入 params（编译边界在 legacy-strategy-compiler 剥除，
+ * 插件从 canonical 字符串重建）。违规者由 Decimal8.toJSON 哨兵在此显式
+ * 抛错——这是有意的运行时守卫，而非需要绕过的障碍。
  */
-function toPlain(value: unknown): unknown {
-  if (value === null || typeof value !== 'object') {
-    return value;
-  }
-  const candidate = value as { formatCanonical?: unknown };
-  if (typeof candidate.formatCanonical === 'function') {
-    return (candidate as { formatCanonical(): string }).formatCanonical();
-  }
-  if (Array.isArray(value)) {
-    return value.map(toPlain);
-  }
-  const out: Record<string, unknown> = {};
-  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
-    out[key] = toPlain(v);
-  }
-  return out;
-}
-
 function renderParamValue(value: unknown): string {
   if (value === null || typeof value !== 'object') {
     return String(value);
   }
-  return JSON.stringify(toPlain(value));
+  return JSON.stringify(value);
 }
 
 export function contextOpinionKey(
