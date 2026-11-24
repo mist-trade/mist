@@ -64,7 +64,7 @@
 ## 四、影响面 (Impact)
 
 - **新增**：`libs/strategy/src/trading/`（引擎 + 账本域模型 + 端口）；`libs/shared-data/src/entities/virtual-fill-event.entity.ts`；`deploy/database/migrations/037_create_virtual_fill_events.sql`；`apps/notification` 交易手册渲染器与 TypeORM 端口实现。
-- **重构**：`apps/backtest/backtest-run.executor.ts`（内联 Arbiter 编排 → engine.decide）；`tools/strategy-dev/server.ts`（删除手写流水线）；`apps/notification/notification-envelope.ts`（信号列表渲染退役 → 交易手册）；`libs/strategy` 交易组件小改（Arbiter 输出形态 ArbitrationVerdict、`PositionStateMachine.onSignal` 决策分支删除、SimulatedBroker 标识确定性化）；
+- **重构**：`apps/backtest/backtest-run.executor.ts`（内联 Arbiter 编排 → engine.decide）；`tools/strategy-dev/server.ts`（删除手写流水线）；`apps/notification/notification-envelope.ts`（信号列表渲染退役 → 交易手册）；`libs/strategy` 交易组件移植（Arbiter if 树 → 规则管线并退役、`PositionStateMachine.onSignal` 决策分支删除、SimulatedBroker + 费率计算器算术重写整数厘、标识业务键派生）；
 - **私仓接入**：`mist-alpha-private/build.mjs` 增加 `@app/strategy` / `@app/market-data`
   alias；新增 `scripts/run-pipeline.js`（本地 K 线 → 门面 → 交易手册）；`src/types.ts`
   的 `FactorPlugin` 私有副本与公共契约增加结构兼容守卫。

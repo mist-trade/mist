@@ -266,7 +266,7 @@ interface PipelineInput {
   registry: FactorPluginRegistry;      // 私仓插件 + 标准插件
   virtualExitPolicy?: VirtualExitPolicyPort;
   seedCapital?: number;                // 默认 1,000,000
-  cashAllocationRatio?: number;        // 默认 0.95
+  cashAllocationRatio?: number;        // 默认 0.95（SizingStrategy 参数透传）
 }
 
 interface PipelineResult {
