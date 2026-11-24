@@ -11,6 +11,7 @@ import {
   extractPivotEvidenceFromReason,
 } from '../decision-flow/decision-pivot-evidence';
 import type { FactorContext } from '../factor/factor.types';
+import type { FactorPluginRegistry } from '../factor/factor-plugin-registry';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
 import { collectVirtualExitBindings } from '../virtual-exit/collect-bindings';
 import type {
@@ -18,7 +19,11 @@ import type {
   VirtualExitPolicyPort,
   VirtualExitProposal,
 } from '../virtual-exit/virtual-exit.port';
-import { contextSeriesKey, isMissingContextSeriesError } from './availability';
+import {
+  contextOpinionKey,
+  contextSeriesKey,
+  isMissingContextSeriesError,
+} from './availability';
 import type {
   KernelConfig,
   KernelDiagnostics,
@@ -57,6 +62,7 @@ export class StrategyEvaluationKernel {
 
   private readonly plans: readonly KernelPlan[];
   private readonly evaluator: DecisionFlowEvaluator;
+  private readonly registry: FactorPluginRegistry;
   private readonly windows = new Map<number, StrategySeriesImputer>();
 
   private readonly externalWindows = new Map<string, ExternalWindowState>();
@@ -158,6 +164,7 @@ export class StrategyEvaluationKernel {
     }
 
     const registry = config.registry ?? new InMemoryFactorPluginRegistry();
+    this.registry = registry;
     this.evaluator = new DecisionFlowEvaluator({ registry });
 
     // 通道级虚拟出场：收集各插件声明的规则，一次性交给外部策略实现。
@@ -454,9 +461,21 @@ export class StrategyEvaluationKernel {
     return true;
   }
 
+  /** context 角色（2026-11-24 定稿，决策文档 7.1.1）：role:'context' 插件每 Bar
+   *  先于 plan 求值一次，opinion 缓存进黑板；GUARD 节点读缓存、不再逐 flow 重复求值。
+   *  context 插件严禁作为终端信号发射源（状态可见性走 decisionTrace.trace）。 */
+  private async prefetchContextOpinions(context: FactorContext): Promise<void> {
+    for (const plugin of this.registry.listByCategory()) {
+      if (plugin.role !== 'context') continue;
+      const opinion = await plugin.evaluate(context);
+      context.attributes.set(contextOpinionKey(plugin.id), opinion);
+    }
+  }
+
   /** 预热相静默求值：仅推进该周期 plan 的插件游标，信号全部丢弃。 */
   private async evaluateSilent(period: number, timestamp: Date): Promise<void> {
     const context = this.buildContext(timestamp, period);
+    await this.prefetchContextOpinions(context);
     for (const plan of this.plans) {
       if (plan.period !== period) continue;
       if (!this.contextReady(plan)) continue;
@@ -468,6 +487,7 @@ export class StrategyEvaluationKernel {
     bar: StrategyBar,
   ): Promise<readonly KernelSignal[]> {
     const context = this.buildContext(bar.timestamp, bar.period);
+    await this.prefetchContextOpinions(context);
     const signals: KernelSignal[] = [];
     for (const plan of this.plans) {
       if (plan.period !== bar.period) continue;

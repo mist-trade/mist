@@ -86,6 +86,14 @@ export interface FactorPluginMetadata {
   /** 参数配置 Schema（用于前台动态渲染配置表单，可选） */
   readonly paramSchema?: Record<string, unknown>;
 
+  /** 插件角色（可选，默认 'signal'，2026-11-24 定稿）：
+   *  - 'signal'（默认）：参与决策流求值路径，可作为终端信号来源；
+   *  - 'context'：上下文提供者——内核每 Bar 先于 plan 求值一次并缓存进黑板
+   *    （`contextOpinion.<pluginId>`），GUARD 节点读缓存、不再重复求值；
+   *    **严禁作为终端信号发射源**（状态可见性走 decisionTrace.trace，不走告警）。
+   */
+  readonly role?: 'signal' | 'context';
+
   /**
    * 声明多周期上下文需求（可选）：context 周期 → 最少保留根数。
    * 编译边界遍历决策流树按 period 取 max 合并进 plan.contextRequirements；

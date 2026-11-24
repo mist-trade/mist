@@ -15,6 +15,15 @@ export function contextSeriesKey(securityCode: string, period: number): string {
   return `${SERIES_ATTRIBUTE_PREFIX}${securityCode}.${period}`;
 }
 
+/** 上下文插件 opinion 的黑板键契约：`contextOpinion.<pluginId>`。
+ *  内核对 role:'context' 插件每 Bar 先于 plan 求值一次并写入；GUARD 读缓存，
+ *  不再逐 flow 重复求值（2026-11-24 聚合层定稿，决策文档 7.1.1）。 */
+export const CONTEXT_OPINION_PREFIX = 'contextOpinion.';
+
+export function contextOpinionKey(pluginId: string): string {
+  return `${CONTEXT_OPINION_PREFIX}${pluginId}`;
+}
+
 /**
  * 可用时刻（availability key）：bar 内容封存的时刻。
  *

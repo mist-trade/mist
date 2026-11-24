@@ -6,8 +6,12 @@ import {
   StrategyAlertDelivery,
   StrategyAlertEvent,
   StrategyAlertStatus,
+  StrategySignal,
 } from '@app/shared-data';
+import { availabilityKey } from '@app/strategy';
+import { formatShanghaiDateString } from '@app/timezone';
 import { toErrorMessage } from '@app/utils';
+import type { AlertDeliveryGroupDescriptor } from '@app/contracts';
 import { AlertDeliveryQueueService } from './alert-delivery-queue.service';
 
 /** Sweep cadence: one pass per minute. */
@@ -24,12 +28,14 @@ export const PENDING_SWEEP_MAX_PER_PASS = 100;
 
 /**
  * Outbox-style recovery relay (remediate-alert-delivery-integrity M2): the
- * strategy producer commits the AlertEvent and then best-effort enqueues the
- * fanout job — if the enqueue fails (Redis unavailable), the event stays
+ * strategy producer commits the AlertEvents and then best-effort enqueues the
+ * group fanout job — if the enqueue fails (Redis unavailable), the events stay
  * PENDING forever with no delivery rows. This sweep finds exactly those
  * stranded events (PENDING + older than the staleness threshold + NO
- * per-channel delivery rows at all) and re-enqueues the fanout. The
- * deterministic fanout job id collapses duplicate sweeps onto one job.
+ * per-channel delivery rows at all), re-derives the (securityId, effectiveTime)
+ * groups in memory from their signals (V2: grouping is never persisted), and
+ * re-enqueues one group fanout per group. The group-scoped deterministic fanout
+ * job id collapses duplicate sweeps onto one job.
  *
  * Deliberately a process timer (@nestjs/schedule), NOT a BullMQ repeatable
  * job: the sweep must keep running while Redis is down (it reads MySQL, a
@@ -47,6 +53,8 @@ export class PendingAlertDeliverySweepService {
     private readonly alertEvents: Repository<StrategyAlertEvent>,
     @InjectRepository(StrategyAlertDelivery)
     private readonly deliveries: Repository<StrategyAlertDelivery>,
+    @InjectRepository(StrategySignal)
+    private readonly signals: Repository<StrategySignal>,
     private readonly queue: AlertDeliveryQueueService,
   ) {}
 
@@ -56,17 +64,10 @@ export class PendingAlertDeliverySweepService {
     this.running = true;
     try {
       const candidates = await this.findStranded();
-      for (const event of candidates) {
-        await this.queue.enqueueFanout(event.id);
-        this.recoveredTotal += 1;
-        this.logger.log(
-          `sweep re-enqueued stranded PENDING event=${event.id} (no delivery rows, age >= 5m)`,
-        );
-      }
-      if (candidates.length > 0) {
-        this.logger.log(
-          `sweep pass recovered ${candidates.length} stranded event(s)`,
-        );
+      const recovered = await this.enqueueGrouped(candidates);
+      this.recoveredTotal += recovered;
+      if (recovered > 0) {
+        this.logger.log(`sweep pass recovered ${recovered} stranded event(s)`);
       }
     } catch (error) {
       this.logger.error(`sweep pass failed: ${toErrorMessage(error)}`);
@@ -78,6 +79,59 @@ export class PendingAlertDeliverySweepService {
   /** Process-local recovered count for the sweep metric. */
   getRecoveredTotal(): number {
     return this.recoveredTotal;
+  }
+
+  private async enqueueGrouped(
+    candidates: StrategyAlertEvent[],
+  ): Promise<number> {
+    if (candidates.length === 0) return 0;
+    const signals = await this.signals.find({
+      where: { id: In(candidates.map((event) => event.strategySignalId)) },
+    });
+    const signalsById = new Map(signals.map((signal) => [signal.id, signal]));
+
+    const groups = new Map<
+      string,
+      { descriptor: AlertDeliveryGroupDescriptor; ids: number[] }
+    >();
+    let recovered = 0;
+    for (const event of candidates) {
+      const signal = signalsById.get(event.strategySignalId);
+      if (!signal) {
+        this.logger.warn(
+          `sweep: event ${event.id} has no signal row — cannot derive the V2 group descriptor; skipping`,
+        );
+        continue;
+      }
+      const effectiveTime = availabilityKey({
+        period: signal.period,
+        timestamp: signal.signalTime,
+      });
+      const key = `${signal.securityId}\u0000${effectiveTime.getTime()}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          descriptor: {
+            securityId: signal.securityId,
+            effectiveTime: effectiveTime.toISOString(),
+            tradingDay: formatShanghaiDateString(effectiveTime),
+          },
+          ids: [],
+        };
+        groups.set(key, group);
+      }
+      group.ids.push(event.id);
+      recovered += 1;
+    }
+
+    for (const { descriptor, ids } of groups.values()) {
+      await this.queue.enqueueFanout(descriptor, ids);
+      this.logger.log(
+        `sweep re-enqueued group fanout securityId=${descriptor.securityId} ` +
+          `effectiveTime=${descriptor.effectiveTime} events=[${ids.join(',')}]`,
+      );
+    }
+    return recovered;
   }
 
   private async findStranded(): Promise<StrategyAlertEvent[]> {

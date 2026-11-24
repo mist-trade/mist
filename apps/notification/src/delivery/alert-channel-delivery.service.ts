@@ -1,6 +1,6 @@
 import { Inject, Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   NotificationChannel,
   Security,
@@ -12,24 +12,29 @@ import {
   StrategySignal,
 } from '@app/shared-data';
 import { toErrorMessage } from '@app/utils';
-import type { AlertDeliveryChannelJobV1 } from '@app/contracts';
+import type { AlertDeliveryChannelJobV2 } from '@app/contracts';
 
 import {
   CHANNEL_ADAPTERS,
   type ChannelAdapter,
   type ChannelSendResult,
 } from '../channels/channel-adapter.port';
-import { buildNotificationEnvelope } from './notification-envelope';
+import {
+  buildGroupedNotificationMessage,
+  type GroupedNotificationItem,
+} from './notification-envelope';
 import { NotificationDeliveryCounters } from './notification-delivery-counters';
 
 const MAX_LAST_ERROR = 1024;
 
 /**
- * Handles deliver.channel: loads evidence, builds the channel-neutral envelope,
- * calls the channel adapter, writes the per-channel delivery result, records
- * metrics, and reconciles the AlertEvent aggregate status. Transient failures
- * throw so BullMQ retries; permanent failures and exhausted retries dead-letter
- * without throwing (job completes; the DB row is the source of truth).
+ * Handles deliver.channel for one (group, channel) job (V2): loads the whole
+ * group's evidence, builds ONE channel-neutral grouped message, calls the channel
+ * adapter once, writes the per-channel delivery result for every delivered row
+ * (same providerMessageId), records metrics, and reconciles each AlertEvent
+ * aggregate status. Transient failures throw so BullMQ retries; permanent
+ * failures and exhausted retries dead-letter without throwing (job completes;
+ * the DB rows are the source of truth).
  */
 @Injectable()
 export class AlertChannelDeliveryService {
@@ -52,66 +57,86 @@ export class AlertChannelDeliveryService {
   ) {}
 
   async run(
-    job: AlertDeliveryChannelJobV1,
+    job: AlertDeliveryChannelJobV2,
     attemptsMade: number,
     maxAttempts: number,
   ): Promise<void> {
-    const { alertEventId, channel: jobChannel } = job;
     // Bridge the contract's pure literal union to the NotificationChannel enum
     // (used by the entity column + adapters). Values are guaranteed equal by decode.
-    const channel = toNotificationChannel(jobChannel);
-    const delivery = await this.deliveries.findOne({
-      where: { strategyAlertEventId: alertEventId, channel },
+    const channel = toNotificationChannel(job.channel);
+    const rows = await this.deliveries.find({
+      where: {
+        strategyAlertEventId: In(job.alertEventIds),
+        channel,
+      },
     });
-    if (!delivery) return;
-    if (
-      delivery.status === StrategyAlertDeliveryStatus.SENT ||
-      delivery.status === StrategyAlertDeliveryStatus.DEAD_LETTERED
-    ) {
-      return; // idempotent skip
-    }
+    if (rows.length === 0) return;
+    const work = rows.filter(
+      (row) =>
+        row.status !== StrategyAlertDeliveryStatus.SENT &&
+        row.status !== StrategyAlertDeliveryStatus.DEAD_LETTERED,
+    );
+    if (work.length === 0) return; // idempotent skip: every row terminal
 
     const adapter = this.adapters.find((a) => a.channel === channel);
     if (!adapter) {
       // Short-circuit before loading evidence: no adapter for this channel.
       this.counters.recordDeadLetter(channel);
-      await this.updateDeliveryStatus(
-        delivery.id,
-        StrategyAlertDeliveryStatus.DEAD_LETTERED,
-        delivery.attemptCount,
-        `no adapter configured for channel ${channel}`,
-      );
-      await this.reconcile(alertEventId);
+      for (const row of work) {
+        await this.updateDeliveryStatus(
+          row.id,
+          StrategyAlertDeliveryStatus.DEAD_LETTERED,
+          row.attemptCount,
+          `no adapter configured for channel ${channel}`,
+        );
+        await this.reconcile(row.strategyAlertEventId);
+      }
       return;
     }
 
-    const alertEvent = await this.alertEvents.findOne({
-      where: { id: alertEventId },
+    const alertEventIds = work.map((row) => row.strategyAlertEventId);
+    const alertEvents = await this.alertEvents.find({
+      where: { id: In(alertEventIds) },
     });
-    if (!alertEvent) return;
-    const signal = await this.signals.findOne({
-      where: { id: alertEvent.strategySignalId },
+    if (alertEvents.length === 0) return;
+    const signals = await this.signals.find({
+      where: { id: In(alertEvents.map((event) => event.strategySignalId)) },
     });
-    const security = signal
-      ? await this.securities.findOne({ where: { id: signal.securityId } })
-      : null;
-    const strategyDefinition = signal
-      ? await this.strategyDefinitions.findOne({
-          where: { id: signal.strategyDefinitionId },
-        })
-      : null;
+    const signalsById = new Map(signals.map((signal) => [signal.id, signal]));
+    const securityIds = [
+      ...new Set(signals.map((signal) => signal.securityId)),
+    ];
+    const definitionIds = [
+      ...new Set(signals.map((signal) => signal.strategyDefinitionId)),
+    ];
+    const securities = await this.securities.find({
+      where: { id: In(securityIds) },
+    });
+    const securitiesById = new Map(securities.map((s) => [s.id, s]));
+    const definitions = await this.strategyDefinitions.find({
+      where: { id: In(definitionIds) },
+    });
+    const definitionsById = new Map(definitions.map((d) => [d.id, d]));
 
-    const envelope = buildNotificationEnvelope(
-      alertEvent,
-      signal,
-      security,
-      strategyDefinition,
-      channel,
-    );
-    const attemptNo = delivery.attemptCount + 1;
+    const items: GroupedNotificationItem[] = [];
+    for (const event of alertEvents) {
+      const signal = signalsById.get(event.strategySignalId) ?? null;
+      items.push({
+        alertEvent: event,
+        signal,
+        security: signal
+          ? (securitiesById.get(signal.securityId) ?? null)
+          : null,
+        strategyDefinition: signal
+          ? (definitionsById.get(signal.strategyDefinitionId) ?? null)
+          : null,
+      });
+    }
+
+    const message = buildGroupedNotificationMessage(items);
     let result: ChannelSendResult;
     try {
-      result = await adapter.send({ text: envelope.message.summary });
+      result = await adapter.send({ text: message });
     } catch (error) {
       result = {
         status: 'transient_failure',
@@ -122,16 +147,18 @@ export class AlertChannelDeliveryService {
 
     if (result.status === 'sent') {
       this.counters.recordSent(channel);
-      await this.deliveries.update(delivery.id, {
-        status: StrategyAlertDeliveryStatus.SENT,
-        attemptCount: attemptNo,
-        providerMessageId: result.providerMessageId ?? null,
-        sentAt: new Date(),
-        lastError: null,
-      });
-      await this.reconcile(alertEventId);
+      for (const row of work) {
+        await this.deliveries.update(row.id, {
+          status: StrategyAlertDeliveryStatus.SENT,
+          attemptCount: row.attemptCount + 1,
+          providerMessageId: result.providerMessageId ?? null,
+          sentAt: new Date(),
+          lastError: null,
+        });
+        await this.reconcile(row.strategyAlertEventId);
+      }
       this.logger.log(
-        `delivered event=${alertEventId} channel=${channel} attempt=${attemptNo}`,
+        `delivered group channel=${channel} events=[${alertEventIds.join(',')}] attempt=${attemptsMade + 1}`,
       );
       return;
     }
@@ -142,22 +169,24 @@ export class AlertChannelDeliveryService {
       ? StrategyAlertDeliveryStatus.DEAD_LETTERED
       : StrategyAlertDeliveryStatus.FAILED;
     this.counters.recordFailure(channel);
-    await this.updateDeliveryStatus(
-      delivery.id,
-      newStatus,
-      attemptNo,
-      result.error,
-    );
-    await this.reconcile(alertEventId);
+    for (const row of work) {
+      await this.updateDeliveryStatus(
+        row.id,
+        newStatus,
+        row.attemptCount + 1,
+        result.error,
+      );
+      await this.reconcile(row.strategyAlertEventId);
+    }
 
     if (result.status === 'transient_failure' && !terminal) {
       throw new Error(
-        `transient delivery failure channel=${channel} event=${alertEventId}: ${result.error ?? 'unknown'}`,
+        `transient delivery failure channel=${channel} events=[${alertEventIds.join(',')}]: ${result.error ?? 'unknown'}`,
       );
     }
     this.counters.recordDeadLetter(channel);
     this.logger.warn(
-      `delivery dead-lettered channel=${channel} event=${alertEventId} attempt=${attemptNo}: ${result.error ?? 'exhausted retries'}`,
+      `delivery dead-lettered channel=${channel} events=[${alertEventIds.join(',')}]: ${result.error ?? 'exhausted retries'}`,
     );
   }
 

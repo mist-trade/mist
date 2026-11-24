@@ -1,8 +1,18 @@
 /**
  * BullMQ contract for proactive strategy alert delivery (deliver-strategy-notifications).
- * Producer (apps/signal) enqueues a fanout job per committed AlertEvent; the worker
- * (apps/notification) fans out to one channel job per configured channel, each retried
- * independently via BullMQ attempts/backoff.
+ *
+ * V2 (2026-11-24, batch-grouped): the producer (apps/signal) persists one AlertEvent
+ * per committed KernelSignal, groups the batch by (securityId, effectiveTime) — the
+ * group is complete at commit time because every same-effectiveTime signal originates
+ * from the same candle_finalized trigger and the same processor transaction batch —
+ * and enqueues ONE deliver.fanout job per group carrying the group's alertEventIds.
+ * The worker (apps/notification) fans the group out to one channel job per configured
+ * channel (same ids), each retried independently via BullMQ attempts/backoff, and the
+ * channel handler renders ONE message for the whole group.
+ *
+ * No V1 compatibility: nothing is deployed; consumers decode V2 exactly (exact-keys).
+ * Grouping is never persisted: the descriptor exists only inside the job payload and
+ * is recomputed in memory on replay from the alert rows' signals (availabilityKey).
  *
  * Pure domain contract: intentionally does NOT import @app/shared-data (forbidden for
  * domain libs by the transport boundary guard). Channel values mirror the
@@ -34,23 +44,46 @@ export const STRATEGY_ALERT_DELIVERY_CHANNEL_JOB_OPTIONS = Object.freeze({
   removeOnFail: Object.freeze({ age: 604_800 }),
 });
 
-export interface AlertDeliveryFanoutJobV1 {
-  readonly contractVersion: 1;
-  readonly alertEventId: number;
+/** Observability descriptor of one (securityId, effectiveTime) aggregation group.
+ *  Structurally separate from alertEventIds so a future V3 can extend the
+ *  descriptor without touching the operative ids semantics. */
+export interface AlertDeliveryGroupDescriptor {
+  readonly securityId: number;
+  /** RFC3339 instant of the group's availabilityKey (content-sealed moment). */
+  readonly effectiveTime: string;
+  /** Shanghai trading day (YYYY-MM-DD) the group belongs to; observability only. */
+  readonly tradingDay?: string;
 }
 
-export interface AlertDeliveryChannelJobV1 {
-  readonly contractVersion: 1;
-  readonly alertEventId: number;
+export interface AlertDeliveryFanoutJobV2 {
+  readonly contractVersion: 2;
+  readonly group: AlertDeliveryGroupDescriptor;
+  readonly alertEventIds: readonly number[];
+}
+
+export interface AlertDeliveryChannelJobV2 {
+  readonly contractVersion: 2;
+  readonly group: AlertDeliveryGroupDescriptor;
   readonly channel: AlertDeliveryChannel;
+  readonly alertEventIds: readonly number[];
 }
 
-const FANOUT_KEYS = Object.freeze(['contractVersion', 'alertEventId']);
+const FANOUT_KEYS = Object.freeze([
+  'contractVersion',
+  'group',
+  'alertEventIds',
+]);
 const CHANNEL_KEYS = Object.freeze([
   'contractVersion',
-  'alertEventId',
+  'group',
   'channel',
+  'alertEventIds',
 ]);
+const GROUP_KEYS_REQUIRED = Object.freeze(['securityId', 'effectiveTime']);
+const GROUP_KEYS_OPTIONAL = Object.freeze(['tradingDay']);
+const RFC3339_PATTERN =
+  /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+const TRADING_DAY_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
 
 function hasExactKeys(
   value: Record<string, unknown>,
@@ -68,43 +101,101 @@ function isPositiveSafeInt(value: unknown): value is number {
   return typeof value === 'number' && Number.isSafeInteger(value) && value > 0;
 }
 
-export function decodeAlertDeliveryFanoutJobV1(
+function decodeGroup(
   input: unknown,
-): AlertDeliveryFanoutJobV1 {
+  jobName: string,
+): AlertDeliveryGroupDescriptor {
+  if (!isRecord(input)) {
+    throw new TypeError(`${jobName} group must be an object`);
+  }
+  const keys = Object.keys(input).sort();
+  const allowed = [...GROUP_KEYS_REQUIRED, ...GROUP_KEYS_OPTIONAL].sort();
+  if (
+    keys.length < GROUP_KEYS_REQUIRED.length ||
+    !GROUP_KEYS_REQUIRED.every((key) => keys.includes(key)) ||
+    keys.some((key) => !allowed.includes(key))
+  ) {
+    throw new TypeError(
+      `${jobName} group must contain exactly securityId + effectiveTime (+ optional tradingDay)`,
+    );
+  }
+  if (!isPositiveSafeInt(input.securityId)) {
+    throw new TypeError(
+      `${jobName} group.securityId must be a positive safe integer`,
+    );
+  }
+  if (
+    typeof input.effectiveTime !== 'string' ||
+    !RFC3339_PATTERN.test(input.effectiveTime) ||
+    !Number.isFinite(Date.parse(input.effectiveTime))
+  ) {
+    throw new TypeError(`${jobName} group.effectiveTime must be RFC3339`);
+  }
+  if (
+    input.tradingDay !== undefined &&
+    (typeof input.tradingDay !== 'string' ||
+      !TRADING_DAY_PATTERN.test(input.tradingDay))
+  ) {
+    throw new TypeError(
+      `${jobName} group.tradingDay must be YYYY-MM-DD when present`,
+    );
+  }
+  const group: AlertDeliveryGroupDescriptor = Object.freeze({
+    securityId: input.securityId,
+    effectiveTime: input.effectiveTime,
+    ...(input.tradingDay !== undefined ? { tradingDay: input.tradingDay } : {}),
+  });
+  return group;
+}
+
+function decodeAlertEventIds(
+  input: unknown,
+  jobName: string,
+): readonly number[] {
+  if (
+    !Array.isArray(input) ||
+    input.length === 0 ||
+    input.some((id) => !isPositiveSafeInt(id))
+  ) {
+    throw new TypeError(
+      `${jobName} alertEventIds must be a non-empty array of positive safe integers`,
+    );
+  }
+  const ids = [...input];
+  if (new Set(ids).size !== ids.length) {
+    throw new TypeError(`${jobName} alertEventIds must not contain duplicates`);
+  }
+  return Object.freeze(ids);
+}
+
+export function decodeAlertDeliveryFanoutJobV2(
+  input: unknown,
+): AlertDeliveryFanoutJobV2 {
   if (!isRecord(input) || !hasExactKeys(input, FANOUT_KEYS)) {
     throw new TypeError(
-      'deliver.fanout data must contain exactly the V1 fields',
+      'deliver.fanout data must contain exactly the V2 fields',
     );
   }
-  if (input.contractVersion !== 1) {
-    throw new TypeError('deliver.fanout contractVersion must be 1');
-  }
-  if (!isPositiveSafeInt(input.alertEventId)) {
-    throw new TypeError(
-      'deliver.fanout alertEventId must be a positive safe integer',
-    );
+  if (input.contractVersion !== 2) {
+    throw new TypeError('deliver.fanout contractVersion must be 2');
   }
   return Object.freeze({
-    contractVersion: 1,
-    alertEventId: input.alertEventId,
+    contractVersion: 2,
+    group: decodeGroup(input.group, 'deliver.fanout'),
+    alertEventIds: decodeAlertEventIds(input.alertEventIds, 'deliver.fanout'),
   });
 }
 
-export function decodeAlertDeliveryChannelJobV1(
+export function decodeAlertDeliveryChannelJobV2(
   input: unknown,
-): AlertDeliveryChannelJobV1 {
+): AlertDeliveryChannelJobV2 {
   if (!isRecord(input) || !hasExactKeys(input, CHANNEL_KEYS)) {
     throw new TypeError(
-      'deliver.channel data must contain exactly the V1 fields',
+      'deliver.channel data must contain exactly the V2 fields',
     );
   }
-  if (input.contractVersion !== 1) {
-    throw new TypeError('deliver.channel contractVersion must be 1');
-  }
-  if (!isPositiveSafeInt(input.alertEventId)) {
-    throw new TypeError(
-      'deliver.channel alertEventId must be a positive safe integer',
-    );
+  if (input.contractVersion !== 2) {
+    throw new TypeError('deliver.channel contractVersion must be 2');
   }
   if (
     input.channel !== 'qq' &&
@@ -116,22 +207,27 @@ export function decodeAlertDeliveryChannelJobV1(
     );
   }
   return Object.freeze({
-    contractVersion: 1,
-    alertEventId: input.alertEventId,
+    contractVersion: 2,
+    group: decodeGroup(input.group, 'deliver.channel'),
     channel: input.channel,
+    alertEventIds: decodeAlertEventIds(input.alertEventIds, 'deliver.channel'),
   });
 }
 
 export function alertDeliveryFanoutJobId(
-  job: AlertDeliveryFanoutJobV1,
+  job: AlertDeliveryFanoutJobV2,
 ): string {
-  const accepted = decodeAlertDeliveryFanoutJobV1(job);
-  return `deliver-fanout-v1-${accepted.alertEventId}`;
+  const accepted = decodeAlertDeliveryFanoutJobV2(job);
+  return `deliver-fanout-v2-${accepted.group.securityId}-${Date.parse(
+    accepted.group.effectiveTime,
+  )}`;
 }
 
 export function alertDeliveryChannelJobId(
-  job: AlertDeliveryChannelJobV1,
+  job: AlertDeliveryChannelJobV2,
 ): string {
-  const accepted = decodeAlertDeliveryChannelJobV1(job);
-  return `deliver-channel-v1-${accepted.alertEventId}-${accepted.channel}`;
+  const accepted = decodeAlertDeliveryChannelJobV2(job);
+  return `deliver-channel-v2-${accepted.group.securityId}-${Date.parse(
+    accepted.group.effectiveTime,
+  )}-${accepted.channel}`;
 }

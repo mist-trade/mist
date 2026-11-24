@@ -353,7 +353,10 @@ describe('CandleFinalizedJobProcessor', () => {
     const first = makeBar('2026-08-04T06:43:00.000Z', 28);
     const second = makeBar('2026-08-04T06:44:00.000Z', 29);
     const marketData = sequentialMarketData(first, second);
-    const persistence = { persist: jest.fn() };
+    const persistence = {
+      persist: jest.fn(),
+      publishGroupedDeliveries: jest.fn(async () => undefined),
+    };
     const processor = modeProcessor(
       marketData,
       'shadow',
@@ -379,8 +382,17 @@ describe('CandleFinalizedJobProcessor', () => {
       persist: jest
         .fn()
         .mockRejectedValueOnce(failure)
-        .mockResolvedValueOnce('created')
-        .mockResolvedValueOnce('created'),
+        .mockResolvedValueOnce({
+          outcome: 'created',
+          alertEventId: null,
+          candidate: null,
+        })
+        .mockResolvedValueOnce({
+          outcome: 'created',
+          alertEventId: null,
+          candidate: null,
+        }),
+      publishGroupedDeliveries: jest.fn(async () => undefined),
     };
     const processor = modeProcessor(
       sequentialMarketData(first, second, third),
@@ -409,7 +421,10 @@ describe('CandleFinalizedJobProcessor', () => {
     const processor = modeProcessor(
       marketData,
       'shadow',
-      { persist: jest.fn() },
+      {
+        persist: jest.fn(),
+        publishGroupedDeliveries: jest.fn(async () => undefined),
+      },
       () => now,
     );
 
@@ -430,7 +445,10 @@ describe('CandleFinalizedJobProcessor', () => {
   it('does not persist a quantity plan when the field is unavailable', async () => {
     const bar = makeBar('2026-08-04T06:44:00.000Z', 28);
     const marketData = sequentialMarketData(bar);
-    const persistence = { persist: jest.fn() };
+    const persistence = {
+      persist: jest.fn(),
+      publishGroupedDeliveries: jest.fn(async () => undefined),
+    };
     const processor = new CandleFinalizedJobProcessor(
       marketData,
       () => [
@@ -686,7 +704,10 @@ function sequentialMarketData(...bars: StrategyBar[]) {
 function modeProcessor(
   marketData: ReturnType<typeof sequentialMarketData>,
   mode: 'shadow' | 'on',
-  persistence: { persist: jest.Mock },
+  persistence: {
+    persist: jest.Mock;
+    publishGroupedDeliveries: jest.Mock;
+  },
   now: () => Date,
 ) {
   return new CandleFinalizedJobProcessor(

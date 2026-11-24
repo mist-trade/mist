@@ -1,4 +1,9 @@
-import type { FactorContext, FactorPlugin } from '../factor/factor.types';
+import type {
+  FactorContext,
+  FactorOpinion,
+  FactorPlugin,
+} from '../factor/factor.types';
+import { contextOpinionKey } from '../kernel/availability';
 import {
   factorPluginRegistry,
   type FactorPluginRegistry,
@@ -56,8 +61,11 @@ export class DecisionFlowEvaluator {
   ): Promise<DecisionResult> {
     switch (node.type) {
       case 'GUARD': {
-        const plugin = this.getPlugin(node.pluginId);
-        const opinion = await plugin.evaluate(context, node.params);
+        const opinion = await this.resolveOpinion(
+          node.pluginId,
+          context,
+          node.params,
+        );
 
         const minConf = node.minConfidence ?? 0.0;
         const actionMatches =
@@ -161,8 +169,11 @@ export class DecisionFlowEvaluator {
       }
 
       case 'EXTRACTOR': {
-        const plugin = this.getPlugin(node.pluginId);
-        const opinion = await plugin.evaluate(context, node.params);
+        const opinion = await this.resolveOpinion(
+          node.pluginId,
+          context,
+          node.params,
+        );
 
         if (opinion.evidence) {
           context.attributes.set(node.exportAttributeKey, opinion.evidence);
@@ -211,8 +222,11 @@ export class DecisionFlowEvaluator {
         const breakdown: ConsensusVoteBreakdown[] = [];
 
         const evaluationPromises = node.plugins.map(async (item) => {
-          const plugin = this.getPlugin(item.pluginId);
-          const opinion = await plugin.evaluate(context, item.params);
+          const opinion = await this.resolveOpinion(
+            item.pluginId,
+            context,
+            item.params,
+          );
           return { item, opinion };
         });
 
@@ -372,6 +386,23 @@ export class DecisionFlowEvaluator {
       }
     }
     return undefined;
+  }
+
+  /** context 角色缓存读取（2026-11-24，决策文档 7.1.1）：内核对 role:'context'
+   *  插件每 Bar 先于 plan 预求值一次并写入黑板 `contextOpinion.<pluginId>`；
+   *  命中缓存则不再重复求值。未命中（非 context 插件或未经内核预取）回退直连
+   *  求值，语义与旧路径完全一致。 */
+  private async resolveOpinion(
+    pluginId: string,
+    context: FactorContext,
+    params?: Record<string, unknown>,
+  ): Promise<FactorOpinion> {
+    const cached = context.attributes.get(contextOpinionKey(pluginId));
+    if (cached) {
+      return cached as FactorOpinion;
+    }
+    const plugin = this.getPlugin(pluginId);
+    return await plugin.evaluate(context, params);
   }
 
   private getPlugin(pluginId: string): FactorPlugin {

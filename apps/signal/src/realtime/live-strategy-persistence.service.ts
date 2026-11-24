@@ -10,7 +10,12 @@ import {
   isUniqueConstraintViolation,
 } from '@app/shared-data';
 import type { ShadowStrategyCandidate } from '@app/signal';
-import { mapKernelSignalToPersistencePayload } from '@app/strategy';
+import {
+  availabilityKey,
+  mapKernelSignalToPersistencePayload,
+} from '@app/strategy';
+import { formatShanghaiDateString } from '@app/timezone';
+import type { AlertDeliveryGroupDescriptor } from '@app/contracts';
 import { DataSource as TypeOrmDataSource } from 'typeorm';
 import {
   STRATEGY_ALERT_DELIVERY_HANDOFF_PORT,
@@ -18,6 +23,14 @@ import {
 } from './notification/strategy-alert-delivery-handoff.port';
 
 export type LiveStrategyPersistenceOutcome = 'created' | 'duplicate_skipped';
+
+export interface LiveStrategyPersistenceResult {
+  readonly outcome: LiveStrategyPersistenceOutcome;
+  /** AlertEvent id when a new row was created; null on duplicate_skipped. */
+  readonly alertEventId: number | null;
+  /** The candidate this result belongs to (identity for batch grouping). */
+  readonly candidate: ShadowStrategyCandidate;
+}
 
 const ALERT_DEDUPE_CONSTRAINT = 'uq_strategy_alert_events_dedupe_key';
 
@@ -34,7 +47,7 @@ export class LiveStrategyPersistenceService {
 
   async persist(
     candidate: ShadowStrategyCandidate,
-  ): Promise<LiveStrategyPersistenceOutcome> {
+  ): Promise<LiveStrategyPersistenceResult> {
     let alertEventId: number | null = null;
     try {
       await this.dataSource.transaction(async (manager) => {
@@ -73,31 +86,76 @@ export class LiveStrategyPersistenceService {
         const savedAlert = await manager.save(StrategyAlertEvent, alert);
         alertEventId = savedAlert.id;
       });
-      // Post-commit enqueue (best-effort): the Signal/AlertEvent is already
-      // committed; an enqueue failure MUST NOT fail persist. The event remains
-      // PENDING for a later reconciliation sweep (dual-write window accepted).
-      if (alertEventId !== null) {
-        await this.enqueueDelivery(alertEventId);
-      }
-      return 'created';
+      return {
+        outcome: 'created',
+        alertEventId,
+        candidate,
+      };
     } catch (error) {
       if (isUniqueConstraintViolation(error, ALERT_DEDUPE_CONSTRAINT)) {
-        return 'duplicate_skipped';
+        return {
+          outcome: 'duplicate_skipped',
+          alertEventId: null,
+          candidate,
+        };
       }
       throw error;
     }
   }
 
-  private async enqueueDelivery(alertEventId: number | null): Promise<void> {
-    if (alertEventId === null || this.deliveryHandoff === null) return;
-    try {
-      await this.deliveryHandoff.publish(alertEventId);
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      this.logger.warn(
-        `Failed to enqueue alert delivery for event ${alertEventId} ` +
-          `(Signal already committed; event stays PENDING for later sweep): ${message}`,
-      );
+  /**
+   * Batch-grouped delivery handoff (V2, 2026-11-24 定稿，决策文档 7.1.3):
+   * group the batch's created AlertEvents by (securityId, effectiveTime) computed
+   * from the candidate signals and enqueue ONE deliver.fanout job per group. The
+   * group is complete at commit time (same 1m trigger => same processor batch), so
+   * no timer/lateness handling is needed. Best-effort: an enqueue failure MUST NOT
+   * fail the processor run — the Signal/AlertEvent rows are already committed and
+   * the events stay PENDING for the pending-alert sweep.
+   */
+  async publishGroupedDeliveries(
+    results: readonly LiveStrategyPersistenceResult[],
+  ): Promise<void> {
+    if (this.deliveryHandoff === null) return;
+    const created = results.filter((r) => r.alertEventId !== null);
+    if (created.length === 0) return;
+
+    const groups = new Map<
+      string,
+      { descriptor: AlertDeliveryGroupDescriptor; ids: number[] }
+    >();
+    for (const result of created) {
+      const candidate = result.candidate;
+      const effectiveTime = availabilityKey({
+        period: candidate.period,
+        timestamp: candidate.signalTime,
+      });
+      const key = `${candidate.securityId}\u0000${effectiveTime.getTime()}`;
+      let group = groups.get(key);
+      if (!group) {
+        group = {
+          descriptor: {
+            securityId: candidate.securityId,
+            effectiveTime: effectiveTime.toISOString(),
+            tradingDay: formatShanghaiDateString(effectiveTime),
+          },
+          ids: [],
+        };
+        groups.set(key, group);
+      }
+      group.ids.push(result.alertEventId as number);
+    }
+
+    for (const { descriptor, ids } of groups.values()) {
+      try {
+        await this.deliveryHandoff.publishGroup(descriptor, ids);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        this.logger.warn(
+          `Failed to enqueue grouped alert delivery for securityId=${descriptor.securityId} ` +
+            `effectiveTime=${descriptor.effectiveTime} events=[${ids.join(',')}] ` +
+            `(rows already committed; events stay PENDING for later sweep): ${message}`,
+        );
+      }
     }
   }
 }

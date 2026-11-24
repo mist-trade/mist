@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import type {
   StrategyBar,
   StrategyRealtimeMarketDataPort,
@@ -21,8 +22,9 @@ import {
   type ShadowStrategyCandidate,
 } from '@app/signal';
 import type { SignalRegistrySnapshot } from '../signal-registry.types';
-import type {
-  LiveStrategyPersistenceOutcome,
+import {
+  type LiveStrategyPersistenceOutcome,
+  type LiveStrategyPersistenceResult,
   LiveStrategyPersistenceService,
 } from './live-strategy-persistence.service';
 import type { RuntimeObservabilityService } from '../observability/runtime-observability.service';
@@ -54,6 +56,7 @@ interface FinalizationCursor {
 }
 
 export class CandleFinalizedJobProcessor {
+  private readonly logger = new Logger(CandleFinalizedJobProcessor.name);
   private readonly cursors = new Map<string, FinalizationCursor>();
   private activeTradingDay: string | null = null;
   private lastPersistenceOutcome:
@@ -81,7 +84,7 @@ export class CandleFinalizedJobProcessor {
     private readonly mode: 'shadow' | 'on' = 'shadow',
     private readonly persistence?: Pick<
       LiveStrategyPersistenceService,
-      'persist'
+      'persist' | 'publishGroupedDeliveries'
     >,
     private readonly runtimeObservability?: Pick<
       RuntimeObservabilityService,
@@ -198,27 +201,40 @@ export class CandleFinalizedJobProcessor {
       );
       this.lastJobEvaluated = true;
 
+      const results: LiveStrategyPersistenceResult[] = [];
       for (const candidate of evaluated) {
         if (this.mode === 'on') {
           if (!this.persistence) {
             throw new Error('on-mode live strategy persistence is unavailable');
           }
           try {
-            await this.runStage(
+            const result = await this.runStage(
               deadlineAt,
               'persistence',
-              async (): Promise<LiveStrategyPersistenceOutcome> => {
-                const outcome = await this.persistence!.persist(candidate);
-                this.lastPersistenceOutcome = outcome;
-                return outcome;
+              async (): Promise<LiveStrategyPersistenceResult> => {
+                return await this.persistence!.persist(candidate);
               },
             );
+            this.lastPersistenceOutcome = result.outcome;
+            results.push(result);
           } catch (error) {
             this.lastPersistenceOutcome = 'failed';
             throw error;
           }
         }
         candidates.push(candidate);
+      }
+      // Batch-grouped best-effort handoff (V2): one deliver.fanout per
+      // (securityId, effectiveTime) group; failures leave events PENDING for
+      // the sweep. Must not fail the committed batch.
+      if (results.length > 0 && this.persistence) {
+        try {
+          await this.persistence.publishGroupedDeliveries(results);
+        } catch (error) {
+          this.logger?.warn?.(
+            `grouped delivery handoff failed (events stay PENDING): ${String(error)}`,
+          );
+        }
       }
     }
     return Object.freeze({

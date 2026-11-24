@@ -3,7 +3,7 @@ import {
   StrategyAlertDeliveryStatus,
   StrategyAlertStatus,
 } from '@app/shared-data';
-import { QueryFailedError } from 'typeorm';
+import { In, QueryFailedError } from 'typeorm';
 import type { ChannelAdapter } from '../channels/channel-adapter.port';
 import { AlertFanoutService } from './alert-fanout.service';
 
@@ -21,6 +21,15 @@ function mockRepo(): Repo {
     update: jest.fn().mockResolvedValue(undefined),
     save: jest.fn().mockResolvedValue(undefined),
   };
+}
+
+const GROUP = Object.freeze({
+  securityId: 9,
+  effectiveTime: '2026-11-24T02:00:00.000Z',
+});
+
+function groupJob(alertEventIds: number[]) {
+  return { contractVersion: 2 as const, group: { ...GROUP }, alertEventIds };
 }
 
 describe('AlertFanoutService', () => {
@@ -53,69 +62,107 @@ describe('AlertFanoutService', () => {
     service = makeService([wechat, qq]);
   });
 
-  it('creates a pending delivery row + enqueues per channel on first fanout', async () => {
-    alertEvents.findOne.mockResolvedValueOnce({ id: 5 });
+  it('creates pending delivery rows for every group event + enqueues one channel job per channel', async () => {
+    alertEvents.find.mockResolvedValueOnce([{ id: 5 }, { id: 6 }]);
     deliveries.findOne.mockResolvedValue(null); // no existing rows
 
-    await service.run({ contractVersion: 1, alertEventId: 5 });
+    await service.run(groupJob([5, 6]));
 
-    expect(deliveries.save).toHaveBeenCalledTimes(2);
+    // 2 events x 2 channels rows
+    expect(deliveries.save).toHaveBeenCalledTimes(4);
     expect(deliveries.save).toHaveBeenCalledWith({
       strategyAlertEventId: 5,
       channel: NotificationChannel.WECHAT,
       status: StrategyAlertDeliveryStatus.PENDING,
       attemptCount: 0,
     });
+    expect(deliveries.save).toHaveBeenCalledWith({
+      strategyAlertEventId: 6,
+      channel: NotificationChannel.QQ,
+      status: StrategyAlertDeliveryStatus.PENDING,
+      attemptCount: 0,
+    });
+    // one channel job per channel carrying the whole group
+    expect(queue.enqueueChannel).toHaveBeenCalledTimes(2);
     expect(queue.enqueueChannel).toHaveBeenCalledWith(
-      5,
+      GROUP,
+      [5, 6],
       NotificationChannel.WECHAT,
     );
     expect(queue.enqueueChannel).toHaveBeenCalledWith(
-      5,
+      GROUP,
+      [5, 6],
       NotificationChannel.QQ,
     );
   });
 
-  it('skips terminal (SENT/DEAD_LETTERED) deliveries, still enqueues PENDING/FAILED', async () => {
-    alertEvents.findOne.mockResolvedValueOnce({ id: 5 });
+  it('skips terminal (SENT/DEAD_LETTERED) rows, still creates/enqueues PENDING/FAILED ones', async () => {
+    alertEvents.find.mockResolvedValueOnce([{ id: 5 }, { id: 6 }]);
+    // wechat: event5 done, event6 pending; qq: none
     deliveries.findOne
-      .mockResolvedValueOnce({
-        status: StrategyAlertDeliveryStatus.SENT,
-      }) // wechat done
-      .mockResolvedValueOnce({
-        status: StrategyAlertDeliveryStatus.PENDING,
-      }); // qq pending
+      .mockResolvedValueOnce({ status: StrategyAlertDeliveryStatus.SENT })
+      .mockResolvedValueOnce({ status: StrategyAlertDeliveryStatus.PENDING })
+      .mockResolvedValue(null);
 
-    await service.run({ contractVersion: 1, alertEventId: 5 });
+    await service.run(groupJob([5, 6]));
 
-    // wechat skipped (no save, no enqueue); qq enqueued (no new save since row exists)
-    expect(queue.enqueueChannel).toHaveBeenCalledTimes(1);
+    // wechat/event5 terminal → skipped; qq rows missing for both events → saved
+    expect(deliveries.save).toHaveBeenCalledTimes(2);
+    expect(deliveries.save).toHaveBeenCalledWith({
+      strategyAlertEventId: 5,
+      channel: NotificationChannel.QQ,
+      status: StrategyAlertDeliveryStatus.PENDING,
+      attemptCount: 0,
+    });
+    expect(deliveries.save).toHaveBeenCalledWith({
+      strategyAlertEventId: 6,
+      channel: NotificationChannel.QQ,
+      status: StrategyAlertDeliveryStatus.PENDING,
+      attemptCount: 0,
+    });
+    expect(queue.enqueueChannel).toHaveBeenCalledTimes(2);
     expect(queue.enqueueChannel).toHaveBeenCalledWith(
-      5,
+      GROUP,
+      [5, 6],
       NotificationChannel.QQ,
     );
-    expect(deliveries.save).not.toHaveBeenCalled();
   });
 
-  it('does nothing if the AlertEvent was deleted', async () => {
-    alertEvents.findOne.mockResolvedValueOnce(null);
-    await service.run({ contractVersion: 1, alertEventId: 5 });
+  it('does nothing when every event in the group was cascade-deleted', async () => {
+    alertEvents.find.mockResolvedValueOnce([]);
+    await service.run(groupJob([5]));
     expect(queue.enqueueChannel).not.toHaveBeenCalled();
     expect(deliveries.save).not.toHaveBeenCalled();
   });
 
-  it('fails the AlertEvent when no channels are configured', async () => {
+  it('delivers the surviving events and warns when some group members are missing', async () => {
+    alertEvents.find.mockResolvedValueOnce([{ id: 6 }]); // 5 deleted
+    deliveries.findOne.mockResolvedValue(null);
+
+    await service.run(groupJob([5, 6]));
+
+    expect(deliveries.save).toHaveBeenCalledTimes(2);
+    expect(queue.enqueueChannel).toHaveBeenCalledTimes(2);
+    expect(queue.enqueueChannel).toHaveBeenCalledWith(
+      GROUP,
+      [5, 6],
+      NotificationChannel.WECHAT,
+    );
+  });
+
+  it('fails every group event when no channels are configured', async () => {
     service = makeService([]);
-    alertEvents.findOne.mockResolvedValueOnce({ id: 5 });
-    await service.run({ contractVersion: 1, alertEventId: 5 });
-    expect(alertEvents.update).toHaveBeenCalledWith(5, {
-      status: StrategyAlertStatus.FAILED,
-    });
+    alertEvents.find.mockResolvedValueOnce([{ id: 5 }, { id: 6 }]);
+    await service.run(groupJob([5, 6]));
+    expect(alertEvents.update).toHaveBeenCalledWith(
+      { id: In([5, 6]) },
+      { status: StrategyAlertStatus.FAILED },
+    );
     expect(queue.enqueueChannel).not.toHaveBeenCalled();
   });
 
   it('swallows the exact delivery-row unique-constraint race (concurrent fanout)', async () => {
-    alertEvents.findOne.mockResolvedValueOnce({ id: 5 });
+    alertEvents.find.mockResolvedValueOnce([{ id: 5 }]);
     deliveries.findOne.mockResolvedValue(null);
     deliveries.save.mockRejectedValueOnce(
       dupError(
@@ -123,21 +170,19 @@ describe('AlertFanoutService', () => {
       ),
     );
 
-    await service.run({ contractVersion: 1, alertEventId: 5 });
+    await service.run(groupJob([5]));
 
     // still enqueued despite the dup-entry on save
     expect(queue.enqueueChannel).toHaveBeenCalledTimes(2);
   });
 
   it('fails the job loudly when delivery-row save fails for a non-unique reason', async () => {
-    alertEvents.findOne.mockResolvedValueOnce({ id: 5 });
+    alertEvents.find.mockResolvedValueOnce([{ id: 5 }]);
     deliveries.findOne.mockResolvedValue(null);
     const failure = new Error('connection lost');
     deliveries.save.mockRejectedValueOnce(failure);
 
-    await expect(
-      service.run({ contractVersion: 1, alertEventId: 5 }),
-    ).rejects.toBe(failure);
+    await expect(service.run(groupJob([5]))).rejects.toBe(failure);
     // No channel job for a row that does not exist
     expect(queue.enqueueChannel).not.toHaveBeenCalled();
   });

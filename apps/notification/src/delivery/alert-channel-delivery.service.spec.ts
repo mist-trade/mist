@@ -23,8 +23,19 @@ function mockRepo(): Repo {
   };
 }
 
-const WECHAT = NotificationChannel.WECHAT;
-const QQ = NotificationChannel.QQ;
+const GROUP = Object.freeze({
+  securityId: 9,
+  effectiveTime: '2026-08-12T01:35:00.000Z',
+});
+
+function groupJob(channel: 'qq' | 'wechat' | 'feishu', ids: number[]) {
+  return {
+    contractVersion: 2 as const,
+    group: { ...GROUP },
+    channel,
+    alertEventIds: ids,
+  };
+}
 
 function delivery(
   overrides: Partial<{
@@ -38,14 +49,35 @@ function delivery(
   return {
     id: 7,
     strategyAlertEventId: 1,
-    channel: WECHAT,
+    channel: NotificationChannel.WECHAT,
     status: StrategyAlertDeliveryStatus.PENDING,
     attemptCount: 0,
     ...overrides,
   };
 }
 
-describe('AlertChannelDeliveryService', () => {
+function makeSignal(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 5,
+    securityId: 9,
+    strategyDefinitionId: 3,
+    signalKind: 'entry',
+    period: 30,
+    signalTime: new Date('2026-08-12T09:35:00+08:00'),
+    confidence: 88.5,
+    confidenceLevel: 'HIGH',
+    contextSnapshot: { triggerPrice: 12.5, badgeText: '二买' },
+    decisionTrace: {
+      trace: [
+        { pluginId: 'plugin.regime.shanghai-index', name: 'regime 门禁' },
+        { pluginId: 'plugin.chan.bsp', name: 'chan 二买' },
+      ],
+    },
+    ...overrides,
+  };
+}
+
+describe('AlertChannelDeliveryService (V2 grouped)', () => {
   let alertEvents: Repo;
   let signals: Repo;
   let securities: Repo;
@@ -61,7 +93,7 @@ describe('AlertChannelDeliveryService', () => {
     securities = mockRepo();
     deliveries = mockRepo();
     strategyDefinitions = mockRepo();
-    adapter = { channel: WECHAT, send: jest.fn() };
+    adapter = { channel: NotificationChannel.WECHAT, send: jest.fn() };
     counters = new NotificationDeliveryCounters();
     service = new AlertChannelDeliveryService(
       alertEvents as any,
@@ -74,43 +106,62 @@ describe('AlertChannelDeliveryService', () => {
     );
   });
 
-  function primeEvidence(): void {
-    alertEvents.findOne.mockResolvedValueOnce({
-      id: 1,
-      strategySignalId: 5,
-      dedupeKey: 'live-v1:..',
+  /** Wire repo mocks for a group of events with their evidence. */
+  function primeGroup(
+    rows: ReturnType<typeof delivery>[],
+    events: { id: number; strategySignalId: number }[],
+    signalsOut: ReturnType<typeof makeSignal>[],
+    reconcileRows: unknown[],
+  ): void {
+    deliveries.find.mockImplementation((opts: any) => {
+      if (opts?.where?.channel !== undefined) return rows;
+      return reconcileRows;
     });
-    signals.findOne.mockResolvedValueOnce({
-      id: 5,
-      securityId: 9,
-      signalKind: 'entry',
-      signalTime: new Date('2026-08-12T09:35:00+08:00'),
-      contextSnapshot: { triggerPrice: 12.5 },
-    });
-    securities.findOne.mockResolvedValueOnce({
-      id: 9,
-      code: '000001',
-      name: '平安银行',
-    });
+    alertEvents.find.mockResolvedValue(events);
+    signals.find.mockResolvedValue(signalsOut);
+    securities.find.mockResolvedValue([
+      { id: 9, code: '000001', name: '平安银行' },
+    ]);
+    strategyDefinitions.find.mockResolvedValue([{ id: 3, name: '全共振战术' }]);
   }
 
-  it('marks SENT + reconciles DELIVERED when adapter succeeds', async () => {
-    deliveries.findOne.mockResolvedValueOnce(delivery());
-    primeEvidence();
+  it('sends ONE message for a multi-signal group, sells first, marks every row SENT with the same providerMessageId', async () => {
+    const buySignal = makeSignal();
+    const sellSignal = makeSignal({
+      id: 6,
+      strategyDefinitionId: 4,
+      signalKind: 'exit',
+      confidence: 80.4,
+      confidenceLevel: 'MEDIUM',
+      contextSnapshot: { triggerPrice: 12.1, badgeText: '顶背离' },
+    });
+    primeGroup(
+      [
+        delivery({ strategyAlertEventId: 1 }),
+        delivery({ id: 8, strategyAlertEventId: 2 }),
+      ],
+      [
+        { id: 1, strategySignalId: 5 },
+        { id: 2, strategySignalId: 6 },
+      ],
+      [buySignal, sellSignal],
+      [{ status: StrategyAlertDeliveryStatus.SENT }],
+    );
     adapter.send.mockResolvedValue({
       status: 'sent',
       providerMessageId: 'mid-1',
     });
-    deliveries.find.mockResolvedValueOnce([
-      { status: StrategyAlertDeliveryStatus.SENT },
-    ]);
 
-    await service.run(
-      { contractVersion: 1, alertEventId: 1, channel: WECHAT },
-      0,
-      5,
-    );
+    await service.run(groupJob('wechat', [1, 2]), 0, 5);
 
+    expect(adapter.send).toHaveBeenCalledTimes(1);
+    const text = adapter.send.mock.calls[0][0].text as string;
+    // 卖出在前
+    expect(text.indexOf('卖出')).toBeLessThan(text.indexOf('买入'));
+    expect(text).toContain('- 卖出');
+    expect(text).toContain('- 买入');
+    // 每信号一行紧凑 trace 链
+    expect(text).toContain('regime 门禁 ✓ → chan 二买 ✓');
     expect(deliveries.update).toHaveBeenCalledWith(
       7,
       expect.objectContaining({
@@ -121,29 +172,71 @@ describe('AlertChannelDeliveryService', () => {
         lastError: null,
       }),
     );
+    expect(deliveries.update).toHaveBeenCalledWith(
+      8,
+      expect.objectContaining({
+        status: StrategyAlertDeliveryStatus.SENT,
+        providerMessageId: 'mid-1',
+      }),
+    );
     expect(alertEvents.update).toHaveBeenCalledWith(1, {
+      status: StrategyAlertStatus.DELIVERED,
+    });
+    expect(alertEvents.update).toHaveBeenCalledWith(2, {
       status: StrategyAlertStatus.DELIVERED,
     });
   });
 
+  it('appends the compact trace chain to a single-signal group message', async () => {
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [{ status: StrategyAlertDeliveryStatus.SENT }],
+    );
+    adapter.send.mockResolvedValue({
+      status: 'sent',
+      providerMessageId: 'mid-2',
+    });
+
+    await service.run(groupJob('wechat', [1]), 0, 5);
+
+    const text = adapter.send.mock.calls[0][0].text as string;
+    expect(text).toContain('[Mist] [HIGH 88.5%] 000001 平安银行 二买 @ 12.5');
+    expect(text).toContain('链路：regime 门禁 ✓ → chan 二买 ✓');
+  });
+
+  it('falls back to the no-chain format when the signal has no decisionTrace', async () => {
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal({ decisionTrace: null })],
+      [{ status: StrategyAlertDeliveryStatus.SENT }],
+    );
+    adapter.send.mockResolvedValue({ status: 'sent' });
+
+    await service.run(groupJob('wechat', [1]), 0, 5);
+
+    const text = adapter.send.mock.calls[0][0].text as string;
+    expect(text).not.toContain('链路：');
+    expect(text).toContain('二买');
+  });
+
   it('marks FAILED and throws on transient failure with retries remaining', async () => {
-    deliveries.findOne.mockResolvedValueOnce(delivery());
-    primeEvidence();
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [{ status: StrategyAlertDeliveryStatus.FAILED }],
+    );
     adapter.send.mockResolvedValue({
       status: 'transient_failure',
       error: 'timeout',
     });
-    deliveries.find.mockResolvedValueOnce([
-      { status: StrategyAlertDeliveryStatus.FAILED },
-    ]);
 
-    await expect(
-      service.run(
-        { contractVersion: 1, alertEventId: 1, channel: WECHAT },
-        0,
-        5,
-      ),
-    ).rejects.toThrow(/transient delivery failure/);
+    await expect(service.run(groupJob('wechat', [1]), 0, 5)).rejects.toThrow(
+      /transient delivery failure/,
+    );
 
     expect(deliveries.update).toHaveBeenCalledWith(
       7,
@@ -158,22 +251,19 @@ describe('AlertChannelDeliveryService', () => {
   });
 
   it('dead-letters (no throw) on the last attempt of a transient failure', async () => {
-    deliveries.findOne.mockResolvedValueOnce(delivery());
-    primeEvidence();
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [{ status: StrategyAlertDeliveryStatus.DEAD_LETTERED }],
+    );
     adapter.send.mockResolvedValue({
       status: 'transient_failure',
       error: 'still down',
     });
-    deliveries.find.mockResolvedValueOnce([
-      { status: StrategyAlertDeliveryStatus.DEAD_LETTERED },
-    ]);
 
     // attemptsMade=4, maxAttempts=5 -> attempt 5 is the last
-    await service.run(
-      { contractVersion: 1, alertEventId: 1, channel: WECHAT },
-      4,
-      5,
-    );
+    await service.run(groupJob('wechat', [1]), 4, 5);
 
     expect(deliveries.update).toHaveBeenLastCalledWith(
       7,
@@ -189,21 +279,18 @@ describe('AlertChannelDeliveryService', () => {
   });
 
   it('dead-letters immediately on permanent failure (no retry, no throw)', async () => {
-    deliveries.findOne.mockResolvedValueOnce(delivery());
-    primeEvidence();
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [{ status: StrategyAlertDeliveryStatus.DEAD_LETTERED }],
+    );
     adapter.send.mockResolvedValue({
       status: 'permanent_failure',
       error: 'not configured',
     });
-    deliveries.find.mockResolvedValueOnce([
-      { status: StrategyAlertDeliveryStatus.DEAD_LETTERED },
-    ]);
 
-    await service.run(
-      { contractVersion: 1, alertEventId: 1, channel: WECHAT },
-      0,
-      5,
-    );
+    await service.run(groupJob('wechat', [1]), 0, 5);
 
     expect(deliveries.update).toHaveBeenLastCalledWith(
       7,
@@ -217,20 +304,17 @@ describe('AlertChannelDeliveryService', () => {
   });
 
   it('treats a throwing adapter as a transient failure', async () => {
-    deliveries.findOne.mockResolvedValueOnce(delivery());
-    primeEvidence();
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [{ status: StrategyAlertDeliveryStatus.FAILED }],
+    );
     adapter.send.mockRejectedValue(new Error('network reset'));
-    deliveries.find.mockResolvedValueOnce([
-      { status: StrategyAlertDeliveryStatus.FAILED },
-    ]);
 
-    await expect(
-      service.run(
-        { contractVersion: 1, alertEventId: 1, channel: WECHAT },
-        0,
-        5,
-      ),
-    ).rejects.toThrow(/transient delivery failure/);
+    await expect(service.run(groupJob('wechat', [1]), 0, 5)).rejects.toThrow(
+      /transient delivery failure/,
+    );
 
     expect(deliveries.update).toHaveBeenCalledWith(
       7,
@@ -241,7 +325,7 @@ describe('AlertChannelDeliveryService', () => {
     );
   });
 
-  it('dead-letters when no adapter is configured for the channel', async () => {
+  it('dead-letters every group row when no adapter is configured for the channel', async () => {
     service = new AlertChannelDeliveryService(
       alertEvents as any,
       signals as any,
@@ -251,21 +335,16 @@ describe('AlertChannelDeliveryService', () => {
       [], // no adapters configured
       counters,
     );
-    deliveries.findOne.mockResolvedValueOnce(delivery({ channel: QQ }));
-    alertEvents.findOne.mockResolvedValueOnce({
-      id: 1,
-      strategySignalId: 5,
-      dedupeKey: 'live-v1:..',
+    const row = delivery({ channel: NotificationChannel.QQ });
+    deliveries.find.mockImplementation(() => [row]);
+    deliveries.update.mockResolvedValue(undefined);
+    alertEvents.find.mockResolvedValue([{ id: 1, strategySignalId: 5 }]);
+    deliveries.find.mockImplementation((opts: any) => {
+      if (opts?.where?.channel !== undefined) return [row];
+      return [{ status: StrategyAlertDeliveryStatus.DEAD_LETTERED }];
     });
-    deliveries.find.mockResolvedValueOnce([
-      { status: StrategyAlertDeliveryStatus.DEAD_LETTERED },
-    ]);
 
-    await service.run(
-      { contractVersion: 1, alertEventId: 1, channel: QQ },
-      0,
-      5,
-    );
+    await service.run(groupJob('qq', [1]), 0, 5);
 
     expect(deliveries.update).toHaveBeenLastCalledWith(
       7,
@@ -273,20 +352,18 @@ describe('AlertChannelDeliveryService', () => {
         status: StrategyAlertDeliveryStatus.DEAD_LETTERED,
       }),
     );
-    // signal/security never loaded (adapter check short-circuits before evidence build)
-    expect(signals.findOne).not.toHaveBeenCalled();
+    // evidence never loaded (adapter check short-circuits before the batch load)
+    expect(signals.find).not.toHaveBeenCalled();
   });
 
-  it('is idempotent: skips when the delivery is already terminal', async () => {
-    deliveries.findOne.mockResolvedValueOnce(
-      delivery({ status: StrategyAlertDeliveryStatus.SENT }),
-    );
+  it('is idempotent: skips when every delivery row is already terminal', async () => {
+    deliveries.find.mockImplementation((opts: any) => {
+      if (opts?.where?.channel !== undefined)
+        return [delivery({ status: StrategyAlertDeliveryStatus.SENT })];
+      return [];
+    });
 
-    await service.run(
-      { contractVersion: 1, alertEventId: 1, channel: WECHAT },
-      0,
-      5,
-    );
+    await service.run(groupJob('wechat', [1]), 0, 5);
 
     expect(adapter.send).not.toHaveBeenCalled();
     expect(deliveries.update).not.toHaveBeenCalled();
@@ -294,19 +371,18 @@ describe('AlertChannelDeliveryService', () => {
   });
 
   it('reconciles FAILED when one channel is dead-lettered even if another is sent', async () => {
-    deliveries.findOne.mockResolvedValueOnce(delivery());
-    primeEvidence();
-    adapter.send.mockResolvedValue({ status: 'sent' });
-    deliveries.find.mockResolvedValueOnce([
-      { status: StrategyAlertDeliveryStatus.SENT },
-      { status: StrategyAlertDeliveryStatus.DEAD_LETTERED },
-    ]);
-
-    await service.run(
-      { contractVersion: 1, alertEventId: 1, channel: WECHAT },
-      0,
-      5,
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [
+        { status: StrategyAlertDeliveryStatus.SENT },
+        { status: StrategyAlertDeliveryStatus.DEAD_LETTERED },
+      ],
     );
+    adapter.send.mockResolvedValue({ status: 'sent' });
+
+    await service.run(groupJob('wechat', [1]), 0, 5);
 
     expect(alertEvents.update).toHaveBeenCalledWith(1, {
       status: StrategyAlertStatus.FAILED,

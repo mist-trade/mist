@@ -11,10 +11,13 @@ import {
   STRATEGY_ALERT_DELIVERY_QUEUE_NAME,
   alertDeliveryChannelJobId,
   alertDeliveryFanoutJobId,
-  decodeAlertDeliveryChannelJobV1,
-  decodeAlertDeliveryFanoutJobV1,
+  decodeAlertDeliveryChannelJobV2,
+  decodeAlertDeliveryFanoutJobV2,
+  type AlertDeliveryChannelJobV2,
+  type AlertDeliveryFanoutJobV2,
+  type AlertDeliveryGroupDescriptor,
 } from '@app/contracts';
-import { NotificationChannel } from '@app/shared-data';
+import type { AlertDeliveryChannel } from '@app/contracts';
 
 /**
  * Owns the single producer-side BullMQ Queue for strategy-alert-delivery.
@@ -22,6 +25,10 @@ import { NotificationChannel } from '@app/shared-data';
  * producer connection is opened (the worker side runs its own consumer
  * forRootAsync + manualRegistration). Fail-fast connection: enqueue errors
  * surface to callers, which treat them as best-effort.
+ *
+ * V2 (2026-11-24): jobs are batch-grouped — one fanout per (securityId,
+ * effectiveTime) group carrying the group's alertEventIds; the deterministic
+ * jobId is group-scoped, so duplicate enqueues (producer retry, sweep) collapse.
  */
 @Injectable()
 export class AlertDeliveryQueueService implements OnModuleDestroy {
@@ -42,11 +49,15 @@ export class AlertDeliveryQueueService implements OnModuleDestroy {
     });
   }
 
-  /** Enqueue deliver.fanout (deterministic jobId dedupes duplicate enqueues). */
-  async enqueueFanout(alertEventId: number): Promise<void> {
-    const accepted = decodeAlertDeliveryFanoutJobV1({
-      contractVersion: 1,
-      alertEventId,
+  /** Enqueue deliver.fanout for one group (deterministic group-scoped jobId). */
+  async enqueueFanout(
+    group: AlertDeliveryGroupDescriptor,
+    alertEventIds: readonly number[],
+  ): Promise<void> {
+    const accepted = decodeAlertDeliveryFanoutJobV2({
+      contractVersion: 2,
+      group,
+      alertEventIds,
     });
     await this.queue.add(STRATEGY_ALERT_DELIVERY_FANOUT_JOB, accepted, {
       ...STRATEGY_ALERT_DELIVERY_FANOUT_JOB_OPTIONS,
@@ -54,15 +65,17 @@ export class AlertDeliveryQueueService implements OnModuleDestroy {
     });
   }
 
-  /** Enqueue deliver.channel (deterministic jobId dedupes re-fanout). */
+  /** Enqueue deliver.channel for one group + channel (group-scoped jobId). */
   async enqueueChannel(
-    alertEventId: number,
-    channel: NotificationChannel,
+    group: AlertDeliveryGroupDescriptor,
+    alertEventIds: readonly number[],
+    channel: AlertDeliveryChannel,
   ): Promise<void> {
-    const accepted = decodeAlertDeliveryChannelJobV1({
-      contractVersion: 1,
-      alertEventId,
+    const accepted = decodeAlertDeliveryChannelJobV2({
+      contractVersion: 2,
+      group,
       channel,
+      alertEventIds,
     });
     await this.queue.add(STRATEGY_ALERT_DELIVERY_CHANNEL_JOB, accepted, {
       ...STRATEGY_ALERT_DELIVERY_CHANNEL_JOB_OPTIONS,
@@ -74,16 +87,18 @@ export class AlertDeliveryQueueService implements OnModuleDestroy {
    * Enqueue a fresh deliver.channel for replay. No deterministic jobId => a new
    * job is always created (the prior failed job lingers in BullMQ's failed set
    * until removeOnFail age cleans it; harmless). The caller must first reset the
-   * delivery row to PENDING so the worker does not idempotently skip it.
+   * delivery rows to PENDING so the worker does not idempotently skip them.
    */
   async enqueueChannelReplay(
-    alertEventId: number,
-    channel: NotificationChannel,
+    group: AlertDeliveryGroupDescriptor,
+    alertEventIds: readonly number[],
+    channel: AlertDeliveryChannel,
   ): Promise<void> {
-    const accepted = decodeAlertDeliveryChannelJobV1({
-      contractVersion: 1,
-      alertEventId,
+    const accepted = decodeAlertDeliveryChannelJobV2({
+      contractVersion: 2,
+      group,
       channel,
+      alertEventIds,
     });
     await this.queue.add(
       STRATEGY_ALERT_DELIVERY_CHANNEL_JOB,
@@ -110,3 +125,5 @@ export class AlertDeliveryQueueService implements OnModuleDestroy {
     await this.queue.close();
   }
 }
+
+export type { AlertDeliveryChannelJobV2, AlertDeliveryFanoutJobV2 };

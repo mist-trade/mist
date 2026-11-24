@@ -1,5 +1,4 @@
 import {
-  NotificationChannel,
   Security,
   StrategyAlertEvent,
   StrategyDefinition,
@@ -10,47 +9,92 @@ import { PERIOD_MINUTES } from '@app/constants';
 
 import { CHAN_BSP_UNITS, SIGNAL_KINDS, availabilityKey } from '@app/strategy';
 
-export interface NotificationMessage {
-  readonly securityCode: string;
-  readonly securityName: string;
-  readonly direction: string;
-  readonly triggerPrice?: number;
-  readonly strategyName: string;
-  readonly periodLabel: string;
-  readonly effectiveTime: string;
-  readonly summary: string;
-  readonly confidence?: number;
-  readonly confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW';
-  readonly reason?: string;
-}
-
-export interface NotificationEnvelope {
-  readonly alertEventId: number;
-  readonly dedupeKey: string;
-  readonly channel: NotificationChannel;
-  readonly message: NotificationMessage;
+export interface GroupedNotificationItem {
+  readonly alertEvent: StrategyAlertEvent;
+  readonly signal: StrategySignal | null;
+  readonly security: Security | null;
+  readonly strategyDefinition: StrategyDefinition | null;
 }
 
 /**
- * Channel-neutral envelope built from persisted Signal/AlertEvent evidence.
- * The notification worker MUST NOT invoke strategy computation; everything the
- * channel needs is derived here from already-committed evidence. Time is rendered
- * in Asia/Shanghai (A-share market local, UTC+8), not the process timezone.
+ * Channel-neutral grouped message built from persisted Signal/AlertEvent evidence
+ * (V2, 2026-11-24 定稿，决策文档 7.1.4). The notification worker MUST NOT invoke
+ * strategy computation; everything the channel needs is derived here from
+ * already-committed evidence. Time is rendered in Asia/Shanghai (A-share market
+ * local, UTC+8), not the process timezone.
+ *
+ * Format:
+ * - one item: the legacy single-signal summary + an optional compact trace chain;
+ * - several items: one header, then one line per signal — sells first, buys after,
+ *   no netting; every line carries its own compact `decisionTrace.trace` chain.
  */
-export function buildNotificationEnvelope(
-  alertEvent: StrategyAlertEvent,
-  signal: StrategySignal | null,
-  security: Security | null,
-  strategyDefinition: StrategyDefinition | null,
-  channel: NotificationChannel,
-): NotificationEnvelope {
+export function buildGroupedNotificationMessage(
+  items: readonly GroupedNotificationItem[],
+): string {
+  if (items.length === 0) {
+    return `[Mist] (empty delivery group)`;
+  }
+  if (items.length === 1) {
+    return renderSingle(items[0]);
+  }
+  return renderGrouped(items);
+}
+
+function renderSingle(item: GroupedNotificationItem): string {
+  const summary = buildLegacySummary(item);
+  const chain = renderTraceChain(item.signal);
+  return chain ? `${summary}\n链路：${chain}` : summary;
+}
+
+function renderGrouped(items: readonly GroupedNotificationItem[]): string {
+  const first = items[0];
+  const { securityCode, securityName } = securityOf(first);
+  const header = `[Mist] ${securityCode}${securityName ? ` ${securityName}` : ''} | ${groupEffectiveTime(items)}`;
+  const ordered = [...items].sort((a, b) => {
+    const aSell = isSell(a.signal);
+    const bSell = isSell(b.signal);
+    if (aSell !== bSell) return aSell ? -1 : 1; // 卖出在前
+    return (confidenceOf(b) ?? -1) - (confidenceOf(a) ?? -1);
+  });
+  const lines = ordered.map((item) => `- ${renderLine(item)}`);
+  return [header, ...lines].join('\n');
+}
+
+function renderLine(item: GroupedNotificationItem): string {
+  const { signal, strategyDefinition } = item;
   const ctx = (signal?.contextSnapshot ?? {}) as Record<string, unknown>;
-  const triggerPrice =
-    typeof ctx.triggerPrice === 'number' ? ctx.triggerPrice : undefined;
-  const securityCode =
-    security?.code ?? String(signal?.securityId ?? alertEvent.strategySignalId);
-  const securityName = security?.name ?? '';
+  const direction = isSell(signal) ? '卖出' : '买入';
+  const badge = directionLabel(signal?.signalKind, ctx, signal);
+  const strategyName = strategyDefinition?.name ?? '';
+  const periodLabel = signal ? formatPeriod(signal.period) : '';
+  const price =
+    typeof ctx.triggerPrice === 'number' ? ` @ ${ctx.triggerPrice}` : '';
+  const confidence = confidenceOf(item);
+  const conf =
+    confidence !== null
+      ? ` [${signal?.confidenceLevel ?? 'CONF'} ${confidence.toFixed(1)}%]`
+      : '';
+  const chain = renderTraceChain(signal);
+  const parts = [
+    [strategyName, periodLabel].filter(Boolean).join(' '),
+    badge,
+  ].filter(Boolean);
+  const chainSeg = chain ? ` ｜ ${chain}` : '';
+  return `${direction} ${parts.join(' ')}${price}${conf}${chainSeg}`;
+}
+
+function buildLegacySummary(item: GroupedNotificationItem): string {
+  const { signal, strategyDefinition } = item;
+  const ctx = (signal?.contextSnapshot ?? {}) as Record<string, unknown>;
+  const { securityCode, securityName } = securityOf(item);
   const direction = directionLabel(signal?.signalKind, ctx, signal);
+  const price =
+    typeof ctx.triggerPrice === 'number' ? ` @ ${ctx.triggerPrice}` : '';
+  const confidence = confidenceOf(item);
+  const conf =
+    confidence !== null
+      ? ` [${signal?.confidenceLevel ?? 'CONF'} ${confidence.toFixed(1)}%]`
+      : '';
   const strategyName = strategyDefinition?.name ?? '';
   const periodLabel = signal ? formatPeriod(signal.period) : '';
   const effectiveTime = signal
@@ -61,67 +105,70 @@ export function buildNotificationEnvelope(
         }),
       )
     : '';
-  const confidence =
-    signal?.confidence !== null && signal?.confidence !== undefined
-      ? Number(signal.confidence)
-      : undefined;
-  const confidenceLevel = signal?.confidenceLevel ?? undefined;
-  const reason = (signal?.decisionTrace as any)?.summary;
-
-  const summary = buildSummary({
-    securityCode,
-    securityName,
-    direction,
-    triggerPrice,
-    strategyName,
-    periodLabel,
-    effectiveTime,
-    confidence,
-    confidenceLevel,
-  });
-  return Object.freeze({
-    alertEventId: alertEvent.id,
-    dedupeKey: alertEvent.dedupeKey,
-    channel,
-    message: Object.freeze({
-      securityCode,
-      securityName,
-      direction,
-      triggerPrice,
-      strategyName,
-      periodLabel,
-      effectiveTime,
-      summary,
-      confidence,
-      confidenceLevel,
-      reason,
-    }),
-  });
-}
-
-function buildSummary(parts: {
-  securityCode: string;
-  securityName: string;
-  direction: string;
-  triggerPrice?: number;
-  strategyName: string;
-  periodLabel: string;
-  effectiveTime: string;
-  confidence?: number;
-  confidenceLevel?: string;
-}): string {
-  const name = parts.securityName ? ` ${parts.securityName}` : '';
-  const price =
-    parts.triggerPrice !== undefined ? ` @ ${parts.triggerPrice}` : '';
-  const conf =
-    parts.confidence !== undefined
-      ? ` [${parts.confidenceLevel ?? 'CONF'} ${parts.confidence.toFixed(1)}%]`
-      : '';
   const seg = (...xs: string[]) => xs.filter(Boolean).join(' | ');
-  const tail = seg(parts.strategyName, parts.periodLabel, parts.effectiveTime);
-  return `[Mist]${conf} ${parts.securityCode}${name} ${parts.direction}${price}${
+  const tail = seg(strategyName, periodLabel, effectiveTime);
+  return `[Mist]${conf} ${securityCode}${securityName ? ` ${securityName}` : ''} ${direction}${price}${
     tail ? ` | ${tail}` : ''
   }`;
+}
+
+/** 紧凑 trace 链（2026-11-24 定稿）：每个节点 `短名 ✓`，' → ' 连接。
+ *  节点短名取 trace.name，缺省回退 pluginId（剥 'plugin.' 前缀）；
+ *  历史/异常行无 trace → 返回 null，消息回退无链格式。 */
+export function renderTraceChain(signal: StrategySignal | null): string | null {
+  const trace = (signal?.decisionTrace as any)?.trace;
+  if (!Array.isArray(trace) || trace.length === 0) return null;
+  const segments: string[] = [];
+  for (const item of trace) {
+    if (!item || typeof item !== 'object') continue;
+    const rawName =
+      typeof item.name === 'string' && item.name.length > 0
+        ? item.name
+        : typeof item.pluginId === 'string'
+          ? item.pluginId.replace(/^plugin\./, '')
+          : null;
+    if (!rawName) continue;
+    segments.push(`${rawName} ✓`);
+  }
+  return segments.length > 0 ? segments.join(' → ') : null;
+}
+
+function securityOf(item: GroupedNotificationItem): {
+  securityCode: string;
+  securityName: string;
+} {
+  return {
+    securityCode:
+      item.security?.code ??
+      String(
+        item.signal?.securityId ??
+          item.alertEvent.strategySignalId ??
+          item.alertEvent.id,
+      ),
+    securityName: item.security?.name ?? '',
+  };
+}
+
+function isSell(signal: StrategySignal | null): boolean {
+  return signal?.signalKind === SIGNAL_KINDS.EXIT;
+}
+
+function confidenceOf(item: GroupedNotificationItem): number | null {
+  const { signal } = item;
+  return signal?.confidence !== null && signal?.confidence !== undefined
+    ? Number(signal.confidence)
+    : null;
+}
+
+function groupEffectiveTime(items: readonly GroupedNotificationItem[]): string {
+  const withSignal = items.find((item) => item.signal !== null);
+  if (!withSignal?.signal) return '';
+  return formatShanghaiTime(
+    availabilityKey({
+      period: withSignal.signal.period,
+      timestamp: withSignal.signal.signalTime,
+    }),
+  );
 }
 
 function directionLabel(

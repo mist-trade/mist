@@ -20,7 +20,9 @@ describe('LiveStrategyPersistenceService', () => {
     };
     const service = new LiveStrategyPersistenceService(dataSource as never);
 
-    await expect(service.persist(candidate())).resolves.toBe('created');
+    const result = await service.persist(candidate());
+    expect(result.outcome).toBe('created');
+    expect(result.alertEventId).toBe(88);
 
     expect(manager.query).toHaveBeenCalledWith(
       'SET SESSION innodb_lock_wait_timeout = 3',
@@ -53,9 +55,10 @@ describe('LiveStrategyPersistenceService', () => {
       transaction: jest.fn().mockRejectedValue(exact),
     } as never);
 
-    await expect(service.persist(candidate())).resolves.toBe(
-      'duplicate_skipped',
-    );
+    await expect(service.persist(candidate())).resolves.toMatchObject({
+      outcome: 'duplicate_skipped',
+      alertEventId: null,
+    });
     expect(
       isUniqueConstraintViolation(exact, 'uq_strategy_alert_events_dedupe_key'),
     ).toBe(true);
@@ -97,6 +100,104 @@ describe('LiveStrategyPersistenceService', () => {
     expect(liveStrategyAlertDedupeKey(candidate())).toBe(
       'live-v1:3:7:9:tdx:5:entry:LEGACY_DSL:1785825840000',
     );
+  });
+
+  describe('publishGroupedDeliveries (V2 batch grouping)', () => {
+    function candidateAt(time: string, securityId = 9) {
+      return { ...candidate(), signalTime: new Date(time), securityId };
+    }
+
+    it('groups created events by (securityId, effectiveTime) and enqueues one fanout per group', async () => {
+      const publishGroup = jest.fn().mockResolvedValue(undefined);
+      const service = new LiveStrategyPersistenceService(
+        { transaction: jest.fn() } as never,
+        { publishGroup } as never,
+      );
+      const a = {
+        candidate: candidateAt('2026-08-04T06:40:00.000Z'),
+        outcome: 'created' as const,
+        alertEventId: 11,
+      };
+      const b = {
+        candidate: candidateAt('2026-08-04T06:40:00.000Z'),
+        outcome: 'created' as const,
+        alertEventId: 12,
+      };
+      const c = {
+        candidate: candidateAt('2026-08-04T06:45:00.000Z'),
+        outcome: 'created' as const,
+        alertEventId: 13,
+      };
+
+      await service.publishGroupedDeliveries([a, b, c]);
+
+      // same (securityId, effectiveTime) collapses; different slot separates
+      expect(publishGroup).toHaveBeenCalledTimes(2);
+      expect(publishGroup).toHaveBeenCalledWith(
+        {
+          securityId: 9,
+          effectiveTime: '2026-08-04T06:40:00.000Z',
+          tradingDay: '2026-08-04',
+        },
+        [11, 12],
+      );
+      expect(publishGroup).toHaveBeenCalledWith(
+        {
+          securityId: 9,
+          effectiveTime: '2026-08-04T06:45:00.000Z',
+          tradingDay: '2026-08-04',
+        },
+        [13],
+      );
+    });
+
+    it('is best-effort: a handoff failure is logged, never thrown', async () => {
+      const publishGroup = jest.fn().mockRejectedValue(new Error('redis down'));
+      const service = new LiveStrategyPersistenceService(
+        { transaction: jest.fn() } as never,
+        { publishGroup } as never,
+      );
+
+      await expect(
+        service.publishGroupedDeliveries([
+          {
+            candidate: candidateAt('2026-08-04T06:40:00.000Z'),
+            outcome: 'created',
+            alertEventId: 11,
+          },
+        ]),
+      ).resolves.toBeUndefined();
+    });
+
+    it('is a no-op without the handoff port or without created events', async () => {
+      const service = new LiveStrategyPersistenceService(
+        { transaction: jest.fn() } as never,
+        null,
+      );
+      await expect(
+        service.publishGroupedDeliveries([
+          {
+            candidate: candidateAt('2026-08-04T06:40:00.000Z'),
+            outcome: 'created',
+            alertEventId: 11,
+          },
+        ]),
+      ).resolves.toBeUndefined();
+
+      const publishGroup = jest.fn();
+      const withHandoff = new LiveStrategyPersistenceService(
+        { transaction: jest.fn() } as never,
+        { publishGroup } as never,
+      );
+      await withHandoff.publishGroupedDeliveries([
+        {
+          candidate: candidateAt('2026-08-04T06:40:00.000Z'),
+          outcome: 'duplicate_skipped',
+          alertEventId: null,
+        },
+      ]);
+      expect(publishGroup).not.toHaveBeenCalled();
+    });
   });
 });
 

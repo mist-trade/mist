@@ -8,13 +8,15 @@ import {
   STRATEGY_ALERT_DELIVERY_FANOUT_JOB_OPTIONS,
   STRATEGY_ALERT_DELIVERY_QUEUE_NAME,
   alertDeliveryFanoutJobId,
-  decodeAlertDeliveryFanoutJobV1,
-  type AlertDeliveryFanoutJobV1,
+  decodeAlertDeliveryFanoutJobV2,
+  type AlertDeliveryFanoutJobV2,
+  type AlertDeliveryGroupDescriptor,
 } from '@app/contracts';
 import type { StrategyAlertDeliveryHandoffPort } from './strategy-alert-delivery-handoff.port';
 
 /**
- * Enqueues deliver.fanout jobs onto the strategy-alert-delivery BullMQ queue.
+ * Enqueues batch-grouped deliver.fanout jobs onto the strategy-alert-delivery
+ * BullMQ queue (V2 contract: one job per (securityId, effectiveTime) group).
  *
  * Uses a dedicated producer Redis connection (fail-fast: enableOfflineQueue=false,
  * maxRetriesPerRequest=1) instead of BullModule.forRootAsync, because apps/signal
@@ -26,7 +28,7 @@ import type { StrategyAlertDeliveryHandoffPort } from './strategy-alert-delivery
 export class BullMqStrategyAlertDeliveryHandoffService
   implements StrategyAlertDeliveryHandoffPort, OnModuleDestroy
 {
-  private readonly queue: Queue<AlertDeliveryFanoutJobV1>;
+  private readonly queue: Queue<AlertDeliveryFanoutJobV2>;
 
   constructor(config: ConfigService) {
     this.queue = new Queue(STRATEGY_ALERT_DELIVERY_QUEUE_NAME, {
@@ -43,9 +45,15 @@ export class BullMqStrategyAlertDeliveryHandoffService
     });
   }
 
-  async publish(alertEventId: number): Promise<void> {
-    const job: AlertDeliveryFanoutJobV1 = { contractVersion: 1, alertEventId };
-    const accepted = decodeAlertDeliveryFanoutJobV1(job);
+  async publishGroup(
+    group: AlertDeliveryGroupDescriptor,
+    alertEventIds: readonly number[],
+  ): Promise<void> {
+    const accepted = decodeAlertDeliveryFanoutJobV2({
+      contractVersion: 2,
+      group,
+      alertEventIds,
+    });
     await this.queue.add(STRATEGY_ALERT_DELIVERY_FANOUT_JOB, accepted, {
       ...STRATEGY_ALERT_DELIVERY_FANOUT_JOB_OPTIONS,
       jobId: alertDeliveryFanoutJobId(accepted),

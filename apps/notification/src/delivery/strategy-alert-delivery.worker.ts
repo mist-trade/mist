@@ -7,15 +7,15 @@ import {
   STRATEGY_ALERT_DELIVERY_JOB_TIMEOUT_MS,
   STRATEGY_ALERT_DELIVERY_QUEUE_NAME,
   STRATEGY_ALERT_DELIVERY_WORKER_CONCURRENCY,
-  decodeAlertDeliveryChannelJobV1,
-  decodeAlertDeliveryFanoutJobV1,
-  type AlertDeliveryChannelJobV1,
-  type AlertDeliveryFanoutJobV1,
+  decodeAlertDeliveryChannelJobV2,
+  decodeAlertDeliveryFanoutJobV2,
+  type AlertDeliveryChannelJobV2,
+  type AlertDeliveryFanoutJobV2,
 } from '@app/contracts';
 import { AlertChannelDeliveryService } from './alert-channel-delivery.service';
 import { AlertFanoutService } from './alert-fanout.service';
 
-type AnyDeliveryJob = AlertDeliveryFanoutJobV1 | AlertDeliveryChannelJobV1;
+type AnyDeliveryJob = AlertDeliveryFanoutJobV2 | AlertDeliveryChannelJobV2;
 
 @Processor(STRATEGY_ALERT_DELIVERY_QUEUE_NAME, {
   concurrency: STRATEGY_ALERT_DELIVERY_WORKER_CONCURRENCY,
@@ -59,9 +59,9 @@ export class StrategyAlertDeliveryWorker extends WorkerHost {
   ): Promise<void> {
     switch (job.name) {
       case STRATEGY_ALERT_DELIVERY_FANOUT_JOB:
-        return await this.fanout.run(decodeAlertDeliveryFanoutJobV1(job.data));
+        return await this.fanout.run(decodeAlertDeliveryFanoutJobV2(job.data));
       case STRATEGY_ALERT_DELIVERY_CHANNEL_JOB: {
-        const decoded = decodeAlertDeliveryChannelJobV1(job.data);
+        const decoded = decodeAlertDeliveryChannelJobV2(job.data);
         const maxAttempts = job.opts.attempts ?? 1;
         return await this.channelDelivery.run(
           decoded,
