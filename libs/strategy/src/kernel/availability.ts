@@ -20,6 +20,29 @@ export function contextSeriesKey(securityCode: string, period: number): string {
  *  不再逐 flow 重复求值（2026-11-24 聚合层定稿，决策文档 7.1.1）。 */
 export const CONTEXT_OPINION_PREFIX = 'contextOpinion.';
 
+/**
+ * params 值的稳定序列化：Decimal8（及嵌套持有者）先 formatCanonical，
+ * 否则 JSON.stringify 会触发其防序列化哨兵（Decimal8 toJSON 有意抛错）。
+ */
+function renderParamValue(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return String(value);
+  }
+  const candidate = value as { formatCanonical?: unknown };
+  if (typeof candidate.formatCanonical === 'function') {
+    return (candidate as { formatCanonical(): string }).formatCanonical();
+  }
+  return JSON.stringify(value, (_key, v) => {
+    if (v !== null && typeof v === 'object') {
+      const nested = v as { formatCanonical?: unknown };
+      if (typeof nested.formatCanonical === 'function') {
+        return (nested as { formatCanonical(): string }).formatCanonical();
+      }
+    }
+    return v;
+  });
+}
+
 export function contextOpinionKey(
   pluginId: string,
   params?: Record<string, unknown>,
@@ -31,14 +54,7 @@ export function contextOpinionKey(
   // 避免同一插件被不同参数的 GUARD 复用同一份 opinion。
   const parts = Object.keys(params)
     .sort()
-    .map((key) => {
-      const value = params[key];
-      const rendered =
-        typeof value === 'object' && value !== null
-          ? JSON.stringify(value)
-          : String(value);
-      return `${key}=${rendered}`;
-    });
+    .map((key) => `${key}=${renderParamValue(params[key])}`);
   return `${CONTEXT_OPINION_PREFIX}${pluginId}:${parts.join('|')}`;
 }
 
