@@ -1270,6 +1270,15 @@ effectiveTime           = availabilityKey(signalTime, period)
    （producer → BullMQ → processor → `StrategyTrigger.timestamp`），不落库、不进
    VO，不会外泄到信号域。30m 策略的 signalTime 是聚合右标，比 triggerTime 晚最多
    29 分钟。
+7. **幂等键归属与执行域位置**：`candleFinalizedJobId`（触发管道）与告警
+   `dedupeKey`（告警持久化 + 投递信封）都在**消息管道**上；`KernelSignal →
+   ExecutionRiskArbiter → SimulatedBroker` 的信号→执行路径**没有**幂等键
+   （broker 内部 `orderId` 只是内存句柄，不落库不去重，重复下单由 Arbiter/持仓
+   状态拦截）。执行域 = `libs/strategy/src/execution/`（SimulatedBroker、
+   ExecutionRiskArbiter、slippage/fee）+ `libs/strategy/src/position/`
+   （PositionStateMachine、CapitalLedger）；消费方 = `apps/backtest` 与
+   `tools/strategy-dev`；记录落 `backtest_trade_results`，`fillTime` 只在内存
+   事件流中存在。以上两条已固化进 `AGENTS.md` 双时间戳契约。
 
 ---
 
