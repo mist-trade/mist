@@ -64,7 +64,20 @@
       交易层定稿与回归数字；
 - [ ] 7.3 记忆更新（project_orderbook_execution_pipeline）。
 
-## 8. 后续（本 change 外，记录缝位）
+## 8. 管线门面与私仓离线接入
+
+- [ ] 8.1 分组提取：`libs/strategy/src/trading/grouping.ts` 纯函数
+      `groupSignals(...)`，apps/signal processor 与门面共用；
+- [ ] 8.2 `libs/strategy/src/pipeline/run-trading-pipeline.ts`：Bars 按
+      `(availabilityKey, period)` 归并驱动 kernel → 分组 → engine.decide →
+      指令报告（零基础设施，内存 fill 日志，离线合成幂等 id）；
+- [ ] 8.3 私仓 `build.mjs` alias 增补（@app/strategy / @app/market-data）+ 私仓
+      边界守卫增加 `src/types.ts` FactorPlugin 与公共契约的结构兼容断言；
+- [ ] 8.4 私仓 `scripts/run-pipeline.js`：本地 K 线 + 预设编译 + 门面 →
+      指令报告打印 / JSON 导出；
+- [ ] 8.5 门面单测：确定性、离线幂等、报告与投递渲染同源。
+
+## 9. 后续（本 change 外，记录缝位）
 
 - [ ] 8.1 `VirtualExitPolicyPort` 账户视图注入：私仓 `MultiLotVirtualPosition`
       改为从 `virtual_fill_events` 派生批次，消除出场策略持仓与执行账本的偏差面

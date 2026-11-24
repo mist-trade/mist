@@ -224,7 +224,67 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
   决策对象；这是信号层同构门禁（`strategy-dual-timestamp.guard.spec.ts`）的姊妹门禁；
 - 另加引擎确定性测试：同输入重放 N 次，输出引用不同但深比较恒等。
 
-## 八、破坏性改动清单
+## 八、管线门面与私仓离线接入（2026-11-24 需求补充）
+
+### 8.1 需求
+
+私仓当前只有信号（研究脚本自带第四份手写交易流水线，且绕过内核直调插件）。
+要求：私仓能独立跑通 信号层 → 聚合层（分组）→ 交易层 → 指令报告 全流程，
+拿到与线上同构的最终结果。
+
+### 8.2 门面：`runTradingPipeline`（libs/strategy/src/pipeline/）
+
+```ts
+interface PipelineInput {
+  barsByPeriod: ReadonlyMap<number, readonly StrategyBar[]>; // 内存 Bars（离线 K 线）
+  plans: readonly KernelPlan[];        // 由 compileStoredDefinitionVersion(预设 JSON) 编译
+  registry: FactorPluginRegistry;      // 私仓插件 + 标准插件
+  virtualExitPolicy?: VirtualExitPolicyPort;
+  seedCapital?: number;                // 默认 1,000,000
+  cashAllocationRatio?: number;        // 默认 0.95
+}
+
+interface PipelineResult {
+  signals: readonly KernelSignal[];
+  groups: readonly { group: SignalGroupInput; decision: TradingDecision }[];
+  fills: readonly VirtualFillEvent[];  // 内存日志
+  report: string;                      // 指令报告（与投递消息同渲染器）
+}
+```
+
+- **零基础设施**：无 NestJS / DB / Redis；回测执行器、dev server、实时投递、
+  私仓脚本全部是门面的数据适配器——编排层也不再有第二份实现；
+- **Bar 驱动顺序**：合并全部周期 Bars 按 `(availabilityKey, period 升序)` 排序
+  逐根 `kernel.push`（HistoricalBarSource 的离线等价，重用既有归并规则）；
+- **确定性**：同输入 → 同输出；离线 fill 的幂等锚点为合成 id
+  `offline-{definitionId}-{signalTime.getTime()}-{kind}`。
+
+### 8.3 分组提取为纯域函数
+
+聚合分组（`(securityId, effectiveTime)` 现算分组）从 `apps/signal` processor 的
+`publishGroupedDeliveries` 中提取为 `libs/strategy/src/trading/grouping.ts` 纯函数
+`groupSignals(...)`；线上路径（processor）与离线路径（门面）共用同一实现——
+分组规则不再有两份。
+
+### 8.4 私仓接入
+
+- `build.mjs` alias 增补：`@app/strategy` → `mist/libs/strategy/src/index.ts`、
+  `@app/market-data` → `mist/libs/market-data/src/index.ts`（现有 alias 模式延续，
+  nodejs-polars 保持 external）；
+- 私仓 `src/types.ts` 的 `FactorPlugin` 副本必须与公共契约**结构兼容**（TS 结构
+  类型 + 门面装配时编译期校验）；私仓边界守卫增加结构兼容断言，防止漂移；
+- 新脚本 `scripts/run-pipeline.js`：本地 K 线（复用现有加载模式）→ 预设
+  （`compileStoredDefinitionVersion`）→ 门面 → 打印指令报告 / 导出 JSON；
+- 私仓研究 harness（`run-tactics.js` 的 MultiLotVirtualPosition 多批次战术）与
+  门面**并存**为两条研究线：门面跑"与线上同构的指令"，harness 跑"多批次战术研究"；
+  基线重跑后由用户决定是否退役 harness。
+
+### 8.5 分层归属补充
+
+门面与分组函数归**公共仓 libs/strategy**（信号层与交易层的编排地带，纯域）；
+私仓只保留插件、策略定义、数据与脚本。私仓"跑全流程"= 捆绑公共域 + 本地数据。
+
+## 九、破坏性改动清单
 
 | 被破坏 | 替代 |
 |---|---|
@@ -235,7 +295,7 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
 | envelope 信号列表消息 | 指令报告 |
 | 回测组内处理顺序（kernel 顺序 → 先出后进） | 统一 interim 规则；重跑基线覆盖 |
 
-## 九、边界与不变式
+## 十、边界与不变式
 
 - 信号层零改动（KernelSignal / 决策流 / 虚拟出场子系统照旧）；
 - 聚合层分组与契约 V2 零改动（fanout payload / jobId / sweep / replay 照旧）；

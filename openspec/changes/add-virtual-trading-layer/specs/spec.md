@@ -27,7 +27,13 @@
 - `TradingDecision`：`instructions` + `rejections` + `accountAfter`
   （假定成交后的账户投影）。
 
-### 1.4 `VirtualFillLogPort`
+### 1.4 `PipelineFacade`
+管线门面（`runTradingPipeline`）：交易层的独立运行入口——输入内存 Bars、编译后的
+`KernelPlan`、插件注册表；内部完成 Bar 归并驱动 → 信号收集 → 分组 → 逐组
+`TradingEngine.decide` → 指令报告。零 NestJS / DB / Redis 依赖，可被私仓 esbuild
+捆绑；回测执行器、dev server、实时投递与私仓脚本全部是它的数据适配器。
+
+### 1.5 `VirtualFillLogPort`
 账本持久化端口（交易层域核心定义、app 层实现）：
 - `append(event: VirtualFillEvent): Promise<void>`：追加成交事实（幂等锚点
   `alert_event_id` 唯一）；
@@ -99,7 +105,25 @@
 - **REQ-MSG-03 (归因随行)**：每条指令行必须携带其信号的紧凑 trace 链（复用
   `renderTraceChain`），归因不可与指令分离。
 
-### 2.5 同构门禁规约 (Isomorphism)
+### 2.5 管线门面规约 (Facade)
+
+- **REQ-FACADE-01 (零基础设施)**：门面必须为纯函数编排——输入内存 Bars / 计划 /
+  注册表，输出信号 / 分组 / 决策 / fill 日志 / 报告；禁止依赖 NestJS、数据库、
+  Redis 或任何进程内单例状态。
+- **REQ-FACADE-02 (归并驱动)**：门面必须按 `(availabilityKey, period 升序)` 合并
+  全部周期 Bars 逐根驱动内核（与 HistoricalBarSource 归并规则一致），禁止乱序
+  求值。
+- **REQ-FACADE-03 (分组单一实现)**：聚合分组逻辑必须提取为纯域函数，线上
+  （apps/signal）与离线（门面）共用同一实现；禁止两份分组代码。
+- **REQ-FACADE-04 (离线幂等)**：离线 fill 的幂等锚点必须为确定性合成 id
+  （`offline-{definitionId}-{signalTime.getTime()}-{kind}`）；同输入重放不得产生
+  重复回填。
+- **REQ-FACADE-05 (报告同源)**：门面的指令报告与线上投递消息必须由同一渲染器
+  产出，严禁两份消息模板。
+- **REQ-FACADE-06 (私仓结构兼容)**：私仓 `FactorPlugin` 类型副本必须与公共契约
+  结构兼容，且必须有 CI 断言守护（防止类型漂移导致门面装配失败）。
+
+### 2.6 同构门禁规约 (Isomorphism)
 
 - **REQ-ISO-01 (交易层三端同构)**：同组信号 + 同账户快照，回测适配器 / 实时
   适配器 / dev 适配器产出的 `TradingDecision` 必须逐字段相同（指令、拒绝、账户
