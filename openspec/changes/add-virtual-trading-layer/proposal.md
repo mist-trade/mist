@@ -45,7 +45,7 @@
 5. **交易层同构门禁**：信号层同构（三链路同一引擎）延伸到交易层——同组信号 + 同账户快照，回测/实时/dev 产出逐字段相同的指令集。
 6. **冲突裁决留缝**：组内处理顺序（interim：先出后进、按置信度）作为引擎参数，未来"冲突裁决因子"研究定稿后插拔替换，不动结构。
 7. **管线门面可独立运行（私仓离线全流程）**：新增 `runTradingPipeline` 纯函数门面——
-   内存 Bars + 预设定义 + 插件注册表 → 信号 → 分组 → 指令报告，零 NestJS/DB/Redis
+   内存 Bars + 预设定义 + 插件注册表 → 信号 → 分组 → 交易手册，零 NestJS/DB/Redis
    依赖，可被私仓 esbuild 捆绑；私仓脚本从"只有信号"升级为拿到与线上同构的最终
    交易指令。聚合层的**分组逻辑**同步提取为纯域函数，线上（apps/signal）与离线
    （门面）共用同一实现。
@@ -60,10 +60,10 @@
 
 ## 四、影响面 (Impact)
 
-- **新增**：`libs/strategy/src/trading/`（引擎 + 账本域模型 + 端口）；`libs/shared-data/src/entities/virtual-fill-event.entity.ts`；`deploy/database/migrations/037_create_virtual_fill_events.sql`；`apps/notification` 指令报告渲染器与 TypeORM 端口实现。
+- **新增**：`libs/strategy/src/trading/`（引擎 + 账本域模型 + 端口）；`libs/shared-data/src/entities/virtual-fill-event.entity.ts`；`deploy/database/migrations/037_create_virtual_fill_events.sql`；`apps/notification` 交易手册渲染器与 TypeORM 端口实现。
 - **重构**：`apps/backtest/backtest-run.executor.ts`（内联 Arbiter 编排 → engine.decide）；`tools/strategy-dev/server.ts`（删除手写流水线）；`apps/notification/notification-envelope.ts`（信号列表渲染退役 → 交易手册）；`libs/strategy` 交易组件小改（Arbiter 输出形态 ArbitrationVerdict、`PositionStateMachine.onSignal` 决策分支删除、SimulatedBroker 标识确定性化）；
 - **私仓接入**：`mist-alpha-private/build.mjs` 增加 `@app/strategy` / `@app/market-data`
-  alias；新增 `scripts/run-pipeline.js`（本地 K 线 → 门面 → 指令报告）；`src/types.ts`
+  alias；新增 `scripts/run-pipeline.js`（本地 K 线 → 门面 → 交易手册）；`src/types.ts`
   的 `FactorPlugin` 私有副本与公共契约增加结构兼容守卫。
 - **不变**：信号层、聚合层分组与契约 V2、fanout 结构、sweep/replay、信号层同构门禁。
-- **破坏性**：dev server 与回测的组内处理顺序统一为"先出后进"（原回测为 kernel 顺序），回测数字可能与旧基线有小偏移；消息格式从信号列表升级为指令报告。无线上流量，无兼容负担。
+- **破坏性**：dev server 与回测的组内处理顺序统一为"先出后进"（原回测为 kernel 顺序），回测数字可能与旧基线有小偏移；消息格式从信号列表升级为交易手册。无线上流量，无兼容负担。
