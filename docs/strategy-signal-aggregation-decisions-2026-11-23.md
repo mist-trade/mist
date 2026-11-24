@@ -1236,6 +1236,21 @@ effectiveTime           = availabilityKey(signalTime, period)
 真正可删的候选只有 `pivotTime`（若放弃 marker 锚点）和 `updatedAt`（信号 VO 层）。
 `acknowledgedAt` 已被前端确认按钮使用，不能删。
 
+#### 8.6.1 第二轮审计（2026-11-24，逐字段核对代码）
+
+| 字段 | 代码现状 | 结论 |
+|---|---|---|
+| `effectiveTime` | 函数 `availabilityKey`（`libs/strategy/src/kernel/availability.ts:27`），唯一实现；三个消费边界（内核 hydration 门禁 `realtime-kernel-pool.ts:318,351`、消息 `notification-envelope.ts:56`、VO `strategy-signal.vo.ts:51`）都调它 | 保留；已是单一来源，删 VO 字段会让前端复刻周期规则 |
+| `aggregateKey` | **代码零引用**，只存在于 3.3/7.1 设计 | 实施聚合时投递时现算（`securityId + effectiveTime`），不落库、不加列 |
+| 派生 key 全景 | 只有 `effectiveTime`（函数）、`candleFinalizedJobId`（含 `Date.parse(triggerTime)`）、`dedupeKey`（含 `signalTime.getTime()`） | 幂等键是去重契约，不统一掉；不需要新 key |
+| `createdAt` / `updatedAt` | TypeORM 自动列；signal VO 只暴露 `createdAt`，alert VO 多暴露了 `updatedAt` | `updatedAt` 可从 alert VO 去，DB 列留 |
+| `sentAt` | 仅 `strategy_alert_deliveries` 表，投递成功时写一次（`alert-channel-delivery.service.ts:129`） | 保留（投递延迟审计，成本为零） |
+| `acknowledgedAt` | **产品功能**：前端 `StrategiesWorkspace.tsx:213-216,574` 确认按钮 → `acknowledgeStrategyAlertEvent` → `strategy-alert-event.service.ts:74` | 是否删除=是否保留"人工确认告警"功能，待用户拍板 |
+| `fillTime` | `OrderFilledEvent.fillTime`（`execution.types.ts:47`），仅执行域内部，不落库不进 VO | 不重复；broker 事件时刻 |
+| `entryTime` / `exitTime` | `position-state-machine.ts:65,114` 从 fillTime 按角色派生，落 `backtest_trade_results`（entryTime 有索引） | 不重复；一笔交易两次成交各归其位 |
+| `triggerTime` | 队列契约 1m Bar 时间（`candle-finalized-trigger.contract.ts:21`）；processor 用它做交易日校验/游标去重/jobId/启动补偿 | 不是 signalTime：1m 时两者相等，30m 时 signalTime 是聚合右标、晚最多 29 分钟；它是 signalTime 的上游原料，传输层已是最小存在 |
+| collector `triggerTime` | `data-collection.strategy.interface.ts:50`，采集触发墙钟（默认北京现在） | **与 candle_finalized triggerTime 同名不同义**，可选改名 `collectAt` 消除混淆 |
+
 ---
 
 ## 九、待确认（剩余）
