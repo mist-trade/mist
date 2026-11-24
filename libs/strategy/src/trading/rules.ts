@@ -6,7 +6,7 @@
  * 兜底显式拒绝（REQ-ENGINE-04），不存在第二条出单路径。
  * Bar 巡检：systemicCrunch → hardStop（per-bar 风控，优先级 = 数组顺序）。
  *
- * 裁决语义移植自 `ExecutionRiskArbiter`（类退役后由清理任务 9.1 删除）。
+ * 裁决语义移植自已退役的 `ExecutionRiskArbiter`（if 树 → 规则序列，组 9 清理已删除）。
  */
 import { MarketRiskRegime } from './domain.types';
 import type {

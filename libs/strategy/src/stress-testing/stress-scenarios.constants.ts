@@ -1,4 +1,4 @@
-import { MarketRiskRegime } from '../execution/execution-risk-arbiter';
+import { MarketRiskRegime } from '../trading/domain.types';
 
 export type StressScenarioId =
   | 'CRASH_2015'

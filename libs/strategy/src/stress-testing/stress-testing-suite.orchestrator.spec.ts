@@ -1,8 +1,10 @@
 import { formatShanghaiDateString } from '@app/timezone';
 import {
-  ExecutionRiskArbiter,
+  createDefaultRiskRules,
   MarketRiskRegime,
-} from '../execution/execution-risk-arbiter';
+  TradingEngine,
+  yuanToLi,
+} from '../trading';
 import { SimulatedBroker } from '../execution/simulated-broker';
 import { PositionStateMachine } from '../position/position-state-machine';
 import { CapitalLedger } from '../position/capital-ledger';
@@ -329,8 +331,9 @@ describe('A 股五大历史极端事件压力测试套件 (Stress Testing Suite)
         });
         const position = new PositionStateMachine(1, '000001');
         const capitalLedger = new CapitalLedger({ initialCash: 1000000 });
-        const arbiter = new ExecutionRiskArbiter({
-          hardStopLossRatio: -0.05, // 浮亏 5% 止损
+        // 交易层引擎接管（组9 迁移）：per-bar 风控巡检走 surveilBar
+        const tradingEngine = new TradingEngine({
+          riskRules: createDefaultRiskRules(-0.05), // 浮亏 5% 止损
         });
 
         const day1 = new Date('2015-06-15T09:30:00.000Z');
@@ -387,15 +390,37 @@ describe('A 股五大历史极端事件压力测试套件 (Stress Testing Suite)
         };
         broker.onBar(bar2);
 
-        const sellDto = arbiter.arbitrate({
-          bar: bar2,
-          position: position.getSnapshot(),
-          availableCash: broker.getAccount().availableCash,
-        });
-        expect(sellDto).not.toBeNull();
-        expect(sellDto?.side).toBe(ORDER_SIDES.SELL);
+        const snap = position.getSnapshot();
+        const riskInstructions = tradingEngine.surveilBar(
+          {
+            securityId: 1,
+            securityCode: '000001',
+            timestamp: bar2.timestamp,
+            close: bar2.close,
+          },
+          {
+            securityId: 1,
+            securityCode: '000001',
+            holdingQuantity: snap.holdingQuantity,
+            costPriceLi: yuanToLi(snap.costPrice),
+            entryTime: snap.entryTime,
+            currentPriceLi: yuanToLi(snap.currentPrice),
+            realizedPnlLi: yuanToLi(snap.realizedPnl),
+          },
+        );
+        expect(riskInstructions).toHaveLength(1);
+        expect(riskInstructions[0].action).toBe('SELL');
 
-        const sellOrder = broker.submitOrder(sellDto!);
+        const sellOrder = broker.submitOrder({
+          securityId: 1,
+          securityCode: '000001',
+          side: 'SELL',
+          orderType: 'MARKET',
+          quantity: riskInstructions[0].quantity,
+          signalTime: bar2.timestamp,
+          exitReason: riskInstructions[0].reason,
+          intentId: riskInstructions[0].idempotencyKey,
+        });
         expect(sellOrder.status).toBe(ORDER_STATUSES.PENDING);
         broker.settleDayClose(formatShanghaiDateString(day2));
         capitalLedger.onDayClose(bar2, position.getSnapshot());

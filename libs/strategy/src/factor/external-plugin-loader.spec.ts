@@ -243,6 +243,13 @@ describe('ExternalFactorPluginLoader', () => {
     });
 
     it('discovers peer workspace plugins when the private workspace is present', () => {
+      // jest 全局 setup 默认禁用了私仓探测（组8）——本测试显式指向平级私仓目录
+      // 以验证 peer 发现机制本身仍然有效（显式 env 独占语义）。
+      process.env.MIST_PRIVATE_PLUGINS_DIR = path.resolve(
+        process.cwd(),
+        '..',
+        'mist-alpha-private',
+      );
       const peerDir = path.resolve(process.cwd(), '..', 'mist-alpha-private');
       const hasPrivateWorkspace =
         fs.existsSync(peerDir) &&

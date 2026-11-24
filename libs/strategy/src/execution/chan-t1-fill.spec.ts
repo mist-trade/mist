@@ -3,7 +3,12 @@ import { StrategyEvaluationKernel } from '../kernel/strategy-evaluation-kernel';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
 import { ChanBspFactorPlugin } from '../factor/plugins/chan-bsp.plugin';
 import { SimulatedBroker } from './simulated-broker';
-import { ExecutionRiskArbiter } from './execution-risk-arbiter';
+import {
+  TradingEngine,
+  type SignalGroupInput,
+  type AccountSnapshot,
+  type TradingPositionState,
+} from '../trading';
 import type { KernelSignal } from '../kernel/kernel.types';
 import { applySlippage } from './slippage-fee-calculator';
 import { ORDER_SIDES } from '../strategy.constants';
@@ -97,36 +102,54 @@ it('chan T+1 一致性：确认 bar 收盘出信号，同 bar 不成交，次根
 
   const broker = new SimulatedBroker(1_000_000);
   broker.registerSecurity('000001', { name: '上证指数', preClose: 100 });
-  const arbiter = new ExecutionRiskArbiter();
-  const position = {
-    securityId: 1,
-    securityCode: '000001',
-    status: 'EMPTY',
-    holdingQuantity: 0,
-    availableQuantity: 0,
-    frozenQuantity: 0,
-    quantity: 0,
-    averageCost: 0,
-    costPrice: 0,
-    unrealizedPnlRatio: 0,
-  } as never;
+  // 交易层引擎接管裁决（组4/组9 迁移）：单信号组 → decide → 指令入待撮合队列
+  const tradingEngine = new TradingEngine({ riskRules: [] });
 
+  const account: AccountSnapshot = {
+    cashLi: 1_000_000_000n,
+    positions: new Map<number, TradingPositionState>(),
+    tradingDay: '',
+  };
   const fills: { price: number; signalTime: Date; fillTime: Date }[] = [];
   const orderSignalTimes = new Map<string, Date>();
   let signalBarIndex = -1;
 
   for (let i = 0; i < N; i++) {
     const signals: readonly KernelSignal[] = await kernel.push(bars[i]);
-    for (const signal of signals) {
+    if (signals.length > 0) {
       signalBarIndex = i;
-      const orderDraft = arbiter.arbitrate({
-        bar: bars[i],
-        signal,
-        position,
-        availableCash: 1_000_000,
-      });
-      if (orderDraft) {
-        const order = broker.submitOrder(orderDraft);
+      const group: SignalGroupInput = {
+        securityId: 1,
+        securityCode: '000001',
+        effectiveTime: signals[0].signalTime,
+        tradingDay: bars[i].timestamp.toISOString().slice(0, 10),
+        signals: signals.map((signal) => ({
+          idempotencyKey: `offline-1-${signal.signalTime.getTime()}-${signal.signalKind}`,
+          signal,
+          attribution: {
+            strategyName: 't1-guard',
+            periodLabel: '日线',
+            confidence: signal.confidence,
+            confidenceLevel: signal.confidenceLevel,
+            traceChain: null,
+          },
+        })),
+      };
+      const decision = tradingEngine.decide(group, account);
+      for (const instruction of decision.instructions) {
+        if (!instruction.signal) continue;
+        const order = broker.submitOrder({
+          securityId: 1,
+          securityCode: '000001',
+          side: instruction.action,
+          orderType: 'MARKET',
+          quantity: instruction.quantity,
+          signalTime: instruction.signal.signalTime,
+          ...(instruction.action === 'BUY'
+            ? { entryReason: instruction.reason }
+            : { exitReason: instruction.reason }),
+          intentId: instruction.idempotencyKey,
+        });
         if (order) orderSignalTimes.set(order.orderId, order.signalTime);
       }
     }
