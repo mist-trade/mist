@@ -21,26 +21,33 @@ export function contextSeriesKey(securityCode: string, period: number): string {
 export const CONTEXT_OPINION_PREFIX = 'contextOpinion.';
 
 /**
- * params 值的稳定序列化：Decimal8（及嵌套持有者）先 formatCanonical，
- * 否则 JSON.stringify 会触发其防序列化哨兵（Decimal8 toJSON 有意抛错）。
+ * params 值的稳定序列化：Decimal8（及嵌套持有者）先 formatCanonical 再入串。
+ * toJSON 优先于 stringify replacer（Decimal8.toJSON 有意抛错），故必须先深拷贝
+ * 替换为 canonical 字符串，再 JSON.stringify。
  */
-function renderParamValue(value: unknown): string {
+function toPlain(value: unknown): unknown {
   if (value === null || typeof value !== 'object') {
-    return String(value);
+    return value;
   }
   const candidate = value as { formatCanonical?: unknown };
   if (typeof candidate.formatCanonical === 'function') {
     return (candidate as { formatCanonical(): string }).formatCanonical();
   }
-  return JSON.stringify(value, (_key, v) => {
-    if (v !== null && typeof v === 'object') {
-      const nested = v as { formatCanonical?: unknown };
-      if (typeof nested.formatCanonical === 'function') {
-        return (nested as { formatCanonical(): string }).formatCanonical();
-      }
-    }
-    return v;
-  });
+  if (Array.isArray(value)) {
+    return value.map(toPlain);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [key, v] of Object.entries(value as Record<string, unknown>)) {
+    out[key] = toPlain(v);
+  }
+  return out;
+}
+
+function renderParamValue(value: unknown): string {
+  if (value === null || typeof value !== 'object') {
+    return String(value);
+  }
+  return JSON.stringify(toPlain(value));
 }
 
 export function contextOpinionKey(
