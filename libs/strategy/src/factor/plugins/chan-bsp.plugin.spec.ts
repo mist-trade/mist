@@ -322,7 +322,7 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
     expect(op.action).toBe('BUY');
     expect(op.reason).toContain('缠论线段级三买确认');
     expect(op.evidence?.units).toBe('duan');
-    expect(op.evidence?.triggerTime).toBe(barTime.toISOString());
+    expect(op.evidence?.signalTime).toBe(barTime.toISOString());
     expect(op.evidence?.pivotTime).toBe(pivotTime.toISOString());
     expect(op.evidence?.pivotPrice).toBe(3900);
   });

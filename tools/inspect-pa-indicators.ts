@@ -1,51 +1,12 @@
-import * as fs from 'node:fs';
-import * as path from 'node:path';
 import {
   FvgMitigationStatus,
   FvgType,
   NecklinePatternType,
   NecklineStatus,
   PaCore,
-  PaK,
   PinBarDirection,
 } from '@app/pacore';
-
-const KLINE_DIR =
-  process.env.MIST_KLINE_DIR || path.resolve(__dirname, '../.data/kline');
-
-interface RawBar {
-  readonly id: number;
-  readonly time: string;
-  readonly open: number;
-  readonly high: number;
-  readonly low: number;
-  readonly close: number;
-  readonly volume?: string | number;
-  readonly amount?: string | number;
-}
-
-function loadBars(fileName: string, limit?: number): PaK[] {
-  const filePath = path.join(KLINE_DIR, fileName);
-  if (!fs.existsSync(filePath)) {
-    console.warn(
-      `⚠️ [inspect-pa] 数据文件未找到: ${filePath}。如需运行真实数据体检，请设置环境变量 MIST_KLINE_DIR。`,
-    );
-    return [];
-  }
-  const rawData: RawBar[] = JSON.parse(fs.readFileSync(filePath, 'utf8'));
-  const sliced = limit ? rawData.slice(-limit) : rawData;
-
-  return sliced.map((b) => ({
-    id: b.id,
-    time: new Date(b.time),
-    open: Number(b.open),
-    high: Number(b.high),
-    low: Number(b.low),
-    close: Number(b.close),
-    volume: b.volume ? Number(b.volume) : undefined,
-    amount: b.amount ? Number(b.amount) : undefined,
-  }));
-}
+import { loadPaKBars } from './strategy-dev/pa-kline-loader';
 
 function inspectPeriod(
   name: string,
@@ -58,7 +19,10 @@ function inspectPeriod(
   );
   console.log(`======================================================`);
 
-  const bars = loadBars(fileName, sampleLimit);
+  const bars = loadPaKBars(fileName, {
+    limit: sampleLimit,
+    warnIfMissing: true,
+  });
   if (bars.length === 0) {
     console.log(`⏭️ [跳过] 无可用 K 线数据，跳过此周期扫描。`);
     return;

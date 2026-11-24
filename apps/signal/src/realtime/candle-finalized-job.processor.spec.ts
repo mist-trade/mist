@@ -76,7 +76,6 @@ describe('CandleFinalizedJobProcessor', () => {
       period: 1,
       signalKind: 'entry',
       signalTime: bar.timestamp,
-      triggerTime: bar.timestamp.toISOString(),
       triggerPrice: 28,
       pivotTime: null,
       pivotPrice: null,

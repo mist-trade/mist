@@ -3,6 +3,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { StrategySignal } from '@app/shared-data';
 import { FindOptionsWhere, Repository } from 'typeorm';
 import { QueryStrategySignalDto } from '../dto/query-strategy-signal.dto';
+import { StrategySignalVo } from '../vo/strategy-signal.vo';
+import { availabilityKey } from '@app/strategy';
 
 @Injectable()
 export class StrategySignalService {
@@ -11,7 +13,7 @@ export class StrategySignalService {
     private readonly signalRepository: Repository<StrategySignal>,
   ) {}
 
-  async findAll(query: QueryStrategySignalDto): Promise<StrategySignal[]> {
+  async findAll(query: QueryStrategySignalDto): Promise<StrategySignalVo[]> {
     const where: FindOptionsWhere<StrategySignal> = {};
 
     if (query.strategyDefinitionId) {
@@ -23,11 +25,22 @@ export class StrategySignalService {
 
     const limit = Math.min(Math.max(query.limit ?? 50, 1), 100);
 
-    return await this.signalRepository.find({
+    const signals = await this.signalRepository.find({
       where,
       relations: ['security'],
       order: { signalTime: 'DESC' },
       take: limit,
     });
+
+    return signals.map((signal) => ({
+      ...signal,
+      confidence: signal.confidence ?? null,
+      confidenceLevel: signal.confidenceLevel ?? null,
+      decisionTrace: signal.decisionTrace ?? null,
+      effectiveTime: availabilityKey({
+        period: signal.period,
+        timestamp: signal.signalTime,
+      }),
+    }));
   }
 }

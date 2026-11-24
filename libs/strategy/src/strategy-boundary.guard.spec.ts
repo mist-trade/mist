@@ -125,7 +125,10 @@ describe('Strategy domain boundary', () => {
               // KDJ/MACD math to it (see extract-shared-indicators-library).
               source !== '@app/indicators' &&
               // The Chan core is a pure computational geometry library (no I/O) for factor plugins
-              source !== '@app/chancore') ||
+              source !== '@app/chancore' &&
+              // The Pa core is a pure computational price-action library (no I/O); the
+              // bar mapper is the single adapter from StrategyBar to PaK.
+              source !== '@app/pacore') ||
             source.startsWith('apps/') ||
             source.includes('/apps/') ||
             relativeImportEscapesStrategy(file, source),

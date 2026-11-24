@@ -42,6 +42,14 @@ export class StrategySignalVo {
   @ApiProperty({ type: String, format: 'date-time' })
   signalTime!: Date;
 
+  @ApiProperty({
+    type: String,
+    format: 'date-time',
+    description:
+      '信号生效时刻 = availabilityKey(signalTime, period)，用于展示/聚合',
+  })
+  effectiveTime!: Date;
+
   @ApiPropertyOptional({ type: String, format: 'date-time', nullable: true })
   pivotTime?: Date | null;
 

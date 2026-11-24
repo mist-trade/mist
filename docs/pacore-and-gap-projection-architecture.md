@@ -1,6 +1,9 @@
 # Mist `@app/pacore`：微观价格行为、缺口失衡与空间投射架构设计方案
 
 > **状态**：Draft / Architecture Baseline  
+> **2026-11-24 注**：`TacticalEventAggregator` / `libs/strategy/src/tactical-event/` 已退役删除；
+> 本文中涉及该层的图示仅保留为设计背景。现行实现是原始 `KernelSignal` 直发消费端，
+> 归因读 `StrategySignal.decisionTrace.trace`。
 > **归属仓库**：`mist`（开源主仓）  
 > **所属模块**：`libs/pacore`（拟新增独立纯数学核心包）  
 > **基准参照**：`libs/chancore`（纯数学/零I/O不可变几何引擎规范）、`libs/visual-command`（图层渲染契约）

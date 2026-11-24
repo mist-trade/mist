@@ -39,8 +39,9 @@ describe('buildNotificationEnvelope', () => {
     expect(env.message.periodLabel).toBe('1m');
     expect(env.message.triggerPrice).toBe(19.87);
     // UTC 01:30 -> Shanghai 09:30
-    expect(env.message.signalTime).toContain('2026-08-13');
-    expect(env.message.signalTime).toContain('09:30');
+    // 1m 标签 09:30 -> 内容封存 09:31
+    expect(env.message.effectiveTime).toContain('2026-08-13');
+    expect(env.message.effectiveTime).toContain('09:31');
     expect(env.message.summary).toContain('300059');
     expect(env.message.summary).toContain('东方财富');
     expect(env.message.summary).toContain('买入');
@@ -54,7 +55,8 @@ describe('buildNotificationEnvelope', () => {
       strategyDefinitionId: 3,
       signalKind: 'exit',
       period: 1440,
-      signalTime: new Date('2026-08-13T01:30:00.000Z'),
+      // 日线标签 = 交易日 00:00(D)，内容封存 = 15:01(D)
+      signalTime: new Date('2026-08-12T16:00:00.000Z'),
       contextSnapshot: {},
     } as unknown as StrategySignal;
 
@@ -68,6 +70,8 @@ describe('buildNotificationEnvelope', () => {
 
     expect(env.message.direction).toBe('卖出');
     expect(env.message.periodLabel).toBe('日线');
+    expect(env.message.effectiveTime).toContain('2026-08-13');
+    expect(env.message.effectiveTime).toContain('15:01');
     expect(env.channel).toBe(NotificationChannel.QQ);
   });
 

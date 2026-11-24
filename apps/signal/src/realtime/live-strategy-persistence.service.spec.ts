@@ -35,7 +35,6 @@ describe('LiveStrategyPersistenceService', () => {
       decisionTrace: { flowId: 'test_flow' },
       contextSnapshot: {
         k: { type: 'incomplete', close: 28 },
-        triggerTime: '2026-08-04T06:44:00.000Z',
         triggerPrice: 28,
       },
     });
@@ -110,7 +109,6 @@ function candidate() {
     period: 5,
     signalKind: 'entry' as const,
     signalTime: new Date('2026-08-04T06:44:00.000Z'),
-    triggerTime: '2026-08-04T06:44:00.000Z',
     triggerPrice: 28,
     pivotTime: null,
     pivotPrice: null,

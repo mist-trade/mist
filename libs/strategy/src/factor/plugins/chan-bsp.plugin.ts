@@ -21,7 +21,7 @@ import {
   type ConfirmedFenxingResult,
 } from '../../analysis/chan-fenxing-trigger';
 import { readContextSeries } from '../../kernel/availability';
-import { toChanKSeries } from '../../analysis/chan-derivation';
+import { toChanKSeries } from '../../analysis/pure-bar-mapper';
 import type {
   FactorContext,
   FactorOpinion,
@@ -349,9 +349,9 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         units: latestEvent.units,
         price: latestEvent.price,
         time: latestEvent.time.toISOString(),
+        signalTime: context.timestamp.toISOString(),
         pivotTime: latestEvent.time.toISOString(),
         pivotPrice: latestEvent.price,
-        triggerTime: context.timestamp.toISOString(),
         triggerPrice: currentBarClose,
         zg: latestEvent.zg,
         zd: latestEvent.zd,
@@ -366,7 +366,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
           time: e.time.toISOString(),
           pivotTime: e.time.toISOString(),
           pivotPrice: e.price,
-          triggerTime: context.timestamp.toISOString(),
           triggerPrice: currentBarClose,
           zg: e.zg,
           zd: e.zd,

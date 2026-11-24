@@ -7,9 +7,9 @@ import { readContextSeries } from '../../kernel/availability';
 import { TrendDirection } from '@app/chancore';
 import {
   findLastCompletedSwing,
-  toChanKSeries,
   type ChanSwingUnitLevel,
 } from '../../analysis/chan-derivation';
+import { toChanKSeries } from '../../analysis/pure-bar-mapper';
 import {
   CHAN_BSP_UNITS,
   DECISION_ACTIONS,

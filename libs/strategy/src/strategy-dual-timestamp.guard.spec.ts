@@ -63,7 +63,6 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
         for (const signal of signals) {
           // 契约断言 1: signalTime 必须严格等于当前确认 Bar 的时间戳 (右侧确立时刻)
           expect(signal.signalTime).toBe(bar.timestamp);
-          expect(signal.triggerTime).toBe(bar.timestamp.toISOString());
 
           // 契约断言 2: pivotTime 必须存在且时间戳必然早于或等于 signalTime (绝对无未来极值)
           expect(signal.pivotTime).not.toBeNull();

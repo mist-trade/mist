@@ -98,8 +98,6 @@ export interface KernelSignal {
   readonly originPluginId?: string;
   /** 决策确立时刻 = 当前确认 Bar timestamp（纯观点确立时刻） */
   readonly signalTime: Date;
-  /** 与 signalTime 严格等价（ISO 字符串） */
-  readonly triggerTime: string;
   /** 决策确立基准观察价（当前确认 Bar 收盘价，非成交价；实际撮合由交易引擎在 Next-Bar 执行） */
   readonly triggerPrice: number;
   /** 形态几何极值时刻（图表 Marker 定位），无 pivot 语义时为 null */

@@ -167,7 +167,7 @@ export class StrategyAlertDeliveryWorker extends WorkerHost {
 
 ### 3.4 Channel delivery service（`deliver.channel`）+ adapter
 - 载入 AlertEvent + Signal evidence（contextSnapshot/ruleSnapshot/signalKind/signalTime）。
-- 建 `NotificationEnvelope`（channel-neutral：alertEventId、dedupeKey、signalKind、symbol、triggerTime/price、context 摘要）。
+- 建 `NotificationEnvelope`（channel-neutral：alertEventId、dedupeKey、signalKind、symbol、effectiveTime/price、context 摘要）。
 - 选 adapter（`@Inject(CHANNEL_ADAPTERS)` Map<channel, ChannelAdapter>）。
 - `result = await adapter.send(envelope)` → 写 delivery 记录（attempt_count++、status、sent_at、provider_message_id、last_error 截断 1024）。
 - reconcile 聚合：查该 alertEventId 所有 delivery 记录；全 `sent`→AlertEvent.status=DELIVERED；任一 `dead_lettered`→FAILED；否则保持 PENDING。

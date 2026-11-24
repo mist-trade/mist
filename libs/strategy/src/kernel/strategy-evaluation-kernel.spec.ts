@@ -309,7 +309,6 @@ describe('StrategyEvaluationKernel（统一 push 内核）', () => {
       for (const signal of signals) {
         sawSignal = true;
         expect(signal.signalTime).toBe(bar.timestamp);
-        expect(signal.triggerTime).toBe(bar.timestamp.toISOString());
         expect(signal.triggerPrice).toBe(bar.close);
         if (signal.pivotTime !== null) {
           expect(new Date(signal.pivotTime).getTime()).toBeLessThanOrEqual(

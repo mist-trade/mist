@@ -12,12 +12,9 @@ import {
   RealtimePeriodBuilder,
   RealtimeKernelPool,
   REALTIME_STRATEGY_PERIODS,
-  TacticalEventAggregator,
   type PreMarketWarmupReport,
   type PreMarketWarmupTarget,
   type RealtimeStrategyExecutionPlan,
-  type TacticalAggregatorConfig,
-  type KernelSignal,
 } from '@app/strategy';
 import {
   RealtimeStrategyEvaluationService,
@@ -58,10 +55,6 @@ interface FinalizationCursor {
 
 export class CandleFinalizedJobProcessor {
   private readonly cursors = new Map<string, FinalizationCursor>();
-  private readonly tacticalAggregators = new Map<
-    string,
-    TacticalEventAggregator
-  >();
   private activeTradingDay: string | null = null;
   private lastPersistenceOutcome:
     | LiveStrategyPersistenceOutcome
@@ -94,9 +87,6 @@ export class CandleFinalizedJobProcessor {
       RuntimeObservabilityService,
       'recordTradingDayRollover' | 'recordConsumerRemoval'
     >,
-    // 组合根必须注入由 TacticalAggregatorConfigLoader 解析的配置；
-    // 空配置表示未挂载私仓，此时战术汇聚层只透传信号、不合成观察窗。
-    private readonly tacticalConfig: TacticalAggregatorConfig = {},
   ) {}
 
   async process(
@@ -129,7 +119,6 @@ export class CandleFinalizedJobProcessor {
       }
       this.activeTradingDay = tradingDay;
       this.cursors.clear();
-      this.tacticalAggregators.clear();
       this.periodBuilder.reset();
       // 跨日守卫：当日已预热的组必须保留（首根封存 Bar 零历史 I/O）；
       // 仅在没有为该交易日预热的组时才清空评估态。
@@ -209,39 +198,7 @@ export class CandleFinalizedJobProcessor {
       );
       this.lastJobEvaluated = true;
 
-      const aggKey = `${bar.securityId}\u0000${bar.source}\u0000${bar.period}`;
-      let aggregator = this.tacticalAggregators.get(aggKey);
-      if (!aggregator) {
-        aggregator = new TacticalEventAggregator(this.tacticalConfig);
-        this.tacticalAggregators.set(aggKey, aggregator);
-      }
-
-      const kernelSignals: KernelSignal[] = evaluated.map((cand) => ({
-        definitionId: cand.definitionId,
-        versionId: cand.versionId,
-        signalKind: cand.signalKind,
-        signalTime: cand.signalTime,
-        triggerTime: cand.triggerTime,
-        triggerPrice: cand.triggerPrice,
-        pivotTime: cand.pivotTime,
-        pivotPrice: cand.pivotPrice,
-        signalType: cand.signalType,
-        confidence: cand.confidence,
-        confidenceLevel: cand.confidenceLevel ?? 'MEDIUM',
-        decisionTrace: cand.decisionTrace ?? {},
-        contextSnapshot: cand.contextSnapshot as Record<string, unknown>,
-        ruleSnapshot: cand.ruleSnapshot,
-      }));
-
-      const tacticalEvents = aggregator.push(kernelSignals, bar);
-      const tacticalEventSet = new Set(
-        tacticalEvents.map((te) => `${te.definitionId}:${te.versionId}`),
-      );
-
       for (const candidate of evaluated) {
-        const isTactical = tacticalEventSet.has(
-          `${candidate.definitionId}:${candidate.versionId}`,
-        );
         if (this.mode === 'on') {
           if (!this.persistence) {
             throw new Error('on-mode live strategy persistence is unavailable');
@@ -251,9 +208,7 @@ export class CandleFinalizedJobProcessor {
               deadlineAt,
               'persistence',
               async (): Promise<LiveStrategyPersistenceOutcome> => {
-                const outcome = await this.persistence!.persist(candidate, {
-                  isTacticalEvent: isTactical,
-                });
+                const outcome = await this.persistence!.persist(candidate);
                 this.lastPersistenceOutcome = outcome;
                 return outcome;
               },
@@ -383,10 +338,6 @@ export class CandleFinalizedJobProcessor {
     );
     for (const key of this.cursors.keys()) {
       if (!retainedSeries.has(key)) this.cursors.delete(key);
-    }
-    for (const key of this.tacticalAggregators.keys()) {
-      const seriesKey = key.split('\u0000').slice(0, 2).join('\u0000');
-      if (!retainedSeries.has(seriesKey)) this.tacticalAggregators.delete(key);
     }
   }
 }

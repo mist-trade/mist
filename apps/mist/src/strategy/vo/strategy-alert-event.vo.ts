@@ -10,7 +10,6 @@ export class StrategyAlertEventVo {
   strategySignalId!: number;
   status!: StrategyAlertStatus;
   dedupeKey!: string;
-  cooldownUntil?: Date | null;
   deliveryResult?: Record<string, unknown> | null;
   acknowledgedAt?: Date | null;
   createdAt!: Date;
@@ -22,7 +21,6 @@ export class StrategyAlertEventVo {
     vo.strategySignalId = entity.strategySignalId;
     vo.status = entity.status;
     vo.dedupeKey = entity.dedupeKey;
-    vo.cooldownUntil = entity.cooldownUntil ?? null;
     vo.deliveryResult = entity.deliveryResult ?? null;
     vo.acknowledgedAt = entity.acknowledgedAt ?? null;
     vo.createdAt = entity.createdAt;

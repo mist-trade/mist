@@ -142,7 +142,6 @@ describe.each(REALTIME_LIVE_SNAPSHOT_FIXTURES)(
         period: 1,
         signalKind: 'entry',
         signalTime: new Date(bucket!.bucketStartMs),
-        triggerTime: new Date(bucket!.bucketStartMs).toISOString(),
         triggerPrice: fixture.expectedPrices.last,
         barType: 'complete',
       });

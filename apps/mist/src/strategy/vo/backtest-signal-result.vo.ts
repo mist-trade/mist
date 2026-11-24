@@ -9,6 +9,12 @@ export class BacktestSignalResultVo {
   securityCode!: string;
   @ApiProperty()
   signalTime!: string;
+
+  @ApiProperty({
+    description:
+      '信号生效时刻 = availabilityKey(signalTime, period)，用于展示/聚合',
+  })
+  effectiveTime!: string;
   @ApiPropertyOptional({
     description: '形态几何极值时刻 (图表 Marker 定位)，无 pivot 语义为 null',
     nullable: true,

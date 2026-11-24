@@ -85,7 +85,6 @@ function createSignal(
     versionId: 1,
     signalKind: kind,
     signalTime: new Date(time),
-    triggerTime: time,
     triggerPrice: 10.0,
     pivotTime: null,
     pivotPrice: null,

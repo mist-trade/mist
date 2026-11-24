@@ -23,6 +23,7 @@ import { BacktestRunVo } from '../vo/backtest-run.vo';
 import { BacktestSignalResultPageVo } from '../vo/backtest-signal-result-page.vo';
 import { BacktestSignalResultVo } from '../vo/backtest-signal-result.vo';
 import { SAFE_FAILURE_CODES_SET } from '@app/contracts';
+import { availabilityKey } from '@app/strategy';
 import { DEFAULT_API_PAGE_LIMIT } from '@app/constants';
 import { BacktestTradeResultPageVo } from '../vo/backtest-trade-result-page.vo';
 import { BacktestTradeResultVo } from '../vo/backtest-trade-result.vo';
@@ -147,6 +148,7 @@ export class BacktestRunQueryService {
         'result.securityCode',
         'result.signalTime',
         'result.pivotTime',
+        'result.period',
         'result.signalType',
         'result.confidence',
         'result.confidenceLevel',
@@ -284,6 +286,13 @@ function mapResult(result: BacktestSignalResult): BacktestSignalResultVo {
     backtestRunId: result.backtestRunId,
     securityCode: result.securityCode,
     signalTime: result.signalTime.toISOString(),
+    effectiveTime: (result.period
+      ? availabilityKey({
+          period: result.period,
+          timestamp: result.signalTime,
+        })
+      : result.signalTime
+    ).toISOString(),
     pivotTime: result.pivotTime ? result.pivotTime.toISOString() : null,
     signalType: result.signalType,
     confidence:

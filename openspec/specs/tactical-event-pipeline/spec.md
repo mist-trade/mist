@@ -1,6 +1,13 @@
 # tactical-event-pipeline Specification
 
 ## Purpose
+> [!NOTE] RETIRED / DEPRECATED (2026-11-24 retire-tactical-event-aggregation)
+> The tactical event aggregation layer was removed. The compiled decision flow emits one terminal
+> `KernelSignal` per definition per bar (same-bar AND chain), so `TemporalWindowEngine` had no
+> cross-bar trigger/confirmation input; `EdgeDetector` never matched because the kernel's
+> `decisionTrace` has no top-level `pluginId`; and `CooldownTracker` only hid messages without
+> changing trades. Consumers now use raw `StrategySignal`s, with attribution rendered from
+> `decisionTrace.trace`. The requirements below are kept as the frozen retirement record.
 Defines the dedicated Tactical Event Aggregation Layer between the pure mathematical signal layer (StrategyEvaluationKernel) and downstream consumers (trading execution broker, notification alerts, and frontend visualization), providing edge-detection, temporal window consensus, and tactical cooldown.
 ## Requirements
 ### Requirement: Dedicated Tactical Event Aggregation Layer

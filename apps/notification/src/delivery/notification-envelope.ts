@@ -8,7 +8,7 @@ import {
 import { formatShanghaiDateTimeString, MINUTES_PER_HOUR } from '@app/timezone';
 import { PERIOD_MINUTES } from '@app/constants';
 
-import { CHAN_BSP_UNITS, SIGNAL_KINDS } from '@app/strategy';
+import { CHAN_BSP_UNITS, SIGNAL_KINDS, availabilityKey } from '@app/strategy';
 
 export interface NotificationMessage {
   readonly securityCode: string;
@@ -17,7 +17,7 @@ export interface NotificationMessage {
   readonly triggerPrice?: number;
   readonly strategyName: string;
   readonly periodLabel: string;
-  readonly signalTime: string;
+  readonly effectiveTime: string;
   readonly summary: string;
   readonly confidence?: number;
   readonly confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW';
@@ -53,7 +53,14 @@ export function buildNotificationEnvelope(
   const direction = directionLabel(signal?.signalKind, ctx, signal);
   const strategyName = strategyDefinition?.name ?? '';
   const periodLabel = signal ? formatPeriod(signal.period) : '';
-  const signalTime = signal ? formatShanghaiTime(signal.signalTime) : '';
+  const effectiveTime = signal
+    ? formatShanghaiTime(
+        availabilityKey({
+          period: signal.period,
+          timestamp: signal.signalTime,
+        }),
+      )
+    : '';
   const confidence =
     signal?.confidence !== null && signal?.confidence !== undefined
       ? Number(signal.confidence)
@@ -68,7 +75,7 @@ export function buildNotificationEnvelope(
     triggerPrice,
     strategyName,
     periodLabel,
-    signalTime,
+    effectiveTime,
     confidence,
     confidenceLevel,
   });
@@ -83,7 +90,7 @@ export function buildNotificationEnvelope(
       triggerPrice,
       strategyName,
       periodLabel,
-      signalTime,
+      effectiveTime,
       summary,
       confidence,
       confidenceLevel,
@@ -99,7 +106,7 @@ function buildSummary(parts: {
   triggerPrice?: number;
   strategyName: string;
   periodLabel: string;
-  signalTime: string;
+  effectiveTime: string;
   confidence?: number;
   confidenceLevel?: string;
 }): string {
@@ -111,7 +118,7 @@ function buildSummary(parts: {
       ? ` [${parts.confidenceLevel ?? 'CONF'} ${parts.confidence.toFixed(1)}%]`
       : '';
   const seg = (...xs: string[]) => xs.filter(Boolean).join(' | ');
-  const tail = seg(parts.strategyName, parts.periodLabel, parts.signalTime);
+  const tail = seg(parts.strategyName, parts.periodLabel, parts.effectiveTime);
   return `[Mist]${conf} ${parts.securityCode}${name} ${parts.direction}${price}${
     tail ? ` | ${tail}` : ''
   }`;

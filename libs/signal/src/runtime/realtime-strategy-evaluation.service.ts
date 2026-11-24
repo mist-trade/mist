@@ -22,8 +22,6 @@ export interface ShadowStrategyCandidate {
   readonly signalKind: 'entry' | 'exit';
   /** 决策触发时刻 = 当前确认 Bar timestamp（撮合/游标唯一认可时刻） */
   readonly signalTime: Date;
-  /** 与 signalTime 严格等价（ISO） */
-  readonly triggerTime: string;
   readonly triggerPrice: number;
   /** 形态几何极值时刻（图表 Marker 定位），无 pivot 语义为 null */
   readonly pivotTime: string | null;
@@ -156,7 +154,6 @@ function toCandidate(
     period: bar.period,
     signalKind,
     signalTime: bar.timestamp,
-    triggerTime: bar.timestamp.toISOString(),
     triggerPrice: signal.triggerPrice,
     pivotTime: signal.pivotTime,
     pivotPrice: signal.pivotPrice,

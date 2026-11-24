@@ -12,7 +12,6 @@ export interface DecisionTraceSnapshot {
   readonly signalTag?: string;
   readonly summary: string;
   readonly trace: readonly DecisionExecutionTraceItem[];
-  readonly timestamp: string;
 }
 
 /**
@@ -24,10 +23,7 @@ export class DecisionExecutionTraceBuilder {
   /**
    * 将求值结果转换为可持久化存储的白盒轨迹快照
    */
-  public static buildSnapshot(
-    result: DecisionResult,
-    timestamp: Date = new Date(),
-  ): DecisionTraceSnapshot {
+  public static buildSnapshot(result: DecisionResult): DecisionTraceSnapshot {
     const summary = this.buildHumanReadableSummary(result);
 
     return {
@@ -38,7 +34,6 @@ export class DecisionExecutionTraceBuilder {
       signalTag: result.signalTag,
       summary,
       trace: result.trace,
-      timestamp: timestamp.toISOString(),
     };
   }
 

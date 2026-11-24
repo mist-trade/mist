@@ -23,6 +23,7 @@ import {
 } from '../../libs/strategy/src/simulation';
 import {
   StrategyEvaluationKernel,
+  availabilityKey,
   type KernelSignal,
 } from '../../libs/strategy/src/kernel';
 import { SimulatedBroker } from '../../libs/strategy/src/execution/simulated-broker';
@@ -55,14 +56,7 @@ import {
   InMemoryReplayPort,
   ReplaySeriesMissingError,
 } from '../../libs/strategy/src/kernel/adapters/in-memory-replay-port';
-import {
-  mapKernelSignalToSimulationSignal,
-  mapTacticalEventToSimulationSignal,
-} from '../../libs/strategy/src/simulation/kernel-signal-mapper';
-import {
-  TacticalEventAggregator,
-  TacticalAggregatorConfigLoader,
-} from '../../libs/strategy/src/tactical-event';
+import { mapKernelSignalToSimulationSignal } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
 import type { StrategySignalKind } from '../../libs/strategy/src/rules/strategy-rule.types';
 import {
   loadCanonicalKlines,
@@ -541,10 +535,6 @@ const sessionStreamClients = new Map<string, Set<http.ServerResponse>>();
 // 回测信号内存缓存池 (cacheKey -> signals, runId -> signals)
 const backtestSignalsCache = new Map<string, readonly SimulationSignal[]>();
 const backtestRunSignalsMap = new Map<number, readonly SimulationSignal[]>();
-const backtestRunTacticalEventsMap = new Map<
-  number,
-  readonly SimulationSignal[]
->();
 
 function getBacktestCacheKey(options: {
   code: string;
@@ -802,7 +792,6 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   ) {
     return {
       signals: cachedSignals,
-      tacticalEvents: [],
       kernel: null,
       navSeries: [],
       closedTrades: [],
@@ -936,19 +925,14 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     : null;
 
   const collectedSignals: SimulationSignal[] = [];
-  const collectedTacticalEvents: SimulationSignal[] = [];
   let lastDateStr: string | null = null;
   let lastEvalBar: StrategyBar | null = null;
   let evalBarCount = 0;
   let pushCount = 0;
 
-  const tacticalAggregator = new TacticalEventAggregator(
-    TacticalAggregatorConfigLoader.load(),
-  );
-
   const replaySummary = await replaySource.drive(
     kernel,
-    // onSignal（仅求值周期）：原始信号收集 + 战术事件汇聚 + 因果委托下达
+    // onSignal（仅求值周期）：原始信号收集 + 因果委托下达
     async (kSig: KernelSignal, bar: StrategyBar) => {
       const simSig = mapKernelSignalToSimulationSignal(kSig, {
         securityCode: options.code,
@@ -956,44 +940,35 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       });
       collectedSignals.push(simSig);
 
-      const tacticalEvents = tacticalAggregator.push([kSig], bar);
-      for (const te of tacticalEvents) {
-        const simTe = mapTacticalEventToSimulationSignal(te, {
-          securityCode: options.code,
-          period: options.period,
-        });
-        collectedTacticalEvents.push(simTe);
+      const hasPendingOrder = broker
+        .getOpenOrders()
+        .some((o) => o.securityCode === options.code);
 
-        const hasPendingOrder = broker
-          .getOpenOrders()
-          .some((o) => o.securityCode === options.code);
-
-        if (te.action === 'BUY' || te.kind === 'ENTRY') {
-          const availableCash = broker.getAccount().availableCash;
-          const buyShares =
-            Math.floor((availableCash * 0.95) / bar.close / 100) * 100;
-          if (
-            buyShares >= 100 &&
-            (position.getStatus() === 'EMPTY' ||
-              position.getStatus() === 'CLOSED') &&
-            !hasPendingOrder
-          ) {
-            broker.submitOrder({
-              securityId: DEFAULT_DEV_SECURITY_ID,
-              securityCode: options.code,
-              side: ORDER_SIDES.BUY,
-              orderType: ORDER_TYPES.MARKET,
-              quantity: buyShares,
-              signalTime: bar.timestamp,
-              entryReason: te.badgeText || te.displayTag || 'TACTICAL_BUY',
-            });
-          }
-        } else if (te.action === 'SELL' || te.kind === 'EXIT') {
-          if (!hasPendingOrder && position.getStatus() === 'HOLDING') {
-            const sellDto = position.onSignal(te.triggerSignal);
-            if (sellDto) {
-              broker.submitOrder(sellDto);
-            }
+      if (kSig.signalKind === 'entry') {
+        const availableCash = broker.getAccount().availableCash;
+        const buyShares =
+          Math.floor((availableCash * 0.95) / bar.close / 100) * 100;
+        if (
+          buyShares >= 100 &&
+          (position.getStatus() === 'EMPTY' ||
+            position.getStatus() === 'CLOSED') &&
+          !hasPendingOrder
+        ) {
+          broker.submitOrder({
+            securityId: DEFAULT_DEV_SECURITY_ID,
+            securityCode: options.code,
+            side: ORDER_SIDES.BUY,
+            orderType: ORDER_TYPES.MARKET,
+            quantity: buyShares,
+            signalTime: bar.timestamp,
+            entryReason: kSig.badgeText || kSig.signalType || 'SIGNAL_BUY',
+          });
+        }
+      } else if (kSig.signalKind === 'exit') {
+        if (!hasPendingOrder && position.getStatus() === 'HOLDING') {
+          const sellDto = position.onSignal(kSig);
+          if (sellDto) {
+            broker.submitOrder(sellDto);
           }
         }
       }
@@ -1009,15 +984,6 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         }
       }
       lastDateStr = currentDateStr;
-
-      const timeoutEvents = tacticalAggregator.onBar(bar);
-      for (const te of timeoutEvents) {
-        const simTe = mapTacticalEventToSimulationSignal(te, {
-          securityCode: options.code,
-          period: options.period,
-        });
-        collectedTacticalEvents.push(simTe);
-      }
 
       const fills = broker.onBar(bar);
       for (const fill of fills) {
@@ -1141,7 +1107,6 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
 
   return {
     signals: collectedSignals,
-    tacticalEvents: collectedTacticalEvents,
     kernel,
     navSeries,
     closedTrades,
@@ -1829,7 +1794,6 @@ const server = http.createServer(async (req, res) => {
       // 统一走策略树仿真引擎计算
       const {
         signals,
-        tacticalEvents,
         performance,
         stressReport,
         closedTrades,
@@ -1904,7 +1868,6 @@ const server = http.createServer(async (req, res) => {
 
       mockRuns.unshift(newRun);
       backtestRunSignalsMap.set(newRun.id, signals);
-      backtestRunTacticalEventsMap.set(newRun.id, tacticalEvents ?? []);
 
       sendJson(
         res,
@@ -1943,8 +1906,6 @@ const server = http.createServer(async (req, res) => {
           trades: closedTrades,
           stressReport,
           signalCount: signals.length,
-          tacticalEventCount: (tacticalEvents ?? []).length,
-          tacticalEvents: tacticalEvents ?? [],
           ...(replay
             ? {
                 replay: {
@@ -2039,12 +2000,8 @@ const server = http.createServer(async (req, res) => {
         parsedUrl.query.filterFenxingContainment === 'true' ||
         parsedUrl.query.filterFenxingContainment === '1';
 
-      const isTacticalLayer =
-        parsedUrl.query.layer === 'tactical_events' ||
-        parsedUrl.query.layer === 'tactical';
-      let signals: readonly SimulationSignal[] | undefined = isTacticalLayer
-        ? backtestRunTacticalEventsMap.get(runId)
-        : backtestRunSignalsMap.get(runId);
+      let signals: readonly SimulationSignal[] | undefined =
+        backtestRunSignalsMap.get(runId);
 
       if (!signals) {
         // 统一走策略树仿真引擎计算
@@ -2056,8 +2013,7 @@ const server = http.createServer(async (req, res) => {
           endDate: matchedRun?.endDate,
         });
         backtestRunSignalsMap.set(runId, result.signals);
-        backtestRunTacticalEventsMap.set(runId, result.tacticalEvents);
-        signals = isTacticalLayer ? result.tacticalEvents : result.signals;
+        signals = result.signals;
       }
 
       const signalResults = (signals || []).map((sig, idx) => ({
@@ -2065,7 +2021,10 @@ const server = http.createServer(async (req, res) => {
         backtestRunId: runId,
         securityCode: symbol,
         signalTime: sig.signalTime,
-        triggerTime: sig.triggerTime || sig.signalTime,
+        effectiveTime: availabilityKey({
+          period: sig.period,
+          timestamp: new Date(sig.signalTime),
+        }).toISOString(),
         pivotTime: sig.pivotTime || sig.signalTime,
         signalType: sig.signalType,
         confidence: sig.confidence,
@@ -2078,7 +2037,7 @@ const server = http.createServer(async (req, res) => {
           triggerPrice: sig.triggerPrice,
           pivotPrice: sig.pivotPrice ?? sig.triggerPrice,
           time: sig.signalTime,
-          triggerTime: sig.triggerTime || sig.signalTime,
+          signalTime: sig.signalTime,
           pivotTime: sig.pivotTime || sig.signalTime,
           badgeText: sig.badgeText,
           signalTag: sig.badgeText,

@@ -34,9 +34,6 @@ export class StrategyAlertEvent {
   @Column({ name: 'dedupe_key', type: 'varchar', length: 255 })
   dedupeKey: string = '';
 
-  @Column({ name: 'cooldown_until', type: 'datetime', nullable: true })
-  cooldownUntil?: Date | null;
-
   @Column({ name: 'delivery_result', type: 'json', nullable: true })
   deliveryResult?: Record<string, unknown> | null;
 

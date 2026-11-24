@@ -100,6 +100,7 @@ describe('BacktestRunQueryService', () => {
           backtestRunId: 1,
           securityCode: '600000.SH',
           signalTime: new Date('2026-01-05T01:30:00Z'),
+          period: 1,
           pivotTime: new Date('2026-01-05T01:28:00Z'),
           signalType: 'first_buy',
           confidence: 85,
@@ -128,6 +129,7 @@ describe('BacktestRunQueryService', () => {
         backtestRunId: 1,
         securityCode: '600000.SH',
         signalTime: '2026-01-05T01:30:00.000Z',
+        effectiveTime: '2026-01-05T01:31:00.000Z',
         pivotTime: '2026-01-05T01:28:00.000Z',
         signalType: 'first_buy',
         confidence: 85,
@@ -139,6 +141,7 @@ describe('BacktestRunQueryService', () => {
       });
       expect(qb.select).toHaveBeenCalledWith(
         expect.arrayContaining([
+          'result.period',
           'result.signalType',
           'result.confidence',
           'result.confidenceLevel',

@@ -72,7 +72,6 @@ async function main() {
 
       console.log(`\n✅ ${item.name} 回测完成! 耗时: ${elapsedSec}s`);
       console.log(`- 原始信号数: ${res.signals.length}`);
-      console.log(`- 战术事件数: ${res.tacticalEvents?.length ?? 0}`);
       console.log(`- 实际成交笔数: ${res.closedTrades?.length ?? 0}`);
       console.log(`- 最长挫跌时期 (天): ${res.maxUnderwaterDuration ?? 'N/A'}`);
       console.log(`- 绩效指标:`, JSON.stringify(res.performance, null, 2));
@@ -95,7 +94,6 @@ async function main() {
         performance: res.performance,
         maxUnderwaterDuration: res.maxUnderwaterDuration,
         signalCount: res.signals.length,
-        tacticalEventCount: res.tacticalEvents?.length ?? 0,
         tradeCount: res.closedTrades?.length ?? 0,
         trades: res.closedTrades,
         stressReport: res.stressReport,

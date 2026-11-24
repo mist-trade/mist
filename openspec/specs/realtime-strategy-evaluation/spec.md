@@ -47,8 +47,8 @@ without copying a complete candle or provider payload into BullMQ.
 - **AND** it MUST map that sealed 1m candle to a canonical bar with `type='complete'` and append it to the
   shared market window before evaluation
 - **AND** it MUST NOT query complete history for each trigger
-- **AND** a resulting persisted Signal context MUST retain `triggerTime` and `triggerPrice` so downstream
-  notification consumers do not query BullMQ or market Redis
+- **AND** a resulting persisted Signal MUST retain `signal_time` and `context_snapshot.triggerPrice`
+  so downstream notification consumers do not query BullMQ or market Redis
 
 #### Scenario: The signal worker consumes a discarded trigger
 - **WHEN** `apps/signal` receives a valid discarded `candle_finalized` job

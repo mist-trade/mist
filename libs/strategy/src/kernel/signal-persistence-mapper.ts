@@ -26,7 +26,6 @@ export type PersistableKernelSignal = Pick<
   readonly intent?: KernelSignal['intent'];
   readonly originPluginId?: KernelSignal['originPluginId'];
   readonly confidenceLevel: KernelSignal['confidenceLevel'] | null;
-  readonly triggerTime?: string;
   readonly pivotTime?: string | Date | null;
   readonly pivotPrice?: number | null;
   readonly decisionTrace?: Readonly<Record<string, unknown>> | null;
@@ -48,7 +47,6 @@ export interface SignalPersistencePayload {
   readonly originPluginId: KernelSignal['originPluginId'];
   readonly signalTime: Date;
   readonly pivotTime: Date | null;
-  readonly triggerTime: string;
   readonly triggerPrice: number;
   readonly signalType: string;
   readonly confidence: number;
@@ -60,7 +58,7 @@ export interface SignalPersistencePayload {
 
 /**
  * 统一内核信号落盘转换函数（全链路单一同构映射器）。
- * 彻底杜绝实时侧与回测侧各自手写映射导致的字段错漏（如 pivotTime, triggerPrice, triggerTime, ruleSnapshot）。
+ * 彻底杜绝实时侧与回测侧各自手写映射导致的字段错漏（如 pivotTime, triggerPrice, ruleSnapshot）。
  */
 export function mapKernelSignalToPersistencePayload(
   signal: PersistableKernelSignal,
@@ -75,12 +73,10 @@ export function mapKernelSignalToPersistencePayload(
       ? signal.pivotTime
       : new Date(signal.pivotTime)
     : null;
-  const triggerTime = signal.triggerTime || signalTime.toISOString();
   const triggerPrice = signal.triggerPrice;
 
   const contextSnapshot: Record<string, unknown> = {
     ...signal.contextSnapshot,
-    triggerTime,
     triggerPrice,
     ...(signal.channel ? { channel: signal.channel } : {}),
     ...(signal.intent ? { intent: signal.intent } : {}),
@@ -104,7 +100,6 @@ export function mapKernelSignalToPersistencePayload(
     originPluginId: signal.originPluginId,
     signalTime,
     pivotTime,
-    triggerTime,
     triggerPrice,
     signalType: signal.signalType,
     confidence: signal.confidence,
