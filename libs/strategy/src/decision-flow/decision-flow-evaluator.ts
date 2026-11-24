@@ -397,12 +397,20 @@ export class DecisionFlowEvaluator {
     context: FactorContext,
     params?: Record<string, unknown>,
   ): Promise<FactorOpinion> {
-    const cached = context.attributes.get(contextOpinionKey(pluginId));
+    const cacheKey = contextOpinionKey(pluginId, params);
+    const cached = context.attributes.get(cacheKey);
     if (cached) {
       return cached as FactorOpinion;
     }
     const plugin = this.getPlugin(pluginId);
-    return await plugin.evaluate(context, params);
+    const opinion = await plugin.evaluate(context, params);
+    // 仅 role:'context' 插件写回缓存（同 Bar 内参数相同的后续节点直接命中，
+    // 如双 regime 门禁共用 {mode:'dual_speed'} 组合时只求值一次）；
+    // 'signal' 插件保持逐次调用语义不变（有状态游标插件依赖每次调用推进）。
+    if (plugin.role === 'context') {
+      context.attributes.set(cacheKey, opinion);
+    }
+    return opinion;
   }
 
   private getPlugin(pluginId: string): FactorPlugin {

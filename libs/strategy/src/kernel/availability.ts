@@ -20,8 +20,26 @@ export function contextSeriesKey(securityCode: string, period: number): string {
  *  不再逐 flow 重复求值（2026-11-24 聚合层定稿，决策文档 7.1.1）。 */
 export const CONTEXT_OPINION_PREFIX = 'contextOpinion.';
 
-export function contextOpinionKey(pluginId: string): string {
-  return `${CONTEXT_OPINION_PREFIX}${pluginId}`;
+export function contextOpinionKey(
+  pluginId: string,
+  params?: Record<string, unknown>,
+): string {
+  if (!params || Object.keys(params).length === 0) {
+    return `${CONTEXT_OPINION_PREFIX}${pluginId}`;
+  }
+  // 相同来源（同一决策流定义）的 params 序列化结果稳定；缓存键按参数组合区分，
+  // 避免同一插件被不同参数的 GUARD 复用同一份 opinion。
+  const parts = Object.keys(params)
+    .sort()
+    .map((key) => {
+      const value = params[key];
+      const rendered =
+        typeof value === 'object' && value !== null
+          ? JSON.stringify(value)
+          : String(value);
+      return `${key}=${rendered}`;
+    });
+  return `${CONTEXT_OPINION_PREFIX}${pluginId}:${parts.join('|')}`;
 }
 
 /**
