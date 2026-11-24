@@ -27,7 +27,8 @@ TacticalEvent（持久化前吞信号）有本质区别。
 
 ```ts
 interface AttributedSignal {
-  readonly alertEventId: number;        // 幂等锚点（一个信号至多一条成交指令）
+  readonly idempotencyKey: string;      // 幂等锚点（一个信号至多一条成交指令）：
+                                        // 实时 = alertEventId 字符串化；离线 = 合成幂等串（8.2）
   readonly signal: KernelSignal;        // signalKind / signalType / triggerPrice / decisionTrace
   readonly attribution: {               // 聚合层附带，引擎不做 DB 查询
     readonly strategyName: string;
@@ -51,21 +52,22 @@ interface SignalGroupInput {
 
 ```ts
 interface AccountSnapshot {
-  readonly cash: number;                // 组合级现金，跨票共享
+  readonly cash: bigint;                // 组合级现金，跨票共享（整数厘）
   readonly positions: ReadonlyMap<number /*securityId*/, PositionSnapshot>;
   readonly tradingDay: string;          // 账本推进到的交易日（T+1 结算依据）
 }
 ```
 
 `PositionSnapshot` 复用 `libs/strategy/src/position/position.types.ts` 现有定义
-（status / holdingQuantity / costPrice / unrealizedPnlRatio…）。
+（status / holdingQuantity / costPrice / unrealizedPnlRatio…），随整数厘移植后
+金额字段（costPrice / marketValue / pnl）一并转为整数厘。
 
 ### 2.3 输出：TradingDecision
 
 ```ts
 interface TradeInstruction {
-  readonly instructionId: string;       // 业务键派生：`ti-{alertEventId}`（REQ-ISO-03）
-  readonly alertEventId: number;
+  readonly instructionId: string;       // 业务键派生：`ti-{idempotencyKey}`（REQ-ISO-03）
+  readonly idempotencyKey: string;      // 回链聚合层锚点
   readonly action: 'BUY' | 'SELL';
   readonly quantity: number;            // 整手（lotSize 100）
   readonly referencePrice: number;      // 信号 triggerPrice（边界转厘，整数）
@@ -75,7 +77,7 @@ interface TradeInstruction {
 }
 
 interface TradeRejection {
-  readonly alertEventId: number;
+  readonly idempotencyKey: string;
   readonly signal: AttributedSignal;
   readonly reason: 'ALREADY_HOLDING' | 'NO_POSITION' | 'INSUFFICIENT_CASH'
     | 'T1_FROZEN' | 'SYSTEMIC_CRUNCH' | 'BELOW_LOT';
@@ -107,7 +109,7 @@ class TradingEngine {
 
 - **纯函数**：快照进 → 决策出，不触 DB、不触撮合；同组同快照 → 逐字段相同的输出；
 - 组内处理顺序：**先出后进**（EXIT 先于 ENTRY；同 kind 内按置信度降序；置信度同则按
-  alertEventId 升序）——沿用账本既有规约 `REQ-LEDGER-02（先出后进执行序）`；
+  幂等锚点字典序）——沿用账本既有规约 `REQ-LEDGER-02（先出后进执行序）`；
 - 每个信号独立裁决：依次过 `signalRules`，首条终局 Verdict 生效；入场与出场是
   同一管线的两条规则序列（entry：regimeGate → cashGate → sizingRule；exit：
   signalExit），末位 fallback 规则兜底显式拒绝（REQ-ENGINE-04）——不存在第二条
@@ -136,7 +138,7 @@ class TradingEngine {
 -- migration 037
 CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-  `alert_event_id` INT UNSIGNED NOT NULL,
+  `alert_event_id` BIGINT UNSIGNED NOT NULL,
   `security_id` INT UNSIGNED NOT NULL,
   `security_code` VARCHAR(32) NOT NULL,
   `side` ENUM('buy','sell') NOT NULL,
@@ -154,7 +156,9 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
 ```
 
 - **追加即成交**：交易层产出 BUY/SELL 指令 → 追加一条 fill 事件（含指令 JSON）→
-  账户状态随之推进；**unique(alert_event_id)** 使投递重试/幂等重放不会二次回填；
+  账户状态随之推进；**unique(alert_event_id)** 使投递重试/幂等重放不会二次回填
+  （域内幂等键为字符串 `idempotencyKey`：实时 = alertEventId 字符串化，离线 =
+  合成幂等串；落库仅实时路径，离线走内存日志）；
 - **账户 = fold(事件)**：加载某票全部 fill（按 id 序）→ 依序喂
   `PositionStateMachine.onOrderFilled` + `CapitalLedger.applyFill` 重建快照。
   当前规模（每季约百条信号）fold 成本可忽略，不建快照表；若未来成为热点再加快照投影；
@@ -214,8 +218,8 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
   （现有）→ 组装 `SignalGroupInput` → `engine.decide` → 追加 fill（事务，幂等）→
   **交易手册渲染** → adapter.send → 整批 SENT；
 - TypeORM 端口实现 `VirtualFillLogPort`（append / loadBySecurity）；
-- 引擎实例：单例（种子资金 env 配置），Arbiter 配 `cashAllocationRatio: 0.95`、
-  无硬止损（遵循零死板止损准则）。
+- 引擎实例：单例（种子资金 env 配置），SizingStrategy 默认 0.95、风控规则无硬止损
+  （遵循零死板止损准则）。
 
 ### 5.3 dev server（tools/strategy-dev/server.ts）
 
@@ -265,7 +269,7 @@ interface PipelineInput {
   plans: readonly KernelPlan[];        // 由 compileStoredDefinitionVersion(预设 JSON) 编译
   registry: FactorPluginRegistry;      // 私仓插件 + 标准插件
   virtualExitPolicy?: VirtualExitPolicyPort;
-  seedCapital?: number;                // 默认 1,000,000
+  seedCapitalLi?: bigint;              // 默认 1,000,000 × 1000（整数厘）
   cashAllocationRatio?: number;        // 默认 0.95（SizingStrategy 参数透传）
 }
 
@@ -313,9 +317,8 @@ interface PipelineResult {
 
 | 被破坏 | 替代 |
 |---|---|
-| dev server 手写交易流水线（`server.ts:899-985`） | TradingEngine + 内存端口 |
+| dev server 手写交易流水线（`server.ts:899-985`） | TradingEngine + 内存端口（0.95 预算归 SizingStrategy） |
 | backtest executor 内联 Arbiter 编排 | engine.decide（每 Bar 批） |
-| dev server 手写 0.95 仓位 | 引擎统一 `cashAllocationRatio: 0.95` |
 | 回测 0.995 预算 + hardStopLoss -0.08（executor 内联配置） | 引擎配置化（SizingStrategy 默认 0.95；硬止损沿袭 -0.08 配置项，规则参数透传） |
 | envelope 信号列表消息 | 交易手册 |
 | `PositionStateMachine.onSignal` 决策分支（`position-state-machine.ts:168`） | 删除；状态机回归纯记账（唯一调用方 dev server:969 已迁引擎） |
@@ -378,8 +381,8 @@ interface PipelineResult {
    代价：SimulatedBroker / 费率计算器算术重写（撮合与费率语义零改动），回测基线
    重跑（与 0.995→0.95 语义变化合并处理）。
 2. **ID 业务键派生**：instructionId / orderId / eventId 全部派生自幂等锚点
-   （`ti-{alertEventId}` / `ord-{intentId}` / `fill-{intentId}`）；墙钟、随机、
-   自增计数在交易层无容身之地（REQ-ISO-03 固化）。
+   （`ti-{idempotencyKey}` / `ord-{intentId}` / `fill-{intentId}`，intentId 即
+   idempotencyKey）；墙钟、随机、自增计数在交易层无容身之地（REQ-ISO-03 固化）。
 3. **规则管线裁决**：`Rule = (ctx) => Verdict` 序列取代 if 树——入场/出场为同一
    管线的两条规则序列，"出场必经裁决"由架构保证而非纪律；Arbiter 类退役，
    spec 用例移植。
@@ -418,7 +421,7 @@ interface PipelineResult {
 5. **确定性 / 幂等标识**（Nautilus client_order_id 防重复成交 + 双时间戳
    ts_event/ts_init；vnpy vt_orderid/vt_tradeid 标准化标识）——本设计
    alert_event_id 幂等锚点 + ID 业务键派生（REQ-ISO-03）同构；Nautilus 的双时间戳
-   与本项目信号层双时间戳契约（signalTime / acknowledgedAt 系）惊人同源。
+   （事件时间 vs 记录时间）与本项目信号层双时间戳契约同源。
 6. **非浮点钱**（Nautilus 用 rust_decimal）——本设计整数厘制目标相同、手段更极端
    （整数无舍入域 vs 高精度十进制），在"厘"粒度下等价且更快。
 

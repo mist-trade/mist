@@ -7,8 +7,9 @@
 - `securityId: number` / `securityCode: string`：标的身份；
 - `effectiveTime: Date`：组内全部信号共同的可用时刻（`availabilityKey`）；
 - `tradingDay: string`：北京时间交易日（YYYY-MM-DD）；
-- `signals: readonly AttributedSignal[]`：组内全部信号，各带 `alertEventId`、
-  `KernelSignal` 与归因（策略名 / 周期标签 / 置信度 / 渲染好的紧凑 trace 链）。
+- `signals: readonly AttributedSignal[]`：组内全部信号，各带 `idempotencyKey`
+  （幂等锚点：实时 = alertEventId 字符串化，离线 = 合成幂等串）、`KernelSignal`
+  与归因（策略名 / 周期标签 / 置信度 / 渲染好的紧凑 trace 链）。
 
 ### 1.2 `AccountSnapshot`
 交易层账本的只读快照：
@@ -18,9 +19,10 @@
 - `tradingDay: string`：账本已推进到的交易日。
 
 ### 1.3 `TradeInstruction` / `TradeRejection` / `TradingDecision`
-- `TradeInstruction`：一条可执行交易指令——`action: 'BUY' | 'SELL'`、`quantity`
-  （整手股数）、`referencePrice`（信号 triggerPrice）、`estimatedValue`、`reason`、
-  归因（策略名 / 周期 / 置信度 / trace 链）；
+- `TradeInstruction`：一条可执行交易指令——`instructionId`（业务键派生
+  `ti-{idempotencyKey}`）、`idempotencyKey`（回链聚合层锚点）、`action: 'BUY' |
+  'SELL'`、`quantity`（整手股数）、`referencePrice`（信号 triggerPrice）、
+  `estimatedValueLi`（整数厘）、`reason`、归因（策略名 / 周期 / 置信度 / trace 链）；
 - `TradeRejection`：一条被拒信号——原信号 + 结构化 `reason`
   （`ALREADY_HOLDING` / `NO_POSITION` / `INSUFFICIENT_CASH` / `T1_FROZEN` /
   `SYSTEMIC_CRUNCH` / `BELOW_LOT`）+ 人类可读 `detail`；
@@ -69,8 +71,8 @@ dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自
   信号 + 同账户快照，任意次重放的 `TradingDecision` 深比较恒等；引擎内部禁止
   I/O、墙钟、随机数。
 - **REQ-ENGINE-02 (先出后进执行序)**：组内处理顺序必须为 EXIT 先于 ENTRY；同
-  kind 内按置信度降序、并列时按 `alertEventId` 升序。卖出指令假定的资金释放当刻
-  可用于后续买入裁决。
+  kind 内按置信度降序、并列时按 `idempotencyKey` 字典序（确定性平局规则）。卖出
+  指令假定的资金释放当刻可用于后续买入裁决。账本侧因果时序见 REQ-LEDGER-02。
 - **REQ-ENGINE-03 (规则管线统一裁决)**：指令生成必须经由规则管线（信号裁决
   `signalRules` + Bar 风控巡检 `riskRules`），规则为纯函数 `(ctx) => Verdict`，
   首条终局裁决生效、末位 fallback 兜底显式拒绝；引擎不得私设第二套裁决规则，
@@ -98,12 +100,13 @@ dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自
 - **REQ-LEDGER-02 (先出后进执行序)**：同一信号组内出现出场与入场时，账本必须
   严格遵循"先平仓、后开仓"的因果时序（与 isomorphic-decision-flow-exit-engine
   的账本规约一致）。
-- **REQ-LEDGER-03 (幂等回填)**：`alert_event_id` 必须唯一约束——同一告警事件至多
-  产生一条 fill；投递重试、幂等重放、进程重启都不得产生重复回填。
+- **REQ-LEDGER-03 (幂等回填)**：幂等锚点必须唯一约束（DB 列 `alert_event_id`
+  承载实时数值锚点；域内键为字符串 `idempotencyKey`）——同一告警事件至多产生
+  一条 fill；投递重试、幂等重放、进程重启都不得产生重复回填。
 - **REQ-LEDGER-04 (指令即成交)**：实时虚拟账本按"指令已正常成交"推进——BUY 按
-  `referencePrice` 全额成交（含手续费，沿用 `slippage-fee-calculator` 费率模型），
-  现金扣减、持仓推进、T+1 冻结由 `PositionStateMachine` + `CapitalLedger` 现有
-  逻辑承担。
+  `referencePrice` 全额成交（含手续费，费率模型沿用 `slippage-fee-calculator`
+  语义、算术为整数厘重写版，REQ-ENGINE-07），现金扣减、持仓推进、T+1 冻结由
+  `PositionStateMachine` + `CapitalLedger` 现有逻辑承担。
 - **REQ-LEDGER-05 (组合级现金)**：现金为组合级（跨票共享），持仓按票独立；
   初始资金默认 1,000,000，必须可通过环境变量配置。
 - **REQ-LEDGER-06 (拒绝不落账)**：被拒信号不得产生 fill 事件，不得影响现金与持仓。
@@ -112,7 +115,8 @@ dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自
 
 - **REQ-ADAPT-01 (回测同构迁移)**：回测执行器必须经由 `TradingEngine` 产出指令，
   经 `SimulatedBroker` Next-Bar 真实撮合；per-bar 风控路径（hardStopLoss /
-  SYSTEMIC_CRUNCH）必须统一走引擎；执行器内禁止内联 Arbiter 调用与手写 sizing。
+  SYSTEMIC_CRUNCH）必须统一走引擎 `surveilBar` 巡检；执行器内禁止内联裁决调用与
+  手写 sizing。
 - **REQ-ADAPT-02 (实时交易手册)**：`deliver.channel` 处理必须在渲染前执行
   `engine.decide`，最终投递消息为**交易手册**（账户快照头 + 指令行 + 拒绝行）；
   信号列表渲染退役。报告时间 = 组的 `effectiveTime`（上海时区渲染）。
@@ -156,9 +160,9 @@ dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自
   姊妹门禁，必须以 CI 测试固化。
 - **REQ-ISO-02 (引擎重放确定性)**：引擎对同一输入的 N 次求值必须深比较恒等。
 - **REQ-ISO-03 (标识业务键派生)**：引擎与撮合端产出的全部标识（instructionId /
-  orderId / eventId）必须派生自幂等业务键（`ti-{alertEventId}` / `ord-{intentId}` /
-  `fill-{intentId}`）；禁止墙钟（`Date.now`）、随机源与自增计数器——同输入重放与
-  跨端同构逐字段比较的前提。
+  orderId / eventId）必须派生自幂等业务键（`ti-{idempotencyKey}` /
+  `ord-{idempotencyKey}` / `fill-{idempotencyKey}`）；禁止墙钟（`Date.now`）、
+  随机源与自增计数器——同输入重放与跨端同构逐字段比较的前提。
 - **REQ-ISO-04 (黄金文件回放)**：引擎回归与四端迁移对账必须以版本化黄金文件为准
   ——`(信号序列, 账户快照序列) → 决策序列` 固化为 fixture；任何语义变化必须经
   golden diff 显式审查，厘级舍入差异须归类标注，禁止静默重生成基线。
