@@ -12,8 +12,9 @@
             └─ 账户投影（假定成交后的现金与持仓）
             虚拟账本回填（virtual_fill_events，幂等）
   → 执行    回测执行端 = SimulatedBroker（Next-Bar 真实撮合，指令先入待撮合队列）
-            实时执行端 = 指令报告 → 人（人工下单）
+            实时执行端 = 交易手册 → 人（人工下单）
             dev 执行端 = 与回测同构（本地撮合）
+            私有研究端 = runTradingPipeline 门面（内存端口，零基础设施，见第八节）
 ```
 
 职责不变式：聚合层做归因分组、不裁决交易；交易层做裁决与账本、不渲染归因分组；
@@ -92,7 +93,7 @@ interface TradingDecision {
 ```ts
 class TradingEngine {
   constructor(deps: {
-    arbiter: ExecutionRiskArbiter;      // 复用，零改动（含仓位计算）
+    arbiter: ExecutionRiskArbiter;      // 复用，裁决逻辑保留，输出形态改造（见下）
     seedCapital?: number;               // 默认 1,000,000
     cashAllocationRatio?: number;       // 默认 0.95（统一三端漂移）
     groupOrdering?: GroupOrderingStrategy;  // 默认 SellFirstByConfidence（interim）
@@ -107,10 +108,16 @@ class TradingEngine {
 - 每个信号独立裁决：`arbiter.arbitrate({ 合成 bar, signal, position, availableCash })`，
   合成 bar 由该信号的 `signalTime` / `triggerPrice` 构造（实时无真实 Bar 可给）；
 - 裁决通过 → 指令 + **假定成交**即时推进内存账户（现金按含费净额扣补、持仓机
-  `onOrderFilled` 推进 T+1）；裁决失败 → 结构化拒绝（拒绝原因由引擎在调用 Arbiter
-  前预判，保证 `reason` 精确：已持仓 / 空仓 / 资金不足 / T+1 / 整手不足）；
+  `onOrderFilled` 推进 T+1）；裁决失败 → 结构化拒绝（信号级原因由 Arbiter verdict
+  给出，账户结构性原因由引擎预检给出，见下）；
 - 账户快照随每个假定成交更新，下一信号使用更新后的快照（卖出释放的资金当刻可用于
   后续买入）。
+- **Arbiter 输出形态改造（唯一接口变更）**：`arbitrate(): CreateOrderDto | null`
+  → `arbitrate(): ArbitrationVerdict`（`{ action: 'INSTRUCT', order } | { action:
+  'REJECT', reason, detail }`）。三级平仓优先级 / 买入管卡 / regime veto / 仓位
+  计算逻辑全部保留；信号级拒绝原因由 Arbiter 自身给出，引擎不再复制裁决规则
+  （REQ-ENGINE-03"不得私设第二套裁决规则"）；引擎层仅保留账户**结构性**预检
+  （T1_FROZEN / INSUFFICIENT_CASH 含费 / NO_POSITION——属账户状态而非信号裁决）。
 
 ## 三、事件溯源虚拟账本
 
@@ -174,7 +181,7 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
    增补账户视图注入（onBar 附带 `AccountSnapshot` 或 fill 事实端口），私仓
    `MultiLotVirtualPosition` 改为从 `virtual_fill_events` 派生批次，两账本归一。
 
-## 五、三个执行端适配
+## 五、执行端适配（四条链路）
 
 ### 5.1 回测（apps/backtest/backtest-run.executor.ts 重构）
 
@@ -192,7 +199,7 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
 
 - `deliver.channel` 处理流程：取组内 AlertEvent + Signal（现有）→ 批量解析策略名
   （现有）→ 组装 `SignalGroupInput` → `engine.decide` → 追加 fill（事务，幂等）→
-  **指令报告渲染** → adapter.send → 整批 SENT；
+  **交易手册渲染** → adapter.send → 整批 SENT；
 - TypeORM 端口实现 `VirtualFillLogPort`（append / loadBySecurity）；
 - 引擎实例：单例（种子资金 env 配置），Arbiter 配 `cashAllocationRatio: 0.95`、
   无硬止损（遵循零死板止损准则）。
@@ -202,10 +209,15 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
 - **删除**手写流水线（`server.ts:899-985` 的手写 sizing / onSignal 出场 / 0.95）；
 - 改用引擎 + 内存端口（与回测同构），本地撮合仍走 SimulatedBroker。
 
-## 六、指令报告渲染（替代信号列表）
+### 5.4 私有研究端（mist-alpha-private）
+
+- 经 `runTradingPipeline` 门面复用同一引擎、同一分组函数、同一渲染器（内存端口、
+  零基础设施），见第八节；四条链路的最终产物（交易手册）逐字段同构。
+
+## 六、交易手册渲染（替代信号列表）
 
 ```text
-[Mist 交易指令] 000001 平安银行 | 2026-08-12 09:35 ｜ 账户 可用 906,250 / 持仓 7,500股 @ 12.50
+[Mist 交易手册] 000001 平安银行 | 2026-08-12 09:35 ｜ 账户 可用 906,250 / 持仓 7,500股 @ 12.50
 ▶ 买入 7,500股 @ 12.50 ≈ 93,750 ｜ 全共振战术 30m 二买 [HIGH 88.5%]
     regime 门禁 ✓ → chan 二买 ✓
 ✗ 卖出已拒绝：NO_POSITION（虚拟账户空仓）｜ 波动压制 60m 顶背离 [MEDIUM 80.4%]
@@ -229,7 +241,7 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
 ### 8.1 需求
 
 私仓当前只有信号（研究脚本自带第四份手写交易流水线，且绕过内核直调插件）。
-要求：私仓能独立跑通 信号层 → 聚合层（分组）→ 交易层 → 指令报告 全流程，
+要求：私仓能独立跑通 信号层 → 聚合层（分组）→ 交易层 → 交易手册 全流程，
 拿到与线上同构的最终结果。
 
 ### 8.2 门面：`runTradingPipeline`（libs/strategy/src/pipeline/）
@@ -248,7 +260,7 @@ interface PipelineResult {
   signals: readonly KernelSignal[];
   groups: readonly { group: SignalGroupInput; decision: TradingDecision }[];
   fills: readonly VirtualFillEvent[];  // 内存日志
-  report: string;                      // 指令报告（与投递消息同渲染器）
+  report: string;                      // 交易手册（与投递消息同渲染器）
 }
 ```
 
@@ -274,7 +286,7 @@ interface PipelineResult {
 - 私仓 `src/types.ts` 的 `FactorPlugin` 副本必须与公共契约**结构兼容**（TS 结构
   类型 + 门面装配时编译期校验）；私仓边界守卫增加结构兼容断言，防止漂移；
 - 新脚本 `scripts/run-pipeline.js`：本地 K 线（复用现有加载模式）→ 预设
-  （`compileStoredDefinitionVersion`）→ 门面 → 打印指令报告 / 导出 JSON；
+  （`compileStoredDefinitionVersion`）→ 门面 → 打印交易手册 / 导出 JSON；
 - 私仓研究 harness（`run-tactics.js` 的 MultiLotVirtualPosition 多批次战术）与
   门面**并存**为两条研究线：门面跑"与线上同构的指令"，harness 跑"多批次战术研究"；
   基线重跑后由用户决定是否退役 harness。
@@ -292,7 +304,9 @@ interface PipelineResult {
 | backtest executor 内联 Arbiter 编排 | engine.decide（每 Bar 批） |
 | dev server 手写 0.95 仓位 | 引擎统一 `cashAllocationRatio: 0.95` |
 | 回测 0.995 预算 + hardStopLoss -0.08（executor 内联配置） | 引擎配置化（0.95 预算；硬止损沿袭 -0.08 配置项，引擎参数透传） |
-| envelope 信号列表消息 | 指令报告 |
+| envelope 信号列表消息 | 交易手册 |
+| `PositionStateMachine.onSignal` 决策分支（`position-state-machine.ts:168`） | 删除；状态机回归纯记账（唯一调用方 dev server:969 已迁引擎） |
+| SimulatedBroker `Date.now()` 标识（`simulated-broker.ts:79,411`） | 注入式确定性序号（REQ-ISO-03 前提） |
 | 回测组内处理顺序（kernel 顺序 → 先出后进） | 统一 interim 规则；重跑基线覆盖 |
 
 ## 十、边界与不变式
@@ -303,3 +317,38 @@ interface PipelineResult {
 - 防未来函数不变（`signalTime ≡ StrategyBar.timestamp`、Next-Bar 撮合、严禁
   `pivotPrice` 入场）；
 - 实时执行端仍是人工下单（无券商 API、无自动下单——2026-11-23 定稿不变）。
+
+## 十一、现有组件盘点：复用与大改清单（2026-11-24 家底核查）
+
+### 11.1 原样复用（一行不动）
+
+| 组件 | 位置 | 说明 |
+|---|---|---|
+| `slippage-fee-calculator` | libs/strategy/src/execution/ | A 股规费（佣金 / 过户费 / 印花税 / ETF 免征）+ 双向滑点纯函数；回测撮合与实时假定成交共用 |
+| `SimulatedBroker` | 同上 | Next-Bar 撮合 / T+1 frozen / 一字板拒单顺延 / STOP 单 / 日结解锁——回测成交端完整存在，仅标识确定性需修正（见 11.4） |
+
+### 11.2 小改复用
+
+| 组件 | 保留 | 改造 |
+|---|---|---|
+| `ExecutionRiskArbiter` | 三级平仓优先级 / 买入管卡 / regime veto / `cashAllocationRatio` 仓位计算 | 输出形态：`CreateOrderDto \| null` → `ArbitrationVerdict`（指令或带结构化原因的拒绝）；默认预算 0.995 → 0.95 |
+| `CapitalLedger` | `applyFill` fold / `onDayClose` 净值 | 补 rehydrate：从 `virtual_fill_events` 事件流重建（fold 逻辑不变，入口加事件加载） |
+| `PositionStateMachine` | `onOrderFilled` 记账 / `calculateExitQuantity` / snapshot | 补 rehydrate；**删除 `onSignal()` 决策分支**（见 11.3） |
+
+### 11.3 彻底大改 / 删除
+
+| 对象 | 处置 |
+|---|---|
+| dev server 手写流水线（`server.ts:899-1010`） | 整段删除：手写 0.95 sizing、exit 走 `position.onSignal` 旁路、`enableStopLoss` 按 mode/strategyId 硬编码（三处漂移的集合体） |
+| 回测 executor 内联编排（`backtest-run.executor.ts:465-466`） | `hardStopLossRatio: -0.08` + `cashAllocationRatio: 0.995` 硬编码上移为引擎配置；时序编排提炼进适配器 |
+| `PositionStateMachine.onSignal`（`position-state-machine.ts:168-204`） | **旁路根除**：类注释自述"平仓动作 100% 由裁决器下达"，该方法仍在生成卖单，全库唯一调用方为 dev server:969；删除后状态机回归纯记账 |
+
+### 11.4 盘点发现的坑（设计修订依据）
+
+1. **SimulatedBroker 标识非确定性**：`ord-${Date.now()}-…` / `fill-${Date.now()}-…`
+   （`simulated-broker.ts:79,411`）直接破坏 REQ-ISO-01 逐字段一致——改为注入式
+   确定性序号，禁止墙钟与随机（固化入 REQ-ISO-03）。
+2. **hardStopLoss 配置无主（待拍板）**：回测传 -0.08、dev server 按开关传、实时
+   无定义——第四个漂移点。本设计暂按"引擎配置透传 + 各执行端显式声明"处理；
+   倾向最终归属**策略定义**（Arbiter 注释"零死板止损准则"暗示部分策略不应有死
+   止损），待用户定稿后改为从策略定义读取。

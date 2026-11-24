@@ -30,7 +30,7 @@
 ### 1.4 `PipelineFacade`
 管线门面（`runTradingPipeline`）：交易层的独立运行入口——输入内存 Bars、编译后的
 `KernelPlan`、插件注册表；内部完成 Bar 归并驱动 → 信号收集 → 分组 → 逐组
-`TradingEngine.decide` → 指令报告。零 NestJS / DB / Redis 依赖，可被私仓 esbuild
+`TradingEngine.decide` → 交易手册。零 NestJS / DB / Redis 依赖，可被私仓 esbuild
 捆绑；回测执行器、dev server、实时投递与私仓脚本全部是它的数据适配器。
 
 ### 1.5 `VirtualFillLogPort`
@@ -39,6 +39,12 @@
   `alert_event_id` 唯一）；
 - `loadBySecurity(securityId: number): Promise<readonly VirtualFillEvent[]>`：
   按 id 序加载，供 fold 重建账户快照。
+
+### 1.6 `交易手册`
+交易层产出的最终投递内容（代码层标识沿用 InstructionReport）：账户快照头
+（可用现金 / 持仓）+ 指令行（方向 / 股数 / 参考价 / 估算金额 / 策略名 / 周期 /
+置信度 / trace 链）+ 拒绝行（信号摘要 + 结构化原因）。四条链路（回测 / 实时 /
+dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自本节起统一称"交易手册"。
 
 ---
 
@@ -55,6 +61,9 @@
 - **REQ-ENGINE-03 (复用统一裁决)**：指令生成必须经由 `ExecutionRiskArbiter`
   （实时与回测共用同一 Arbiter 配置），引擎不得私设第二套裁决规则；仓位计算必须
   来自 Arbiter 的 `cashAllocationRatio` × 整手取整，禁止散落的手写 sizing。
+  Arbiter 输出必须为携带结构化原因的裁决（`ArbitrationVerdict`：指令或拒绝），
+  禁止以裸 `null` 静默否决；引擎仅保留账户结构性预检（T1_FROZEN /
+  INSUFFICIENT_CASH 含费 / NO_POSITION）。
 - **REQ-ENGINE-04 (拒绝必须显式)**：每个未产出指令的信号必须输出 `TradeRejection`
   并携带结构化原因；**严禁静默丢弃信号**。被拒信号不落成交事实，但其可审计性由
   `StrategySignal` 行 + `TradingDecision` 渲染保证。
@@ -88,17 +97,17 @@
 - **REQ-ADAPT-01 (回测同构迁移)**：回测执行器必须经由 `TradingEngine` 产出指令，
   经 `SimulatedBroker` Next-Bar 真实撮合；per-bar 风控路径（hardStopLoss /
   SYSTEMIC_CRUNCH）必须统一走引擎；执行器内禁止内联 Arbiter 调用与手写 sizing。
-- **REQ-ADAPT-02 (实时指令报告)**：`deliver.channel` 处理必须在渲染前执行
-  `engine.decide`，最终投递消息为**指令报告**（账户快照头 + 指令行 + 拒绝行）；
+- **REQ-ADAPT-02 (实时交易手册)**：`deliver.channel` 处理必须在渲染前执行
+  `engine.decide`，最终投递消息为**交易手册**（账户快照头 + 指令行 + 拒绝行）；
   信号列表渲染退役。报告时间 = 组的 `effectiveTime`（上海时区渲染）。
 - **REQ-ADAPT-03 (dev 同构)**：dev server 必须删除手写交易流水线并改用引擎 +
   内存端口；其对外响应字段（signals / trades）保持兼容。
 - **REQ-ADAPT-04 (账本持久化端口隔离)**：交易层域核心禁止依赖 TypeORM /
   shared-data；持久化经由 `VirtualFillLogPort` 在 app 层实现（传输边界守卫）。
 
-### 2.4 指令报告规约 (Report)
+### 2.4 交易手册规约 (Report)
 
-- **REQ-MSG-01 (报告完整性)**：指令报告必须包含：账户快照头（可用现金 / 持仓）、
+- **REQ-MSG-01 (报告完整性)**：交易手册必须包含：账户快照头（可用现金 / 持仓）、
   每条指令行（方向 / 股数 / 参考价 / 估算金额 / 策略名 / 周期 / 置信度 / trace 链）、
   每条拒绝行（信号摘要 + 结构化原因）。**严禁省略或静默丢弃任何组内信号**。
 - **REQ-MSG-02 (卖出在前)**：多指令报告中卖出行必须先于买入行。
@@ -118,7 +127,7 @@
 - **REQ-FACADE-04 (离线幂等)**：离线 fill 的幂等锚点必须为确定性合成 id
   （`offline-{definitionId}-{signalTime.getTime()}-{kind}`）；同输入重放不得产生
   重复回填。
-- **REQ-FACADE-05 (报告同源)**：门面的指令报告与线上投递消息必须由同一渲染器
+- **REQ-FACADE-05 (报告同源)**：门面的交易手册与线上投递消息必须由同一渲染器
   产出，严禁两份消息模板。
 - **REQ-FACADE-06 (私仓结构兼容)**：私仓 `FactorPlugin` 类型副本必须与公共契约
   结构兼容，且必须有 CI 断言守护（防止类型漂移导致门面装配失败）。
@@ -130,6 +139,9 @@
   投影）。该门禁是信号层同构门禁（`strategy-dual-timestamp.guard.spec.ts`）的
   姊妹门禁，必须以 CI 测试固化。
 - **REQ-ISO-02 (引擎重放确定性)**：引擎对同一输入的 N 次求值必须深比较恒等。
+- **REQ-ISO-03 (确定性标识)**：引擎与撮合端产出的全部标识（orderId / eventId /
+  fill id）必须由注入式确定性序号生成，禁止墙钟（`Date.now`）与随机源——此为
+  REQ-ISO-01 逐字段比较的前提。
 
 ---
 

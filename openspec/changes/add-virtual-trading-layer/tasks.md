@@ -6,14 +6,19 @@
       `TradeInstruction` / `TradeRejection` / `TradingDecision` 类型定义；
 - [ ] 1.2 组排序策略：`GroupOrderingStrategy`（interim = 先出后进、置信度降序、
       alertEventId 升序），作为引擎参数留冲突因子插拔缝；
-- [ ] 1.3 拒绝原因预判：在调用 Arbiter 前输出结构化原因（ALREADY_HOLDING /
-      NO_POSITION / INSUFFICIENT_CASH / T1_FROZEN / BELOW_LOT / SYSTEMIC_CRUNCH）；
+- [ ] 1.3 拒绝产出拆分：Arbiter 输出形态改造（`ArbitrationVerdict`：指令或带
+      结构化原因的拒绝，信号级原因由 Arbiter 给出）+ 引擎账户结构性预检
+      （NO_POSITION / INSUFFICIENT_CASH 含费 / T1_FROZEN）；
 - [ ] 1.4 `TradingEngine.decide`：合成 bar（signalTime/triggerPrice）→ 逐信号
       Arbiter 裁决 → 指令 + 拒绝 + 假定成交账户投影（含手续费，复用
       `slippage-fee-calculator`）；
 - [ ] 1.5 `VirtualFillLogPort` 端口定义（append / loadBySecurity）；
 - [ ] 1.6 单测：纯函数确定性（同输入重放恒等）、先出后进、卖出释放资金可供买入、
       拒绝原因精确、整手取整、T+1 冻结、手续费计入现金。
+- [ ] 1.7 `ExecutionRiskArbiter` 输出形态改造（`CreateOrderDto | null` →
+      `ArbitrationVerdict`，裁决逻辑零改动，默认预算 0.995 → 0.95）；
+- [ ] 1.8 `SimulatedBroker` 标识确定性：orderId/eventId 改注入式序号
+      （禁 `Date.now()`，REQ-ISO-03 前提）。
 
 ## 2. 账本持久化（libs/shared-data + migration 037）
 
@@ -24,9 +29,9 @@
       loadBySecurity），引擎装配（种子资金 env `NOTIFICATION_VIRTUAL_SEED_CAPITAL`
       默认 1,000,000、cashAllocationRatio 0.95）。
 
-## 3. 指令报告渲染（apps/notification）
+## 3. 交易手册渲染（apps/notification）
 
-- [ ] 3.1 指令报告渲染器（header 带账户快照、▶ 指令行 + 归因与 trace 链、
+- [ ] 3.1 交易手册渲染器（header 带账户快照、▶ 指令行 + 归因与 trace 链、
       ✗ 拒绝行 + 原因）；
 - [ ] 3.2 `renderTraceChain` 迁入交易层报告模块；
 - [ ] 3.3 `notification-envelope.ts` 信号列表渲染退役，channel handler 接引擎
@@ -38,7 +43,7 @@
       Broker submitOrder；per-bar 风控裁决路径（hardStopLoss / SYSTEMIC_CRUNCH）
       走引擎；
 - [ ] 4.2 内存端口注入（随跑随弃）；engine 配置透传（0.95 预算、硬止损 -0.08、
-      lot 100）；
+      lot 100；硬止损归属待拍板——暂引擎透传、倾向改策略定义，见 design 11.4）；
 - [ ] 4.3 回测输出对账：同批信号下指令集与旧路径决策一致（允许组内顺序与预算比例
       的既定语义变化，偏差需显式解释）。
 
@@ -46,7 +51,9 @@
 
 - [ ] 5.1 删除手写交易流水线（`server.ts:899-985` 手写 sizing / onSignal 出场 /
       0.95），换引擎 + 内存端口；
-- [ ] 5.2 dev 前端回测响应字段保持兼容（signals/trades 不变）。
+- [ ] 5.2 dev 前端回测响应字段保持兼容（signals/trades 不变）；
+- [ ] 5.3 `PositionStateMachine.onSignal` 决策分支删除（回归纯记账；全库唯一
+      调用方 dev server:969 已迁引擎）。
 
 ## 6. 同构门禁与回归
 
@@ -70,17 +77,17 @@
       `groupSignals(...)`，apps/signal processor 与门面共用；
 - [ ] 8.2 `libs/strategy/src/pipeline/run-trading-pipeline.ts`：Bars 按
       `(availabilityKey, period)` 归并驱动 kernel → 分组 → engine.decide →
-      指令报告（零基础设施，内存 fill 日志，离线合成幂等 id）；
+      交易手册（零基础设施，内存 fill 日志，离线合成幂等 id）；
 - [ ] 8.3 私仓 `build.mjs` alias 增补（@app/strategy / @app/market-data）+ 私仓
       边界守卫增加 `src/types.ts` FactorPlugin 与公共契约的结构兼容断言；
 - [ ] 8.4 私仓 `scripts/run-pipeline.js`：本地 K 线 + 预设编译 + 门面 →
-      指令报告打印 / JSON 导出；
+      交易手册打印 / JSON 导出；
 - [ ] 8.5 门面单测：确定性、离线幂等、报告与投递渲染同源。
 
 ## 9. 后续（本 change 外，记录缝位）
 
-- [ ] 8.1 `VirtualExitPolicyPort` 账户视图注入：私仓 `MultiLotVirtualPosition`
+- [ ] 9.1 `VirtualExitPolicyPort` 账户视图注入：私仓 `MultiLotVirtualPosition`
       改为从 `virtual_fill_events` 派生批次，消除出场策略持仓与执行账本的偏差面
       （design.md 第四节的下一阶段）；
-- [ ] 8.2 同刻同票冲突裁决因子化研究（替换 interim 先出后进排序）；
-- [ ] 8.3 成交回写 / 券商 API 对账（人工交易闭环，用户后期决定）。
+- [ ] 9.2 同刻同票冲突裁决因子化研究（替换 interim 先出后进排序）；
+- [ ] 9.3 成交回写 / 券商 API 对账（人工交易闭环，用户后期决定）。
