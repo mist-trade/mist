@@ -1,7 +1,12 @@
 /** Every third-party provider is its own `vendor_<slug>` source. */
 export type VendorSource = `vendor_${string}`;
 
-export type StrategyMarketSource = 'ef' | 'tdx' | 'qmt' | VendorSource;
+export type StrategyMarketSource =
+  | 'ef'
+  | 'tdx'
+  | 'qmt'
+  | 'synthetic'
+  | VendorSource;
 
 /** Realtime evaluation is fed only by the two live providers. */
 export type StrategyRealtimeSource = 'tdx' | 'qmt';
