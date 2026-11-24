@@ -1179,6 +1179,18 @@ effectiveTime           = availabilityKey(signalTime, period)
 如果确认不需要“marker 锚在形态极值”，可以删除 `pivotTime` 及前端锚点逻辑，marker 统一用
 `signalTime`；`pivotPrice` 仍可保留作止损参考。
 
+**为什么不能用 `signalTime - 1` 推导 `pivotTime`（2026-11-24）**：
+
+- pivot 与确认 Bar 的距离是**形态相关**的，不是固定偏移：
+  - Chan 一买/二买：pivot 是趋势最低点，确认在右侧，距离 ≥ 1 且根数不定；
+  - 斐波那契：pivot = 摆动单元端点，距离不定；
+  - 磨底 / 牛熊左右侧：pivot 就是当前确认 Bar，距离 = 0（这种情况下 `pivotTime`
+    与 `signalTime` 相同，确实是冗余复制）。
+- 它与 `pivotPrice` 是一对**求值时产生的证据**：价格是止损锚，时间是图上定位；
+  同一价位可能对应多根 K（含合并 K），用 `pivotPrice` 也反推不出唯一的时间。
+- 所以只有两个选项：存储（现状，marker 锚结构点），或不存储并放弃该展示；
+  不存在“由 `signalTime` 推导”的第三条路。
+
 **`pivotTime` 的用途（2026-11-24 补充）**：
 
 它回答“这个买卖点指的是哪一个结构位置”：
