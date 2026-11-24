@@ -1361,3 +1361,15 @@ effectiveTime           = availabilityKey(signalTime, period)
 - `apps/notification/src/delivery/notification-envelope.ts`
 - `openspec/specs/realtime-strategy-evaluation/spec.md:282-300`
 - `openspec/changes/archive/2026-10-26-support-multi-period-evaluation/design.md` 第 5.3–5.5 节
+
+## 8. 交易层落地补充（2026-11-25，add-virtual-trading-layer 实施完毕）
+
+OpenSpec `add-virtual-trading-layer` 全组任务完成，四链路（实时/回测/dev/私有研究）收敛到同一交易层：
+
+- **域核心**：`libs/strategy/src/trading/`——`TradingEngine.decide` 纯函数 + `Rule/Verdict` 规则管线（Arbiter if 树退役，语义逐条移植）+ `SizingStrategy`（AllInWithBuffer 0.95，与裁决分离）+ 整数厘制（REQ-ENGINE-07，唯一舍入点 half-up 取厘）+ 业务键派生 ID（REQ-ISO-03）+ `groupSignals` 分组纯函数（线上扇出与门面共用）+ `runTradingPipeline` 门面（零基础设施，私仓 esbuild 捆绑）。
+- **黄金文件回放**（REQ-ISO-04）：6 场景版本化 fixture，语义变化必须过 golden diff 显式审查；`UPDATE_GOLDEN=1` 才可重生成。
+- **四端适配**：回测 executor（信号按 Bar 缓冲成组，时序与旧逐信号路径等价）/ 实时 channel handler（fold 账本 → decide → 假定成交回填 → 手册）/ dev server（手写流水线整段删除）/ 私仓 run-pipeline.js（本地 K 线 + 预设编译 → 门面，880003 外部 context 全量装载，volume/amount 厘级 canonical 化）。
+- **清理**：`ExecutionRiskArbiter`/`PositionStateMachine.onSignal`/`ExitPolicyPort`/`EXIT_ACTIONS`/envelope 信号列表渲染全部退役；grep 门禁零生产引用。
+- **回归**：apps 39 套件 176 测试 + libs/strategy 43 套件 343 测试全绿；私仓 29 套件 295 测试全绿（含 FactorPlugin 结构兼容守卫）。
+- **语义变化（基线重跑覆盖）**：预算比例 0.995→0.95 统一；组内顺序统一先出后进；厘级舍入（分→厘）；后续硬止损归属倾向策略定义（design 11.4 待拍板）。
+- **开源对齐**：五仓调研（Nautilus/LEAN/backtrader/freqtrade/vnpy）确认四项从零基准全部为生产验证模式（design 12）。
