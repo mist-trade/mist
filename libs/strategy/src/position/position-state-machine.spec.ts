@@ -1,14 +1,7 @@
 import type { StrategyBar } from '@app/market-data';
 import type { OrderFilledEvent } from '../execution/execution.types';
-import type { KernelSignal } from '../kernel/kernel.types';
-import {
-  ORDER_SIDES,
-  ORDER_TYPES,
-  POSITION_STATUSES,
-  SIGNAL_KINDS,
-} from '../strategy.constants';
+import { ORDER_SIDES, POSITION_STATUSES } from '../strategy.constants';
 import { PositionStateMachine } from './position-state-machine';
-import type { ExitPolicyPort } from './position.types';
 
 function createBar(
   timestamp: string,
@@ -62,7 +55,7 @@ function createFillEvent(
   };
 }
 
-describe('PositionStateMachine', () => {
+describe('PositionStateMachine（纯记账员）', () => {
   let psm: PositionStateMachine;
 
   beforeEach(() => {
@@ -125,7 +118,7 @@ describe('PositionStateMachine', () => {
     expect(rallySnapshot.unrealizedPnlRatio).toBe(0.2);
   });
 
-  it('exits position on decision flow reverse exit signal and records complete closed trade', () => {
+  it('records complete closed trade on sell fill (平仓订单由交易层引擎下达，此处仅记账)', () => {
     const entryTime = new Date('2026-10-15T09:31:00.000Z');
     psm.onOrderFilled(
       createFillEvent(ORDER_SIDES.BUY, 10.0, 1000, 10, entryTime),
@@ -135,30 +128,7 @@ describe('PositionStateMachine', () => {
     psm.onBar(createBar('2026-10-15T10:00:00.000Z', 10.5));
     psm.onBar(createBar('2026-10-15T11:00:00.000Z', 11.2));
 
-    // 策略树发出反向顶背驰卖出信号
-    const exitSignal: KernelSignal = {
-      definitionId: 1,
-      versionId: 1,
-      signalKind: SIGNAL_KINDS.EXIT,
-      signalTime: new Date('2026-10-15T14:55:00.000Z'),
-      triggerPrice: 11.5,
-      pivotTime: null,
-      pivotPrice: null,
-      signalType: 'first_sell',
-      confidence: 0.9,
-      confidenceLevel: 'HIGH',
-      decisionTrace: {},
-      contextSnapshot: {},
-      ruleSnapshot: {},
-    };
-
-    const exitOrderDraft = psm.onSignal(exitSignal);
-    expect(exitOrderDraft).not.toBeNull();
-    expect(exitOrderDraft?.side).toBe(ORDER_SIDES.SELL);
-    expect(exitOrderDraft?.orderType).toBe(ORDER_TYPES.MARKET);
-    expect(exitOrderDraft?.quantity).toBe(1000);
-
-    // 随后撮合引擎在次一周期成交卖单：卖出价 11.50，规费 15 元，净收入 11485 元
+    // 卖出撮合（成交事件由引擎产出的指令经撮合端回填）
     const exitTime = new Date('2026-10-15T15:00:00.000Z');
     psm.onOrderFilled(
       createFillEvent(ORDER_SIDES.SELL, 11.5, 1000, 15, exitTime),
@@ -181,28 +151,8 @@ describe('PositionStateMachine', () => {
     expect(trade.holdingBars).toBe(2);
   });
 
-  it('strictly adheres to pure accountant role: onBar never generates exit orders and returns null', () => {
-    // 模拟外部出场插件
-    const mockPrivateExitPolicy: ExitPolicyPort = {
-      id: 'plugin.exit.private_custom',
-      evaluate: (bar) => {
-        if (bar.close >= 13.0) {
-          return { action: 'EXIT', reason: 'TAKE_PROFIT' };
-        }
-        return { action: 'HOLD', reason: 'CONTINUE' };
-      },
-      onSignal: (signal) => {
-        if (signal.signalKind === SIGNAL_KINDS.EXIT) {
-          return { action: 'EXIT', reason: 'TAKE_PROFIT_SIGNAL' };
-        }
-        return { action: 'HOLD', reason: 'CONTINUE' };
-      },
-    };
-
-    const customPsm = new PositionStateMachine(1, '600519', {
-      exitPolicy: mockPrivateExitPolicy,
-    });
-    customPsm.onOrderFilled(
+  it('strictly adheres to pure accountant role: onBar never generates exit orders', () => {
+    psm.onOrderFilled(
       createFillEvent(
         ORDER_SIDES.BUY,
         10.0,
@@ -212,41 +162,16 @@ describe('PositionStateMachine', () => {
       ),
     );
 
-    // 价格未到 13.00，保持持仓，onBar 返回 null
-    expect(
-      customPsm.onBar(createBar('2026-10-15T10:00:00.000Z', 12.5)),
-    ).toBeNull();
+    // 价格未到高位，保持持仓，onBar 返回 null
+    expect(psm.onBar(createBar('2026-10-15T10:00:00.000Z', 12.5))).toBeNull();
 
-    // 价格即使突破 13.00，onBar 亦纯粹记账（更新 holdingBars 和 currentPrice），绝不下单
-    const exitDraft = customPsm.onBar(
-      createBar('2026-10-15T10:30:00.000Z', 13.2),
-    );
-    expect(exitDraft).toBeNull();
-    expect(customPsm.getSnapshot().holdingBars).toBe(2);
-    expect(customPsm.getSnapshot().currentPrice).toBe(13.2);
-
-    // 显式信号到达时，通过 onSignal 正常生成订单
-    const exitSignal: KernelSignal = {
-      definitionId: 1,
-      versionId: 1,
-      signalKind: SIGNAL_KINDS.EXIT,
-      signalTime: new Date('2026-10-15T10:30:00.000Z'),
-      triggerPrice: 13.2,
-      pivotTime: null,
-      pivotPrice: null,
-      signalType: 'take_profit',
-      confidence: 0.9,
-      confidenceLevel: 'HIGH',
-      decisionTrace: {},
-      contextSnapshot: {},
-      ruleSnapshot: {},
-    };
-    const signalOrder = customPsm.onSignal(exitSignal);
-    expect(signalOrder).not.toBeNull();
-    expect(signalOrder?.side).toBe(ORDER_SIDES.SELL);
+    // 价格即使大幅上冲，onBar 亦纯粹记账（更新 holdingBars 和 currentPrice），绝不下单
+    expect(psm.onBar(createBar('2026-10-15T10:30:00.000Z', 13.2))).toBeNull();
+    expect(psm.getSnapshot().holdingBars).toBe(2);
+    expect(psm.getSnapshot().currentPrice).toBe(13.2);
   });
 
-  it('supports custom exitRatio via options and generates partial exit orders', () => {
+  it('calculateExitQuantity respects configured exitRatio (整手向下取整)', () => {
     const partialPsm = new PositionStateMachine(1, '600519', {
       exitRatio: 0.5,
     });
@@ -262,29 +187,10 @@ describe('PositionStateMachine', () => {
       ),
     );
 
-    const exitSignal: KernelSignal = {
-      definitionId: 1,
-      versionId: 1,
-      signalKind: SIGNAL_KINDS.EXIT,
-      signalTime: new Date('2026-10-15T14:30:00.000Z'),
-      triggerPrice: 12.0,
-      pivotTime: '2026-10-15T14:00:00.000Z',
-      pivotPrice: 12.2,
-      signalType: 'first_sell',
-      confidence: 0.9,
-      confidenceLevel: 'HIGH',
-      decisionTrace: {},
-      contextSnapshot: {},
-      ruleSnapshot: {},
-    };
-
-    const draft = partialPsm.onSignal(exitSignal);
-    expect(draft).not.toBeNull();
-    expect(draft?.side).toBe(ORDER_SIDES.SELL);
-    expect(draft?.quantity).toBe(500); // 50% of 1000
-  });
-
-  it('supports per-call exitRatio override in onSignal', () => {
+    // 50% of 1000 = 500
+    expect(partialPsm.calculateExitQuantity()).toBe(500);
+    // 逐次调用 override：30% → 300
+    expect(psm.calculateExitQuantity(0.3)).toBe(0); // 空仓为 0
     psm.onOrderFilled(
       createFillEvent(
         ORDER_SIDES.BUY,
@@ -294,27 +200,7 @@ describe('PositionStateMachine', () => {
         new Date('2026-10-15T09:31:00.000Z'),
       ),
     );
-
-    const exitSignal: KernelSignal = {
-      definitionId: 1,
-      versionId: 1,
-      signalKind: SIGNAL_KINDS.EXIT,
-      signalTime: new Date('2026-10-15T14:30:00.000Z'),
-      triggerPrice: 12.0,
-      pivotTime: '2026-10-15T14:00:00.000Z',
-      pivotPrice: 12.2,
-      signalType: 'first_sell',
-      confidence: 0.9,
-      confidenceLevel: 'HIGH',
-      decisionTrace: {},
-      contextSnapshot: {},
-      ruleSnapshot: {},
-    };
-
-    // 覆盖默认 exitRatio (1.0) 为 0.3 (30%)
-    const draft = psm.onSignal(exitSignal, { exitRatio: 0.3 });
-    expect(draft).not.toBeNull();
-    expect(draft?.quantity).toBe(300); // 30% of 1000
+    expect(psm.calculateExitQuantity(0.3)).toBe(300);
   });
 
   it('validates exitRatio range (must be (0, 1.0])', () => {

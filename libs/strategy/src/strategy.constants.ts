@@ -92,11 +92,6 @@ export const POSITION_STATUSES = Object.freeze({
   CLOSED: 'CLOSED',
 } as const);
 
-export const EXIT_ACTIONS = Object.freeze({
-  HOLD: 'HOLD',
-  EXIT: 'EXIT',
-} as const);
-
 export const POSITION_DECIMAL_PLACES = Object.freeze({
   RATIO_SCALE: 10000,
   DATE_STRING_LENGTH: 10,

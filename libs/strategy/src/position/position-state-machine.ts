@@ -1,13 +1,11 @@
 /**
  * 持仓状态机（float 边界接口，整数厘内部算术）。
  *
- * 组 1b 移植（REQ-ENGINE-07）：纯记账员定位不变——数量 / 成本 / 已实现盈亏
- * 记账与平仓股数计算，内部整数厘运算；`onBar` 严禁生成订单。
+ * 组 1b 移植（REQ-ENGINE-07）：纯记账员定位——数量 / 成本 / 已实现盈亏
+ * 记账与平仓股数计算，内部整数厘运算；平仓决策权 100% 归交易层规则管线
+ * （TradingEngine），本类不产生任何订单（组5/任务5.3 已根除 onSignal 旁路）。
  *
  * rehydrate（REQ-LEDGER-01）：`fromFillEvents` 由 fill 事件流 fold 重建持仓。
- * ⚠ `onSignal` 为 dev server 手写旁路的遗留入口（全库唯一调用方
- * tools/strategy-dev/server.ts:969），随组 5 迁移一并删除（任务 5.3）——
- * 平仓决策权 100% 归交易层规则管线。
  */
 import { TRADING_RULES } from '@app/constants';
 import type { StrategyBar } from '@app/market-data';
@@ -16,19 +14,14 @@ import type {
   OrderFilledEvent,
 } from '../execution/execution.types';
 
-import type { KernelSignal } from '../kernel/kernel.types';
 import { liToYuan, yuanToLi, type Li } from '../trading/money';
 import {
-  EXIT_ACTIONS,
   ORDER_SIDES,
-  ORDER_TYPES,
   POSITION_DECIMAL_PLACES,
   POSITION_EXIT_REASONS,
   POSITION_STATUSES,
-  SIGNAL_KINDS,
 } from '../strategy.constants';
 import type {
-  ExitPolicyPort,
   PositionClosedRecord,
   PositionSnapshot,
   PositionStateMachineOptions,
@@ -46,7 +39,6 @@ export class PositionStateMachine {
   private currentPriceLi: Li = 0n;
   private realizedPnlLi: Li = 0n;
   private accumulatedBuyFeesLi: Li = 0n;
-  private readonly exitPolicy?: ExitPolicyPort;
   private readonly exitRatio: number;
   private readonly closedTrades: PositionClosedRecord[] = [];
   private entryReason?: string;
@@ -58,7 +50,6 @@ export class PositionStateMachine {
   ) {
     this.securityId = securityId;
     this.securityCode = securityCode;
-    this.exitPolicy = options?.exitPolicy;
     this.exitRatio = options?.exitRatio ?? 1.0;
 
     if (this.exitRatio <= 0 || this.exitRatio > 1.0) {
@@ -186,48 +177,6 @@ export class PositionStateMachine {
     this.currentPriceLi = yuanToLi(bar.close);
 
     // 纯记账员定位：严禁在 onBar 内私自生成平仓订单，平仓决策权 100% 移交上层交易层规则管线
-    return null;
-  }
-
-  /**
-   * ⚠ 遗留旁路入口（组 5 迁移后随任务 5.3 删除）——dev server 手写流水线专用；
-   * 平仓决策权 100% 归交易层规则管线（TradingEngine）。
-   */
-  onSignal(
-    signal: KernelSignal,
-    options?: { readonly exitRatio?: number },
-  ): CreateOrderDto | null {
-    if (this.status !== POSITION_STATUSES.HOLDING) {
-      return null;
-    }
-
-    if (this.exitPolicy?.onSignal) {
-      const decision = this.exitPolicy.onSignal(signal, this.getSnapshot());
-      if (decision.action === EXIT_ACTIONS.EXIT) {
-        return {
-          securityId: this.securityId,
-          securityCode: this.securityCode,
-          side: ORDER_SIDES.SELL,
-          orderType: ORDER_TYPES.MARKET,
-          quantity: this.calculateExitQuantity(options?.exitRatio),
-          signalTime: signal.signalTime,
-        };
-      }
-    }
-
-    // 反向卖出信号触发平仓（默认全平，支持配置 exitRatio）
-    if (signal.signalKind === SIGNAL_KINDS.EXIT) {
-      return {
-        securityId: this.securityId,
-        securityCode: this.securityCode,
-        side: ORDER_SIDES.SELL,
-        orderType: ORDER_TYPES.MARKET,
-        quantity: this.calculateExitQuantity(options?.exitRatio),
-        signalTime: signal.signalTime,
-        exitReason: signal.signalType ?? 'SIGNAL_EXIT',
-      };
-    }
-
     return null;
   }
 

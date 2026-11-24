@@ -1,10 +1,7 @@
-import type { StrategyBar } from '@app/market-data';
-import type { KernelSignal } from '../kernel/kernel.types';
-import { EXIT_ACTIONS, POSITION_STATUSES } from '../strategy.constants';
+import { POSITION_STATUSES } from '../strategy.constants';
 
 export type PositionStatus =
   (typeof POSITION_STATUSES)[keyof typeof POSITION_STATUSES];
-export type ExitAction = (typeof EXIT_ACTIONS)[keyof typeof EXIT_ACTIONS];
 
 export interface PositionSnapshot {
   readonly status: PositionStatus;
@@ -47,29 +44,7 @@ export interface PositionClosedRecord {
   readonly entryReason?: string;
 }
 
-export interface ExitDecision {
-  readonly action: ExitAction;
-  readonly reason: string;
-}
-
-/**
- * 统一出场与风控插件抽象端口，与决策树插件标准同构，供私有仓扩展
- */
-export interface ExitPolicyPort {
-  readonly id: string;
-  evaluate(
-    bar: StrategyBar,
-    position: Readonly<PositionSnapshot>,
-  ): ExitDecision;
-  onSignal?(
-    signal: KernelSignal,
-    position: Readonly<PositionSnapshot>,
-  ): ExitDecision;
-}
-
 export interface PositionStateMachineOptions {
-  /** 自定义出场风控策略插件 */
-  readonly exitPolicy?: ExitPolicyPort;
   /** 平仓比例，取值范围 (0, 1.0]，默认 1.0（全部平仓） */
   readonly exitRatio?: number;
 }

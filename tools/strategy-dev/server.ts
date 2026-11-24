@@ -29,7 +29,16 @@ import {
 import { SimulatedBroker } from '../../libs/strategy/src/execution/simulated-broker';
 import { PositionStateMachine } from '../../libs/strategy/src/position/position-state-machine';
 import { CapitalLedger } from '../../libs/strategy/src/position/capital-ledger';
-import { ExecutionRiskArbiter } from '../../libs/strategy/src/execution/execution-risk-arbiter';
+import {
+  TradingEngine,
+  createDefaultRiskRules,
+  yuanToLi,
+} from '../../libs/strategy/src/trading';
+import type {
+  AccountSnapshot,
+  SignalGroupInput,
+  TradingPositionState,
+} from '../../libs/strategy/src/trading';
 import { formatShanghaiDateString } from '@app/timezone';
 import {
   computePerformanceSummary,
@@ -39,10 +48,7 @@ import { StressTestingSuiteOrchestrator } from '../../libs/strategy/src/stress-t
 import { InMemoryFactorPluginRegistry } from '../../libs/strategy/src/factor/factor-plugin-registry';
 import { ensureStandardPluginsRegistered } from '../../libs/strategy/src/factor/standard-plugins';
 import { ExternalFactorPluginLoader } from '../../libs/strategy/src/factor/external-plugin-loader';
-import {
-  ORDER_SIDES,
-  ORDER_TYPES,
-} from '../../libs/strategy/src/strategy.constants';
+import { ORDER_TYPES } from '../../libs/strategy/src/strategy.constants';
 import type { DecisionFlowNode } from '../../libs/strategy/src/decision-flow/decision-flow.types';
 import type { ExternalContextRequirement } from '../../libs/strategy/src/kernel/kernel.types';
 import {
@@ -918,11 +924,94 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         options.mode === 'enhanced' ||
         options.strategyDefinitionId === 2 ||
         options.strategyDefinitionId === 3));
-  const arbiter = enableStopLoss
-    ? new ExecutionRiskArbiter({
-        hardStopLossRatio: -0.08,
-      })
-    : null;
+  // 交易层统一引擎（组5 迁移）：裁决/仓位/巡检出同一管线；enableStopLoss 语义
+  // 沿袭——关闭时无任何巡检规则（含 systemic），开启时挂载 systemic + hardStop -0.08。
+  const tradingEngine = new TradingEngine({
+    riskRules: enableStopLoss ? createDefaultRiskRules(-0.08) : [],
+  });
+
+  // 信号按 Bar 缓冲成组（与回测迁移同构）：drive 序 push → onBar(T) → onSignal(T)，
+  // 组内信号于下一根 Bar 开始统一 engine.decide，指令于本 Bar Next-Bar 撮合。
+  const pendingSignals: { signal: KernelSignal }[] = [];
+
+  const buildAccountSnapshot = (currentBar: StrategyBar): AccountSnapshot => {
+    const snap = position.getSnapshot();
+    const positions = new Map<number, TradingPositionState>();
+    if (snap.holdingQuantity > 0) {
+      positions.set(DEFAULT_DEV_SECURITY_ID, {
+        securityId: DEFAULT_DEV_SECURITY_ID,
+        securityCode: options.code,
+        holdingQuantity: snap.holdingQuantity,
+        costPriceLi: yuanToLi(snap.costPrice),
+        entryTime: snap.entryTime,
+        currentPriceLi: yuanToLi(snap.currentPrice),
+        realizedPnlLi: yuanToLi(snap.realizedPnl),
+      });
+    }
+    return {
+      cashLi: yuanToLi(capitalLedger.getCash()),
+      positions,
+      tradingDay: formatShanghaiDateString(currentBar.timestamp),
+    };
+  };
+
+  const submitInstruction = (
+    instruction: {
+      readonly action: 'BUY' | 'SELL';
+      readonly quantity: number;
+      readonly reason: string;
+      readonly idempotencyKey: string;
+    },
+    signalTime: Date,
+  ): void => {
+    if (broker.getOpenOrders().some((o) => o.securityCode === options.code)) {
+      return; // 既有挂单在途——沿袭旧守卫，不叠加挂单
+    }
+    broker.submitOrder({
+      securityId: DEFAULT_DEV_SECURITY_ID,
+      securityCode: options.code,
+      side: instruction.action,
+      orderType: ORDER_TYPES.MARKET,
+      quantity: instruction.quantity,
+      signalTime,
+      ...(instruction.action === 'BUY'
+        ? { entryReason: instruction.reason }
+        : { exitReason: instruction.reason }),
+      intentId: instruction.idempotencyKey,
+    });
+  };
+
+  const flushPendingGroup = (currentBar: StrategyBar): void => {
+    if (pendingSignals.length === 0) return;
+    const first = pendingSignals[0]!.signal;
+    const group: SignalGroupInput = {
+      securityId: DEFAULT_DEV_SECURITY_ID,
+      securityCode: options.code,
+      effectiveTime: first.signalTime,
+      tradingDay: formatShanghaiDateString(first.signalTime),
+      signals: pendingSignals.map(({ signal }) => ({
+        idempotencyKey: `offline-${options.strategyDefinitionId ?? 0}-${signal.signalTime.getTime()}-${signal.signalKind}`,
+        signal,
+        attribution: {
+          strategyName: `definition-${options.strategyDefinitionId ?? 0}`,
+          periodLabel: `${options.period}m`,
+          confidence: signal.confidence,
+          confidenceLevel: signal.confidenceLevel,
+          traceChain: null,
+        },
+      })),
+    };
+    pendingSignals.length = 0;
+
+    const decision = tradingEngine.decide(
+      group,
+      buildAccountSnapshot(currentBar),
+    );
+    for (const instruction of decision.instructions) {
+      if (!instruction.signal) continue;
+      submitInstruction(instruction, instruction.signal.signalTime);
+    }
+  };
 
   const collectedSignals: SimulationSignal[] = [];
   let lastDateStr: string | null = null;
@@ -932,46 +1021,16 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
 
   const replaySummary = await replaySource.drive(
     kernel,
-    // onSignal（仅求值周期）：原始信号收集 + 因果委托下达
-    async (kSig: KernelSignal, bar: StrategyBar) => {
+    // onSignal（仅求值周期）：原始信号收集（API 兼容）+ 入组缓冲
+    async (kSig: KernelSignal) => {
       const simSig = mapKernelSignalToSimulationSignal(kSig, {
         securityCode: options.code,
         period: options.period,
       });
       collectedSignals.push(simSig);
 
-      const hasPendingOrder = broker
-        .getOpenOrders()
-        .some((o) => o.securityCode === options.code);
-
-      if (kSig.signalKind === 'entry') {
-        const availableCash = broker.getAccount().availableCash;
-        const buyShares =
-          Math.floor((availableCash * 0.95) / bar.close / 100) * 100;
-        if (
-          buyShares >= 100 &&
-          (position.getStatus() === 'EMPTY' ||
-            position.getStatus() === 'CLOSED') &&
-          !hasPendingOrder
-        ) {
-          broker.submitOrder({
-            securityId: DEFAULT_DEV_SECURITY_ID,
-            securityCode: options.code,
-            side: ORDER_SIDES.BUY,
-            orderType: ORDER_TYPES.MARKET,
-            quantity: buyShares,
-            signalTime: bar.timestamp,
-            entryReason: kSig.badgeText || kSig.signalType || 'SIGNAL_BUY',
-          });
-        }
-      } else if (kSig.signalKind === 'exit') {
-        if (!hasPendingOrder && position.getStatus() === 'HOLDING') {
-          const sellDto = position.onSignal(kSig);
-          if (sellDto) {
-            broker.submitOrder(sellDto);
-          }
-        }
-      }
+      // 交易层统一裁决：信号入组缓冲，下一根 Bar 开始统一 engine.decide
+      pendingSignals.push({ signal: kSig });
     },
     // onBar（仅求值周期）：跨日日结 / Next-Bar 撮合 / 持仓盯市 / 风控裁决
     async (bar: StrategyBar) => {
@@ -985,6 +1044,10 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       }
       lastDateStr = currentDateStr;
 
+      // 1) 上一 Bar 信号组统一裁决 → 指令入待撮合队列（本 Bar Next-Bar 撮合）
+      flushPendingGroup(bar);
+
+      // 2) 撮合 + 记账（SimulatedBroker 撮合语义零改动）
       const fills = broker.onBar(bar);
       for (const fill of fills) {
         position.onOrderFilled(fill);
@@ -992,24 +1055,28 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       }
       position.onBar(bar);
 
-      // 风控裁决器检查（仅当明确开启止损时生效）。注：drive 序为 push → onBar →
-      // onSignal，同 Bar 上风控单先于信号单下达（旧循环相反）；两者皆为清仓卖单，
-      // 经济结果等价，仅 entryReason 归因可能不同。
-      const hasPendingOrderForArbiter = broker
-        .getOpenOrders()
-        .some((o) => o.securityCode === options.code);
-      if (
-        arbiter &&
-        !hasPendingOrderForArbiter &&
-        position.getStatus() === 'HOLDING'
-      ) {
-        const arbiterSellDto = arbiter.arbitrate({
-          bar,
-          position: position.getSnapshot(),
-          availableCash: broker.getAccount().availableCash,
-        });
-        if (arbiterSellDto) {
-          broker.submitOrder(arbiterSellDto);
+      // 3) per-bar 风控巡检（规则仅 enableStopLoss 开启时挂载）
+      const snap = position.getSnapshot();
+      if (snap.holdingQuantity > 0) {
+        const riskInstructions = tradingEngine.surveilBar(
+          {
+            securityId: DEFAULT_DEV_SECURITY_ID,
+            securityCode: options.code,
+            timestamp: bar.timestamp,
+            close: bar.close,
+          },
+          {
+            securityId: DEFAULT_DEV_SECURITY_ID,
+            securityCode: options.code,
+            holdingQuantity: snap.holdingQuantity,
+            costPriceLi: yuanToLi(snap.costPrice),
+            entryTime: snap.entryTime,
+            currentPriceLi: yuanToLi(snap.currentPrice),
+            realizedPnlLi: yuanToLi(snap.realizedPnl),
+          },
+        );
+        for (const instruction of riskInstructions) {
+          submitInstruction(instruction, bar.timestamp);
         }
       }
 
@@ -1028,6 +1095,9 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       }
     },
   );
+
+  // 回放末尾残余信号组补 flush（指令入队后无后续 Bar 撮合——与旧路径一致不成交）
+  flushPendingGroup(lastEvalBar ?? evaluationBars.at(-1)!);
 
   // 最后一根 Bar 的日终结算
   if (lastEvalBar !== null && lastDateStr !== null) {
