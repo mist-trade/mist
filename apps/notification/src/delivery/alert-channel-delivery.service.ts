@@ -13,6 +13,17 @@ import {
 } from '@app/shared-data';
 import { toErrorMessage } from '@app/utils';
 import type { AlertDeliveryChannelJobV2 } from '@app/contracts';
+import {
+  calculateExecutionFeesLi,
+  foldVirtualFills,
+  yuanToLi,
+  type AttributedSignal,
+  type KernelSignal,
+  type SignalGroupInput,
+  type TradeInstruction,
+  TradingEngine,
+} from '@app/strategy';
+import { formatShanghaiDateString } from '@app/timezone';
 
 import {
   CHANNEL_ADAPTERS,
@@ -20,9 +31,15 @@ import {
   type ChannelSendResult,
 } from '../channels/channel-adapter.port';
 import {
-  buildGroupedNotificationMessage,
-  type GroupedNotificationItem,
-} from './notification-envelope';
+  buildTradingManual,
+  formatPeriod,
+  renderTraceChain,
+} from '../trading/trading-manual';
+import {
+  NOTIFICATION_VIRTUAL_SEED_CAPITAL_LI,
+  TRADING_ENGINE,
+} from '../trading/trading-engine.provider';
+import { VirtualFillLogService } from '../trading/virtual-fill-log.service';
 import { NotificationDeliveryCounters } from './notification-delivery-counters';
 
 const MAX_LAST_ERROR = 1024;
@@ -54,6 +71,11 @@ export class AlertChannelDeliveryService {
     @Inject(CHANNEL_ADAPTERS)
     private readonly adapters: readonly ChannelAdapter[],
     private readonly counters: NotificationDeliveryCounters,
+    @Inject(TRADING_ENGINE)
+    private readonly engine: TradingEngine,
+    @Inject(NOTIFICATION_VIRTUAL_SEED_CAPITAL_LI)
+    private readonly seedCapitalLi: bigint,
+    private readonly fillLog: VirtualFillLogService,
   ) {}
 
   async run(
@@ -118,7 +140,12 @@ export class AlertChannelDeliveryService {
     });
     const definitionsById = new Map(definitions.map((d) => [d.id, d]));
 
-    const items: GroupedNotificationItem[] = [];
+    const items: {
+      readonly alertEvent: StrategyAlertEvent;
+      readonly signal: StrategySignal | null;
+      readonly security: Security | null;
+      readonly strategyDefinition: StrategyDefinition | null;
+    }[] = [];
     for (const event of alertEvents) {
       const signal = signalsById.get(event.strategySignalId) ?? null;
       items.push({
@@ -133,7 +160,7 @@ export class AlertChannelDeliveryService {
       });
     }
 
-    const message = buildGroupedNotificationMessage(items);
+    const message = await this.decideAndRender(job.group, items);
     let result: ChannelSendResult;
     try {
       result = await adapter.send({ text: message });
@@ -188,6 +215,150 @@ export class AlertChannelDeliveryService {
     this.logger.warn(
       `delivery dead-lettered channel=${channel} events=[${alertEventIds.join(',')}]: ${result.error ?? 'exhausted retries'}`,
     );
+  }
+
+  /**
+   * 交易层接管（REQ-ADAPT-02）：证据 → 归因信号组 → fold 账本快照 →
+   * engine.decide → 指令假定成交回填（指令即成交，幂等）→ 交易手册渲染。
+   */
+  private async decideAndRender(
+    group: {
+      readonly securityId: number;
+      readonly effectiveTime: string;
+      readonly tradingDay?: string;
+    },
+    items: {
+      readonly alertEvent: StrategyAlertEvent;
+      readonly signal: StrategySignal | null;
+      readonly security: Security | null;
+      readonly strategyDefinition: StrategyDefinition | null;
+    }[],
+  ): Promise<string> {
+    const effectiveTime = new Date(group.effectiveTime);
+    const tradingDay =
+      group.tradingDay ?? formatShanghaiDateString(effectiveTime);
+    const securityId = group.securityId;
+    const first = items.find((item) => item.signal !== null) ?? items[0];
+    const securityCode = first?.security?.code ?? String(securityId);
+    const securityName = first?.security?.name ?? '';
+
+    const attributed: AttributedSignal[] = items.map((item) =>
+      this.toAttributed(item, effectiveTime),
+    );
+    const signalGroup: SignalGroupInput = {
+      securityId,
+      securityCode,
+      effectiveTime,
+      tradingDay,
+      signals: attributed,
+    };
+
+    const fillEvents = await this.fillLog.loadBySecurity(securityId);
+    const snapshot = foldVirtualFills(
+      fillEvents,
+      this.seedCapitalLi,
+      tradingDay,
+    );
+    const decision = this.engine.decide(signalGroup, snapshot);
+
+    // 指令即成交（REQ-LEDGER-04）：假定成交回填，幂等锚点 = alertEventId
+    for (const instruction of decision.instructions) {
+      await this.appendAssumedFill(
+        instruction,
+        securityId,
+        securityCode,
+        tradingDay,
+      );
+    }
+
+    return buildTradingManual({
+      securityCode,
+      securityName,
+      effectiveTime,
+      decision,
+    });
+  }
+
+  private toAttributed(
+    item: {
+      readonly alertEvent: StrategyAlertEvent;
+      readonly signal: StrategySignal | null;
+      readonly security: Security | null;
+      readonly strategyDefinition: StrategyDefinition | null;
+    },
+    effectiveTime: Date,
+  ): AttributedSignal {
+    const signal = item.signal;
+    const ctx = (signal?.contextSnapshot ?? {}) as Record<string, unknown>;
+    const ctxTriggerPrice = ctx.triggerPrice;
+    const triggerPrice =
+      typeof ctxTriggerPrice === 'number' && ctxTriggerPrice > 0
+        ? ctxTriggerPrice
+        : 0; // 缺失 → 引擎 priceGate 显式 INVALID_PRICE 拒绝（可审计）
+    const kernelLike: KernelSignal = {
+      definitionId: signal?.strategyDefinitionId ?? 0,
+      versionId: signal?.strategyVersionId ?? 0,
+      signalKind: signal?.signalKind ?? 'entry',
+      signalTime: signal?.signalTime ?? effectiveTime,
+      triggerPrice,
+      pivotTime: null,
+      pivotPrice: null,
+      signalType: signal?.signalType ?? 'signal',
+      confidence: signal?.confidence ?? 0,
+      confidenceLevel: signal?.confidenceLevel ?? 'LOW',
+      decisionTrace: (signal?.decisionTrace ?? {}) as Record<string, unknown>,
+      contextSnapshot: signal?.contextSnapshot ?? {},
+      ruleSnapshot: signal?.ruleSnapshot ?? {},
+    };
+    return {
+      idempotencyKey: String(item.alertEvent.id),
+      signal: kernelLike,
+      attribution: {
+        strategyName: item.strategyDefinition?.name ?? '',
+        periodLabel: formatPeriod(signal?.period),
+        confidence: signal?.confidence ?? undefined,
+        confidenceLevel: signal?.confidenceLevel ?? undefined,
+        traceChain: renderTraceChain(signal),
+      },
+    };
+  }
+
+  private async appendAssumedFill(
+    instruction: TradeInstruction,
+    securityId: number,
+    securityCode: string,
+    tradingDay: string,
+  ): Promise<void> {
+    const priceLi = yuanToLi(instruction.referencePrice);
+    const fees = calculateExecutionFeesLi(
+      instruction.action,
+      priceLi,
+      instruction.quantity,
+      securityCode,
+    );
+    const turnoverLi = priceLi * BigInt(instruction.quantity);
+    const netAmountLi =
+      instruction.action === 'BUY'
+        ? -(turnoverLi + fees.totalFeesLi)
+        : turnoverLi - fees.totalFeesLi;
+    await this.fillLog.append({
+      idempotencyKey: instruction.idempotencyKey,
+      securityId,
+      securityCode,
+      side: instruction.action,
+      quantity: instruction.quantity,
+      priceLi,
+      feesLi: fees.totalFeesLi,
+      netAmountLi,
+      tradingDay,
+      instruction: {
+        instructionId: instruction.instructionId,
+        action: instruction.action,
+        reason: instruction.reason,
+        strategyName: instruction.attribution.strategyName,
+        periodLabel: instruction.attribution.periodLabel,
+      },
+    });
   }
 
   private async updateDeliveryStatus(

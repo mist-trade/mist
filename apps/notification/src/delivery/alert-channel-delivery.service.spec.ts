@@ -3,6 +3,7 @@ import {
   StrategyAlertDeliveryStatus,
   StrategyAlertStatus,
 } from '@app/shared-data';
+import { TradingEngine } from '@app/strategy';
 import type { ChannelAdapter } from '../channels/channel-adapter.port';
 import { AlertChannelDeliveryService } from './alert-channel-delivery.service';
 import { NotificationDeliveryCounters } from './notification-delivery-counters';
@@ -86,6 +87,7 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
   let adapter: jest.Mocked<ChannelAdapter>;
   let service: AlertChannelDeliveryService;
   let counters: NotificationDeliveryCounters;
+  let fillLog: { loadBySecurity: jest.Mock; append: jest.Mock };
 
   beforeEach(() => {
     alertEvents = mockRepo();
@@ -95,6 +97,10 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
     strategyDefinitions = mockRepo();
     adapter = { channel: NotificationChannel.WECHAT, send: jest.fn() };
     counters = new NotificationDeliveryCounters();
+    fillLog = {
+      loadBySecurity: jest.fn().mockResolvedValue([]),
+      append: jest.fn().mockResolvedValue(undefined),
+    };
     service = new AlertChannelDeliveryService(
       alertEvents as any,
       signals as any,
@@ -103,6 +109,9 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
       strategyDefinitions as any,
       [adapter],
       counters,
+      new TradingEngine({ riskRules: [] }),
+      1_000_000_000n,
+      fillLog as any,
     );
   });
 
@@ -156,11 +165,11 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
 
     expect(adapter.send).toHaveBeenCalledTimes(1);
     const text = adapter.send.mock.calls[0][0].text as string;
-    // 卖出在前
-    expect(text.indexOf('卖出')).toBeLessThan(text.indexOf('买入'));
-    expect(text).toContain('- 卖出');
-    expect(text).toContain('- 买入');
-    // 每信号一行紧凑 trace 链
+    // 交易手册：买入指令产出（现金充足），同组卖出被显式拒绝（空仓）
+    expect(text).toContain('[Mist 交易手册]');
+    expect(text).toContain('▶ 买入');
+    expect(text).toContain('✗ 卖出已拒绝：NO_POSITION');
+    // 指令行携带紧凑 trace 链
     expect(text).toContain('regime 门禁 ✓ → chan 二买 ✓');
     expect(deliveries.update).toHaveBeenCalledWith(
       7,
@@ -202,8 +211,10 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
     await service.run(groupJob('wechat', [1]), 0, 5);
 
     const text = adapter.send.mock.calls[0][0].text as string;
-    expect(text).toContain('[Mist] [HIGH 88.5%] 000001 平安银行 二买 @ 12.5');
-    expect(text).toContain('链路：regime 门禁 ✓ → chan 二买 ✓');
+    expect(text).toContain('[Mist 交易手册] 000001 平安银行');
+    expect(text).toContain('▶ 买入');
+    expect(text).toContain('@ 12.50');
+    expect(text).toContain('regime 门禁 ✓ → chan 二买 ✓');
   });
 
   it('falls back to the no-chain format when the signal has no decisionTrace', async () => {
@@ -218,8 +229,8 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
     await service.run(groupJob('wechat', [1]), 0, 5);
 
     const text = adapter.send.mock.calls[0][0].text as string;
-    expect(text).not.toContain('链路：');
-    expect(text).toContain('二买');
+    expect(text).not.toContain('regime 门禁 ✓');
+    expect(text).toContain('▶ 买入');
   });
 
   it('marks FAILED and throws on transient failure with retries remaining', async () => {
@@ -334,6 +345,9 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
       strategyDefinitions as any,
       [], // no adapters configured
       counters,
+      new TradingEngine({ riskRules: [] }),
+      1_000_000_000n,
+      fillLog as any,
     );
     const row = delivery({ channel: NotificationChannel.QQ });
     deliveries.find.mockImplementation(() => [row]);

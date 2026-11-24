@@ -17,6 +17,10 @@ import {
 } from '@app/shared-data';
 import { OoAlertModule } from '../oo-alert/oo-alert.module';
 import { VirtualFillLogService } from '../trading/virtual-fill-log.service';
+import {
+  seedCapitalProvider,
+  tradingEngineProvider,
+} from '../trading/trading-engine.provider';
 import { CHANNEL_ADAPTERS } from '../channels/channel-adapter.port';
 import { FeishuChannelAdapter } from '../channels/feishu.channel-adapter';
 import { QqChannelAdapter } from '../channels/qq.channel-adapter';
@@ -67,6 +71,8 @@ import { StrategyAlertDeliveryWorker } from './strategy-alert-delivery.worker';
     NotificationMetricsBootstrap,
     PendingAlertDeliverySweepService,
     VirtualFillLogService,
+    tradingEngineProvider,
+    seedCapitalProvider,
     QqChannelAdapter,
     WeComChannelAdapter,
     FeishuChannelAdapter,
