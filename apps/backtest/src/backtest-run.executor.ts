@@ -27,18 +27,25 @@ import {
 import {
   CapitalLedger,
   compileStoredDefinitionVersion,
+  createDefaultRiskRules,
   DEFAULT_BROKER_INITIAL_CASH,
-  ExecutionRiskArbiter,
   ExternalFactorPluginLoader,
   HistoricalBarSource,
   mapKernelSignalToPersistencePayload,
+  ORDER_TYPES,
   PositionStateMachine,
   SimulatedBroker,
   StrategyEvaluationKernel,
+  TradingEngine,
   shanghaiMidnight,
+  yuanToLi,
+  type AccountSnapshot,
   type CompiledStoredDefinition,
   type DailyNavSnapshot,
+  type KernelSignal,
   type PositionClosedRecord,
+  type SignalGroupInput,
+  type TradingPositionState,
 } from '@app/strategy';
 import type {
   ReplayDataSelection,
@@ -52,7 +59,6 @@ import {
   type PortfolioSharpeInput,
 } from '@app/indicators';
 import { formatShanghaiDateString, isSessionCloseBar } from '@app/timezone';
-import { TRADING_RULES } from '@app/constants';
 import { DataSource as TypeOrmDataSource, In, Repository } from 'typeorm';
 
 import { BacktestMarketDataAdapter } from './backtest-market-data.adapter';
@@ -461,11 +467,96 @@ export class BacktestRunExecutor {
     const capitalLedger = new CapitalLedger({
       initialCash: DEFAULT_BROKER_INITIAL_CASH,
     });
-    const arbiter = new ExecutionRiskArbiter({
-      hardStopLossRatio: -0.08,
-      cashAllocationRatio: 0.995,
-      lotSize: TRADING_RULES.MAIN_BOARD_LOT_SIZE,
+    // 交易层统一引擎（组4 迁移）：裁决/仓位/巡检出自同一管线；硬止损沿袭 -0.08
+    // 显式声明（归属待拍板，design 11.4），预算比例统一 0.95（原 0.995）。
+    const tradingEngine = new TradingEngine({
+      riskRules: createDefaultRiskRules(-0.08),
     });
+
+    // 信号按 Bar 缓冲成组：drive 序为 push → onBar(T) → onSignal(T)，组内信号在
+    // 下一根 Bar 开始时统一 engine.decide（持仓/现金快照 = 前一 Bar 收盘后状态，
+    // 指令交 Broker 于本 Bar Next-Bar 撮合——与旧"逐信号即时裁决"时序等价）。
+    const pendingSignals: { signal: KernelSignal }[] = [];
+
+    const buildAccountSnapshot = (): AccountSnapshot => {
+      const snap = positionMachine.getSnapshot();
+      const positions = new Map<number, TradingPositionState>();
+      if (snap.holdingQuantity > 0) {
+        positions.set(securityId, {
+          securityId,
+          securityCode,
+          holdingQuantity: snap.holdingQuantity,
+          costPriceLi: yuanToLi(snap.costPrice),
+          entryTime: snap.entryTime,
+          currentPriceLi: yuanToLi(snap.currentPrice),
+          realizedPnlLi: yuanToLi(snap.realizedPnl),
+        });
+      }
+      return {
+        cashLi: yuanToLi(capitalLedger.getCash()),
+        positions,
+        tradingDay: formatShanghaiDateString(
+          (lastSeenBar as StrategyBar | null)?.timestamp ?? new Date(0),
+        ),
+      };
+    };
+
+    const submitInstruction = (
+      instruction: {
+        readonly action: 'BUY' | 'SELL';
+        readonly quantity: number;
+        readonly reason: string;
+        readonly idempotencyKey: string;
+      },
+      signalTime: Date,
+    ): void => {
+      if (broker.getOpenOrders().some((o) => o.securityCode === securityCode)) {
+        return; // 既有挂单在途（如一字跌停顺延的卖单）——沿用旧守卫，不叠加挂单
+      }
+      broker.submitOrder({
+        securityId,
+        securityCode,
+        side: instruction.action,
+        orderType: ORDER_TYPES.MARKET,
+        quantity: instruction.quantity,
+        signalTime,
+        ...(instruction.action === 'BUY'
+          ? { entryReason: instruction.reason }
+          : { exitReason: instruction.reason }),
+        intentId: instruction.idempotencyKey,
+      });
+    };
+
+    const flushPendingGroup = (): void => {
+      if (pendingSignals.length === 0) return;
+      const first = pendingSignals[0]!.signal;
+      const group: SignalGroupInput = {
+        securityId,
+        securityCode,
+        effectiveTime: first.signalTime,
+        tradingDay: formatShanghaiDateString(first.signalTime),
+        signals: pendingSignals.map(({ signal }) => ({
+          // 离线合成幂等锚点（与门面离线 scheme 一致，design 8.2）
+          idempotencyKey: `offline-${run.strategyDefinitionId}-${signal.signalTime.getTime()}-${signal.signalKind}`,
+          signal,
+          attribution: {
+            strategyName: `definition-${run.strategyDefinitionId}`,
+            periodLabel: `${run.period}m`,
+            confidence: signal.confidence,
+            confidenceLevel: signal.confidenceLevel,
+            traceChain: null,
+          },
+        })),
+      };
+      pendingSignals.length = 0;
+
+      const decision = tradingEngine.decide(group, buildAccountSnapshot());
+      for (const instruction of decision.instructions) {
+        if (!instruction.signal) continue;
+        submitInstruction(instruction, instruction.signal.signalTime);
+      }
+    };
+
     let lastSeenBar: StrategyBar | null = null;
 
     const outcome = await source.drive(
@@ -503,20 +594,8 @@ export class BacktestRunExecutor {
         matchedCodes.add(securityCode);
         onSignal();
 
-        // 战术汇聚层已退役：信号直接进入风控裁决；持仓期间的重复买入由 Arbiter 拦截。
-        const orderDraft = arbiter.arbitrate({
-          bar,
-          signal,
-          position: positionMachine.getSnapshot(),
-          availableCash: capitalLedger.getCash(),
-        });
-        if (
-          orderDraft &&
-          !broker.getOpenOrders().some((o) => o.securityCode === securityCode)
-        ) {
-          broker.submitOrder(orderDraft);
-        }
-
+        // 信号入组缓冲，下一根 Bar 开始时统一经交易层引擎裁决（先出后进）
+        pendingSignals.push({ signal });
         if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
           await this.flushResults(results);
       },
@@ -524,6 +603,10 @@ export class BacktestRunExecutor {
         budget.consume();
         lastSeenBar = bar;
 
+        // 1) 上一 Bar 信号组统一裁决 → 指令入待撮合队列（本 Bar Next-Bar 撮合）
+        flushPendingGroup();
+
+        // 2) 撮合 + 记账（SimulatedBroker 撮合语义零改动）
         const fills = broker.onBar(bar);
         for (const fill of fills) {
           positionMachine.onOrderFilled(fill);
@@ -532,16 +615,29 @@ export class BacktestRunExecutor {
 
         positionMachine.onBar(bar);
 
-        const riskOrderDraft = arbiter.arbitrate({
-          bar,
-          position: positionMachine.getSnapshot(),
-          availableCash: capitalLedger.getCash(),
-        });
-        if (
-          riskOrderDraft &&
-          !broker.getOpenOrders().some((o) => o.securityCode === securityCode)
-        ) {
-          broker.submitOrder(riskOrderDraft);
+        // 3) per-bar 风控巡检（systemicCrunch → hardStop），保护性清仓指令
+        const snap = positionMachine.getSnapshot();
+        if (snap.holdingQuantity > 0) {
+          const riskInstructions = tradingEngine.surveilBar(
+            {
+              securityId,
+              securityCode,
+              timestamp: bar.timestamp,
+              close: bar.close,
+            },
+            {
+              securityId,
+              securityCode,
+              holdingQuantity: snap.holdingQuantity,
+              costPriceLi: yuanToLi(snap.costPrice),
+              entryTime: snap.entryTime,
+              currentPriceLi: yuanToLi(snap.currentPrice),
+              realizedPnlLi: yuanToLi(snap.realizedPnl),
+            },
+          );
+          for (const instruction of riskInstructions) {
+            submitInstruction(instruction, bar.timestamp);
+          }
         }
 
         if (isSessionCloseBar(bar.timestamp, run.period)) {
@@ -558,6 +654,9 @@ export class BacktestRunExecutor {
       },
     );
     await budget.checkpoint(true);
+
+    // 回放末尾残余信号组补flush（指令入队后无后续 Bar 撮合——与旧路径一致不成交）
+    flushPendingGroup();
 
     const finalBar = lastSeenBar as StrategyBar | null;
     if (finalBar && capitalLedger.getNavHistory().length === 0) {
