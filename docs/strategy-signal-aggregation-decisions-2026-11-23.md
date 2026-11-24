@@ -985,44 +985,54 @@ push 粒度隐式实现。
 | `tools/strategy-dev` | 聚合器与 `tacticalEvents` 兼容字段均已删除；只返回 `signals` |
 | `libs/strategy/src/tactical-event` | 整目录已删除；无类型保留 |
 
-## 七、重新设计的起点（2026-11-24，待讨论）
+## 七、聚合层设计定稿（2026-11-24 第二轮讨论收口）
 
-战术事件层删除后，当前链路是：
+战术层删除 + 时间模型收口后，聚合层按以下定稿实施。无线上流量，不做向后兼容。
+
+### 7.1 四个决策
+
+1. **regime 上结构化 context 角色**：内核支持 `role: 'context'` 插件——每 Bar 先于 plan
+   求值一次，opinion 缓存进黑板（attributes）；GUARD 节点读缓存，不再逐 flow 重复求值；
+   **context 插件严禁作为终端信号发射源**。私仓决策流同步重构：删除以 regime 结论为
+   终端的发射分支，`REGIME_BEAR` / `REGIME_DEFEND_SELL` 不再成为信号。
+2. **窄状态过滤取消**：regime 源头停发后无状态信号可滤，以架构纪律替代运行时过滤器
+   （AGENTS「context 型插件纪律」），连带省掉过滤器所需的"上次状态"持久化与重启恢复。
+3. **聚合不用定时器**：同一 `effectiveTime` 的信号来自同一个 1m 触发、同一批事务原子
+   落库——组在 commit 时天然完整，3 秒窗口在等一个不存在的东西。改为 **fanout 按批
+   分组**：每组一个 `deliver.fanout` job（jobId 按组去重），payload 显式携带该组
+   `alertEventIds[]`；handler 取这批 id 渲染一条消息、整批 SENT + 同一 providerMessageId。
+   `AlertEvent` 保持 1:1 挂信号，schema 不动，分组不落库、现算即弃。
+4. **消息格式**：一条消息多行、卖出在前、不净额；**每信号一行紧凑 trace 链**
+   （`｜ regime ✓ chan ✓ vpci ✓`）；单信号组退化为现有单条格式，无 trace 历史行回退。
+
+### 7.2 fanout v2 契约与扩展性结论
 
 ```text
-KernelSignal（每个 definition 每根 Bar 一条，带 decisionTrace.trace）
-  → StrategySignal / StrategyAlertEvent
-  → 飞书消息 / 人工买卖
+{
+  contractVersion: 2,
+  group: { securityId, effectiveTime, tradingDay? },   // 观测/日志用，与 ids 语义分离
+  alertEventIds: [1, 2, 3],                            // 操作数据
+}
 ```
 
-### 7.1 只设计三件事
+- **不需要前向扩展机制**。本仓契约模式是 exact-keys + `contractVersion`：字段变更 =
+  升 v3，无线上流量、无外部消费方，成本极低；"以防万一"的可选字段违反严格契约纪律。
+- group 描述符与 ids 结构分离是唯一保留的延展位：v3 可以只扩描述符，不动 ids 语义。
+- **replay 路径**：job payload 丢失后，handler 从告警行 + 信号行在内存里重算
+  `(securityId, effectiveTime)` 重分组（`availabilityKey` 可派生）——重放不需要新存储，
+  与主路径共用同一个分组函数。
+- `deliver.channel` 同步升 v2：`(group, channel, alertEventIds[])`，一组一渠道一条消息。
 
-1. **消息聚合**：按 `(securityId, effectiveTime)` 分组，一条消息列出同一时刻所有
-   definition 的信号；买入/卖出同时出现时仍按“卖出在前、不净额”展示。
-2. **归因**：每条信号直接渲染 `decisionTrace.trace`（regime、chan、vpci、terminal 等节点），
-   不再造 `TacticalEvent`，也不新增 `contributors` 表/列。
-3. **窄状态过滤**：只对 `state` 类信号（如 `REGIME_*`）做状态变化去重；买/卖点全发。
-   这是下一步唯一需要新增的过滤逻辑，放在告警/通知层，不回信号层。
+### 7.3 实施切分与顺序
 
-### 7.2 需要先定的三个口径
-
-1. **状态信号怎么判定？**
-   - 按 `signalType` 前缀（如 `REGIME_*`）；
-   - 在私有定义里给终端节点加 `signalNature: 'state' | 'event'`；
-   - 按 `decisionTrace.trace` 的节点类型（`GUARD` vs `EXTRACTOR`）。
-2. **聚合窗口多大？**
-   - 精确到 `effectiveTime` 的分钟；
-   - 允许 3 秒/1 分钟的抖动（同一批触发可能跨秒到达）。
-3. **同一时刻多个 definition 的消息格式？**
-   - 一条消息多行（推荐，便于人工横向比较）；
-   - 每个 definition 一条（信息更细，但同一时刻会多条）。
-
-### 7.3 明确不做
-
-- 不恢复 `TacticalEvent` / `EdgeDetector` / `TemporalWindowEngine` / `CooldownTracker`；
-- 不做订单簿、账本、自动下单、独立执行进程、outbox；
-- 不再引入 `emittedAt` / `receivedAt` / `expiresAt` 等执行域时间；
-- 前端 `tactical_events` 图层名在重新设计图表层时改为 `backtest_signals` 或 `raw_signals`。
+| 序 | 仓库 | 内容 |
+|---|---|---|
+| 1 | 公共仓 | 内核 `role: 'context'` 插件支持（先求值、黑板缓存、GUARD 读缓存） |
+| 2 | 公共仓 | fanout/channel 契约 v2 + handler 分组渲染 + 整批 SENT |
+| 3 | 公共仓 | envelope 多信号 + 每信号紧凑 trace 链；历史行回退 |
+| 4 | 公共仓 | 测试：同批组完整性、重放重分组与主路径同组、无 trace 回退 |
+| 5 | 私仓（另一 AI 入场口径修复落地后） | regime 声明为 context 插件；决策流删 `REGIME_*` 终端分支；重建 dist |
+| 6 | 公共仓 | 私仓落地后端到端回归 + 文档状态更新 |
 
 ---
 
@@ -1314,7 +1324,7 @@ effectiveTime           = availabilityKey(signalTime, period)
    - 前者优先做价格触发器；
    - 后者只能做临时信号，且要接受重绘。
 3. 临时信号是否可接受？如果可以，消息用 `[未确认] / [已确认] / [已取消]` 三态。
-4. 状态信号、聚合窗口、消息格式三个口径见 7.2。
+4. ~~状态信号、聚合窗口、消息格式三个口径~~ 已于 2026-11-24 定稿（第七节）。
 
 ---
 
