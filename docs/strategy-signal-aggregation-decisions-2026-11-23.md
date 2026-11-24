@@ -1137,13 +1137,30 @@ O(n) 映射，相对于 Chan/Pa 的几何计算可以忽略。能优化的是“
 **`signalTime` 与 `effectiveTime` 的规则：**
 
 ```text
-signalTime    = StrategyBar.timestamp（逐字复制，不做偏移）
-effectiveTime = availabilityKey(signalTime, period)
+KernelSignal.signalTime === StrategyBar.timestamp（完全等价，逐字复制，不做偏移）
+effectiveTime           = availabilityKey(signalTime, period)
   1m:                     +1m
   5/15/30/60m 常规窗:      同 signalTime
   11:30 / 15:00 终端桶:    +1m
   1440:                   15:01(D)
 ```
+
+**信号时间单源派生（2026-11-24 固化）**：除原始 `StrategyBar.timestamp`（Bar 身份）外，
+实时/回测/策略系统里的所有“信号时间”都必须由 `KernelSignal.signalTime` 派生：
+
+- `effectiveTime = availabilityKey(signalTime, period)`；
+- `aggregateKey = securityId + effectiveTime`；
+- 消息展示时间 = `effectiveTime`；
+- 去重键、回测游标 = 包含 `signalTime.getTime()`；
+- 图表 marker = `signalTime`（+ 可选 `pivotTime` 结构锚点）。
+
+不可派生的例外（不是信号时间，不允许从 `signalTime` 造出来）：
+
+- `pivotTime`：结构极值，来自插件 evidence，早于或等于 `signalTime`，随信号携带；
+- `createdAt` / `updatedAt` / `sentAt` / `acknowledgedAt`：墙钟审计时间；
+- `entryTime` / `exitTime` / `fillTime`：Bar 流的成交时间（下一根 Bar），属于执行域，
+  实时侧在信号发出时未来 Bar 还不存在，不能从 `signalTime` 推算；
+- `triggerTime`：传输层上游（1m Bar 时间），是 `signalTime` 的来源，不是派生目标。
 
 `signalTime` 是 Bar 标签，`effectiveTime` 才是“内容封存/可执行”的归一化时间。
 `triggerTime` 只存在于传输层，映射后就是 1m 的 `StrategyBar.timestamp`。
@@ -1164,18 +1181,18 @@ effectiveTime = availabilityKey(signalTime, period)
 
 ### 8.6 其他时间分类
 
-| 时间 | 层 | 现状 | 建议 |
-|---|---|---|---|
-| `StrategyBar.timestamp` | Bar 身份 | 不可变 | 保留，固化 |
-| `signalTime` | 信号 | 必须等于 Bar 时间 | 保留 |
-| `pivotTime` | 图表/止损 | 可选 | 保留为可选，或前端改造后删除 |
-| `effectiveTime` | 派生 | 消息/聚合 | 保留派生，不落库 |
-| `triggerTime` | 队列传输 | jobId/同日校验/补偿 | 保留，不进信号域 |
-| `createdAt` | 审计 | 信号表/回测历史/扫描 | 保留 |
-| `updatedAt` | 审计 | 主要是 TypeORM/VO；信号表未展示 | 可从信号/告警 VO 去掉，DB 列可留 |
-| `sentAt` | 投递审计 | 投递服务写入；前端未用 | 保留用于延迟/审计 |
-| `acknowledgedAt` | 人工确认 | 服务/API + 前端 `acknowledge` 按钮（`StrategiesWorkspace`） | 保留；这是产品功能，不是冗余字段 |
-| `entryTime` / `exitTime` / `fillTime` | 回测/执行 | 成交时间 | 保留在执行域 |
+| 时间 | 层 | 来源 | 现状 | 建议 |
+|---|---|---|---|---|
+| `StrategyBar.timestamp` | Bar 身份 | producer 标签 | 不可变 | 保留，固化 |
+| `signalTime` | 信号 | `= StrategyBar.timestamp` | 必须等于 Bar 时间 | 保留 |
+| `pivotTime` | 图表/止损 | 插件 evidence（结构极值） | 可选 | 保留为可选，或前端改造后删除 |
+| `effectiveTime` | 派生 | `availabilityKey(signalTime, period)` | 消息/聚合 | 保留派生，不落库 |
+| `triggerTime` | 队列传输 | 上游 1m Bar 时间 | jobId/同日校验/补偿 | 保留，不进信号域 |
+| `createdAt` | 审计 | 墙钟 | 信号表/回测历史/扫描 | 保留 |
+| `updatedAt` | 审计 | 墙钟 | 主要是 TypeORM/VO；信号表未展示 | 可从信号/告警 VO 去掉，DB 列可留 |
+| `sentAt` | 投递审计 | 墙钟 | 投递服务写入；前端未用 | 保留用于延迟/审计 |
+| `acknowledgedAt` | 人工确认 | 墙钟（人工动作） | 服务/API + 前端 `acknowledge` 按钮（`StrategiesWorkspace`） | 保留；这是产品功能，不是冗余字段 |
+| `entryTime` / `exitTime` / `fillTime` | 回测/执行 | Bar 流（下一根 Bar） | 成交时间 | 保留在执行域 |
 
 结论：其余时间不是“信号语义时间”，而是审计/传输/执行时间；不需要参与消息和聚合。
 真正可删的候选只有 `pivotTime`（若放弃 marker 锚点）和 `updatedAt`（信号 VO 层）。
