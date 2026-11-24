@@ -386,3 +386,55 @@ interface PipelineResult {
 4. **黄金文件回放**：引擎回归以 `(信号序列, 账户快照序列) → 决策序列` 版本化
    fixture 为准（REQ-ISO-04）；回测对账（tasks 4.3）直接消费 golden diff——
    语义变化显式审查，厘级舍入差异归类标注。
+
+## 十二、开源对齐调研（2026-11-24，信号 → 交易 → 出场全链）
+
+调研对象：**NautilusTrader**（Rust/Python，20k+ star）、**QuantConnect LEAN**（C#）、
+**backtrader**（Python）、**freqtrade**（Python）、**vn.py / VeighNa**（Python，国内
+主流）。
+
+### 12.1 各仓库的信号 → 交易 → 出场链条
+
+| 仓库 | 信号 | 裁决/风控 | 仓位 | 撮合/成交 | 出场 |
+|---|---|---|---|---|---|
+| Nautilus | Strategy.on_bar 内生成 | **RiskEngine** 独立预检（字段/余额/限流），ExecEngine 管订单状态机 | 策略内自算 | 端口替换：回测 SimulatedExchange（FillModel/FeeModel/LatencyModel）↔ 实盘 venue adapter，**其余代码完全相同** | 订单/持仓事件回调 on_order_filled；client_order_id 幂等防重复成交 |
+| LEAN | **Alpha 模型产出 Insight** | **Risk Management 模型**调整/否决 PortfolioTarget | **Portfolio Construction 模型**（Insight→目标仓位） | Execution 模型 + Fill/Fee/Slippage/Margin "reality modeling" 插件 | 风控模型输出 risk-adjusted target → Execution；margin call 走保护性清仓 |
+| backtrader | strategy.next() 调 buy/sell | broker checksubmit（资金预检，拒单带 Margin 状态） | **Sizer** 独立组件定 stake | BackBroker：Next-Bar Open 默认撮合（防未来函数，与本项目同款）+ 滑点/成交量 filler | 订单生命周期状态（Submitted→Accepted→Partial→Completed/Rejected/Expired），notify_order 推送；Trade 对象跟踪开平全程 pnl |
+| freqtrade | populate_entry/exit_trend 产信号 | confirm_trade_entry/exit 回调 + protections（配对锁定/回撤锁） | **custom_stake_amount** 回调 | dry-run 与实盘共用同一 bot 逻辑；backtest 全模拟（含费） | **should_exit() 集中出场**：stoploss / ROI / exit 信号 / custom_exit 统一裁决，每笔出场带 **exit_reason** 标签 |
+| vn.py | on_bar/on_tick 策略内计算 | vnpy_riskmanager 前置风控（委托数/撤单数/活动委托上限） | 策略内自算 | **Gateway 适配器**统一 send_order/cancel_order；开平仓语义转换（平今/平昨）下沉 Gateway 层 | OmsEngine 缓存全市场委托/成交/持仓；on_order/on_trade 回报驱动策略状态推进 |
+
+### 12.2 五仓共识（本设计全部吻合）
+
+1. **决策与成交分离**（ports & adapters / reality modeling / gateway）——五仓全部
+   如此，无一例外；本设计的引擎纯函数 + FillSimulator 端口同构。
+2. **风控独立于策略与执行**（Nautilus RiskEngine / LEAN Risk Model / vnpy
+   riskmanager / backtrader checksubmit）——本设计 riskRules 管线同构。
+3. **仓位计算是独立组件**（LEAN Portfolio Construction / backtrader Sizer /
+   freqtrade custom_stake_amount）——本设计 SizingStrategy 同构，且"预算比例"归
+   sizing 而非裁决，与 LEAN 的 Insight→Target 分层一致。
+4. **出场集中化 + 原因标签**（freqtrade should_exit + exit_reason 是最彻底的范本）
+   ——本设计 exitRules + exitReason 同构；freqtrade 证明了"出场裁决只有一处"在
+   生产系统里是可维持的纪律。
+5. **确定性 / 幂等标识**（Nautilus client_order_id 防重复成交 + 双时间戳
+   ts_event/ts_init；vnpy vt_orderid/vt_tradeid 标准化标识）——本设计
+   alert_event_id 幂等锚点 + ID 业务键派生（REQ-ISO-03）同构；Nautilus 的双时间戳
+   与本项目信号层双时间戳契约（signalTime / acknowledgedAt 系）惊人同源。
+6. **非浮点钱**（Nautilus 用 rust_decimal）——本设计整数厘制目标相同、手段更极端
+   （整数无舍入域 vs 高精度十进制），在"厘"粒度下等价且更快。
+
+### 12.3 有意分歧（为什么不照抄）
+
+| 分歧点 | 开源做法 | 本设计选择 | 理由 |
+|---|---|---|---|
+| 域模型风格 | Nautilus 富领域模型（Order/Position 自带行为与状态机） | 值对象 + fold 投影（事件溯源） | 单票单通道规模下 fold 更简单可审计；富模型的状态机维护成本不值 |
+| 引擎内通信 | MessageBus pub/sub（Nautilus / vnpy） | 直接函数调用 | 无跨组件解耦需求；组合级扩展成为现实时再引入总线（记缝位） |
+| 订单生命周期 | Partial / 改单 / 到期（backtrader / LEAN 全套） | 指令即成交（人工假定成交）+ 回测 Next-Bar 全量成交 | 无自动下单、无部分成交场景；生命周期全套是本 change 非目标 |
+| 管线组合度 | LEAN 允许用户自由组合四类模型 | 管线固定在域代码，插件缝只留 GroupOrderingStrategy / SizingStrategy | 本项目策略共享同一套 house style，自由组合=漂移温床 |
+
+### 12.4 调研结论
+
+四项从零基准（11.5）在五个成熟开源仓库中全部找到对应实践——**没有一项是发明**，
+全部是生产验证过的主流模式。本设计相对开源社区的差异化仅在于：A 股微观结构
+（T+1 / 整手 / 一字板 / 印花税单边）与"人按手册下单"的执行模型（人工执行端 =
+Nautilus 语境下的 sandbox context：实时数据 + 模拟成交）。无需因调研修订 11.5
+任何一项；本节作为设计依据存档。
