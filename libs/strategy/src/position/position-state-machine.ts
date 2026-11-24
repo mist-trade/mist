@@ -1,3 +1,14 @@
+/**
+ * 持仓状态机（float 边界接口，整数厘内部算术）。
+ *
+ * 组 1b 移植（REQ-ENGINE-07）：纯记账员定位不变——数量 / 成本 / 已实现盈亏
+ * 记账与平仓股数计算，内部整数厘运算；`onBar` 严禁生成订单。
+ *
+ * rehydrate（REQ-LEDGER-01）：`fromFillEvents` 由 fill 事件流 fold 重建持仓。
+ * ⚠ `onSignal` 为 dev server 手写旁路的遗留入口（全库唯一调用方
+ * tools/strategy-dev/server.ts:969），随组 5 迁移一并删除（任务 5.3）——
+ * 平仓决策权 100% 归交易层规则管线。
+ */
 import { TRADING_RULES } from '@app/constants';
 import type { StrategyBar } from '@app/market-data';
 import type {
@@ -6,6 +17,7 @@ import type {
 } from '../execution/execution.types';
 
 import type { KernelSignal } from '../kernel/kernel.types';
+import { liToYuan, yuanToLi, type Li } from '../trading/money';
 import {
   EXIT_ACTIONS,
   ORDER_SIDES,
@@ -28,12 +40,12 @@ export class PositionStateMachine {
   private readonly securityCode: string;
   private status: PositionStatus = POSITION_STATUSES.EMPTY;
   private holdingQuantity = 0;
-  private costPrice = 0;
+  private costPriceLi: Li = 0n;
   private entryTime?: Date;
   private holdingBars = 0;
-  private currentPrice = 0;
-  private realizedPnl = 0;
-  private accumulatedBuyFees = 0;
+  private currentPriceLi: Li = 0n;
+  private realizedPnlLi: Li = 0n;
+  private accumulatedBuyFeesLi: Li = 0n;
   private readonly exitPolicy?: ExitPolicyPort;
   private readonly exitRatio: number;
   private readonly closedTrades: PositionClosedRecord[] = [];
@@ -56,6 +68,20 @@ export class PositionStateMachine {
     }
   }
 
+  /** 事件流重建（REQ-LEDGER-01）：依序 fold fill 事件。 */
+  static fromFillEvents(
+    securityId: number,
+    securityCode: string,
+    events: readonly OrderFilledEvent[],
+    options?: PositionStateMachineOptions,
+  ): PositionStateMachine {
+    const machine = new PositionStateMachine(securityId, securityCode, options);
+    for (const event of events) {
+      machine.onOrderFilled(event);
+    }
+    return machine;
+  }
+
   onOrderFilled(event: OrderFilledEvent): void {
     if (event.side === ORDER_SIDES.BUY) {
       if (
@@ -68,42 +94,40 @@ export class PositionStateMachine {
       }
       this.status = POSITION_STATUSES.HOLDING;
 
-      const prevCostTotal = this.holdingQuantity * this.costPrice;
+      const prevCostTotalLi = BigInt(this.holdingQuantity) * this.costPriceLi;
+      const turnoverLi = yuanToLi(event.turnover);
       this.holdingQuantity += event.filledQuantity;
-      this.costPrice =
+      this.costPriceLi =
         this.holdingQuantity > 0
-          ? Math.round(
-              ((prevCostTotal + event.turnover) / this.holdingQuantity) * 100,
-            ) / 100
-          : 0;
+          ? (prevCostTotalLi + turnoverLi) / BigInt(this.holdingQuantity)
+          : 0n;
 
-      this.accumulatedBuyFees += event.fees.totalFees;
-      this.currentPrice = event.fillPrice;
+      this.accumulatedBuyFeesLi += yuanToLi(event.fees.totalFees);
+      this.currentPriceLi = yuanToLi(event.fillPrice);
     } else if (event.side === ORDER_SIDES.SELL) {
       if (this.holdingQuantity <= 0) return;
 
       const fillQty = Math.min(this.holdingQuantity, event.filledQuantity);
-      const costBasis = Math.round(fillQty * this.costPrice * 100) / 100;
-      const allocatedBuyFees =
+      const costBasisLi = this.costPriceLi * BigInt(fillQty);
+      const allocatedBuyFeesLi =
         this.holdingQuantity > 0
-          ? Math.round(
-              (fillQty / this.holdingQuantity) * this.accumulatedBuyFees * 100,
-            ) / 100
-          : 0;
-      const netProceeds = event.turnover - event.fees.totalFees;
-      const tradePnl =
-        Math.round((netProceeds - costBasis - allocatedBuyFees) * 100) / 100;
+          ? (this.accumulatedBuyFeesLi * BigInt(fillQty)) /
+            BigInt(this.holdingQuantity)
+          : 0n;
+      const netProceedsLi =
+        yuanToLi(event.turnover) - yuanToLi(event.fees.totalFees);
+      const tradePnlLi = netProceedsLi - costBasisLi - allocatedBuyFeesLi;
 
-      this.realizedPnl = Math.round((this.realizedPnl + tradePnl) * 100) / 100;
-      this.accumulatedBuyFees = Math.max(
-        0,
-        this.accumulatedBuyFees - allocatedBuyFees,
-      );
+      this.realizedPnlLi += tradePnlLi;
+      this.accumulatedBuyFeesLi -= allocatedBuyFeesLi;
+      if (this.accumulatedBuyFeesLi < 0n) this.accumulatedBuyFeesLi = 0n;
 
+      const costBasis = liToYuan(costBasisLi);
       const returnRatio =
         costBasis > 0
           ? Math.round(
-              (tradePnl / costBasis) * POSITION_DECIMAL_PLACES.RATIO_SCALE,
+              (liToYuan(tradePnlLi) / costBasis) *
+                POSITION_DECIMAL_PLACES.RATIO_SCALE,
             ) / POSITION_DECIMAL_PLACES.RATIO_SCALE
           : 0;
 
@@ -113,10 +137,10 @@ export class PositionStateMachine {
         entryTime: this.entryTime ?? event.fillTime,
         exitTime: event.fillTime,
         holdingBars: this.holdingBars,
-        entryPrice: this.costPrice,
+        entryPrice: liToYuan(this.costPriceLi),
         exitPrice: event.fillPrice,
         quantity: fillQty,
-        realizedPnl: tradePnl,
+        realizedPnl: liToYuan(tradePnlLi),
         returnRatio,
         entryReason: this.entryReason ?? 'BUY_SIGNAL',
         exitReason: event.exitReason ?? POSITION_EXIT_REASONS.SIGNAL_EXIT,
@@ -126,8 +150,8 @@ export class PositionStateMachine {
       if (this.holdingQuantity <= 0) {
         this.status = POSITION_STATUSES.CLOSED;
         this.holdingQuantity = 0;
-        this.costPrice = 0;
-        this.accumulatedBuyFees = 0;
+        this.costPriceLi = 0n;
+        this.accumulatedBuyFeesLi = 0n;
         this.entryTime = undefined;
         this.entryReason = undefined;
       }
@@ -159,12 +183,16 @@ export class PositionStateMachine {
     }
 
     this.holdingBars += 1;
-    this.currentPrice = bar.close;
+    this.currentPriceLi = yuanToLi(bar.close);
 
-    // 纯记账员定位：严禁在 onBar 内私自生成平仓订单，平仓决策权 100% 移交上层 ExecutionRiskArbiter
+    // 纯记账员定位：严禁在 onBar 内私自生成平仓订单，平仓决策权 100% 移交上层交易层规则管线
     return null;
   }
 
+  /**
+   * ⚠ 遗留旁路入口（组 5 迁移后随任务 5.3 删除）——dev server 手写流水线专用；
+   * 平仓决策权 100% 归交易层规则管线（TradingEngine）。
+   */
   onSignal(
     signal: KernelSignal,
     options?: { readonly exitRatio?: number },
@@ -187,7 +215,7 @@ export class PositionStateMachine {
       }
     }
 
-    // 主仓核心默认准则：反向卖出信号触发平仓（默认全平，支持配置 exitRatio），不设死板止损以防洗盘割肉
+    // 反向卖出信号触发平仓（默认全平，支持配置 exitRatio）
     if (signal.signalKind === SIGNAL_KINDS.EXIT) {
       return {
         securityId: this.securityId,
@@ -205,9 +233,10 @@ export class PositionStateMachine {
 
   getSnapshot(): PositionSnapshot {
     const marketValue =
-      Math.round(this.holdingQuantity * this.currentPrice * 100) / 100;
+      Math.round(this.holdingQuantity * liToYuan(this.currentPriceLi) * 100) /
+      100;
     const costBasis =
-      Math.round(this.holdingQuantity * this.costPrice * 100) / 100;
+      Math.round(this.holdingQuantity * liToYuan(this.costPriceLi) * 100) / 100;
     const unrealizedPnl =
       this.holdingQuantity > 0
         ? Math.round((marketValue - costBasis) * 100) / 100
@@ -224,14 +253,14 @@ export class PositionStateMachine {
       securityId: this.securityId,
       securityCode: this.securityCode,
       holdingQuantity: this.holdingQuantity,
-      costPrice: this.costPrice,
+      costPrice: liToYuan(this.costPriceLi),
       entryTime: this.entryTime,
       holdingBars: this.holdingBars,
-      currentPrice: this.currentPrice,
+      currentPrice: liToYuan(this.currentPriceLi),
       marketValue,
       unrealizedPnl,
       unrealizedPnlRatio,
-      realizedPnl: this.realizedPnl,
+      realizedPnl: liToYuan(this.realizedPnlLi),
     };
   }
 

@@ -78,6 +78,12 @@ export interface CreateOrderDto {
   readonly stopPrice?: number;
   readonly exitReason?: string;
   readonly entryReason?: string;
+  /**
+   * 业务键派生意图 id（REQ-ISO-03）：交易层指令传 `idempotencyKey`，
+   * broker 依此派生 orderId（`ord-{intentId}`）；缺省时由
+   * (code, side, signalTime, quantity) 复合派生，禁止墙钟/随机。
+   */
+  readonly intentId?: string;
 }
 
 /**

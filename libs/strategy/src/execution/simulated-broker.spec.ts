@@ -271,8 +271,8 @@ describe('SimulatedBroker', () => {
     const fills2 = broker.onBar(normalBar);
     expect(fills2).toHaveLength(1);
     expect(fills2[0].side).toBe('SELL');
-    // 9.20 - 0.1% 滑点 = 9.19
-    expect(fills2[0].fillPrice).toBe(9.19);
+    // 9.20 - 0.1% 滑点 = 9.1908 → 厘级取整 9.191（REQ-ENGINE-07：分→厘，REQ-ISO-04 归类）
+    expect(fills2[0].fillPrice).toBe(9.191);
     expect(broker.getOpenOrders()).toHaveLength(0);
   });
 
@@ -313,8 +313,8 @@ describe('SimulatedBroker', () => {
     );
     const fills = broker.onBar(gapDownBar);
     expect(fills).toHaveLength(1);
-    // 低开跳空按 open 减滑点强平 (9.30 - 0.1% = 9.29)
-    expect(fills[0].fillPrice).toBe(9.29);
+    // 低开跳空按 open 减滑点强平 (9.30 × 0.999 = 9.2907 → 厘级 9.291，原分级 round2 为 9.29)
+    expect(fills[0].fillPrice).toBe(9.291);
   });
 
   it('TC-6: verifies precise fees and stamp duty exemption for ETFs', () => {
@@ -375,8 +375,8 @@ describe('SimulatedBroker', () => {
     expect(fills).toHaveLength(1);
     // 10.0 * (1 + 0.002) = 10.02 (滑点 0.2%)
     expect(fills[0].fillPrice).toBe(10.02);
-    // 佣金 10020 * 0.0002 = 2.004 -> 2.00 (免五)
-    expect(fills[0].fees.commission).toBe(2.0);
+    // 佣金 10020 * 0.0002 = 2.004（厘级精确，免五；原分级 round2 为 2.00）(REQ-ENGINE-07)
+    expect(fills[0].fees.commission).toBe(2.004);
   });
 
   it('TC-8: recognizes ST stock 5% price limits when registered via registerSecurity', () => {

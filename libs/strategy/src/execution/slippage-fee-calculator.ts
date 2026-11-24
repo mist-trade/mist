@@ -1,10 +1,15 @@
+/**
+ * 双向滑点计算与 A 股精确规费计算（float 边界接口，整数厘内部算术）。
+ *
+ * 组 1b 移植（REQ-ENGINE-07）：费率语义零改动，算术迁移至 trading/fees.ts
+ * 的整数厘实现——佣金 / 过户费 / 印花税 / ETF 免征 / 双向滑点。
+ * 旧路径按「分」取整、本路径按「厘」取整：差异属厘级舍入，由黄金回放
+ * diff 归类标注（REQ-ISO-04）。
+ */
 import { isEtfSecurity } from '@app/market-data';
 import { EXECUTION_RULES, ORDER_SIDES } from '../strategy.constants';
 import type { BrokerFeeConfig, FeeDetails, OrderSide } from './execution.types';
-
-function round2(value: number): number {
-  return Math.round(value * 100) / 100;
-}
+import { applyRatioLi, liToYuan, yuanToLi } from '../trading/money';
 
 /**
  * 双向滑点计算
@@ -15,11 +20,12 @@ export function applySlippage(
   side: OrderSide,
   slippageRatio: number = EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO,
 ): number {
-  const adjusted =
+  const priceLi = yuanToLi(price);
+  const adjustedLi =
     side === ORDER_SIDES.BUY
-      ? price * (1 + slippageRatio)
-      : price * (1 - slippageRatio);
-  return round2(adjusted);
+      ? priceLi + applyRatioLi(priceLi, slippageRatio)
+      : priceLi - applyRatioLi(priceLi, slippageRatio);
+  return liToYuan(adjustedLi);
 }
 
 /**
@@ -36,7 +42,8 @@ export function calculateExecutionFees(
   slippageRatio: number = EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO,
   feeConfig?: BrokerFeeConfig,
 ): FeeDetails {
-  const turnover = fillPrice * quantity;
+  const fillPriceLi = yuanToLi(fillPrice);
+  const turnoverLi = fillPriceLi * BigInt(quantity);
   const commissionRate =
     feeConfig?.commissionRate ?? EXECUTION_RULES.DEFAULT_COMMISSION_RATE;
   const minCommission =
@@ -46,22 +53,27 @@ export function calculateExecutionFees(
   const stampDutyRate =
     feeConfig?.stampDutyRate ?? EXECUTION_RULES.STAMP_DUTY_RATE;
 
-  const rawCommission = turnover * commissionRate;
-  const commission = round2(
-    minCommission > 0 ? Math.max(minCommission, rawCommission) : rawCommission,
-  );
-  const transferFee = round2(turnover * transferFeeRate);
+  const rawCommissionLi = applyRatioLi(turnoverLi, commissionRate);
+  const minCommissionLi = BigInt(Math.round(minCommission * 1000));
+  const commissionLi =
+    minCommission > 0
+      ? rawCommissionLi > minCommissionLi
+        ? rawCommissionLi
+        : minCommissionLi
+      : rawCommissionLi;
+  const transferFeeLi = applyRatioLi(turnoverLi, transferFeeRate);
   const isEtf = isEtfSecurity(securityCode);
-  const stampDuty =
-    side === ORDER_SIDES.SELL && !isEtf ? round2(turnover * stampDutyRate) : 0;
-  const slippageCost = round2(turnover * slippageRatio);
-  const totalFees = round2(commission + transferFee + stampDuty);
+  const stampDutyLi =
+    side === ORDER_SIDES.SELL && !isEtf
+      ? applyRatioLi(turnoverLi, stampDutyRate)
+      : 0n;
+  const slippageCostLi = applyRatioLi(turnoverLi, slippageRatio);
 
   return {
-    commission,
-    transferFee,
-    stampDuty,
-    slippageCost,
-    totalFees,
+    commission: liToYuan(commissionLi),
+    transferFee: liToYuan(transferFeeLi),
+    stampDuty: liToYuan(stampDutyLi),
+    slippageCost: liToYuan(slippageCostLi),
+    totalFees: liToYuan(commissionLi + transferFeeLi + stampDutyLi),
   };
 }
