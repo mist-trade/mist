@@ -1040,10 +1040,10 @@ KernelSignal（每个 definition 每根 Bar 一条，带 decisionTrace.trace）
 | 项 | 现状 |
 |---|---|
 | `StrategyBar.timestamp` | 1m 左标；5/15/30/60m 右标；1440 = 00:00(D) |
-| `signalTime` | 确认 Bar 标签；每条信号一个 |
+| `signalTime` | `StrategyBar.timestamp` 逐字复制；不做可用时刻偏移；每条信号一个 |
 | `pivotTime` | 形态几何极值；图表 marker / 止损参考 |
 | `effectiveTime` | `availabilityKey(signalTime, period)` 派生，不落库；消息/聚合用 |
-| `triggerTime` | 只在 `CandleFinalizedTriggerV1` 传输契约，信号域不存 |
+| `triggerTime` | 只在 `CandleFinalizedTriggerV1` 传输契约；`toStrategyTrigger` 把它映射为 1m `StrategyBar.timestamp`，不是第三个时间 |
 | `createdAt` / `updatedAt` / `sentAt` / `acknowledgedAt` | 运营/审计时间，不参与信号语义 |
 | 回测 `entryTime` / `exitTime` / `fillTime` | 成交时间，留在回测/执行域 |
 
@@ -1131,8 +1131,22 @@ O(n) 映射，相对于 Chan/Pa 的几何计算可以忽略。能优化的是“
 | 字段 | 消费方 | 结论 |
 |---|---|---|
 | `signalTime` | DB 索引/排序/游标、`effectiveTime` 派生、broker 因果检查、通知、去重键、图表/回放 | **必须保留**；它是 Bar 标签，不是可推导的冗余 |
-| `pivotTime` | `decision-pivot-evidence` 提取、持久化/API、前端 marker 锚点（无则回退 `signalTime`）、`pivotPrice` 止损参考 | **可选保留**；它是图表/止损的结构锚点，不是“第二个信号时间” |
+| `pivotTime` | Chan + 私有战术插件（`bull/bear-left-right-bsp`、`compass-grinding-bottom`、`fibonacci-confluence` 等）的 evidence；`decision-pivot-evidence` 提取、持久化/API、前端 marker 锚点（无则回退 `signalTime`）、`pivotPrice` 止损参考 | **可选保留**；它不是 Chan 专属，也不是“第二个信号时间” |
 | `effectiveTime` | 消息、聚合、VO | 派生，不落库；保留 |
+
+**`signalTime` 与 `effectiveTime` 的规则：**
+
+```text
+signalTime    = StrategyBar.timestamp（逐字复制，不做偏移）
+effectiveTime = availabilityKey(signalTime, period)
+  1m:                     +1m
+  5/15/30/60m 常规窗:      同 signalTime
+  11:30 / 15:00 终端桶:    +1m
+  1440:                   15:01(D)
+```
+
+`signalTime` 是 Bar 标签，`effectiveTime` 才是“内容封存/可执行”的归一化时间。
+`triggerTime` 只存在于传输层，映射后就是 1m 的 `StrategyBar.timestamp`。
 
 建议把“两条语义时间”改成“**一条信号时间 + 一个可选结构锚点**”：
 
@@ -1155,12 +1169,12 @@ O(n) 映射，相对于 Chan/Pa 的几何计算可以忽略。能优化的是“
 | `createdAt` | 审计 | 信号表/回测历史/扫描 | 保留 |
 | `updatedAt` | 审计 | 主要是 TypeORM/VO；信号表未展示 | 可从信号/告警 VO 去掉，DB 列可留 |
 | `sentAt` | 投递审计 | 投递服务写入；前端未用 | 保留用于延迟/审计 |
-| `acknowledgedAt` | 人工确认 | 服务/API 类型；前端未用 | 若手动确认不是产品功能，可像 `cooldownUntil` 一样删除 |
+| `acknowledgedAt` | 人工确认 | 服务/API + 前端 `acknowledge` 按钮（`StrategiesWorkspace`） | 保留；这是产品功能，不是冗余字段 |
 | `entryTime` / `exitTime` / `fillTime` | 回测/执行 | 成交时间 | 保留在执行域 |
 
 结论：其余时间不是“信号语义时间”，而是审计/传输/执行时间；不需要参与消息和聚合。
-真正可删的候选只有 `pivotTime`（若放弃 marker 锚点）、`updatedAt`（VO 层）、
-`acknowledgedAt`（若不做人工确认）。
+真正可删的候选只有 `pivotTime`（若放弃 marker 锚点）和 `updatedAt`（信号 VO 层）。
+`acknowledgedAt` 已被前端确认按钮使用，不能删。
 
 ---
 
