@@ -1179,6 +1179,23 @@ effectiveTime           = availabilityKey(signalTime, period)
 如果确认不需要“marker 锚在形态极值”，可以删除 `pivotTime` 及前端锚点逻辑，marker 统一用
 `signalTime`；`pivotPrice` 仍可保留作止损参考。
 
+**`pivotTime` 的用途（2026-11-24 补充）**：
+
+它回答“这个买卖点指的是哪一个结构位置”：
+
+- `signalTime` / `triggerPrice` = **确认位置**（右侧确认 Bar 的时间与收盘价）；
+- `pivotTime` / `pivotPrice` = **结构位置**（买卖点指向的极值点的时间与价格）。
+
+唯一活消费方是前端图表 marker 锚点（+ 持久化/API 供前端取数）；消息和聚合不用。
+
+生产方现状：
+
+- Chan BSP：`pivotTime` = 买卖点事件的**结构 Bar**（分型/笔端点），通常早于确认 Bar，
+  这是它唯一有信息量的场景；
+- 私有插件（`compass-grinding-bottom` / `bull-left-right-bsp` / `bear-left-right-bsp`）：
+  `pivotTime` = 当前确认 Bar，与 `signalTime` 相同，属于冗余复制；
+- `pivotPrice` 是止损参考，必须保留，与 `pivotTime` 去留无关。
+
 ### 8.6 其他时间分类
 
 | 时间 | 层 | 来源 | 现状 | 建议 |
