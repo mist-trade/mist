@@ -1148,6 +1148,11 @@ effectiveTime = availabilityKey(signalTime, period)
 `signalTime` 是 Bar 标签，`effectiveTime` 才是“内容封存/可执行”的归一化时间。
 `triggerTime` 只存在于传输层，映射后就是 1m 的 `StrategyBar.timestamp`。
 
+> **命名说明（2026-11-24）**：`signalTime` 不是重复字段，而是信号契约里的“决策时刻”语义名；
+> 它与 `StrategyBar.timestamp` 同值，但分属“行情事实层”和“信号输出层”。不要为了少一个名字
+> 把 `signalTime` 改成 `timestamp`：这会改 DB 列（`signal_time`）、API 字段和前端，
+> 且丢掉“哪根 Bar 确认了信号”的语义。真正冗余的 `triggerTime`（信号域）已经删除。
+
 建议把“两条语义时间”改成“**一条信号时间 + 一个可选结构锚点**”：
 
 - `signalTime` required；
