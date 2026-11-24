@@ -12,7 +12,6 @@ export class StrategyAlertEventVo {
   dedupeKey!: string;
   deliveryResult?: Record<string, unknown> | null;
   createdAt!: Date;
-  updatedAt!: Date;
 
   static fromEntity(entity: StrategyAlertEvent): StrategyAlertEventVo {
     const vo = new StrategyAlertEventVo();
@@ -22,7 +21,6 @@ export class StrategyAlertEventVo {
     vo.dedupeKey = entity.dedupeKey;
     vo.deliveryResult = entity.deliveryResult ?? null;
     vo.createdAt = entity.createdAt;
-    vo.updatedAt = entity.updatedAt;
     return vo;
   }
 }

@@ -1280,6 +1280,20 @@ effectiveTime           = availabilityKey(signalTime, period)
    `tools/strategy-dev`；记录落 `backtest_trade_results`，`fillTime` 只在内存
    事件流中存在。以上两条已固化进 `AGENTS.md` 双时间戳契约。
 
+#### 8.6.3 收口（2026-11-24）
+
+- `updatedAt` 已从 `StrategyAlertEventVo` 与前端 `StrategyAlertEvent` 类型移除；
+  DB `updated_at` 列（TypeORM `@UpdateDateColumn`）保留。
+- `pivotTime <= signalTime` 不变量已落 CI：`strategy-dual-timestamp.guard.spec.ts`
+  新增第 3 组守卫——通过自定义 `registry` 注入被 spy 的 `ChanBspFactorPlugin`，
+  走真实的决策流求值 → pivot 证据提取 → KernelSignal 装配路径（kernel:528），
+  bi/duan 双变体，带**非空门禁**（零信号或 pivot 全 null 都会失败）。
+- **遗留（后续再说）**：前端图表图层名 `tactical_events` 名不副实，出现在
+  `mist-fe/app/backtests/BacktestWorkspace.tsx:88,106` 与
+  `mist-fe/app/backtests/utils/backtest-signal-visual.util.ts:50`（向 `apps/mist`
+  传 `layer=tactical_events`，后端不解析该参数，无功能依赖）。等图表层重新设计时
+  一并改为 `backtest_signals` 或 `raw_signals`。
+
 ---
 
 ## 九、待确认（剩余）

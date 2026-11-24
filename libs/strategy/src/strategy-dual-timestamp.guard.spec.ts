@@ -3,6 +3,7 @@ import { contextSeriesKey } from './kernel/availability';
 import type { KernelConfig } from './kernel/kernel.types';
 import { createChanBspDecisionFlow } from './simulation/standard-simulation-flows';
 import { ChanBspFactorPlugin } from './factor/plugins/chan-bsp.plugin';
+import { InMemoryFactorPluginRegistry } from './factor/factor-plugin-registry';
 import type { StrategyBar } from '@app/market-data';
 import { normalizeExternalDecimalText } from '../../decimal/src/decimal8';
 
@@ -235,6 +236,83 @@ describe('Strategy Dual-Timestamp & Frontier Parity Boundary Guard (架构红线
       for (const cand of candidates) {
         expect(cand.eventType.endsWith('_buy')).toBe(true);
         expect(cand.eventType.endsWith('_sell')).toBe(false);
+      }
+    });
+  });
+
+  describe('3. pivotTime 不变量 (Pivot Invariant, 2026-11-24)', () => {
+    // 通过自定义 registry 注入被 spy 的 ChanBspFactorPlugin，走真实的
+    // 决策流求值 → pivot 证据提取 → KernelSignal 装配路径（kernel:528），
+    // 保证断言覆盖的是生产装配边界而非 mock 捷径。
+    it('KernelSignal 装配边界必须满足 pivotTime <= signalTime：结构极值在过去的场景（bi/duan）', async () => {
+      const startTime = new Date('2025-10-01T09:30:00.000Z');
+      const bars = Array.from({ length: 20 }, (_, i) =>
+        makeStrategyBar(new Date(startTime.getTime() + i * 30 * 60000)),
+      );
+      const pivotTime = bars[5].timestamp; // 结构极值在过去
+
+      for (const units of ['bi', 'duan'] as const) {
+        const plugin = new ChanBspFactorPlugin();
+        const spy = jest.spyOn(plugin as any, 'detectEvents').mockReturnValue([
+          {
+            type: 'third_buy' as const,
+            units,
+            time: pivotTime,
+            price: 10.5,
+            zhongshuIndex: 0,
+            zg: 11,
+            zd: 10,
+            unitIndex: 4,
+          },
+        ]);
+        const registry = new InMemoryFactorPluginRegistry();
+        registry.register(plugin);
+        const config: KernelConfig = {
+          securityId: 1,
+          securityCode: '000001',
+          publicFrom: bars[0].timestamp,
+          registry,
+          plans: [
+            {
+              definitionId: 1,
+              versionId: 1,
+              flow: createChanBspDecisionFlow({
+                units,
+                direction: 'both',
+                requiredBarCount: 10,
+              }),
+              ruleSnapshot: Object.freeze({}),
+              period: 30,
+              requiredBarCount: 10,
+              contextRequirements: {},
+            },
+          ],
+        };
+        const kernel = new StrategyEvaluationKernel(config);
+
+        const emitted: { signalTime: Date; pivotTime: string | null }[] = [];
+        for (const bar of bars) {
+          for (const signal of await kernel.push(bar)) {
+            emitted.push({
+              signalTime: signal.signalTime,
+              pivotTime: signal.pivotTime,
+            });
+          }
+        }
+
+        // 非空门禁：严禁因零信号而使断言空转通过。
+        expect(emitted.length).toBeGreaterThan(0);
+        // 证据确实流经了装配边界（防止 pivot 为 null 的空转通过）。
+        expect(emitted.some((s) => s.pivotTime !== null)).toBe(true);
+
+        for (const signal of emitted) {
+          if (signal.pivotTime !== null) {
+            expect(new Date(signal.pivotTime).getTime()).toBeLessThanOrEqual(
+              signal.signalTime.getTime(),
+            );
+          }
+        }
+        expect(spy).toHaveBeenCalled();
       }
     });
   });
