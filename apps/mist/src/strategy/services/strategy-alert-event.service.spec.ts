@@ -11,7 +11,6 @@ describe('StrategyAlertEventService', () => {
         status: StrategyAlertStatus.PENDING,
         dedupeKey: 'dedupe-1',
         deliveryResult: null,
-        acknowledgedAt: null,
       },
     ];
     const repository = {
@@ -37,7 +36,6 @@ describe('StrategyAlertEventService', () => {
       id: 1,
       status: StrategyAlertStatus.DELIVERED,
       deliveryResult: { channel: 'astrbot', messageId: 'msg-1' },
-      acknowledgedAt: null,
     });
     // save receives the modified entity; the public result is the VO view.
     expect(repository.save).toHaveBeenCalledWith(
@@ -58,23 +56,6 @@ describe('StrategyAlertEventService', () => {
       id: 1,
       status: StrategyAlertStatus.FAILED,
       deliveryResult: { channel: 'astrbot', error: 'bot unavailable' },
-      acknowledgedAt: null,
-    });
-  });
-
-  it('keeps acknowledgement separate from delivery result metadata', async () => {
-    const { service } = createHarness();
-
-    await service.markDelivered(1, {
-      deliveryResult: { channel: 'astrbot', messageId: 'msg-1' },
-    });
-    const acknowledged = await service.acknowledge(1);
-
-    expect(acknowledged.status).toBe(StrategyAlertStatus.ACKED);
-    expect(acknowledged.acknowledgedAt).toBeInstanceOf(Date);
-    expect(acknowledged.deliveryResult).toEqual({
-      channel: 'astrbot',
-      messageId: 'msg-1',
     });
   });
 

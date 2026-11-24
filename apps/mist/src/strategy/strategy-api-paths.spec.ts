@@ -85,11 +85,6 @@ describe('Strategy API path registry', () => {
 
     expectRoute(routes, RequestMethod.GET, '/v1/strategy-signals');
     expectRoute(routes, RequestMethod.GET, '/v1/strategy-alert-events');
-    expectRoute(
-      routes,
-      RequestMethod.POST,
-      '/v1/strategy-alert-events/:id/ack',
-    );
     expectRoute(routes, RequestMethod.POST, '/v1/strategy-backtests');
     expectRoute(routes, RequestMethod.GET, '/v1/strategy-backtests');
     expectRoute(routes, RequestMethod.GET, '/v1/strategy-backtests/:runId');

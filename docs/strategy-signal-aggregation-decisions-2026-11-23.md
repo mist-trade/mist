@@ -97,11 +97,10 @@ apps/mist 封存 1m candle
 
 ## 三、聚合方案（只发消息）
 
-### 3.1 聚合键
+### 3.1 聚合分组
 
-```text
-aggregateKey = securityId + availabilityKey(signalTime, period)
-```
+分组规则：`securityId + availabilityKey(signalTime, period)`，投递时现算，**不引入命名键、
+不落库、不加列**。
 
 不按方向分组，这样一个时间片里的买入和卖出可以放进同一条消息。
 
@@ -127,9 +126,9 @@ aggregateKey = securityId + availabilityKey(signalTime, period)
 
 1. `apps/signal` 写 `StrategySignal` + `StrategyAlertEvent`（每个候选一条）。
 2. `deliver.fanout` 看到可聚合的 alert 后，投一个延迟 3 秒的 `deliver.aggregate` job，
-   jobId 用 `aggregate:<aggregateKey>` 去重。
+   jobId 用分组规则字符串去重。
 3. `deliver.aggregate`：
-   - 取同一 `aggregateKey` 下所有 PENDING 的 AlertEvent
+   - 取同一分组（`securityId` + 可用时刻）下所有 PENDING 的 AlertEvent
    - 一次 `IN` 查询关联 `strategy_signals`，读 `decisionTrace.trace`
    - 合成一条飞书消息
    - 成功后把这批子事件标记 SENT，写同一个 providerMessageId
@@ -377,7 +376,6 @@ StrategyAlertDelivery.sentAt - availabilityKey(signalTime, period)
 | `effectiveTime` | `availabilityKey(signalTime, period)` | 聚合分组、消息展示 | 1m = 标签+1m；30m = 右标；日线 = 15:01 |
 | `StrategySignalVo.effectiveTime` | `availabilityKey(signal.signalTime, signal.period)` | 实时 API 展示 | 服务端计算，不新增 DB 列 |
 | `BacktestSignalResultVo.effectiveTime` | `availabilityKey(result.signalTime, result.period)` | 回测 API/报告/导出 | 服务端计算，不新增 DB 列 |
-| `aggregateKey` | `securityId + effectiveTime` | 多策略分组 | 不落库，或用一列索引 |
 | `triggerTime`（信号域） | `signalTime.toISOString()` | 序列化/兼容 | 只在边界临时生成，不存字段 |
 | `orderKey` | 同 `availabilityKey` | 数据归并排序 | 统一叫 `availabilityKey`，不再引入别名 |
 | 消息里的“信号时间” | `effectiveTime` | 飞书展示 | 不再直接展示 Bar 标签 |
@@ -441,7 +439,7 @@ bar.timestamp（Bar 标签）
 | 实时飞书消息 | `apps/notification/src/delivery/notification-envelope.ts:56` | 用 `effectiveTime` 替代直接展示 `signalTime` |
 | 回测信号 API | `apps/mist/src/strategy/services/backtest-run-query.service.ts:281` `mapResult` | `availabilityKey(result.signalTime, result.period)` |
 | 回测报告/前端展示 | 复用同一 VO 映射 | 必须带 `effectiveTime` |
-| 多策略聚合 | `aggregateKey = securityId + effectiveTime` | 不落库，或用一列索引 |
+| 多策略聚合 | 按 `securityId + effectiveTime` 现算分组 | 不引入命名键，不落库 |
 | 图表 marker | `signalTime` + `pivotTime` | 不用 `effectiveTime` 作为几何定位时间 |
 
 > 回测不新增 DB 列：`BacktestSignalResult` 已有 `period` 和 `signalTime`，在查询/展示时计算即可（如有导出，复用同一映射）。
@@ -699,7 +697,6 @@ eventKey = sha1([
 | `tactical_kind` | `enum('ENTRY','EXIT','RISK_CUT') NULL` | 事件动作类型 |
 | `badge_text` | `varchar(128) NULL` | 合成 badge（如“缠论多头+放量确认”） |
 | `contributors` | `json NULL` | 触发/确认/加成快照 |
-| `aggregate_key` | `varchar(128) NULL`，普通索引 | 通知聚合分组 |
 
 `strategySignalId` 保留，指向**确认信号**（单点事件指向触发信号），用于关联原始信号行。
 
@@ -774,10 +771,10 @@ eventKey = sha1([
 
 #### 6.8.5 聚合：从“信号聚合”改为“事件聚合”
 
-`aggregateKey = securityId + effectiveTime(event.timestamp, period)` 不变，但聚合对象改为
+按 `securityId + effectiveTime(event.timestamp, period)` 现算分组，但聚合对象改为
 `StrategyAlertEvent`：
 
-- 同一 `aggregateKey` 下可能有多条事件（不同 definition / 不同 trigger）；
+- 同一分组下可能有多条事件（不同 definition / 不同 trigger）；
 - 每条事件保留自己的 `tactical_event_key`，聚合消息按它去重；
 - 合并的是 contributors，不是信号行；
 - 同一时间片买入/卖出同时存在时，仍按“一条消息两段、卖出在前、不净额”。
@@ -807,8 +804,7 @@ push 粒度隐式实现。
 
 #### 6.8.7 迁移与兼容
 
-1. Migration 036：加 `tactical_event_key` / `tactical_kind` / `badge_text` /
-   `contributors` / `aggregate_key` 与索引。
+1. Migration：加 `tactical_event_key` / `tactical_kind` / `badge_text` / `contributors` 与索引。
 2. 历史 AlertEvent 不回填（无法从单信号反推事件），新列保持 `NULL`。
 3. 消息侧：`contributors` 为 `NULL` → 走现有单信号格式；非空 → 走多 contributor 格式。
 4. `dedupe_key` 保留，新写入为 `live-v2:<eventKey>`；旧行不动。
@@ -1149,7 +1145,6 @@ effectiveTime           = availabilityKey(signalTime, period)
 实时/回测/策略系统里的所有“信号时间”都必须由 `KernelSignal.signalTime` 派生：
 
 - `effectiveTime = availabilityKey(signalTime, period)`；
-- `aggregateKey = securityId + effectiveTime`；
 - 消息展示时间 = `effectiveTime`；
 - 去重键、回测游标 = 包含 `signalTime.getTime()`；
 - 图表 marker = `signalTime`（+ 可选 `pivotTime` 结构锚点）。
@@ -1241,15 +1236,40 @@ effectiveTime           = availabilityKey(signalTime, period)
 | 字段 | 代码现状 | 结论 |
 |---|---|---|
 | `effectiveTime` | 函数 `availabilityKey`（`libs/strategy/src/kernel/availability.ts:27`），唯一实现；三个消费边界（内核 hydration 门禁 `realtime-kernel-pool.ts:318,351`、消息 `notification-envelope.ts:56`、VO `strategy-signal.vo.ts:51`）都调它 | 保留；已是单一来源，删 VO 字段会让前端复刻周期规则 |
-| `aggregateKey` | **代码零引用**，只存在于 3.3/7.1 设计 | 实施聚合时投递时现算（`securityId + effectiveTime`），不落库、不加列 |
 | 派生 key 全景 | 只有 `effectiveTime`（函数）、`candleFinalizedJobId`（含 `Date.parse(triggerTime)`）、`dedupeKey`（含 `signalTime.getTime()`） | 幂等键是去重契约，不统一掉；不需要新 key |
 | `createdAt` / `updatedAt` | TypeORM 自动列；signal VO 只暴露 `createdAt`，alert VO 多暴露了 `updatedAt` | `updatedAt` 可从 alert VO 去，DB 列留 |
 | `sentAt` | 仅 `strategy_alert_deliveries` 表，投递成功时写一次（`alert-channel-delivery.service.ts:129`） | 保留（投递延迟审计，成本为零） |
-| `acknowledgedAt` | **产品功能**：前端 `StrategiesWorkspace.tsx:213-216,574` 确认按钮 → `acknowledgeStrategyAlertEvent` → `strategy-alert-event.service.ts:74` | 是否删除=是否保留"人工确认告警"功能，待用户拍板 |
+| `acknowledgedAt` | ~~产品功能~~ | ✅ 已于 2026-11-24 整条链路删除（见 8.6.2） |
 | `fillTime` | `OrderFilledEvent.fillTime`（`execution.types.ts:47`），仅执行域内部，不落库不进 VO | 不重复；broker 事件时刻 |
 | `entryTime` / `exitTime` | `position-state-machine.ts:65,114` 从 fillTime 按角色派生，落 `backtest_trade_results`（entryTime 有索引） | 不重复；一笔交易两次成交各归其位 |
 | `triggerTime` | 队列契约 1m Bar 时间（`candle-finalized-trigger.contract.ts:21`）；processor 用它做交易日校验/游标去重/jobId/启动补偿 | 不是 signalTime：1m 时两者相等，30m 时 signalTime 是聚合右标、晚最多 29 分钟；它是 signalTime 的上游原料，传输层已是最小存在 |
 | collector `triggerTime` | `data-collection.strategy.interface.ts:50`，采集触发墙钟（默认北京现在） | **与 candle_finalized triggerTime 同名不同义**，可选改名 `collectAt` 消除混淆 |
+
+#### 8.6.2 第三轮处置（2026-11-24，已执行）
+
+1. **`effectiveTime` 命名定调**：它的准确语义是**信号可执行时刻**——“这根 Bar 的内容
+   已封存、可以据此行动的最早时刻”。名字保留 `effectiveTime` 不改（实现是
+   `availabilityKey` 函数，单一来源）。
+2. **`aggregateKey` 术语废弃**：文档与设计里不再出现该名字；聚合分组按
+   `securityId + effectiveTime` 投递时现算，不引入命名键、不落库、不加列。
+3. **人工确认告警整条链路删除**：`ACKED` 状态、`acknowledged_at` 列、`POST :id/ack`
+   端点、`acknowledge` 服务方法、VO 字段、前端确认按钮与 API client、相关测试全部移除。
+   理由：告警主要经飞书消费，Web 端无法确认；告警状态收敛为
+   `pending / delivered / failed`。migration 036（drop column + enum 收敛）。
+   `AGENTS.md` 双时间戳契约同步更新。
+4. **collector `triggerTime` → `collectAt`**：采集域参数改名，消除与
+   `candle_finalized` triggerTime 的同名混淆；范围 = 接口 + tdx/east-money/qmt 三实现
+   + east-money spec，共 26 处；无外部调用方传参，纯重命名。
+5. **`entryTime` / `exitTime` / `fillTime` 定性**：不属于信号层（正确）。它们是
+   **执行域事实**：fillTime = broker 成交事件时刻（不落库不外泄），
+   entry/exit = 持仓机从 fillTime 按角色派生的交易记录（`backtest_trade_results`）。
+   **不能**用 `signalTime`/`effectiveTime` 替代：成交发生在 Next-Bar（受停牌、节假日
+   影响，不可由 signalTime 推算），且信号可能不成交。三层各司其职，已是最小存在。
+6. **`triggerTime` 定性确认**：理解正确——它永远是 1m Bar 时间，而 1m 是左标
+   （producer 用 `bucketStartMs`），所以 triggerTime 全是左标；且只存在于触发管道
+   （producer → BullMQ → processor → `StrategyTrigger.timestamp`），不落库、不进
+   VO，不会外泄到信号域。30m 策略的 signalTime 是聚合右标，比 triggerTime 晚最多
+   29 分钟。
 
 ---
 

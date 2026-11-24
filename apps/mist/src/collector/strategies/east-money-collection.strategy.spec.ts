@@ -119,12 +119,12 @@ describe('EastMoneyCollectionStrategy', () => {
 
     it('should calculate boundary and collect for minute period', async () => {
       const security = createMockSecurity('000001.SH');
-      const triggerTime = new Date('2026-03-30T09:36:00+08:00');
+      const collectAt = new Date('2026-03-30T09:36:00+08:00');
 
       await strategy.collectScheduledCandle(
         security,
         Period.FIVE_MIN,
-        triggerTime,
+        collectAt,
       );
 
       expect(mockCollectorService.collectKForSource).toHaveBeenCalledWith(
@@ -144,20 +144,20 @@ describe('EastMoneyCollectionStrategy', () => {
       );
     });
 
-    it('should skip when triggerTime is outside trading session', async () => {
+    it('should skip when collectAt is outside trading session', async () => {
       const security = createMockSecurity('000001.SH');
-      const triggerTime = new Date('2026-03-30T12:31:00+08:00'); // lunch break
+      const collectAt = new Date('2026-03-30T12:31:00+08:00'); // lunch break
 
       await strategy.collectScheduledCandle(
         security,
         Period.FIVE_MIN,
-        triggerTime,
+        collectAt,
       );
 
       expect(mockCollectorService.collectKForSource).not.toHaveBeenCalled();
     });
 
-    it('should use current time when triggerTime not provided', async () => {
+    it('should use current time when collectAt not provided', async () => {
       const security = createMockSecurity('000001.SH');
       // Pin "current" time to a trading-session moment so the boundary resolves
       // deterministically (rather than depending on wall-clock at run time).
@@ -199,8 +199,8 @@ describe('EastMoneyCollectionStrategy', () => {
 
       mockSecurityRepository.find.mockResolvedValue(securities);
 
-      const triggerTime = new Date('2026-03-30T09:36:00+08:00');
-      await strategy.collectForAllSecurities(Period.FIVE_MIN, triggerTime);
+      const collectAt = new Date('2026-03-30T09:36:00+08:00');
+      await strategy.collectForAllSecurities(Period.FIVE_MIN, collectAt);
 
       expect(mockSecurityRepository.find).toHaveBeenCalledWith({
         where: { status: SecurityStatus.ACTIVE },
@@ -228,8 +228,8 @@ describe('EastMoneyCollectionStrategy', () => {
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce(undefined);
 
-      const triggerTime = new Date('2026-03-30T09:36:00+08:00');
-      await strategy.collectForAllSecurities(Period.FIVE_MIN, triggerTime);
+      const collectAt = new Date('2026-03-30T09:36:00+08:00');
+      await strategy.collectForAllSecurities(Period.FIVE_MIN, collectAt);
 
       expect(mockCollectorService.collectKForSource).toHaveBeenCalledTimes(2);
       expect(loggerErrorSpy).toHaveBeenCalledTimes(1);

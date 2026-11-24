@@ -69,7 +69,6 @@ export class LiveStrategyPersistenceService {
           status: StrategyAlertStatus.PENDING,
           dedupeKey: liveStrategyAlertDedupeKey(candidate),
           deliveryResult: null,
-          acknowledgedAt: null,
         });
         const savedAlert = await manager.save(StrategyAlertEvent, alert);
         alertEventId = savedAlert.id;

@@ -37,9 +37,6 @@ export class StrategyAlertEvent {
   @Column({ name: 'delivery_result', type: 'json', nullable: true })
   deliveryResult?: Record<string, unknown> | null;
 
-  @Column({ name: 'acknowledged_at', type: 'datetime', nullable: true })
-  acknowledgedAt?: Date | null;
-
   @CreateDateColumn({ name: 'created_at' })
   createdAt!: Date;
 

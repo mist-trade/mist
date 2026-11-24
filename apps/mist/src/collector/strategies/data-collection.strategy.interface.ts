@@ -47,12 +47,12 @@ export interface IDataCollectionStrategy {
    *
    * @param security - Security entity
    * @param period - K-line period
-   * @param triggerTime - The time when the collection is triggered (defaults to now)
+   * @param collectAt - The time when the collection is triggered (defaults to now)
    */
   collectScheduledCandle?(
     security: Security,
     period: Period,
-    triggerTime?: Date,
+    collectAt?: Date,
   ): Promise<void>;
 
   /**
@@ -60,9 +60,9 @@ export interface IDataCollectionStrategy {
    * Only available for polling strategies.
    *
    * @param period - K-line period
-   * @param triggerTime - The time when the collection is triggered (defaults to now)
+   * @param collectAt - The time when the collection is triggered (defaults to now)
    */
-  collectForAllSecurities?(period: Period, triggerTime?: Date): Promise<void>;
+  collectForAllSecurities?(period: Period, collectAt?: Date): Promise<void>;
 
   /**
    * Start the strategy (for streaming mode).

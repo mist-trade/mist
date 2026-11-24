@@ -42,10 +42,4 @@ export class StrategyAlertEventController {
   ): Promise<StrategyAlertEventVo> {
     return await this.strategyAlertEventService.markFailed(Number(id), dto);
   }
-
-  @Post(':id/ack')
-  @ApiEnvelopeResponse({ status: 200, type: StrategyAlertEventVo })
-  async acknowledge(@Param('id') id: string): Promise<StrategyAlertEventVo> {
-    return await this.strategyAlertEventService.acknowledge(Number(id));
-  }
 }

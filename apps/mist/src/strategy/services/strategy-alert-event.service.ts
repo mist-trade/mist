@@ -67,16 +67,6 @@ export class StrategyAlertEventService {
     );
   }
 
-  async acknowledge(id: number): Promise<StrategyAlertEventVo> {
-    const event = await this.findEventOrThrow(id);
-
-    event.status = StrategyAlertStatus.ACKED;
-    event.acknowledgedAt = new Date();
-    return StrategyAlertEventVo.fromEntity(
-      await this.alertEventRepository.save(event),
-    );
-  }
-
   private async findEventOrThrow(id: number): Promise<StrategyAlertEvent> {
     const event = await this.alertEventRepository.findOne({ where: { id } });
 

@@ -11,7 +11,6 @@ export class StrategyAlertEventVo {
   status!: StrategyAlertStatus;
   dedupeKey!: string;
   deliveryResult?: Record<string, unknown> | null;
-  acknowledgedAt?: Date | null;
   createdAt!: Date;
   updatedAt!: Date;
 
@@ -22,7 +21,6 @@ export class StrategyAlertEventVo {
     vo.status = entity.status;
     vo.dedupeKey = entity.dedupeKey;
     vo.deliveryResult = entity.deliveryResult ?? null;
-    vo.acknowledgedAt = entity.acknowledgedAt ?? null;
     vo.createdAt = entity.createdAt;
     vo.updatedAt = entity.updatedAt;
     return vo;

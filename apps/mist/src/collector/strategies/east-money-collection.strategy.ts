@@ -57,9 +57,9 @@ export class EastMoneyCollectionStrategy implements IDataCollectionStrategy {
   async collectScheduledCandle(
     security: Security,
     period: Period,
-    triggerTime?: Date,
+    collectAt?: Date,
   ): Promise<void> {
-    const time = triggerTime || this.timezoneService.getCurrentBeijingTime();
+    const time = collectAt || this.timezoneService.getCurrentBeijingTime();
     const boundary = this.calculator.calculate(period, time);
 
     if (!boundary) {
@@ -95,7 +95,7 @@ export class EastMoneyCollectionStrategy implements IDataCollectionStrategy {
    */
   async collectForAllSecurities(
     period: Period,
-    triggerTime?: Date,
+    collectAt?: Date,
   ): Promise<void> {
     const activeSecurities = await this.securityRepository.find({
       where: { status: SecurityStatus.ACTIVE },
@@ -112,7 +112,7 @@ export class EastMoneyCollectionStrategy implements IDataCollectionStrategy {
 
     const results = await Promise.allSettled(
       activeSecurities.map((security) =>
-        this.collectScheduledCandle(security, period, triggerTime),
+        this.collectScheduledCandle(security, period, collectAt),
       ),
     );
 
