@@ -6,23 +6,31 @@
       `TradeInstruction` / `TradeRejection` / `TradingDecision` 类型定义；
 - [ ] 1.2 组排序策略：`GroupOrderingStrategy`（interim = 先出后进、置信度降序、
       alertEventId 升序），作为引擎参数留冲突因子插拔缝；
-- [ ] 1.3 拒绝产出拆分：Arbiter 输出形态改造（`ArbitrationVerdict`：指令或带
-      结构化原因的拒绝，信号级原因由 Arbiter 给出）+ 引擎账户结构性预检
+- [ ] 1.3 规则管线：`Rule` / `Verdict` 类型 + 信号裁决管线（entry：
+      regimeGate → cashGate → sizingRule；exit：signalExit）+ Bar 巡检管线
+      （systemicCrunch / hardStop）+ fallback 兜底拒绝；引擎账户结构性预检
       （NO_POSITION / INSUFFICIENT_CASH 含费 / T1_FROZEN）；
 - [ ] 1.4 `TradingEngine.decide`：合成 bar（signalTime/triggerPrice）→ 逐信号
       Arbiter 裁决 → 指令 + 拒绝 + 假定成交账户投影（含手续费，复用
       `slippage-fee-calculator`）；
 - [ ] 1.5 `VirtualFillLogPort` 端口定义（append / loadBySecurity）；
 - [ ] 1.6 单测：纯函数确定性（同输入重放恒等）、先出后进、卖出释放资金可供买入、
-      拒绝原因精确、整手取整、T+1 冻结、手续费计入现金。
-- [ ] 1.7 `ExecutionRiskArbiter` 输出形态改造（`CreateOrderDto | null` →
-      `ArbitrationVerdict`，裁决逻辑零改动，默认预算 0.995 → 0.95）；
-- [ ] 1.8 `SimulatedBroker` 标识确定性：orderId/eventId 改注入式序号
-      （禁 `Date.now()`，REQ-ISO-03 前提）。
+      拒绝原因精确、整手取整、T+1 冻结、手续费计入现金、整数厘舍入点唯一；
+- [ ] 1.7 规则管线移植：`ExecutionRiskArbiter` 三级平仓 / 买入管卡逻辑 → 规则
+      序列（类退役，既有 spec 用例移植）；`SizingStrategy` 默认 AllInWithBuffer
+      （0.95 × 整手取整，ELEVATED_RISK 减半）；
+- [ ] 1.8 `SimulatedBroker` 移植：撮合语义零改动（Next-Bar / 一字板 / T+1 /
+      STOP / 日结）、算术重写整数厘；orderId/eventId 改业务键派生
+      （`ord-{intentId}`，禁 `Date.now()`）；
+- [ ] 1.9 费率计算器整数厘重写（费率语义零改动，唯一舍入点 half-up 取厘）+
+      `CapitalLedger` / `PositionStateMachine` 整数厘移植与 rehydrate 入口；
+- [ ] 1.10 黄金文件回放基线：`trading/__fixtures__/` 版本化 fixture
+      （信号序列 + 快照序列 → 决策序列），golden diff 分类审查工具。
 
 ## 2. 账本持久化（libs/shared-data + migration 037）
 
-- [ ] 2.1 `deploy/database/migrations/037_create_virtual_fill_events.sql`；
+- [ ] 2.1 `deploy/database/migrations/037_create_virtual_fill_events.sql`
+      （金额列 BIGINT 厘、价格列 DECIMAL(10,3)，REQ-ENGINE-07）；
 - [ ] 2.2 `libs/shared-data/src/entities/virtual-fill-event.entity.ts` +
       index 导出；
 - [ ] 2.3 notification 侧 TypeORM `VirtualFillLogPort` 实现（append 事务 +
@@ -42,10 +50,11 @@
 - [ ] 4.1 executor 内联 Arbiter 编排 → `engine.decide`（每 Bar 信号批），指令交
       Broker submitOrder；per-bar 风控裁决路径（hardStopLoss / SYSTEMIC_CRUNCH）
       走引擎；
-- [ ] 4.2 内存端口注入（随跑随弃）；engine 配置透传（0.95 预算、硬止损 -0.08、
-      lot 100；硬止损归属待拍板——暂引擎透传、倾向改策略定义，见 design 11.4）；
-- [ ] 4.3 回测输出对账：同批信号下指令集与旧路径决策一致（允许组内顺序与预算比例
-      的既定语义变化，偏差需显式解释）。
+- [ ] 4.2 内存端口注入（随跑随弃）；engine 配置透传（SizingStrategy 0.95、硬止损
+      -0.08 规则参数、lot 100；硬止损归属待拍板——暂引擎透传、倾向改策略定义，
+      见 design 11.4）；
+- [ ] 4.3 回测对账（黄金回放）：迁移前旧路径生成 golden 基线 → 迁移后 diff——
+      语义变化（先出后进、0.95 预算、规则管线序、厘级舍入）显式归类审查。
 
 ## 5. dev server 迁移（tools/strategy-dev）
 

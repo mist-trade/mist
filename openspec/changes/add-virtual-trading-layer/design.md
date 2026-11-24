@@ -64,11 +64,12 @@ interface AccountSnapshot {
 
 ```ts
 interface TradeInstruction {
+  readonly instructionId: string;       // 业务键派生：`ti-{alertEventId}`（REQ-ISO-03）
   readonly alertEventId: number;
   readonly action: 'BUY' | 'SELL';
   readonly quantity: number;            // 整手（lotSize 100）
-  readonly referencePrice: number;      // 信号 triggerPrice
-  readonly estimatedValue: number;      // quantity × referencePrice（BUY 另计手续费预算）
+  readonly referencePrice: number;      // 信号 triggerPrice（边界转厘，整数）
+  readonly estimatedValueLi: bigint;    // quantity × referencePrice（整数厘，BUY 另计手续费预算）
   readonly reason: string;              // signalType / exitReason
   readonly attribution: AttributedSignal['attribution'];
 }
@@ -93,31 +94,39 @@ interface TradingDecision {
 ```ts
 class TradingEngine {
   constructor(deps: {
-    arbiter: ExecutionRiskArbiter;      // 复用，裁决逻辑保留，输出形态改造（见下）
-    seedCapital?: number;               // 默认 1,000,000
-    cashAllocationRatio?: number;       // 默认 0.95（统一三端漂移）
+    signalRules: readonly Rule[];       // 信号裁决管线（首条终局 Verdict 生效）
+    riskRules: readonly Rule[];         // Bar 巡检管线（per-bar 风控，回测/dev 共用）
+    sizing: SizingStrategy;             // 默认 AllInWithBuffer(0.95)（统一漂移）
     groupOrdering?: GroupOrderingStrategy;  // 默认 SellFirstByConfidence（interim）
+    seedCapitalLi?: bigint;             // 种子资金（整数厘），默认 1,000,000 × 1000
   });
   decide(group: SignalGroupInput, snapshot: AccountSnapshot): TradingDecision;
+  surveilBar(bar, position): readonly TradeInstruction[];  // per-bar 风控巡检
 }
 ```
 
 - **纯函数**：快照进 → 决策出，不触 DB、不触撮合；同组同快照 → 逐字段相同的输出；
 - 组内处理顺序：**先出后进**（EXIT 先于 ENTRY；同 kind 内按置信度降序；置信度同则按
   alertEventId 升序）——沿用账本既有规约 `REQ-LEDGER-02（先出后进执行序）`；
-- 每个信号独立裁决：`arbiter.arbitrate({ 合成 bar, signal, position, availableCash })`，
-  合成 bar 由该信号的 `signalTime` / `triggerPrice` 构造（实时无真实 Bar 可给）；
-- 裁决通过 → 指令 + **假定成交**即时推进内存账户（现金按含费净额扣补、持仓机
-  `onOrderFilled` 推进 T+1）；裁决失败 → 结构化拒绝（信号级原因由 Arbiter verdict
-  给出，账户结构性原因由引擎预检给出，见下）；
+- 每个信号独立裁决：依次过 `signalRules`，首条终局 Verdict 生效；入场与出场是
+  同一管线的两条规则序列（entry：regimeGate → cashGate → sizingRule；exit：
+  signalExit），末位 fallback 规则兜底显式拒绝（REQ-ENGINE-04）——不存在第二条
+  出单路径。合成 bar 由该信号的 `signalTime` / `triggerPrice` 构造（实时无真实
+  Bar 可给），价格在数据边界一次转换为整数厘；
+- 裁决通过 → 指令 + **假定成交**即时推进内存账户（现金按含费净额扣补、整数厘
+  运算，持仓机 `onOrderFilled` 推进 T+1）；裁决失败 → 结构化拒绝（信号级原因由
+  规则 Verdict 给出，账户结构性原因由引擎预检给出，见下）；
 - 账户快照随每个假定成交更新，下一信号使用更新后的快照（卖出释放的资金当刻可用于
   后续买入）。
-- **Arbiter 输出形态改造（唯一接口变更）**：`arbitrate(): CreateOrderDto | null`
-  → `arbitrate(): ArbitrationVerdict`（`{ action: 'INSTRUCT', order } | { action:
-  'REJECT', reason, detail }`）。三级平仓优先级 / 买入管卡 / regime veto / 仓位
-  计算逻辑全部保留；信号级拒绝原因由 Arbiter 自身给出，引擎不再复制裁决规则
-  （REQ-ENGINE-03"不得私设第二套裁决规则"）；引擎层仅保留账户**结构性**预检
-  （T1_FROZEN / INSUFFICIENT_CASH 含费 / NO_POSITION——属账户状态而非信号裁决）。
+- **规则管线取代 Arbiter if 树（从零基准采纳 2026-11-24）**：现有
+  `ExecutionRiskArbiter` 的三级平仓优先级（SYSTEMIC_CRUNCH → HARD_STOP →
+  SIGNAL_EXIT）与买入管卡（regime veto → cash gate → sizing）移植为规则序列——
+  `Rule = (ctx) => Verdict`，`Verdict = { action: 'INSTRUCT', order } | { action:
+  'REJECT', reason, detail }`，每条规则独立单测、可插拔可重排；Arbiter 类退役
+  （既有 spec 用例同步移植）。仓位计算归 `SizingStrategy`（默认 AllInWithBuffer：
+  可用现金 × 0.95 × 整手取整，ELEVATED_RISK 预算减半语义保留），与裁决分离；
+  引擎层仅保留账户**结构性**预检（T1_FROZEN / INSUFFICIENT_CASH 含费 /
+  NO_POSITION——属账户状态而非信号裁决）。
 
 ## 三、事件溯源虚拟账本
 
@@ -132,9 +141,9 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
   `security_code` VARCHAR(32) NOT NULL,
   `side` ENUM('buy','sell') NOT NULL,
   `quantity` INT UNSIGNED NOT NULL,
-  `price` DECIMAL(10,4) NOT NULL,
-  `fees` DECIMAL(12,4) NOT NULL DEFAULT 0,
-  `net_amount` DECIMAL(14,4) NOT NULL,
+  `price` DECIMAL(10,3) NOT NULL,
+  `fees` BIGINT NOT NULL DEFAULT 0,
+  `net_amount` BIGINT NOT NULL,
   `trading_day` DATE NOT NULL,
   `instruction` JSON NULL,
   `created_at` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -150,6 +159,9 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
   `PositionStateMachine.onOrderFilled` + `CapitalLedger.applyFill` 重建快照。
   当前规模（每季约百条信号）fold 成本可忽略，不建快照表；若未来成为热点再加快照投影；
 - **拒绝不落库**：拒绝可由"信号 + 账户快照"确定性重演，保持账本纯成交事实。
+- **整数厘单一算术**（REQ-ENGINE-07）：金额列 BIGINT 厘（1 元 = 1000 厘）、价格
+  列 DECIMAL(10,3)（A 股 ≤3 位小数，精确）；费率折算只在唯一舍入点发生
+  （half-up 取厘），其后全整数运算，禁止 float 金额在域核心流转。
 
 ### 3.2 账本生命周期
 
@@ -185,8 +197,9 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
 
 ### 5.1 回测（apps/backtest/backtest-run.executor.ts 重构）
 
-- 保留：Bar 循环、kernel 驱动、SimulatedBroker（Next-Bar 撮合 + 滑点手续费）、
-  `backtest_trade_results` 持久化；
+- 保留：Bar 循环、kernel 驱动、SimulatedBroker **撮合语义**（Next-Bar / 一字板 /
+  T+1 / STOP / 日结）、`backtest_trade_results` 持久化；SimulatedBroker 与费率
+  计算器**算术重写为整数厘**（撮合与费率语义零改动，REQ-ENGINE-07）；
 - 替换：内联 Arbiter 调用与 open-order 检查 → 每 Bar 信号批组装 `SignalGroupInput`
   → `engine.decide` → 指令交 Broker `submitOrder`（撮合仍由 Broker onBar 完成）；
   撤销/风控路径（hardStopLoss / SYSTEMIC_CRUNCH）由引擎统一产出（Bar 回调里的
@@ -303,10 +316,12 @@ interface PipelineResult {
 | dev server 手写交易流水线（`server.ts:899-985`） | TradingEngine + 内存端口 |
 | backtest executor 内联 Arbiter 编排 | engine.decide（每 Bar 批） |
 | dev server 手写 0.95 仓位 | 引擎统一 `cashAllocationRatio: 0.95` |
-| 回测 0.995 预算 + hardStopLoss -0.08（executor 内联配置） | 引擎配置化（0.95 预算；硬止损沿袭 -0.08 配置项，引擎参数透传） |
+| 回测 0.995 预算 + hardStopLoss -0.08（executor 内联配置） | 引擎配置化（SizingStrategy 默认 0.95；硬止损沿袭 -0.08 配置项，规则参数透传） |
 | envelope 信号列表消息 | 交易手册 |
 | `PositionStateMachine.onSignal` 决策分支（`position-state-machine.ts:168`） | 删除；状态机回归纯记账（唯一调用方 dev server:969 已迁引擎） |
-| SimulatedBroker `Date.now()` 标识（`simulated-broker.ts:79,411`） | 注入式确定性序号（REQ-ISO-03 前提） |
+| SimulatedBroker `Date.now()` 标识（`simulated-broker.ts:79,411`） | 业务键派生 id（`ord-{intentId}` / `fill-{intentId}`，REQ-ISO-03）+ 算术重写整数厘（撮合语义零改动） |
+| `ExecutionRiskArbiter` if 树（`execution-risk-arbiter.ts`） | 规则管线移植（裁决语义保留，类退役，spec 用例同步移植） |
+| `slippage-fee-calculator` float 算术 | 费率语义零改动，算术重写整数厘（唯一舍入点 half-up 取厘） |
 | 回测组内处理顺序（kernel 顺序 → 先出后进） | 统一 interim 规则；重跑基线覆盖 |
 
 ## 十、边界与不变式
@@ -324,16 +339,17 @@ interface PipelineResult {
 
 | 组件 | 位置 | 说明 |
 |---|---|---|
-| `slippage-fee-calculator` | libs/strategy/src/execution/ | A 股规费（佣金 / 过户费 / 印花税 / ETF 免征）+ 双向滑点纯函数；回测撮合与实时假定成交共用 |
-| `SimulatedBroker` | 同上 | Next-Bar 撮合 / T+1 frozen / 一字板拒单顺延 / STOP 单 / 日结解锁——回测成交端完整存在，仅标识确定性需修正（见 11.4） |
+| `isOneWordLimitUp` / `isOneWordLimitDown` 等 A 股市场判定 | libs/market-data | 一字板 / ETF 判定纯函数，与金额无关，直接复用 |
 
 ### 11.2 小改复用
 
 | 组件 | 保留 | 改造 |
 |---|---|---|
-| `ExecutionRiskArbiter` | 三级平仓优先级 / 买入管卡 / regime veto / `cashAllocationRatio` 仓位计算 | 输出形态：`CreateOrderDto \| null` → `ArbitrationVerdict`（指令或带结构化原因的拒绝）；默认预算 0.995 → 0.95 |
-| `CapitalLedger` | `applyFill` fold / `onDayClose` 净值 | 补 rehydrate：从 `virtual_fill_events` 事件流重建（fold 逻辑不变，入口加事件加载） |
-| `PositionStateMachine` | `onOrderFilled` 记账 / `calculateExitQuantity` / snapshot | 补 rehydrate；**删除 `onSignal()` 决策分支**（见 11.3） |
+| `ExecutionRiskArbiter` | 三级平仓优先级 / 买入管卡 / regime veto 裁决语义 | **逻辑移植进规则管线，类退役**；Verdict 输出；预算默认 0.95 归 `SizingStrategy` |
+| `slippage-fee-calculator` | 费率模型（佣金 / 过户费 / 印花税 / ETF 免征 / 双向滑点） | 算术重写为整数厘（费率语义零改动，唯一舍入点） |
+| `SimulatedBroker` | Next-Bar / T+1 frozen / 一字板拒单顺延 / STOP 单 / 日结解锁撮合语义 | 算术重写整数厘；orderId/eventId 改业务键派生 |
+| `CapitalLedger` | `applyFill` fold / `onDayClose` 净值语义 | 移植整数厘 + 补 rehydrate（从 `virtual_fill_events` 重建） |
+| `PositionStateMachine` | `onOrderFilled` 记账 / `calculateExitQuantity` / snapshot 语义 | 移植整数厘 + 补 rehydrate；**删除 `onSignal()` 决策分支**（见 11.3） |
 
 ### 11.3 彻底大改 / 删除
 
@@ -346,9 +362,27 @@ interface PipelineResult {
 ### 11.4 盘点发现的坑（设计修订依据）
 
 1. **SimulatedBroker 标识非确定性**：`ord-${Date.now()}-…` / `fill-${Date.now()}-…`
-   （`simulated-broker.ts:79,411`）直接破坏 REQ-ISO-01 逐字段一致——改为注入式
-   确定性序号，禁止墙钟与随机（固化入 REQ-ISO-03）。
+   （`simulated-broker.ts:79,411`）直接破坏 REQ-ISO-01 逐字段一致——已采纳更彻底的
+   业务键派生方案（11.5 第 2 项，REQ-ISO-03 固化）。
 2. **hardStopLoss 配置无主（待拍板）**：回测传 -0.08、dev server 按开关传、实时
    无定义——第四个漂移点。本设计暂按"引擎配置透传 + 各执行端显式声明"处理；
    倾向最终归属**策略定义**（Arbiter 注释"零死板止损准则"暗示部分策略不应有死
    止损），待用户定稿后改为从策略定义读取。
+
+### 11.5 从零基准采纳记录（2026-11-24 用户拍板）
+
+四项"从零更激进选择"全部采纳，覆盖 11.2-11.3 的复用折中：
+
+1. **整数厘制**：域核心金额一律整数厘（1 元 = 1000 厘），唯一舍入点（费率折算
+   half-up 取厘）；A 股价格 ≤3 位小数 → 边界转换精确无损；DB 金额列 BIGINT 厘。
+   代价：SimulatedBroker / 费率计算器算术重写（撮合与费率语义零改动），回测基线
+   重跑（与 0.995→0.95 语义变化合并处理）。
+2. **ID 业务键派生**：instructionId / orderId / eventId 全部派生自幂等锚点
+   （`ti-{alertEventId}` / `ord-{intentId}` / `fill-{intentId}`）；墙钟、随机、
+   自增计数在交易层无容身之地（REQ-ISO-03 固化）。
+3. **规则管线裁决**：`Rule = (ctx) => Verdict` 序列取代 if 树——入场/出场为同一
+   管线的两条规则序列，"出场必经裁决"由架构保证而非纪律；Arbiter 类退役，
+   spec 用例移植。
+4. **黄金文件回放**：引擎回归以 `(信号序列, 账户快照序列) → 决策序列` 版本化
+   fixture 为准（REQ-ISO-04）；回测对账（tasks 4.3）直接消费 golden diff——
+   语义变化显式审查，厘级舍入差异归类标注。

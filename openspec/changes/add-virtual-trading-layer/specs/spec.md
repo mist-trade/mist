@@ -46,6 +46,19 @@
 置信度 / trace 链）+ 拒绝行（信号摘要 + 结构化原因）。四条链路（回测 / 实时 /
 dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自本节起统一称"交易手册"。
 
+### 1.7 `Rule` / `Verdict` / `SizingStrategy`
+- `Rule`：纯函数裁决规则 `(ctx: RuleContext) => Verdict`；管线内首条终局裁决生效，
+  末位 fallback 规则兜底显式拒绝（REQ-ENGINE-04）；
+- `Verdict`：`{ action: 'INSTRUCT', order } | { action: 'REJECT', reason, detail }`；
+- `SizingStrategy`：仓位策略，与裁决分离——输入（账户快照 / 合成 bar / regime），
+  输出整手股数；默认 `AllInWithBuffer`（可用现金 × 0.95 × 整手取整，
+  ELEVATED_RISK 预算减半语义保留）。
+
+### 1.8 `厘`（整数货币单位）
+域核心一切金额的表示与运算单位（1 元 = 1000 厘，整数）。费率折算（佣金万 2.5、
+印花税万 5 等）是唯一舍入点（half-up 取厘），其后全整数运算；市场价（A 股 ≤3 位
+小数）在数据边界一次转换，精确无损。落库：金额列 BIGINT 厘，价格列 DECIMAL(10,3)。
+
 ---
 
 ## 二、行为需求规约 (Behavioral Requirements)
@@ -58,12 +71,11 @@ dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自
 - **REQ-ENGINE-02 (先出后进执行序)**：组内处理顺序必须为 EXIT 先于 ENTRY；同
   kind 内按置信度降序、并列时按 `alertEventId` 升序。卖出指令假定的资金释放当刻
   可用于后续买入裁决。
-- **REQ-ENGINE-03 (复用统一裁决)**：指令生成必须经由 `ExecutionRiskArbiter`
-  （实时与回测共用同一 Arbiter 配置），引擎不得私设第二套裁决规则；仓位计算必须
-  来自 Arbiter 的 `cashAllocationRatio` × 整手取整，禁止散落的手写 sizing。
-  Arbiter 输出必须为携带结构化原因的裁决（`ArbitrationVerdict`：指令或拒绝），
-  禁止以裸 `null` 静默否决；引擎仅保留账户结构性预检（T1_FROZEN /
-  INSUFFICIENT_CASH 含费 / NO_POSITION）。
+- **REQ-ENGINE-03 (规则管线统一裁决)**：指令生成必须经由规则管线（信号裁决
+  `signalRules` + Bar 风控巡检 `riskRules`），规则为纯函数 `(ctx) => Verdict`，
+  首条终局裁决生效、末位 fallback 兜底显式拒绝；引擎不得私设第二套裁决规则，
+  入场与出场必须同处一条管线（不存在第二条出单路径）。仓位计算必须来自
+  `SizingStrategy`（默认 0.95 × 整手取整），禁止散落的手写 sizing。
 - **REQ-ENGINE-04 (拒绝必须显式)**：每个未产出指令的信号必须输出 `TradeRejection`
   并携带结构化原因；**严禁静默丢弃信号**。被拒信号不落成交事实，但其可审计性由
   `StrategySignal` 行 + `TradingDecision` 渲染保证。
@@ -73,6 +85,10 @@ dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自
 - **REQ-ENGINE-06 (冲突裁决留缝)**：组内排序必须以 `GroupOrderingStrategy` 参数
   注入；interim 实现（先出后进）可被未来"冲突裁决因子"整体替换，禁止将排序逻辑
   硬编码进引擎主体。
+- **REQ-ENGINE-07 (整数厘制)**：域核心一切金额必须以整数厘表示与运算（1 元 =
+  1000 厘）；费率折算只在唯一舍入点发生（half-up 取厘），其后全整数；禁止 float
+  金额在域核心流转；市场价在数据边界一次转换（A 股价格 ≤3 位小数，转换精确
+  无损）。落库：金额列 BIGINT 厘、价格列 DECIMAL(10,3)。
 
 ### 2.2 虚拟账本规约 (Ledger)
 
@@ -139,9 +155,13 @@ dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自
   投影）。该门禁是信号层同构门禁（`strategy-dual-timestamp.guard.spec.ts`）的
   姊妹门禁，必须以 CI 测试固化。
 - **REQ-ISO-02 (引擎重放确定性)**：引擎对同一输入的 N 次求值必须深比较恒等。
-- **REQ-ISO-03 (确定性标识)**：引擎与撮合端产出的全部标识（orderId / eventId /
-  fill id）必须由注入式确定性序号生成，禁止墙钟（`Date.now`）与随机源——此为
-  REQ-ISO-01 逐字段比较的前提。
+- **REQ-ISO-03 (标识业务键派生)**：引擎与撮合端产出的全部标识（instructionId /
+  orderId / eventId）必须派生自幂等业务键（`ti-{alertEventId}` / `ord-{intentId}` /
+  `fill-{intentId}`）；禁止墙钟（`Date.now`）、随机源与自增计数器——同输入重放与
+  跨端同构逐字段比较的前提。
+- **REQ-ISO-04 (黄金文件回放)**：引擎回归与四端迁移对账必须以版本化黄金文件为准
+  ——`(信号序列, 账户快照序列) → 决策序列` 固化为 fixture；任何语义变化必须经
+  golden diff 显式审查，厘级舍入差异须归类标注，禁止静默重生成基线。
 
 ---
 
