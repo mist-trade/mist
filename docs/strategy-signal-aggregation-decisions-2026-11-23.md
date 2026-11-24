@@ -1037,7 +1037,25 @@ push 粒度隐式实现。
 **公共仓 1–4 已实施（2026-11-24，commit 19f8d193）**：内核 `role: 'context'`、
 契约 v2、信号侧分组 handoff、通知侧分组渲染与整批 SENT、sweep/replay 内存重分组、
 context 角色守卫测试。typecheck + eslint + 76 套件 508 测试全过。
-私仓第 5 步等另一 AI 的入场口径修复提交后执行。
+
+**5/6 已实施（2026-11-24，私仓 commit 755534b）**：`ShanghaiRegimePlugin` 声明
+`role: 'context'`；两个预设的 `term_regime_defend_sell` 改为 ABORT（熊市防守但无战术
+卖点时静默中止，不再发射状态信号）。内核预取升级为**按 (pluginId, params) 组合**——
+`contextOpinionKey` 携带参数（双 regime 门禁共用 `{mode:'dual_speed'}` 只求值一次），
+resolveOpinion 仅对 context 插件写回缓存，signal 插件保持逐次调用语义。
+
+**端到端回归（000001 30m、definition 3、2024 Q1，与 6.11 同样本）：**
+
+| 指标 | 改造前 | 改造后 |
+|---|---|---|
+| 信号数 | 104（84 条 REGIME_* + 20 条战术） | **20**（REGIME_* = 0） |
+| 成交 | 5 笔（3 笔出场 = REGIME_DEFEND_SELL） | 4 笔（**全部** BEAR_TACTICS_SIGNAL 出场） |
+| 夏普 / 收益 / 回撤 | -1.2115 / -2.30% / 3.32% | -1.5021 / -3.53% / 4.37% |
+
+绩效差异来源：原 REGIME_DEFEND_SELL 在回测中驱动防守性平仓（本样本 3 笔）；
+删除后该样本少了一次切亏（01-15→01-23 一段持仓更久、亏损更大）。这是单样本结果，
+不构成对"状态信号可交易"的支持——状态不再可发射是架构决策（7.1.1）；
+绩效基线以用户重跑为准。
 
 ---
 
