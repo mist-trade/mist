@@ -53,3 +53,13 @@ export type {
   VirtualFillLogPort,
   VirtualFillSide,
 } from './fill-log.port';
+export { foldVirtualFills } from './account-fold';
+export type {
+  GoldenScenario,
+  GoldenEvent,
+  GoldenGroupEvent,
+  GoldenSignalSpec,
+  GoldenSurveilEvent,
+  SerializedLogEntry,
+} from './golden';
+export { runGoldenScenario, serializeAccount } from './golden';

@@ -13,8 +13,10 @@ import {
   StrategyAlertEvent,
   StrategyDefinition,
   StrategySignal,
+  VirtualFillEventEntity,
 } from '@app/shared-data';
 import { OoAlertModule } from '../oo-alert/oo-alert.module';
+import { VirtualFillLogService } from '../trading/virtual-fill-log.service';
 import { CHANNEL_ADAPTERS } from '../channels/channel-adapter.port';
 import { FeishuChannelAdapter } from '../channels/feishu.channel-adapter';
 import { QqChannelAdapter } from '../channels/qq.channel-adapter';
@@ -36,6 +38,7 @@ import { StrategyAlertDeliveryWorker } from './strategy-alert-delivery.worker';
       Security,
       StrategyDefinition,
       StrategyAlertDelivery,
+      VirtualFillEventEntity,
     ]),
     BullModule.forRootAsync({
       inject: [ConfigService],
@@ -63,6 +66,7 @@ import { StrategyAlertDeliveryWorker } from './strategy-alert-delivery.worker';
     NotificationDeliveryCounters,
     NotificationMetricsBootstrap,
     PendingAlertDeliverySweepService,
+    VirtualFillLogService,
     QqChannelAdapter,
     WeComChannelAdapter,
     FeishuChannelAdapter,

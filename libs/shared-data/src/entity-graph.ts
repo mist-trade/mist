@@ -18,6 +18,7 @@ import {
   StrategyDefinition,
   StrategySignal,
   StrategyVersion,
+  VirtualFillEventEntity,
 } from './entities';
 
 /**
@@ -48,6 +49,7 @@ export const MIST_ENTITIES = [
   StrategySignal,
   StrategyAlertEvent,
   StrategyAlertDelivery,
+  VirtualFillEventEntity,
   BacktestRun,
   BacktestSignalResult,
   BacktestTradeResult,

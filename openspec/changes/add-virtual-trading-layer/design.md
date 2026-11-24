@@ -141,7 +141,7 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
   `alert_event_id` BIGINT UNSIGNED NOT NULL,
   `security_id` INT UNSIGNED NOT NULL,
   `security_code` VARCHAR(32) NOT NULL,
-  `side` ENUM('buy','sell') NOT NULL,
+  `side` ENUM('BUY','SELL') NOT NULL,
   `quantity` INT UNSIGNED NOT NULL,
   `price` DECIMAL(10,3) NOT NULL,
   `fees` BIGINT NOT NULL DEFAULT 0,

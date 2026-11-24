@@ -18,3 +18,4 @@ export * from './backtest-trade-result.entity';
 export * from './market-macro-indicator.entity';
 export * from './collector-sync-event.entity';
 export * from './strategy-signal-parity.interface';
+export * from './virtual-fill-event.entity';
