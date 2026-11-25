@@ -170,11 +170,11 @@ export interface NecklineProjection {
 
 /** 颈线检测门槛配置 */
 export interface NecklineOptions {
-  readonly swingWindow?: number; // Swing Pivot 局域窗口半径 (默认 3，即 7 棒局域)
-  readonly maxTroughDifferenceRatio?: number; // 双底/双顶两端点容差比 (默认 0.03 即 3%)
-  readonly minPatternHeightRatio?: number; // 形态最小高度占均价比例 (默认 0.015)
+  readonly swingWindow?: number; // Swing Pivot 局域窗口半径 (默认 2，即 5 棒局域)
+  readonly maxTroughDifferenceRatio?: number; // 双底/双顶两端点容差比 (默认 0.05 即 5%)
+  readonly minPatternHeightRatio?: number; // 形态最小高度占均价比例 (默认 0.01)
   readonly maxBarSpan?: number; // 形态最大横跨 Bar 数 (默认 120)
-  readonly minBarSpan?: number; // 形态最小横跨 Bar 数 (默认 8)
+  readonly minBarSpan?: number; // 形态最小横跨 Bar 数 (默认 4)
 }
 
 export interface PaGeometryResult {

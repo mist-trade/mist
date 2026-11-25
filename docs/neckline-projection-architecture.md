@@ -40,7 +40,7 @@
 ```
 
 ### 第一步：客观识别局域摆动极值点 (Swing Pivots)
-- 设定局域检测半宽窗口 $K$（如 $K=3$，对应前后共 7 根 Bar 的局域窗口 $[i-K, i+K]$）：
+- 设定局域检测半宽窗口 $K$（实现默认 `swingWindow = 2`，即 $[i-2, i+2]$ 共 5 根 Bar；若按需放宽可传入 $K=3$）：
   - **摆动高点 (Pivot High)**：当且仅当第 $i$ 根 Bar 的最高价严格大于前后各 $K$ 根 Bar 时确立：
     $$High[i] > \max_{j \in [i-K, i+K], j \neq i}(High[j])$$
   - **摆动低点 (Pivot Low)**：当且仅当第 $i$ 根 Bar 的最低价严格小于前后各 $K$ 根 Bar 时确立：
@@ -54,7 +54,7 @@
 
 #### 1. 双底 (W底 / Double Bottom)
 - **输入端点**：$L_1$（底1） $\to$ $P_{\text{mid}}$（中间反弹峰） $\to$ $L_2$（底2）；
-- **拓扑约束**：$|L_1.low - L_2.low| / \min(L_1.low, L_2.low) \le 3.0\%$（两底对称度容差）；
+- **拓扑约束**：$|L_1.low - L_2.low| / \min(L_1.low, L_2.low) \le 5.0\%$（默认 `maxTroughDifferenceRatio = 0.05`，两底对称度容差；高要求场景可收紧至 `0.03`）；
 - **颈线基准价计算**：
   $$P_{\text{neckline}} = P_{\text{mid}}.\text{high}$$
   *含义*：两底之间反弹所达到的最高价，即多头向上突围必须攻克的第一道客观天花板。

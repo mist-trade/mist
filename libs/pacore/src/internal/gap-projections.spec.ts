@@ -61,4 +61,43 @@ describe('GapProjectionEngine (空间对称度量与标准差投射)', () => {
     expect(projection.sdTargets.sd2_5).toBe(65); // 90 - 25
     expect(projection.sdTargets.sd4_0).toBe(50); // 90 - 40
   });
+
+  it('省略 originPrice 时不退化为缺口边沿，而是按缺口基准尺度向外 1:1 投射', () => {
+    const bullFvg: FairValueGap = {
+      id: 'test_fvg_bull_default',
+      type: FvgType.Bullish,
+      startIndex: 0,
+      displacementIndex: 1,
+      endIndex: 2,
+      startTime: new Date('2026-01-01T09:30:00Z'),
+      endTime: new Date('2026-01-01T09:40:00Z'),
+      gapBottom: 100,
+      gapTop: 110,
+      gapSize: 10,
+      consequentEncroachment: 105,
+      status: FvgMitigationStatus.Unmitigated,
+    };
+    const bearFvg: FairValueGap = {
+      id: 'test_fvg_bear_default',
+      type: FvgType.Bearish,
+      startIndex: 0,
+      displacementIndex: 1,
+      endIndex: 2,
+      startTime: new Date('2026-01-01T09:30:00Z'),
+      endTime: new Date('2026-01-01T09:40:00Z'),
+      gapTop: 100,
+      gapBottom: 90,
+      gapSize: 10,
+      consequentEncroachment: 95,
+      status: FvgMitigationStatus.Unmitigated,
+    };
+
+    const bullProj = GapProjectionEngine.project(bullFvg);
+    const bearProj = GapProjectionEngine.project(bearFvg);
+
+    expect(bullProj.measuredTarget).toBeGreaterThan(bullFvg.gapTop);
+    expect(bullProj.measuredTarget).toBe(120);
+    expect(bearProj.measuredTarget).toBeLessThan(bearFvg.gapBottom);
+    expect(bearProj.measuredTarget).toBe(80);
+  });
 });

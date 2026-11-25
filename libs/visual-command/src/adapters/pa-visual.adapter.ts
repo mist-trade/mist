@@ -113,7 +113,10 @@ export class PaVisualAdapter {
 
         // (3) 空间对称度量投射目标线 (1:1 Measured Move)
         if (includeProjections) {
-          const projection = PaCore.calculateProjection(fvg);
+          const projection = PaCore.calculateProjection(
+            fvg,
+            PaCore.resolveFvgOrigin(fvg, klines),
+          );
           const targetColor = isBull ? '#3b82f6' : '#f59e0b';
           const projLine: LineVisualCommand = {
             id: `cmd_${fvg.id}_proj_measured`,

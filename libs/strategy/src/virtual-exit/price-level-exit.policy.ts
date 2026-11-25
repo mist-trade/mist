@@ -1,27 +1,27 @@
 import type { StrategyBar } from '@app/market-data';
+import { SIGNAL_KINDS } from '../strategy.constants';
 import type { KernelSignal, SignalChannelRef } from '../kernel/kernel.types';
-import type {
-  VirtualExitChannelSpec,
-  VirtualExitPolicyPort,
-  VirtualExitProposal,
-  VirtualExitRule,
-  VirtualExitRuleBinding,
+import {
+  PRICE_LEVEL_RULE_KINDS,
+  type PriceLevelVirtualExitRule,
+  type VirtualExitChannelSpec,
+  type VirtualExitPolicyPort,
+  type VirtualExitProposal,
+  type VirtualExitRule,
+  type VirtualExitRuleBinding,
 } from './virtual-exit.port';
 
+const DEFAULT_PRICE_LEVEL_CONFIDENCE = 0.9;
+
 /**
- * 价格型虚拟出场规则种类（本求值器可解释的子集）。
+ * 价格/时间型虚拟出场规则种类（本求值器可解释的子集）。
  *
- * 结构性规则（structural_breakdown / line_break / micro_divergence_exit /
- * macro_line_break / bear_* / support_zone_breached / fibonacci_extension_take_profit
- * 等）依赖形态证据，由私仓 `VirtualExitPolicyPort` 实现求值——configure 时
- * 通道内若只含结构型规则则整通道跳过（不本求值器的职责面）。
+ * 扩展/自定义结构型规则依赖外部上下文或形态证据，由外部 `VirtualExitPolicyPort`
+ * 实现求值——configure 时通道内若只含外部规则则整通道跳过（非本求值器职责面）。
  */
-const PRICE_LEVEL_KINDS: ReadonlySet<VirtualExitRule['kind']> = new Set([
-  'stop',
-  'breakeven',
-  'trailing',
-  'time_expired',
-]);
+const PRICE_LEVEL_KINDS: ReadonlySet<string> = new Set(
+  Object.values(PRICE_LEVEL_RULE_KINDS),
+);
 
 /** 通道虚拟批次（单批次，A 股全进全出语义，与执行引擎 AllIn 一致）。 */
 interface VirtualLot {
@@ -34,7 +34,9 @@ interface VirtualLot {
   peakPrice: number;
 }
 
-function isPriceLevelRule(rule: VirtualExitRule): boolean {
+function isPriceLevelRule(
+  rule: VirtualExitRule,
+): rule is PriceLevelVirtualExitRule {
   return PRICE_LEVEL_KINDS.has(rule.kind);
 }
 
@@ -55,7 +57,10 @@ function channelKey(channel: SignalChannelRef): string {
 export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
   private readonly specs = new Map<
     string,
-    { channel: SignalChannelRef; bindings: readonly VirtualExitRuleBinding[] }
+    {
+      channel: SignalChannelRef;
+      bindings: readonly VirtualExitRuleBinding<PriceLevelVirtualExitRule>[];
+    }
   >();
   private readonly lots = new Map<string, VirtualLot>();
 
@@ -63,7 +68,10 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
     this.specs.clear();
     this.lots.clear();
     for (const spec of specs) {
-      const bindings = spec.bindings.filter((b) => isPriceLevelRule(b.rule));
+      const bindings = spec.bindings.filter(
+        (b): b is VirtualExitRuleBinding<PriceLevelVirtualExitRule> =>
+          isPriceLevelRule(b.rule),
+      );
       if (bindings.length === 0) continue;
       this.specs.set(channelKey(spec.channel), {
         channel: spec.channel,
@@ -76,7 +84,7 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
     const channel = signal.channel;
     if (!channel) return;
     const key = channelKey(channel);
-    if (signal.signalKind === 'entry') {
+    if (signal.signalKind === SIGNAL_KINDS.ENTRY) {
       if (!this.lots.has(key)) {
         this.lots.set(key, {
           entryPrice: signal.triggerPrice,
@@ -115,7 +123,7 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
   private evaluateBindings(
     spec: {
       channel: SignalChannelRef;
-      bindings: readonly VirtualExitRuleBinding[];
+      bindings: readonly VirtualExitRuleBinding<PriceLevelVirtualExitRule>[];
     },
     lot: VirtualLot,
     bar: StrategyBar,
@@ -136,20 +144,19 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
   private evaluateRule(
     channel: SignalChannelRef,
     ownerPluginId: string,
-    rule: VirtualExitRule,
+    rule: PriceLevelVirtualExitRule,
     lot: VirtualLot,
     bar: StrategyBar,
   ): VirtualExitProposal | null {
     const gainRatio = (bar.close - lot.entryPrice) / lot.entryPrice;
     switch (rule.kind) {
-      case 'stop': {
+      case PRICE_LEVEL_RULE_KINDS.STOP: {
         // 均价止损：收盘跌破 entryPrice × (1 + lossRatio)，lossRatio 为负数
         if (bar.close >= lot.entryPrice * (1 + rule.lossRatio)) return null;
         return this.proposal(
           channel,
           ownerPluginId,
           rule,
-          'stop',
           `价格防守止损：收盘 ${bar.close} 跌破成本 ${lot.entryPrice} × (1 + ${rule.lossRatio})`,
           {
             close: bar.close,
@@ -159,7 +166,7 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
           },
         );
       }
-      case 'breakeven': {
+      case PRICE_LEVEL_RULE_KINDS.BREAKEVEN: {
         // 浮盈回吐保护：峰值浮盈曾达 activationGain，随后收盘跌破成本
         const peakGain = (lot.peakPrice - lot.entryPrice) / lot.entryPrice;
         if (peakGain < rule.activationGain) return null;
@@ -168,7 +175,6 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
           channel,
           ownerPluginId,
           rule,
-          'breakeven',
           `保本离场：峰值浮盈 ${(peakGain * 100).toFixed(2)}% 后收盘跌破成本 ${lot.entryPrice}`,
           {
             close: bar.close,
@@ -178,7 +184,7 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
           },
         );
       }
-      case 'trailing': {
+      case PRICE_LEVEL_RULE_KINDS.TRAILING: {
         // 均价移动止盈：峰值浮盈达 activationGain 后，收盘自峰值回撤 drawdownRatio
         const peakGain = (lot.peakPrice - lot.entryPrice) / lot.entryPrice;
         if (peakGain < rule.activationGain) return null;
@@ -187,7 +193,6 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
           channel,
           ownerPluginId,
           rule,
-          'trailing',
           `移动止盈：峰值 ${lot.peakPrice} 回撤超 ${(rule.drawdownRatio * 100).toFixed(2)}%（收盘 ${bar.close}）`,
           {
             close: bar.close,
@@ -197,14 +202,13 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
           },
         );
       }
-      case 'time_expired': {
+      case PRICE_LEVEL_RULE_KINDS.TIME_EXPIRED: {
         // 持仓超时：持有确认 Bar 数达上限
         if (lot.barsHeld < rule.maxHoldingBars) return null;
         return this.proposal(
           channel,
           ownerPluginId,
           rule,
-          'time_expired',
           `持仓超时：已持有 ${lot.barsHeld} 根确认 Bar（上限 ${rule.maxHoldingBars}）`,
           {
             close: bar.close,
@@ -222,8 +226,7 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
   private proposal(
     channel: SignalChannelRef,
     ownerPluginId: string,
-    rule: VirtualExitRule,
-    exitKind: string,
+    rule: PriceLevelVirtualExitRule,
     reason: string,
     evidence: Record<string, unknown>,
   ): VirtualExitProposal {
@@ -231,10 +234,10 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
       channel,
       ownerPluginId,
       ruleId: `${ownerPluginId}:${rule.kind}:${rule.id ?? 'default'}`,
-      exitKind,
+      exitKind: rule.kind,
       reason,
-      badgeText: `防守出场·${exitKind}`,
-      confidence: 0.9,
+      badgeText: `防守出场·${rule.kind}`,
+      confidence: DEFAULT_PRICE_LEVEL_CONFIDENCE,
       evidence,
     };
   }

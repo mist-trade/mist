@@ -560,6 +560,18 @@ describe('StrategyEvaluationKernel（虚拟出场端口）', () => {
     expect(exit.originPluginId).toBe('plugin.test.rule-declaring');
     expect(exit.channel).toEqual({ definitionId: 7, versionId: 1, period: 30 });
     expect(exit.contextSnapshot).toMatchObject({ exitKind: 'AVERAGE_STOP' });
+    expect(exit.decisionTrace).toMatchObject({
+      exitKind: 'AVERAGE_STOP',
+      badgeText: '均价止损',
+      trace: [
+        expect.objectContaining({
+          type: 'VIRTUAL_EXIT',
+          pluginId: 'plugin.test.rule-declaring',
+          name: '均价止损',
+          action: 'SELL',
+        }),
+      ],
+    });
   });
 });
 

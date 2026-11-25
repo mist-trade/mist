@@ -327,4 +327,31 @@ describe('NecklineProjectionEngine (颈线映射与空间测距算子引擎)', (
     expect(Array.isArray(result.necklines)).toBe(true);
     expect(result.necklines.length).toBeGreaterThanOrEqual(1);
   });
+
+  it('场景 9: Breakout 同棒同时触达 1:1 目标位与回抽敏感带时，保持 TargetReached 不被覆盖回 PullbackRetested', () => {
+    const builder = new SyntheticBarSeriesBuilder();
+    builder.pushBar(105, 106, 99, 100);
+    builder.pushBar(100, 101, 94, 95);
+    builder.pushBar(95, 96, 90, 91); // 底1: Low=90
+    builder.pushBar(91, 95, 91, 94);
+    builder.pushBar(94, 98, 93, 97);
+    builder.pushBar(97, 100, 96, 99.5); // 颈线: High=100
+    builder.pushBar(99.5, 100, 94, 95);
+    builder.pushBar(95, 96, 91, 92);
+    builder.pushBar(92, 94, 91, 93.5); // 底2: Low=91
+    builder.pushBar(93.5, 97, 93, 96.5);
+    builder.pushBar(96.5, 99.8, 96, 99.2);
+    builder.pushBar(99.2, 102.5, 98.5, 101.8, 50000); // 突破: Close=101.8 > 100
+    // 同棒大波动：下探回踩敏感带 (Low=100.5 <= 101) 并直接拉升触达 1:1 目标 (High=110.5 >= 110)
+    builder.pushBar(101.8, 110.5, 100.5, 109.0);
+
+    const projections = NecklineProjectionEngine.findProjections(
+      builder.build(),
+    );
+    expect(projections.length).toBeGreaterThanOrEqual(1);
+    const w = projections[0];
+
+    expect(w.status).toBe(NecklineStatus.TargetReached);
+    expect(w.retestZone.isRetested).toBe(true);
+  });
 });

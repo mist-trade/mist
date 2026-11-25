@@ -7,7 +7,20 @@ import type { KernelSignal, SignalChannelRef } from '../kernel/kernel.types';
  * 规则的具体阈值由插件在私仓声明；规则的求值算法由私仓实现的
  * `VirtualExitPolicyPort` 承担。开源仓只定义"有哪些规则种类"。
  */
-export type VirtualExitRule =
+/**
+ * 内置价位/时间防守虚拟出场规则种类常量（与 {@link PriceLevelVirtualExitRule} 联合严格对齐）。
+ */
+export const PRICE_LEVEL_RULE_KINDS = Object.freeze({
+  BREAKEVEN: 'breakeven',
+  STOP: 'stop',
+  TRAILING: 'trailing',
+  TIME_EXPIRED: 'time_expired',
+} as const);
+
+/**
+ * 开源通用价位/时间防守虚拟出场规则（由 {@link PriceLevelExitPolicy} 原生求值）。
+ */
+export type PriceLevelVirtualExitRule =
   | {
       /** 浮盈回吐保护：峰值浮盈曾达 activationGain，随后收盘跌破均价 */
       readonly kind: 'breakeven';
@@ -27,70 +40,36 @@ export type VirtualExitRule =
       readonly drawdownRatio: number;
       readonly id?: string;
     }
-  // ── 以下规则种类由私仓出场插件声明（内核只透传给 VirtualExitPolicyPort
-  // 求值，不解释其字段）——2026-11-24 结构兼容守卫（REQ-FACADE-06）收敛入公共
-  // 联合，消除两侧漂移。 ──
-  | {
-      /** 结构破位（私仓战术出场） */
-      readonly kind: 'structural_breakdown';
-      readonly id?: string;
-    }
-  | {
-      /** 线破位（私仓战术出场） */
-      readonly kind: 'line_break';
-      readonly id?: string;
-    }
-  | {
-      /** 微观顶背离出场（私仓战术出场） */
-      readonly kind: 'micro_divergence_exit';
-      readonly id?: string;
-    }
-  | {
-      /** 宏观线破位（私仓战术出场） */
-      readonly kind: 'macro_line_break';
-      readonly id?: string;
-    }
   | {
       /** 持仓超时：持有 Bar 数达上限 */
       readonly kind: 'time_expired';
       readonly maxHoldingBars: number;
       readonly id?: string;
-    }
-  | {
-      /** 熊市跳空低开：跳空幅度超阈值 */
-      readonly kind: 'bear_gap_down';
-      readonly gapThreshold?: number;
-      readonly id?: string;
-    }
-  | {
-      /** 熊市跌破 MA5 */
-      readonly kind: 'bear_break_ma5';
-      readonly id?: string;
-    }
-  | {
-      /** 熊市次级别跌破零轴 */
-      readonly kind: 'bear_sub_break_zero';
-      readonly id?: string;
-    }
-  | {
-      /** 支撑区失守 */
-      readonly kind: 'support_zone_breached';
-      readonly id?: string;
-    }
-  | {
-      /** 斐波那契扩展止盈：T1 保本提损 + T2 黄金止盈 */
-      readonly kind: 'fibonacci_extension_take_profit';
-      readonly enableBreakevenAtT1?: boolean;
-      readonly enableTakeProfitAtT2?: boolean;
-      readonly t1Key?: string;
-      readonly t2Key?: string;
-      readonly id?: string;
     };
 
-export interface VirtualExitRuleBinding {
+/**
+ * 可扩展外部虚拟出场规则（内核只透传给外部 {@link VirtualExitPolicyPort} 求值，
+ * 开源核心不枚举也不强绑定具体扩展战术字段）。
+ */
+export interface ExternalVirtualExitRule {
+  readonly kind: string;
+  readonly id?: string;
+  readonly [key: string]: unknown;
+}
+
+/**
+ * 通道级虚拟出场规则：内置价位/时间防守规则 + 可扩展外部规则。
+ */
+export type VirtualExitRule =
+  | PriceLevelVirtualExitRule
+  | ExternalVirtualExitRule;
+
+export interface VirtualExitRuleBinding<
+  TRule extends VirtualExitRule = VirtualExitRule,
+> {
   /** 声明该规则的插件，仅用于归因 */
   readonly ownerPluginId: string;
-  readonly rule: VirtualExitRule;
+  readonly rule: TRule;
 }
 
 /** 一个通道可用的全部规则绑定。 */

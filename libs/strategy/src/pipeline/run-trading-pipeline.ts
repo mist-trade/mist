@@ -19,6 +19,7 @@ import {
   groupSignals,
   foldVirtualFills,
   buildTradingManual,
+  renderTraceChainOf,
   TradingEngine,
   yuanToLi,
   type RiskRule,
@@ -150,7 +151,7 @@ export async function runTradingPipeline(
           periodLabel: `${signal.channel?.period ?? 0}m`,
           confidence: signal.confidence,
           confidenceLevel: signal.confidenceLevel,
-          traceChain: null,
+          traceChain: renderTraceChainOf(signal.decisionTrace),
         },
       })),
     };

@@ -134,7 +134,7 @@ stateDiagram-v2
 
 1. **对称度量投射 (`measuredTarget`)**：
    $$\text{measuredTarget} = 2.0 \times \text{CE} - \text{origin}$$
-   - **调用注意（重要）**：`originPrice` 为可选参数。若省略 `originPrice`，当前实现默认取 `origin = fvg.gapBottom`（看涨）或 `fvg.gapTop`（看跌），此时 `2 * CE - origin` 在数值上等于 `fvg.gapTop` / `fvg.gapBottom`（即缺口自身远端边界）；**仅当调用方显式传入结构起涨/起跌基准价 `originPrice` 时，才会输出向外部对称延伸的目标位**。
+   - **自动锚点与防退化契约**：`PaCore.executeFullAnalysis` 与 `PaVisualAdapter` 通过 `GapProjectionEngine.resolveImpulseOrigin(fvg, klines)` 自动提取三棒脉冲起点（看涨取 `klines[startIndex].low`、看跌取 `klines[startIndex].high`）传入 `project`；若外部直接调用 `GapProjectionEngine.project(fvg)` 省略 `originPrice`，则回退为 `gapBottom - baseHeight`（看涨）或 `gapTop + baseHeight`（看跌），确保对称目标位始终向趋势延续方向延伸而不退化为缺口自身边界。
 2. **标准差倍数投射 (`sdTargets`)**：
    - **看涨 FVG (`direction = 'up'`)**：`sd1_0 = gapTop + 1.0 * H`，`sd2_0 = gapTop + 2.0 * H`，`sd2_5 = gapTop + 2.5 * H`，`sd4_0 = gapTop + 4.0 * H`；
    - **看跌 FVG (`direction = 'down'`)**：`sd1_0 = gapBottom - 1.0 * H`，`sd2_0 = gapBottom - 2.0 * H`，`sd2_5 = gapBottom - 2.5 * H`，`sd4_0 = gapBottom - 4.0 * H`；
@@ -161,7 +161,7 @@ stateDiagram-v2
 
 ### 5. 形态颈线空间映射 (`NecklineProjectionEngine`)
 `PaCore.findNecklines(klines, options?)` 已在 `libs/pacore/src/internal/neckline-projections.ts` 落地，完整理论与公式见姊妹文档 [`docs/neckline-projection-architecture.md`](./neckline-projection-architecture.md)。
-- **实现对齐说明**：`NecklineProjectionEngine` 当前默认值是 `swingWindow = 2`、`maxTroughDifferenceRatio = 0.05`、`minPatternHeightRatio = 0.01`、`minBarSpan = 4`、`maxBarSpan = 120`（与 `contracts.ts` 注释及姊妹文档写的 `3 / 0.03 / 0.015 / 8` 有差异，后续可按需显式传参或对齐默认值）；另外在 `Breakout` 状态递推中若同一根 Bar 同时满足 `target1_0` 与回踩 `retestZone`，当前顺序会先置 `TargetReached` 再被 `PullbackRetested` 覆盖，调用方消费状态时需注意。
+- **实现与契约对齐**：`NecklineProjectionEngine` 与 `contracts.ts` 注释均已对齐默认参数 `swingWindow = 2`、`maxTroughDifferenceRatio = 0.05`、`minPatternHeightRatio = 0.01`、`minBarSpan = 4`、`maxBarSpan = 120`；在 `Breakout` 状态递推中，一旦触及 `target1_0` 即锁定 `reachedTarget` 标记，同一根 Bar 即使同时回踩 `retestZone` 也不会将 `TargetReached` 覆盖回 `PullbackRetested`。
 
 ---
 
@@ -255,7 +255,7 @@ mist/libs/pacore/
   2. `internal/liquidity-sweep.spec.ts` 缺失单元测试；
   3. `PaTrendDirection` 枚举与 `PaAnalysisOptions.atrThreshold` 当前未被调用；
   4. `assertPaKSeries` 尚未拦截 `<= 0` 的非正价格；
-  5. `GapProjectionEngine.project` 未传 `originPrice` 时退化、`NecklineProjectionEngine` 同 Bar `TargetReached` 与 `PullbackRetested` 覆写问题、以及 `NecklineOptions` 默认值与注释对齐。
+  5. ~~`GapProjectionEngine.project` 未传 `originPrice` 时退化、`NecklineProjectionEngine` 同 Bar `TargetReached` 与 `PullbackRetested` 覆写问题、以及 `NecklineOptions` 默认值与注释对齐。~~（已于本轮收口：`GapProjectionEngine.resolveImpulseOrigin` 与防退化回退、同 Bar `reachedTarget` 优先锁定及 `contracts.ts` 默认值注释已对齐，见 Batch 1 单测）。
 
 ### Batch 2: 视觉指令图层适配器 `libs/visual-command`（已落地 + 已知缺口）
 - **已落地**：[`pa-visual.adapter.ts`](../libs/visual-command/src/adapters/pa-visual.adapter.ts) 与 [`visual-command.service.ts`](../libs/visual-command/src/visual-command.service.ts#L85-L105) 的图层分发及配套单测。

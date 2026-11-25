@@ -49,13 +49,15 @@ describe('PaVisualAdapter (纯价格行为图元适配器)', () => {
       expect(ceLine.style).toBe('dashed');
     }
 
-    // 包含 1:1 度量投射目标线
+    // 包含 1:1 度量投射目标线（不应退化为 gapTop=110，应基于推动起点 99 投射到 116）
     const projLine = commands.find(
       (c) => c.layer === 'pa_projection' && c.type === 'line',
     );
     expect(projLine).toBeDefined();
     if (projLine && projLine.type === 'line') {
       expect(projLine.style).toBe('dotted');
+      expect(projLine.startPrice).toBe(116);
+      expect(projLine.startPrice).toBeGreaterThan(110);
     }
   });
 

@@ -1,5 +1,6 @@
 import type { ProjectedStrategyBar, StrategyBar } from '@app/market-data';
 import { StrategySeriesImputer } from '@app/market-data';
+import { DECISION_ACTIONS } from '../strategy.constants';
 import type {
   ConfidenceLevel,
   DecisionResult,
@@ -34,6 +35,8 @@ import type {
   SignalChannelRef,
   SignalIntent,
 } from './kernel.types';
+
+const VIRTUAL_EXIT_TRACE_NODE_TYPE = 'VIRTUAL_EXIT';
 
 /**
  * 统一策略求值内核（三链路唯一通路：实时 / 单步推演 / 批量回测）。
@@ -306,6 +309,17 @@ export class StrategyEvaluationKernel {
         ruleId: proposal.ruleId,
         exitKind: proposal.exitKind,
         reason: proposal.reason,
+        badgeText: proposal.badgeText,
+        trace: [
+          {
+            nodeId: proposal.ruleId,
+            type: VIRTUAL_EXIT_TRACE_NODE_TYPE,
+            pluginId: proposal.ownerPluginId,
+            name: proposal.badgeText || proposal.exitKind,
+            action: DECISION_ACTIONS.SELL,
+            reason: proposal.reason,
+          },
+        ],
       },
       contextSnapshot: {
         exitKind: proposal.exitKind,

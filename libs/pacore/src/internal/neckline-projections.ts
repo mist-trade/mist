@@ -302,18 +302,22 @@ export class NecklineProjectionEngine {
           }
         }
       } else if (status === NecklineStatus.Breakout) {
-        // 1. 目标达成判定
+        // 1. 目标达成判定（若当根已达 1:1 目标位，即使盘中曾回探敏感带也不再退回 PullbackRetested）
+        let reachedTarget = false;
         if (
           (direction === 'up' && bar.high >= targets.target1_0) ||
           (direction === 'down' && bar.low <= targets.target1_0)
         ) {
           status = NecklineStatus.TargetReached;
+          reachedTarget = true;
         }
 
         // 2. 回抽支阻互换判定
         if (direction === 'up') {
           if (bar.low <= retestZone.top && bar.close >= retestZone.bottom) {
-            status = NecklineStatus.PullbackRetested;
+            if (!reachedTarget) {
+              status = NecklineStatus.PullbackRetested;
+            }
             retestZone = {
               ...retestZone,
               isRetested: true,
@@ -321,13 +325,18 @@ export class NecklineProjectionEngine {
               retestTime: bar.time,
               retestExtreme: bar.low,
             };
-          } else if (bar.close < necklinePrice - 0.5 * baseHeight) {
+          } else if (
+            !reachedTarget &&
+            bar.close < necklinePrice - 0.5 * baseHeight
+          ) {
             status = NecklineStatus.Invalidated; // 假突破深幅破坏
             break;
           }
         } else {
           if (bar.high >= retestZone.bottom && bar.close <= retestZone.top) {
-            status = NecklineStatus.PullbackRetested;
+            if (!reachedTarget) {
+              status = NecklineStatus.PullbackRetested;
+            }
             retestZone = {
               ...retestZone,
               isRetested: true,
@@ -335,7 +344,10 @@ export class NecklineProjectionEngine {
               retestTime: bar.time,
               retestExtreme: bar.high,
             };
-          } else if (bar.close > necklinePrice + 0.5 * baseHeight) {
+          } else if (
+            !reachedTarget &&
+            bar.close > necklinePrice + 0.5 * baseHeight
+          ) {
             status = NecklineStatus.Invalidated;
             break;
           }

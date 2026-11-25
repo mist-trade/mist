@@ -1,10 +1,18 @@
+import { DECISION_ACTIONS } from '../../strategy.constants';
 import type {
   FactorContext,
   FactorOpinion,
   FactorPlugin,
   FactorPluginMetadata,
 } from '../factor.types';
-import type { VirtualExitRule } from '../../virtual-exit/virtual-exit.port';
+import {
+  PRICE_LEVEL_RULE_KINDS,
+  type VirtualExitRule,
+} from '../../virtual-exit/virtual-exit.port';
+
+const PRICE_DEFENSE_SKIP_REASON =
+  '价格防守出场插件仅声明虚拟出场规则，不参与因子求值';
+const PRICE_DEFENSE_DISPLAY_TAG = 'EXIT_RULE_HOST';
 
 /**
  * 价格防守出场插件（标准插件）。
@@ -35,10 +43,10 @@ export class PriceDefenseExitPlugin implements FactorPlugin {
     // 出场插件不产生因子观点（NEUTRAL 弃权）：决策流树中不作为信号源，
     // 仅通过 virtualExitRules 声明虚拟出场规则。
     return {
-      action: 'NEUTRAL',
+      action: DECISION_ACTIONS.NEUTRAL,
       confidence: 0,
-      reason: '价格防守出场插件仅声明虚拟出场规则，不参与因子求值',
-      displayTag: 'EXIT_RULE_HOST',
+      reason: PRICE_DEFENSE_SKIP_REASON,
+      displayTag: PRICE_DEFENSE_DISPLAY_TAG,
     };
   }
 
@@ -48,14 +56,17 @@ export class PriceDefenseExitPlugin implements FactorPlugin {
     if (!params) return [];
     const rules: VirtualExitRule[] = [];
     if (typeof params.stopLossRatio === 'number' && params.stopLossRatio < 0) {
-      rules.push({ kind: 'stop', lossRatio: params.stopLossRatio });
+      rules.push({
+        kind: PRICE_LEVEL_RULE_KINDS.STOP,
+        lossRatio: params.stopLossRatio,
+      });
     }
     if (
       typeof params.breakevenActivationGain === 'number' &&
       params.breakevenActivationGain > 0
     ) {
       rules.push({
-        kind: 'breakeven',
+        kind: PRICE_LEVEL_RULE_KINDS.BREAKEVEN,
         activationGain: params.breakevenActivationGain,
       });
     }
@@ -66,7 +77,7 @@ export class PriceDefenseExitPlugin implements FactorPlugin {
       params.trailingDrawdownRatio > 0
     ) {
       rules.push({
-        kind: 'trailing',
+        kind: PRICE_LEVEL_RULE_KINDS.TRAILING,
         activationGain: params.trailingActivationGain,
         drawdownRatio: params.trailingDrawdownRatio,
       });
@@ -76,7 +87,7 @@ export class PriceDefenseExitPlugin implements FactorPlugin {
       params.maxHoldingBars > 0
     ) {
       rules.push({
-        kind: 'time_expired',
+        kind: PRICE_LEVEL_RULE_KINDS.TIME_EXPIRED,
         maxHoldingBars: params.maxHoldingBars,
       });
     }

@@ -158,4 +158,81 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
     const times = result.signals.map((s) => s.signalTime.getTime());
     expect(times).toEqual([...times].sort((a, b) => a - b));
   });
+
+  it('交易手册展示决策流 traceChain 与虚拟出场细分原因', async () => {
+    const { PriceLevelExitPolicy } = await import(
+      '../virtual-exit/price-level-exit.policy'
+    );
+
+    class BuyWithStopPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.buy-with-stop';
+      public readonly name = '带止损测试插件';
+      public readonly category = 'TECHNICAL' as const;
+      public readonly version = '1.0.0';
+      public readonly description = '第一根买入并挂 -5% 止损';
+      public readonly paramSchema = {};
+
+      public async evaluate(ctx: { timestamp: Date }): Promise<FactorOpinion> {
+        const isFirst = ctx.timestamp.getTime() === Date.UTC(2026, 0, 5, 1, 30);
+        return isFirst
+          ? { action: 'BUY', confidence: 0.9, reason: '开仓' }
+          : { action: 'NEUTRAL', confidence: 0.5, reason: '观望' };
+      }
+
+      public virtualExitRules() {
+        return [{ kind: 'stop' as const, lossRatio: -0.05 }];
+      }
+    }
+
+    const bars = [
+      makeBar(new Date(Date.UTC(2026, 0, 5, 1, 30)), 10),
+      makeBar(new Date(Date.UTC(2026, 0, 6, 1, 30)), 9),
+    ];
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new BuyWithStopPlugin());
+    const flow: DecisionFlowNode = {
+      id: 'guard_stop_buy',
+      type: 'GUARD',
+      name: '形态买入',
+      pluginId: 'plugin.test.buy-with-stop',
+      params: {},
+      requiredAction: 'BUY',
+      minConfidence: 0.5,
+      onPass: {
+        id: 'term_buy',
+        type: 'TERMINAL',
+        action: 'BUY',
+        signalTag: 'TEST_BUY',
+        reason: '买入',
+      },
+      onFail: {
+        id: 'term_abort',
+        type: 'TERMINAL',
+        action: 'ABORT',
+        reason: '跳过',
+      },
+    };
+    const result = await runTradingPipeline(
+      makeInput({
+        barsByPeriod: new Map([[30, bars]]),
+        plans: [
+          {
+            definitionId: 1,
+            versionId: 1,
+            flow,
+            ruleSnapshot: Object.freeze({}),
+            period: 30,
+            requiredBarCount: 1,
+            contextRequirements: {},
+          },
+        ],
+        registry,
+        publicFrom: bars[0].timestamp,
+        virtualExitPolicy: new PriceLevelExitPolicy(),
+      }),
+    );
+
+    expect(result.report).toContain('形态买入 ✓');
+    expect(result.report).toContain('防守出场·stop ✓');
+  });
 });

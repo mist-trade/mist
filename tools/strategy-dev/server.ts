@@ -32,6 +32,7 @@ import { CapitalLedger } from '../../libs/strategy/src/position/capital-ledger';
 import {
   TradingEngine,
   createDefaultRiskRules,
+  renderTraceChainOf,
   yuanToLi,
 } from '../../libs/strategy/src/trading';
 import type {
@@ -998,7 +999,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
           periodLabel: `${options.period}m`,
           confidence: signal.confidence,
           confidenceLevel: signal.confidenceLevel,
-          traceChain: null,
+          traceChain: renderTraceChainOf(signal.decisionTrace),
         },
       })),
     };

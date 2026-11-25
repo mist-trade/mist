@@ -31,6 +31,9 @@ describe('PaCore Facade (纯几何门面集成测试)', () => {
     expect(result.fvgs).toHaveLength(1);
     expect(result.fvgs[0].consequentEncroachment).toBe(107.5);
     expect(result.projections).toHaveLength(1);
+    // 推动起源 min(k0.low=99, k1.low=103) = 99 -> 2*107.5 - 99 = 116 (> gapTop 110)
+    expect(result.projections[0].originPrice).toBe(99);
+    expect(result.projections[0].measuredTarget).toBe(116);
     expect(result.pinBars.length).toBeGreaterThanOrEqual(1);
   });
 

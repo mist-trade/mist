@@ -38,6 +38,7 @@ import {
   SimulatedBroker,
   StrategyEvaluationKernel,
   TradingEngine,
+  renderTraceChainOf,
   shanghaiMidnight,
   yuanToLi,
   type AccountSnapshot,
@@ -542,7 +543,7 @@ export class BacktestRunExecutor {
             periodLabel: `${run.period}m`,
             confidence: signal.confidence,
             confidenceLevel: signal.confidenceLevel,
-            traceChain: null,
+            traceChain: renderTraceChainOf(signal.decisionTrace),
           },
         })),
       };

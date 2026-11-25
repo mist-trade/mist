@@ -85,6 +85,16 @@ export class PaCore {
   }
 
   /**
+   * 从 K 线序列解析 FVG 推动段起源极值价，供外部投射调用
+   */
+  public static resolveFvgOrigin(
+    fvg: FairValueGap,
+    klines: readonly PaK[],
+  ): number | undefined {
+    return GapProjectionEngine.resolveImpulseOrigin(fvg, klines);
+  }
+
+  /**
    * 计算失衡缺口的空间对称度量与标准差扩展投射
    */
   public static calculateProjection(
@@ -124,7 +134,10 @@ export class PaCore {
     });
 
     const projections: GapProjection[] = fvgs.map((fvg) =>
-      GapProjectionEngine.project(fvg),
+      GapProjectionEngine.project(
+        fvg,
+        GapProjectionEngine.resolveImpulseOrigin(fvg, klines),
+      ),
     );
 
     const necklines = NecklineProjectionEngine.findProjections(

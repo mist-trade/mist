@@ -214,4 +214,22 @@ describe('PriceLevelExitPolicy（价格型虚拟出场求值器）', () => {
     policy.configure([]);
     expect(policy.onBar(bar(9.0), 30)).toHaveLength(0);
   });
+
+  it('扩展外部虚拟出场规则可透传共存且不影响内置价位规则求值', () => {
+    const policy = new PriceLevelExitPolicy();
+    const externalRule = {
+      kind: 'pa_measured_move_tp' as const,
+      id: 'pa.tp1',
+      targetRatio: 1.0,
+    };
+    configure(policy, [
+      { ownerPluginId: 'plugin.private.pa', rule: externalRule },
+      { ownerPluginId: 'p', rule: { kind: 'stop', lossRatio: -0.05 } },
+    ]);
+    policy.onSignal(entrySignal(10));
+    // 外部自定义规则由外部策略求值器处理，PriceLevelExitPolicy 仅触发同通道内置规则
+    const proposals = policy.onBar(bar(9.4), 30);
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0]?.exitKind).toBe('stop');
+  });
 });
