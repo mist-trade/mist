@@ -2,6 +2,8 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { FactorPlugin } from './factor.types';
 import type { FactorPluginRegistry } from './factor-plugin-registry';
+import { PriceLevelExitPolicy } from '../virtual-exit/price-level-exit.policy';
+import { CompositeVirtualExitPolicy } from '../virtual-exit/composite-virtual-exit.policy';
 import type { VirtualExitPolicyPort } from '../virtual-exit/virtual-exit.port';
 
 const CANDIDATE_INDEX_FILES: readonly string[] = Object.freeze([
@@ -109,23 +111,27 @@ export class ExternalFactorPluginLoader {
   }
 
   /**
-   * 从外部插件包创建虚拟出场策略实例（每个内核实例一份，持有自己的通道虚拟持仓）。
-   * 未挂载私仓或未导出工厂时返回 null，内核退化为不产出虚拟出场信号。
+   * 创建虚拟出场策略实例（每个内核实例一份，持有自己的通道虚拟持仓）。
+   *
+   * 公共域 `PriceLevelExitPolicy`（价格型规则：stop/breakeven/trailing/
+   * time_expired，含 2026-11-25 拍板后的硬止损信号侧求值）**常驻**；
+   * 探测到私仓实现时以 Composite 组合（结构型规则由私仓求值）。
    */
-  public static createVirtualExitPolicy(): VirtualExitPolicyPort | null {
+  public static createVirtualExitPolicy(): VirtualExitPolicyPort {
+    const primary = new PriceLevelExitPolicy();
     if (this.disabled) {
-      return null;
+      return primary;
     }
     for (const candPath of this.getCandidatePaths()) {
       const entryFiles = this.resolveEntryFiles(candPath);
       for (const entryFile of entryFiles) {
         const policy = this.tryCreatePolicy(entryFile);
         if (policy) {
-          return policy;
+          return new CompositeVirtualExitPolicy(primary, policy);
         }
       }
     }
-    return null;
+    return primary;
   }
 
   private static tryCreatePolicy(

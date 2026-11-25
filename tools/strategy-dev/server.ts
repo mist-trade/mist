@@ -51,7 +51,6 @@ import { ExternalFactorPluginLoader } from '../../libs/strategy/src/factor/exter
 import {
   ORDER_STATUSES,
   ORDER_TYPES,
-  TRADING_LAYER_DEFAULTS,
 } from '../../libs/strategy/src/strategy.constants';
 import type { DecisionFlowNode } from '../../libs/strategy/src/decision-flow/decision-flow.types';
 import type { ExternalContextRequirement } from '../../libs/strategy/src/kernel/kernel.types';
@@ -928,14 +927,11 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         options.mode === 'enhanced' ||
         options.strategyDefinitionId === 2 ||
         options.strategyDefinitionId === 3));
-  // 交易层统一引擎（组5 迁移）：裁决/仓位/巡检出同一管线；enableStopLoss 语义
-  // 沿袭——关闭时无任何巡检规则（含 systemic），开启时挂载 systemic + hardStop。
+  // 交易层统一引擎（组5 迁移）：裁决/仓位/巡检出同一管线。2026-11-25 拍板：
+  // 引擎不出方案——硬止损由策略定义声明走信号层；enableStopLoss 开关仅控制
+  // 市场级保护巡检（systemicCrunch）是否常驻。
   const tradingEngine = new TradingEngine({
-    riskRules: enableStopLoss
-      ? createDefaultRiskRules(
-          TRADING_LAYER_DEFAULTS.DEFAULT_HARD_STOP_LOSS_RATIO,
-        )
-      : [],
+    riskRules: enableStopLoss ? createDefaultRiskRules() : [],
   });
 
   // 信号按 Bar 缓冲成组（与回测迁移同构）：drive 序 push → onBar(T) → onSignal(T)，

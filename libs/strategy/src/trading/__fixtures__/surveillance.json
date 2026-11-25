@@ -5,9 +5,6 @@
     "securityId": 1,
     "securityCode": "000001",
     "seedCapitalLi": "1000000000",
-    "riskRules": {
-      "hardStopLossRatio": -0.08
-    },
     "events": [
       {
         "kind": "group",
@@ -24,9 +21,18 @@
         ]
       },
       {
-        "kind": "surveil",
-        "timestamp": "2026-01-06T06:00:00Z",
-        "close": 9.19
+        "kind": "group",
+        "tradingDay": "2026-01-06",
+        "effectiveTime": "2026-01-06T06:00:00Z",
+        "signals": [
+          {
+            "key": "evt-stop-d2",
+            "signalKind": "exit",
+            "signalType": "PRICE_DEFENSE_EXIT",
+            "triggerPrice": 9.19,
+            "confidence": 0.9
+          }
+        ]
       },
       {
         "kind": "group",
@@ -85,36 +91,37 @@
       }
     },
     {
-      "event": "surveil@2026-01-06T06:00:00Z@9.19",
+      "event": "group@2026-01-06T06:00:00Z",
       "instructions": [
         {
-          "instructionId": "ti-risk-000001-1767679200000-hard-stop-loss",
-          "idempotencyKey": "risk-000001-1767679200000-hard-stop-loss",
+          "instructionId": "ti-evt-stop-d2",
+          "idempotencyKey": "evt-stop-d2",
           "action": "SELL",
           "quantity": 95000,
           "referencePrice": 9.19,
           "estimatedValueLi": "873050000",
-          "reason": "HARD_STOP_LOSS"
-        }
-      ],
-      "rejections": []
-    },
-    {
-      "event": "group@2026-01-06T07:35:00Z",
-      "instructions": [
-        {
-          "instructionId": "ti-evt-exit-d2",
-          "idempotencyKey": "evt-exit-d2",
-          "action": "SELL",
-          "quantity": 95000,
-          "referencePrice": 9.2,
-          "estimatedValueLi": "874000000",
-          "reason": "CHAN_SECOND_SELL"
+          "reason": "PRICE_DEFENSE_EXIT"
         }
       ],
       "rejections": [],
       "accountAfter": {
-        "cashLi": "923088760",
+        "cashLi": "922139481",
+        "tradingDay": "2026-01-06",
+        "positions": []
+      }
+    },
+    {
+      "event": "group@2026-01-06T07:35:00Z",
+      "instructions": [],
+      "rejections": [
+        {
+          "idempotencyKey": "evt-exit-d2",
+          "reason": "NO_POSITION",
+          "detail": "虚拟账户空仓"
+        }
+      ],
+      "accountAfter": {
+        "cashLi": "922139481",
         "tradingDay": "2026-01-06",
         "positions": []
       }

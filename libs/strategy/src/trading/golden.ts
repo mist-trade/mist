@@ -16,8 +16,7 @@ import type {
   TradingDecision,
   TradingPositionState,
 } from './domain.types';
-import { TradingEngine, type TradingEngineDeps } from './engine';
-import { createDefaultRiskRules } from './rules';
+import { TradingEngine } from './engine';
 
 /* ───────────────────────── 场景 DSL ───────────────────────── */
 
@@ -52,8 +51,6 @@ export interface GoldenScenario {
   readonly securityCode: string;
   /** 种子资金（整数厘，字符串序列化） */
   readonly seedCapitalLi: string;
-  /** 引擎风控配置（硬止损归属待拍板前的显式声明位） */
-  readonly riskRules?: { readonly hardStopLossRatio?: number };
   readonly events: readonly GoldenEvent[];
 }
 
@@ -175,13 +172,10 @@ function foldPositionFromAccount(
 export function runGoldenScenario(
   scenario: GoldenScenario,
 ): readonly SerializedLogEntry[] {
-  const deps: TradingEngineDeps = scenario.riskRules
-    ? {
-        // 场景显式声明风控位（systemicCrunch 常驻；hardStop 仅在声明比例时挂载）
-        riskRules: createDefaultRiskRules(scenario.riskRules.hardStopLossRatio),
-      }
-    : {};
-  const engine = new TradingEngine(deps);
+  // 2026-11-25 拍板：引擎风控仅 systemicCrunch 常驻；硬止损走信号层
+  // （PriceDefenseExitPlugin → PriceLevelExitPolicy → exit 信号），场景以
+  // 显式 SELL 信号表达。
+  const engine = new TradingEngine();
 
   let account: AccountSnapshot = {
     cashLi: BigInt(scenario.seedCapitalLi),

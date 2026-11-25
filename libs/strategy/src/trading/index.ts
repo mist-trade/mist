@@ -35,7 +35,6 @@ export {
   createDefaultExitRules,
   createDefaultRiskRules,
   createEntrySizingRule,
-  createRiskHardStopRule,
   entryHoldingGate,
   entryPriceGate,
   entryRegimeGate,

@@ -1371,5 +1371,6 @@ OpenSpec `add-virtual-trading-layer` 全组任务完成，四链路（实时/回
 - **四端适配**：回测 executor（信号按 Bar 缓冲成组，时序与旧逐信号路径等价）/ 实时 channel handler（fold 账本 → decide → 假定成交回填 → 手册）/ dev server（手写流水线整段删除）/ 私仓 run-pipeline.js（本地 K 线 + 预设编译 → 门面，880003 外部 context 全量装载，volume/amount 厘级 canonical 化）。
 - **清理**：`ExecutionRiskArbiter`/`PositionStateMachine.onSignal`/`ExitPolicyPort`/`EXIT_ACTIONS`/envelope 信号列表渲染全部退役；grep 门禁零生产引用。
 - **回归**：apps 39 套件 176 测试 + libs/strategy 43 套件 343 测试全绿；私仓 29 套件 295 测试全绿（含 FactorPlugin 结构兼容守卫）。
-- **语义变化（基线重跑覆盖）**：预算比例 0.995→0.95 统一；组内顺序统一先出后进；厘级舍入（分→厘）；后续硬止损归属倾向策略定义（design 11.4 待拍板）。
+- **语义变化（基线重跑覆盖）**：预算比例 0.995→0.95 统一；组内顺序统一先出后进；厘级舍入（分→厘）。
+- **硬止损归属已拍板（2026-11-25，架构总纲）**：**引擎不出方案，全部由插件决定；引擎只负责接受信号然后撮合交易**。硬止损由策略定义 DSL params 声明（`plugin.exit.price-defense` 转换规则绑定），公共域 `PriceLevelExitPolicy` 按虚拟持仓求值产出 exit 信号（与真实信号同构）；引擎风控仅 systemicCrunch 常驻；出场归因 exitReason 'HARD_STOP_LOSS' → 'VIRTUAL_EXIT'（exitKind 在信号 contextSnapshot）。golden surveillance 场景重写：回放器特例（surveil 指令不推进账本导致双重卖出）同步消除，与回测真实时序对齐。
 - **开源对齐**：五仓调研（Nautilus/LEAN/backtrader/freqtrade/vnpy）确认四项从零基准全部为生产验证模式（design 12）。

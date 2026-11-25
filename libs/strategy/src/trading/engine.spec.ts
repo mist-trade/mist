@@ -2,7 +2,6 @@
  * TradingEngine 单测（REQ-ENGINE-01/02/03/04/05/07 + REQ-ISO-02）。
  */
 import { TradingEngine } from './engine';
-import { createDefaultRiskRules } from './rules';
 import { sellFirstByConfidence } from './ordering';
 import { createAllInWithBuffer } from './sizing';
 import { MarketRiskRegime } from './domain.types';
@@ -339,35 +338,7 @@ describe('TradingEngine', () => {
       );
     });
 
-    it('配置硬止损 -8% 且浮亏破线 → HARD_STOP_LOSS', () => {
-      const stopEngine = new TradingEngine({
-        riskRules: createDefaultRiskRules(-0.08),
-      });
-      const out = stopEngine.surveilBar(
-        {
-          securityId: 1,
-          securityCode: '000001',
-          timestamp: SIGNAL_TIME,
-          close: 9.19,
-        }, // -8.1%
-        held,
-      );
-      expect(out).toHaveLength(1);
-      expect(out[0].action).toBe('SELL');
-      expect(out[0].quantity).toBe(5000);
-      expect(out[0].reason).toBe('HARD_STOP_LOSS');
-
-      // 未破线（-7.9%）→ 不产出
-      const outAbove = stopEngine.surveilBar(
-        {
-          securityId: 1,
-          securityCode: '000001',
-          timestamp: SIGNAL_TIME,
-          close: 9.21,
-        },
-        held,
-      );
-      expect(outAbove).toEqual([]);
-    });
+    // 2026-11-25 拍板：硬止损退役出引擎（策略定义 → 插件 → 信号层），
+    // 由 virtual-exit/price-level-exit.policy.spec.ts 覆盖等价语义。
   });
 });

@@ -37,7 +37,6 @@ import {
   PositionStateMachine,
   SimulatedBroker,
   StrategyEvaluationKernel,
-  TRADING_LAYER_DEFAULTS,
   TradingEngine,
   shanghaiMidnight,
   yuanToLi,
@@ -469,14 +468,12 @@ export class BacktestRunExecutor {
     const capitalLedger = new CapitalLedger({
       initialCash: DEFAULT_BROKER_INITIAL_CASH,
     });
-    // 交易层统一引擎（组4 迁移）：裁决/仓位/巡检出自同一管线；硬止损沿袭
-    // 显式声明（归属待拍板，design 11.4），预算比例统一 0.95（原 0.995）。
+    // 交易层统一引擎（组4 迁移）：裁决/仓位出自同一管线。2026-11-25 拍板后
+    // 引擎风控仅 systemicCrunch 常驻；硬止损由策略定义声明（DSL params →
+    // PriceDefenseExitPlugin → 信号层 exit 信号），预算比例统一 0.95。
     const tradingEngine = new TradingEngine({
-      riskRules: createDefaultRiskRules(
-        TRADING_LAYER_DEFAULTS.DEFAULT_HARD_STOP_LOSS_RATIO,
-      ),
+      riskRules: createDefaultRiskRules(),
     });
-
     // 信号按 Bar 缓冲成组：drive 序为 push → onBar(T) → onSignal(T)，组内信号在
     // 下一根 Bar 开始时统一 engine.decide（持仓/现金快照 = 前一 Bar 收盘后状态，
     // 指令交 Broker 于本 Bar Next-Bar 撮合——与旧"逐信号即时裁决"时序等价）。

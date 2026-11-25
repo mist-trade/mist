@@ -52,9 +52,12 @@
 - [ ] 4.1 executor 内联 Arbiter 编排 → `engine.decide`（每 Bar 信号批），指令交
       Broker submitOrder；per-bar 风控裁决路径（hardStopLoss / SYSTEMIC_CRUNCH）
       走引擎；
-- [ ] 4.2 内存端口注入（随跑随弃）；engine 配置透传（SizingStrategy 0.95、硬止损
+- [x] 4.2 内存端口注入（随跑随弃）；engine 配置透传（SizingStrategy 0.95、硬止损
       -0.08 规则参数、lot 100；硬止损归属待拍板——暂引擎透传、倾向改策略定义，
       见 design 11.4）；
+      > **[2026-11-25 拍板收口]** 硬止损已退役出引擎（引擎不出方案总纲）：
+      > 策略定义 DSL params → `plugin.exit.price-defense` → `PriceLevelExitPolicy`
+      > 信号层求值；引擎风控仅 systemicCrunch。见 design 11.4 第 2 条。
 - [ ] 4.3 回测对账（黄金回放）：迁移前旧路径生成 golden 基线 → 迁移后 diff——
       语义变化（先出后进、0.95 预算、规则管线序、厘级舍入）显式归类审查。
 

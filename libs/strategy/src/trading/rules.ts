@@ -19,7 +19,6 @@ import type {
 } from './domain.types';
 import type { KernelSignal } from '../kernel/kernel.types';
 import { SIGNAL_KINDS } from '../strategy.constants';
-import { liToYuan } from './money';
 
 function isHolding(position: TradingPositionState | null): boolean {
   return position !== null && position.holdingQuantity > 0;
@@ -179,7 +178,7 @@ export type RiskVerdict = {
 
 export type RiskRule = (ctx: RiskRuleContext) => RiskVerdict | null;
 
-/** 系统性雪崩：无条件紧急清仓（优先级 1）。 */
+/** 系统性雪崩：无条件紧急清仓（优先级 1，市场级保护巡检，非策略方案）。 */
 export const riskSystemicCrunchRule: RiskRule = ({ position, macroRegime }) => {
   if (macroRegime?.regime !== MarketRiskRegime.SYSTEMIC_CRUNCH) return null;
   return {
@@ -189,32 +188,11 @@ export const riskSystemicCrunchRule: RiskRule = ({ position, macroRegime }) => {
   };
 };
 
-/** 硬止损（可选配置）：浮亏跌破阈值斩仓（优先级 2）。 */
-export function createRiskHardStopRule(hardStopLossRatio: number): RiskRule {
-  return ({ position, bar }) => {
-    const costYuan = liToYuan(position.costPriceLi);
-    if (costYuan <= 0) return null;
-    const currentPnlRatio = (bar.close - costYuan) / costYuan;
-    const markedPnlRatio =
-      liToYuan(position.currentPriceLi - position.costPriceLi) / costYuan;
-    const effectivePnlRatio = Math.min(markedPnlRatio, currentPnlRatio);
-    if (effectivePnlRatio > hardStopLossRatio) return null;
-    return {
-      ruleId: 'hard-stop-loss',
-      quantity: position.holdingQuantity,
-      reason: 'HARD_STOP_LOSS',
-    };
-  };
-}
-
-export function createDefaultRiskRules(
-  hardStopLossRatio?: number | null,
-): readonly RiskRule[] {
-  const rules: RiskRule[] = [riskSystemicCrunchRule];
-  if (typeof hardStopLossRatio === 'number') {
-    rules.push(createRiskHardStopRule(hardStopLossRatio));
-  }
-  return rules;
+export function createDefaultRiskRules(): readonly RiskRule[] {
+  // 2026-11-25 拍板（design 11.4 收口）：引擎不出方案——硬止损由策略定义在
+  // DSL params 声明、PriceDefenseExitPlugin 转换为虚拟出场规则、信号层产出
+  // exit 信号；引擎风控仅保留市场级保护巡检（systemicCrunch）。
+  return [riskSystemicCrunchRule];
 }
 
 /** 首条终局 Verdict 生效（管线求值原语）。 */

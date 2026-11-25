@@ -6,6 +6,7 @@ import {
 } from '@app/shared-data';
 import {
   compileStoredDefinitionVersion,
+  LegacyStrategyCompiler,
   shanghaiMidnight,
   type DailyNavSnapshot,
 } from '@app/strategy';
@@ -598,14 +599,31 @@ describe('BacktestRunExecutor 统一内核回放', () => {
       period: 1440,
       startDate: new Date('2026-01-01T00:00:00.000Z'),
       endDate: new Date('2026-01-31T00:00:00.000Z'),
-      kind: 'rule_dsl',
+      kind: 'decision_flow',
     };
     fixture.dependencies.runRepository.findOne.mockResolvedValue(run);
     fixture.dependencies.versionRepository.findOne.mockResolvedValue({
       id: 7,
       ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
-      // Bar 1 close = 10 > 5 -> 发出 ENTRY 信号
-      rule: { field: 'k.close', operator: 'gt', value: 5 },
+      // 信号层硬止损声明（2026-11-25 拍板：引擎不出方案，出场规则由策略定义
+      // 经插件声明）：legacy 入场门禁 onFail 挂价格防守出场插件节点——该节点
+      // 仅声明虚拟出场规则（求值恒 NEUTRAL 无信号），params 声明 -8% 止损。
+      rule: {
+        rootNode: {
+          ...LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 5 },
+            'entry',
+          ),
+          onFail: {
+            id: 'guard_price_defense',
+            type: 'GUARD',
+            name: '价格防守出场规则声明',
+            pluginId: 'plugin.exit.price-defense',
+            params: { stopLossRatio: -0.08 },
+          },
+        },
+        requiredBarCount: 1,
+      },
       signalKind: 'entry',
     });
     fixture.dependencies.securityRepository.find.mockResolvedValue([
@@ -646,7 +664,8 @@ describe('BacktestRunExecutor 统一内核回放', () => {
         amount: '10000',
         type: 'complete',
       },
-      // Bar 3 (01-06): close 9.10 -> 跌幅 -9% 跌破 -8% 硬止损线，裁决器生成硬止损卖单
+      // Bar 3 (01-06): close 9.10 -> 跌破成本 10 × (1 - 0.08) = 9.2，信号层
+      // 价格防守出场规则（PriceLevelExitPolicy）产出虚拟出场信号
       {
         securityId: 9,
         securityCode: '600000.SH',
@@ -661,7 +680,7 @@ describe('BacktestRunExecutor 统一内核回放', () => {
         amount: '9100',
         type: 'complete',
       },
-      // Bar 4 (01-07): open 9.0 -> Next-Bar 撮合成交卖出，出场原因 HARD_STOP_LOSS
+      // Bar 4 (01-07): open 9.0 -> 组缓冲 Next-Bar decide 后撮合卖出，出场归因 VIRTUAL_EXIT
       {
         securityId: 9,
         securityCode: '600000.SH',
@@ -699,12 +718,13 @@ describe('BacktestRunExecutor 统一内核回放', () => {
       }),
     );
 
-    // 验证交易流水记录，且 exitReason 精确记录为 HARD_STOP_LOSS
+    // 验证交易流水记录：信号层出场归因（虚拟出场；exitKind/规则 id 细节在
+    // 信号 contextSnapshot，trade 流水记录机器类型）
     expect(fixture.dependencies.tradeRepository.create).toHaveBeenCalledWith(
       expect.objectContaining({
         backtestRunId: 41,
         securityCode: '600000.SH',
-        exitReason: 'HARD_STOP_LOSS',
+        exitReason: 'VIRTUAL_EXIT',
       }),
     );
   });

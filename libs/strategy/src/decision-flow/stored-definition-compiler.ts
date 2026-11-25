@@ -214,7 +214,8 @@ function collectPluginReferences(
 ): Map<string, Record<string, unknown> | undefined> {
   const references = new Map<string, Record<string, unknown> | undefined>();
   const visited = new Set<string>();
-  const visit = (node: DecisionFlowNode): void => {
+  const visit = (node: DecisionFlowNode | null | undefined): void => {
+    if (!node) return;
     if (visited.has(node.id)) return;
     visited.add(node.id);
     switch (node.type) {

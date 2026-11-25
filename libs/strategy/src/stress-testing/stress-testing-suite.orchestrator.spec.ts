@@ -1,9 +1,9 @@
 import { formatShanghaiDateString } from '@app/timezone';
 import {
-  createDefaultRiskRules,
   MarketRiskRegime,
   TradingEngine,
   yuanToLi,
+  type RiskRule,
 } from '../trading';
 import { SimulatedBroker } from '../execution/simulated-broker';
 import { PositionStateMachine } from '../position/position-state-machine';
@@ -331,9 +331,22 @@ describe('A 股五大历史极端事件压力测试套件 (Stress Testing Suite)
         });
         const position = new PositionStateMachine(1, '000001');
         const capitalLedger = new CapitalLedger({ initialCash: 1000000 });
-        // 交易层引擎接管（组9 迁移）：per-bar 风控巡检走 surveilBar
+        // 交易层引擎接管（组9 迁移）：per-bar 风控巡检走 surveilBar。
+        // 2026-11-25 拍板后引擎默认风控仅 systemicCrunch；本场景以依赖注入
+        // 形式显式挂载自定义止损规则（引擎仍支持自定义 RiskRule 注入）。
+        const customStopRule: RiskRule = ({ position, bar }) => {
+          const cost = Number(position.costPriceLi) / 1000;
+          if (cost <= 0) return null;
+          const pnlRatio = (bar.close - cost) / cost;
+          if (pnlRatio > -0.05) return null;
+          return {
+            ruleId: 'custom-stop',
+            quantity: position.holdingQuantity,
+            reason: 'HARD_STOP_LOSS',
+          };
+        };
         const tradingEngine = new TradingEngine({
-          riskRules: createDefaultRiskRules(-0.05), // 浮亏 5% 止损
+          riskRules: [customStopRule],
         });
 
         const day1 = new Date('2015-06-15T09:30:00.000Z');

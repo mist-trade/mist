@@ -1,0 +1,217 @@
+import type { StrategyBar } from '@app/market-data';
+import { PriceLevelExitPolicy } from './price-level-exit.policy';
+import type {
+  VirtualExitChannelSpec,
+  VirtualExitRuleBinding,
+} from './virtual-exit.port';
+import type { KernelSignal } from '../kernel/kernel.types';
+
+const CHANNEL = { definitionId: 1, versionId: 1, period: 30 };
+
+function bar(
+  close: number,
+  timestamp = new Date('2026-01-06T06:00:00Z'),
+): StrategyBar {
+  return {
+    securityId: 1,
+    securityCode: '000001',
+    source: 'tdx',
+    period: 30,
+    timestamp,
+    open: close,
+    high: close,
+    low: close,
+    close,
+    volume: '1000',
+    amount: '1000000',
+    type: 'complete',
+  };
+}
+
+function entrySignal(triggerPrice: number): KernelSignal {
+  return {
+    definitionId: CHANNEL.definitionId,
+    versionId: CHANNEL.versionId,
+    signalKind: 'entry',
+    channel: CHANNEL,
+    signalTime: new Date('2026-01-05T07:35:00Z'),
+    triggerPrice,
+    pivotTime: null,
+    pivotPrice: null,
+    signalType: 'CHAN_SECOND_BUY',
+    confidence: 0.86,
+    confidenceLevel: 'HIGH',
+    decisionTrace: {},
+    contextSnapshot: {},
+    ruleSnapshot: {},
+  };
+}
+
+function exitSignal(): KernelSignal {
+  return {
+    ...entrySignal(0),
+    signalKind: 'exit',
+    signalType: 'CHAN_SECOND_SELL',
+    triggerPrice: 0,
+  };
+}
+
+function configure(
+  policy: PriceLevelExitPolicy,
+  rules: VirtualExitRuleBinding[],
+): void {
+  const specs: VirtualExitChannelSpec[] = [
+    { channel: CHANNEL, bindings: rules },
+  ];
+  policy.configure(specs);
+}
+
+describe('PriceLevelExitPolicy（价格型虚拟出场求值器）', () => {
+  it('stop：收盘跌破成本 × (1 + lossRatio) 触发，产出出场提案并平批', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      {
+        ownerPluginId: 'plugin.exit.price-defense',
+        rule: { kind: 'stop', lossRatio: -0.08 },
+      },
+    ]);
+    policy.onSignal(entrySignal(10));
+
+    // 9.19 < 9.2 → 触发
+    const proposals = policy.onBar(bar(9.19), 30);
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].ownerPluginId).toBe('plugin.exit.price-defense');
+    expect(proposals[0].exitKind).toBe('stop');
+    expect(proposals[0].ruleId).toBe('plugin.exit.price-defense:stop:default');
+    expect(proposals[0].channel).toEqual(CHANNEL);
+    expect(proposals[0].evidence).toMatchObject({
+      entryPrice: 10,
+      lossRatio: -0.08,
+    });
+
+    // 触发即平批：同 bar 再次求值不重复触发
+    expect(policy.onBar(bar(9.0), 30)).toHaveLength(0);
+  });
+
+  it('stop：未破线不触发，持仓继续推进', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      { ownerPluginId: 'p', rule: { kind: 'stop', lossRatio: -0.08 } },
+    ]);
+    policy.onSignal(entrySignal(10));
+    expect(policy.onBar(bar(9.21), 30)).toHaveLength(0);
+    expect(policy.onBar(bar(10.5), 30)).toHaveLength(0);
+  });
+
+  it('breakeven：峰值浮盈达标后跌破成本触发；未达峰值不触发', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      { ownerPluginId: 'p', rule: { kind: 'breakeven', activationGain: 0.1 } },
+    ]);
+    policy.onSignal(entrySignal(10));
+
+    // 浮盈 12% → 峰值达标
+    expect(policy.onBar(bar(11.2), 30)).toHaveLength(0);
+    // 回落至成本下方 → 保本离场
+    const proposals = policy.onBar(bar(9.9), 30);
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].exitKind).toBe('breakeven');
+    expect(proposals[0].evidence).toMatchObject({ peakPrice: 11.2 });
+  });
+
+  it('trailing：峰值浮盈达标后自峰值回撤超阈值触发', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      {
+        ownerPluginId: 'p',
+        rule: { kind: 'trailing', activationGain: 0.1, drawdownRatio: 0.05 },
+      },
+    ]);
+    policy.onSignal(entrySignal(10));
+
+    // 峰值 11.5（+15%）
+    policy.onBar(bar(11.5), 30);
+    // 回撤至 10.95 = 峰值 × 0.95 边界 → 不触发（>= 阈值）
+    expect(policy.onBar(bar(10.95), 30)).toHaveLength(0);
+    // 回撤至 10.9 < 10.925 → 触发
+    const proposals = policy.onBar(bar(10.9), 30);
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].exitKind).toBe('trailing');
+    expect(proposals[0].evidence).toMatchObject({
+      peakPrice: 11.5,
+      drawdownRatio: 0.05,
+    });
+  });
+
+  it('time_expired：持有 Bar 数达上限触发', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      { ownerPluginId: 'p', rule: { kind: 'time_expired', maxHoldingBars: 3 } },
+    ]);
+    policy.onSignal(entrySignal(10));
+    expect(policy.onBar(bar(10), 30)).toHaveLength(0); // 1
+    expect(policy.onBar(bar(10), 30)).toHaveLength(0); // 2
+    const proposals = policy.onBar(bar(10), 30); // 3
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].exitKind).toBe('time_expired');
+    expect(proposals[0].evidence).toMatchObject({
+      barsHeld: 3,
+      maxHoldingBars: 3,
+    });
+  });
+
+  it('多规则按声明顺序首条终局生效', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      { ownerPluginId: 'p', rule: { kind: 'breakeven', activationGain: 0.5 } }, // 未达标
+      { ownerPluginId: 'p', rule: { kind: 'stop', lossRatio: -0.08 } },
+    ]);
+    policy.onSignal(entrySignal(10));
+    const proposals = policy.onBar(bar(9.0), 30);
+    expect(proposals).toHaveLength(1);
+    expect(proposals[0].exitKind).toBe('stop');
+  });
+
+  it('EXIT 信号平批后不再触发；重新 ENTRY 后恢复求值', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      { ownerPluginId: 'p', rule: { kind: 'stop', lossRatio: -0.08 } },
+    ]);
+    policy.onSignal(entrySignal(10));
+    policy.onSignal(exitSignal());
+    expect(policy.onBar(bar(9.0), 30)).toHaveLength(0);
+
+    policy.onSignal({ ...entrySignal(12) });
+    expect(policy.onBar(bar(11.0), 30)).toHaveLength(1); // 11 < 12×0.92=11.04
+  });
+
+  it('非本周期 bar 与结构性规则通道均跳过', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      { ownerPluginId: 'p', rule: { kind: 'structural_breakdown' } },
+    ]);
+    policy.onSignal(entrySignal(10));
+    // 通道只含结构型规则 → configure 过滤后无求值通道
+    expect(policy.onBar(bar(9.0), 30)).toHaveLength(0);
+
+    const p2 = new PriceLevelExitPolicy();
+    configure(p2, [
+      { ownerPluginId: 'p', rule: { kind: 'stop', lossRatio: -0.08 } },
+    ]);
+    p2.onSignal(entrySignal(10));
+    // 其它周期 bar 不求值
+    expect(
+      p2.onBar(bar(9.0, new Date('2026-01-06T07:00:00Z')), 60),
+    ).toHaveLength(0);
+  });
+
+  it('configure 重置清空全部虚拟持仓', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      { ownerPluginId: 'p', rule: { kind: 'stop', lossRatio: -0.08 } },
+    ]);
+    policy.onSignal(entrySignal(10));
+    policy.configure([]);
+    expect(policy.onBar(bar(9.0), 30)).toHaveLength(0);
+  });
+});

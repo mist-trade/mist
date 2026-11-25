@@ -367,10 +367,15 @@ interface PipelineResult {
 1. **SimulatedBroker 标识非确定性**：`ord-${Date.now()}-…` / `fill-${Date.now()}-…`
    （`simulated-broker.ts:79,411`）直接破坏 REQ-ISO-01 逐字段一致——已采纳更彻底的
    业务键派生方案（11.5 第 2 项，REQ-ISO-03 固化）。
-2. **hardStopLoss 配置无主（待拍板）**：回测传 -0.08、dev server 按开关传、实时
-   无定义——第四个漂移点。本设计暂按"引擎配置透传 + 各执行端显式声明"处理；
-   倾向最终归属**策略定义**（Arbiter 注释"零死板止损准则"暗示部分策略不应有死
-   止损），待用户定稿后改为从策略定义读取。
+2. **hardStopLoss 配置无主 → 已拍板（2026-11-25）**：回测传 -0.08、dev server
+   按开关传、实时无定义——第四个漂移点。用户定稿：**引擎不出方案，全部由插件
+   决定；引擎只负责接受信号然后撮合交易**。落地：策略定义 DSL 节点 params 声明
+   阈值 → `PriceDefenseExitPlugin` 转换为虚拟出场规则绑定 → 公共域
+   `PriceLevelExitPolicy`（价格型求值器，虚拟持仓从信号流自推导）产出 exit 信号
+   → 与真实信号同构走 decide/撮合；引擎 `createDefaultRiskRules` 仅保留
+   systemicCrunch（市场级保护巡检）；私仓结构型出场规则经 Composite 组合求值。
+   语义变化：出场归因 exitReason 由 'HARD_STOP_LOSS' 变为 'VIRTUAL_EXIT'
+   （exitKind 细节在信号 contextSnapshot）。
 
 ### 11.5 从零基准采纳记录（2026-11-24 用户拍板）
 
