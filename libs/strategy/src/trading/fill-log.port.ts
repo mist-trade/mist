@@ -25,6 +25,8 @@ export interface VirtualFillEvent {
   readonly netAmountLi: Li;
   /** 交易日至（YYYY-MM-DD） */
   readonly tradingDay: string;
+  /** 成交发生时刻（与指令有效时刻对齐） */
+  readonly fillTime?: Date | undefined;
   /** 产出该成交的指令（审计快照，可选） */
   readonly instruction?:
     | {

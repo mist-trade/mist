@@ -39,6 +39,7 @@ export interface TradingManualInput {
   readonly securityName: string;
   readonly effectiveTime: Date;
   readonly decision: TradingDecision;
+  readonly securityId?: number;
 }
 
 export function buildTradingManual(input: TradingManualInput): string {
@@ -55,7 +56,10 @@ function buildHeader(input: TradingManualInput): string {
   const { decision } = input;
   const name = input.securityName ? ` ${input.securityName}` : '';
   const cash = formatYuan(decision.accountAfter.cashLi);
-  const holding = [...decision.accountAfter.positions.values()][0];
+  const holding =
+    typeof input.securityId === 'number'
+      ? decision.accountAfter.positions.get(input.securityId)
+      : [...decision.accountAfter.positions.values()][0];
   const holdingSeg = holding
     ? ` / 持仓 ${holding.holdingQuantity.toLocaleString('en-US')}股 @ ${liToYuan(holding.costPriceLi).toFixed(2)}`
     : ' / 空仓';
@@ -98,6 +102,9 @@ function renderRejection(r: TradingDecision['rejections'][number]): string {
 
 /** 厘 → 元展示（整数省小数；非整数保留至厘位）。 */
 export function formatYuan(li: bigint): string {
+  if (li < 0n) {
+    return `-${formatYuan(-li)}`;
+  }
   const yuan = liToYuan(li);
   const rounded = Math.round(yuan * 1000) / 1000;
   const text = Number.isInteger(rounded)

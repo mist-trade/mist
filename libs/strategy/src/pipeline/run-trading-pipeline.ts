@@ -184,6 +184,7 @@ export async function runTradingPipeline(
             ? -(turnoverLi + fees.totalFeesLi)
             : turnoverLi - fees.totalFeesLi,
         tradingDay: descriptor.tradingDay,
+        fillTime: descriptor.effectiveTime,
         instruction: {
           instructionId: instruction.instructionId,
           action: instruction.action,
@@ -206,6 +207,7 @@ export async function runTradingPipeline(
       buildTradingManual({
         securityCode: input.securityCode,
         securityName: '',
+        securityId: input.securityId,
         effectiveTime: r.group.effectiveTime,
         decision: r.decision,
       }),
