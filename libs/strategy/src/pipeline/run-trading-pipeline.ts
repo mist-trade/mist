@@ -102,7 +102,11 @@ export async function runTradingPipeline(
           timestamp: b.bar.timestamp,
         }).getTime();
       if (keyDiff !== 0) return keyDiff;
-      return a.period - b.period;
+      if (a.period !== b.period) return a.period - b.period;
+      // 外部 Context 标的优先入窗，确保主标的当期求值能读取最新上下文
+      const aIsExt = a.bar.securityId !== input.securityId ? 0 : 1;
+      const bIsExt = b.bar.securityId !== input.securityId ? 0 : 1;
+      return aIsExt - bIsExt;
     });
 
   const signals: KernelSignal[] = [];
