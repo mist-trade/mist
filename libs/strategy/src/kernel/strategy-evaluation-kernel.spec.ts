@@ -549,11 +549,12 @@ describe('StrategyEvaluationKernel（虚拟出场端口）', () => {
     ];
 
     const signals = await kernel.push(bar);
-    // 本 bar 的真实 BUY 在前，虚拟出场在后
+    // 先出后进（Exit-Before-Entry）：已有持仓的虚拟出场在前，当根真实 BUY 在后
     expect(signals).toHaveLength(2);
     expect(policy.signals).toHaveLength(1);
 
-    const exit = signals[1];
+    const exit = signals[0];
+    expect(signals[1].intent).toBe('ENTRY');
     expect(exit.intent).toBe('EXIT');
     expect(exit.signalType).toBe('VIRTUAL_EXIT');
     expect(exit.displayTag).toBe('VIRTUAL_EXIT_AVERAGE_STOP');
@@ -771,5 +772,243 @@ describe('StrategyEvaluationKernel（多周期窗口）', () => {
       kernel.push(makeStrategyBar(new Date(), 10, 1)),
     ).rejects.toThrow(/not a declared kernel period/);
     expect(kernel.diagnostics().publicBarCount).toBe(0);
+  });
+
+  it('同 Bar 先出后进：新建仓不得在入场同一根 Bar 触发 VIRTUAL_EXIT', async () => {
+    const { PriceLevelExitPolicy } = await import(
+      '../virtual-exit/price-level-exit.policy'
+    );
+    class EntryWithOneBarTimeoutPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.entry-one-bar-timeout';
+      public readonly name = '单根超时测试插件';
+      public readonly category = 'TECHNICAL' as const;
+      public readonly version = '1.0.0';
+      public readonly description = '仅首根买入并声明 1-bar 超时规则';
+      private count = 0;
+
+      public async evaluate(): Promise<FactorOpinion> {
+        this.count += 1;
+        return this.count === 1
+          ? { action: 'BUY', confidence: 0.9, reason: '首根建仓' }
+          : { action: 'NEUTRAL', confidence: 0, reason: '观望' };
+      }
+
+      public virtualExitRules() {
+        return [{ kind: 'time_expired' as const, maxHoldingBars: 1 }];
+      }
+    }
+
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new EntryWithOneBarTimeoutPlugin());
+    const flow: DecisionFlowNode = {
+      id: 'guard_entry',
+      type: 'GUARD',
+      name: '入场',
+      pluginId: 'plugin.test.entry-one-bar-timeout',
+      requiredAction: 'BUY',
+      onPass: { id: 'term_buy', type: 'TERMINAL', action: 'BUY', reason: 'ok' },
+    };
+    const b1 = makeStrategyBar(new Date('2026-01-05T02:00:00Z'), 10, 30);
+    const b2 = makeStrategyBar(new Date('2026-01-05T02:30:00Z'), 10, 30);
+    const kernel = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: b1.timestamp,
+      registry,
+      virtualExitPolicy: new PriceLevelExitPolicy(),
+      plans: [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+    });
+
+    const s1 = await kernel.push(b1);
+    expect(s1.map((s) => s.signalKind)).toEqual(['entry']);
+
+    const s2 = await kernel.push(b2);
+    expect(s2).toHaveLength(1);
+    expect(s2[0]?.signalType).toBe('VIRTUAL_EXIT');
+    expect(s2[0]?.contextSnapshot).toMatchObject({ exitKind: 'time_expired' });
+  });
+
+  it('surveillancePeriods 监控周期直通 virtualExitPolicy 且不触发主周期决策流', async () => {
+    const evaluateSpy = jest.fn().mockResolvedValue({
+      action: 'BUY',
+      confidence: 0.9,
+      reason: 'daily buy',
+    });
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register({
+      id: 'plugin.test.daily-only',
+      name: 'Daily Only',
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'daily',
+      evaluate: evaluateSpy,
+    });
+
+    const onBar5Calls: StrategyBar[] = [];
+    const policy: VirtualExitPolicyPort = {
+      configure: jest.fn(),
+      onSignal: jest.fn(),
+      onBar: (bar, period) => {
+        if (period === 5) {
+          onBar5Calls.push(bar);
+          return [
+            {
+              channel: { definitionId: 9, versionId: 1, period: 1440 },
+              ownerPluginId: 'plugin.test.daily-only',
+              ruleId: 'intraday-5m-stop',
+              exitKind: 'INTRADAY_5M_STOP',
+              reason: '5m 盘中击穿',
+              badgeText: '盘中5m击穿',
+            },
+          ];
+        }
+        return [];
+      },
+    };
+
+    const flow: DecisionFlowNode = {
+      id: 'guard_daily',
+      type: 'GUARD',
+      name: '日线门禁',
+      pluginId: 'plugin.test.daily-only',
+      requiredAction: 'BUY',
+      onPass: { id: 'term', type: 'TERMINAL', action: 'BUY', reason: 'ok' },
+    };
+
+    const publicFrom = new Date('2026-01-05T00:00:00Z');
+    const kernel = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom,
+      registry,
+      virtualExitPolicy: policy,
+      surveillancePeriods: [5],
+      plans: [
+        {
+          definitionId: 9,
+          versionId: 1,
+          flow,
+          ruleSnapshot: Object.freeze({}),
+          period: 1440,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+    });
+
+    // 预热期 5m bar：仅推进游标，不发射
+    const pre5m = makeStrategyBar(new Date('2026-01-04T06:00:00Z'), 10, 5);
+    expect(await kernel.push(pre5m)).toEqual([]);
+    expect(onBar5Calls).toHaveLength(0);
+    expect(evaluateSpy).not.toHaveBeenCalled();
+
+    // 公开期 5m bar：直通 policy.onBar(bar, 5)，产出 VIRTUAL_EXIT，且不调用主日线策略树
+    const pub5m = makeStrategyBar(new Date('2026-01-05T02:00:00Z'), 9.5, 5);
+    const exits = await kernel.push(pub5m);
+    expect(evaluateSpy).not.toHaveBeenCalled();
+    expect(onBar5Calls).toHaveLength(1);
+    expect(exits).toHaveLength(1);
+    expect(exits[0]?.signalType).toBe('VIRTUAL_EXIT');
+    expect(exits[0]?.signalTime).toBe(pub5m.timestamp);
+    expect(exits[0]?.channel?.period).toBe(1440);
+  });
+
+  it('onFail 失败门禁不污染 KernelSignal 归因与 pivot 证据', async () => {
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register({
+      id: 'plugin.guard.fail-a',
+      name: 'Fail A',
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'fail',
+      evaluate: async () => ({
+        action: 'NEUTRAL',
+        confidence: 0,
+        reason: '未满足A',
+        badgeText: 'A失败',
+        evidence: {
+          eventType: 'A_FAIL',
+          pivotTime: '2026-01-01T00:00:00.000Z',
+          pivotPrice: 99,
+        },
+      }),
+    });
+    registry.register({
+      id: 'plugin.guard.pass-b',
+      name: 'Pass B',
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'pass',
+      evaluate: async () => ({
+        action: 'BUY',
+        confidence: 0.95,
+        reason: 'B突破成立',
+        badgeText: 'B突破',
+        evidence: {
+          eventType: 'B_PASS',
+          pivotTime: '2026-01-02T00:00:00.000Z',
+          pivotPrice: 10.5,
+        },
+      }),
+    });
+
+    const flow: DecisionFlowNode = {
+      id: 'guard_a',
+      type: 'GUARD',
+      name: '门禁A',
+      pluginId: 'plugin.guard.fail-a',
+      requiredAction: 'BUY',
+      onPass: { id: 'term_a', type: 'TERMINAL', action: 'BUY' },
+      onFail: {
+        id: 'guard_b',
+        type: 'GUARD',
+        name: '门禁B',
+        pluginId: 'plugin.guard.pass-b',
+        requiredAction: 'BUY',
+        onPass: {
+          id: 'term_b',
+          type: 'TERMINAL',
+          action: 'INHERIT',
+          signalTag: 'B_TAG',
+        },
+      },
+    };
+
+    const bar = makeStrategyBar(new Date('2026-01-05T02:00:00Z'), 11, 30);
+    const kernel = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bar.timestamp,
+      registry,
+      plans: [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+    });
+
+    const signals = await kernel.push(bar);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]?.confidence).toBe(95);
+    expect(signals[0]?.originPluginId).toBe('plugin.guard.pass-b');
+    expect(signals[0]?.badgeText).toBe('B突破');
+    expect(signals[0]?.pivotPrice).toBe(10.5);
+    expect(signals[0]?.pivotTime).toBe('2026-01-02T00:00:00.000Z');
   });
 });

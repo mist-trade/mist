@@ -21,7 +21,13 @@ export function renderTraceChainOf(decisionTrace: unknown): string | null {
   if (!Array.isArray(trace) || trace.length === 0) return null;
   const segments: string[] = [];
   for (const item of trace) {
-    if (!item || typeof item !== 'object') continue;
+    if (
+      !item ||
+      typeof item !== 'object' ||
+      (item as { passed?: unknown }).passed === false
+    ) {
+      continue;
+    }
     const rawName =
       typeof item.name === 'string' && item.name.length > 0
         ? item.name

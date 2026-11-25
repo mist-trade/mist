@@ -108,6 +108,8 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
       if (spec.channel.period !== period) continue;
       const lot = this.lots.get(key);
       if (!lot) continue;
+      // 严禁在建仓信号同一根 Bar 上立即计持仓天数或触发出场
+      if (bar.timestamp.getTime() <= lot.entryTime.getTime()) continue;
       lot.barsHeld += 1;
       if (bar.close > lot.peakPrice) lot.peakPrice = bar.close;
       const proposal = this.evaluateBindings(spec, lot, bar);

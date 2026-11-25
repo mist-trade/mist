@@ -3,6 +3,8 @@ import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
 import type { FactorContext } from '../factor/factor.types';
 import { contextSeriesKey } from '../kernel/availability';
 import { DecisionFlowEvaluator } from './decision-flow-evaluator';
+import { extractPivotEvidence } from './decision-pivot-evidence';
+import { renderTraceChainOf } from '../trading/manual';
 import type { DecisionFlowNode } from './decision-flow.types';
 import { DecisionExecutionTraceBuilder } from './decision-trace-builder';
 import { LegacyStrategyCompiler } from './legacy-strategy-compiler';
@@ -760,6 +762,95 @@ describe('Phase 2: Decision Flow Engine', () => {
       expect(flatResult.action).toBe('BUY');
       expect(flatResult.signalTag).toBe('TACTICAL_ENTRY');
       expect(flatResult.badgeText).toBe('1买');
+    });
+
+    it('onFail 保留上游 score 且失败 GUARD 不污染 evidence / badgeText / pivot / traceChain', async () => {
+      registry.register({
+        id: 'plugin.guard.fail-a',
+        name: '门禁A',
+        category: 'TECHNICAL',
+        version: '1.0.0',
+        description: 'fail',
+        evaluate: async () => ({
+          action: 'NEUTRAL',
+          confidence: 0,
+          reason: '未触发A',
+          badgeText: 'A失败徽标',
+          evidence: {
+            eventType: 'FAIL_A',
+            pivotTime: '2026-01-01T00:00:00.000Z',
+            pivotPrice: 99,
+          },
+        }),
+      });
+      registry.register({
+        id: 'plugin.guard.pass-b',
+        name: '门禁B',
+        category: 'TECHNICAL',
+        version: '1.0.0',
+        description: 'pass',
+        evaluate: async () => ({
+          action: 'BUY',
+          confidence: 0.95,
+          reason: 'B突破成立',
+          badgeText: 'B突破',
+          evidence: {
+            eventType: 'TEST_B',
+            pivotTime: '2026-01-02T00:00:00.000Z',
+            pivotPrice: 10,
+          },
+        }),
+      });
+
+      const flow: DecisionFlowNode = {
+        id: 'guard_a',
+        type: 'GUARD',
+        name: '门禁A',
+        pluginId: 'plugin.guard.fail-a',
+        requiredAction: 'BUY',
+        onPass: {
+          id: 'term_a',
+          type: 'TERMINAL',
+          action: 'BUY',
+          signalTag: 'TAG_A',
+        },
+        onFail: {
+          id: 'guard_b',
+          type: 'GUARD',
+          name: '门禁B',
+          pluginId: 'plugin.guard.pass-b',
+          requiredAction: 'BUY',
+          onPass: {
+            id: 'term_b',
+            type: 'TERMINAL',
+            action: 'INHERIT',
+            signalTag: 'TAG_B',
+          },
+        },
+      };
+
+      const context: FactorContext = {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date('2026-01-05T02:00:00.000Z'),
+        period: 1440,
+        attributes: new Map(),
+      };
+
+      const result = await evaluator.evaluate(flow, context);
+      expect(result.status).toBe('SIGNAL_EMITTED');
+      expect(result.confidence).toBe(95);
+      expect(result.confidenceLevel).toBe('HIGH');
+      expect(result.badgeText).toBe('B突破');
+      expect(result.evidence).toMatchObject({ eventType: 'TEST_B' });
+      expect(result.trace[0]?.passed).toBe(false);
+      expect(result.trace[1]?.passed).toBe(true);
+      expect(extractPivotEvidence(result)).toEqual({
+        pivotTime: '2026-01-02T00:00:00.000Z',
+        pivotPrice: 10,
+      });
+      const chain = renderTraceChainOf({ trace: result.trace });
+      expect(chain).toBe('门禁B ✓');
     });
   });
 });

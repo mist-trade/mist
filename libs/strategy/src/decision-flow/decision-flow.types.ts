@@ -145,6 +145,8 @@ export interface DecisionExecutionTraceItem {
   readonly reason?: string;
   readonly exportedKey?: string;
   readonly conditionResult?: boolean;
+  /** GUARD / CONSENSUS 节点是否通过（用于隔离 onFail 路径上的失败轨迹项） */
+  readonly passed?: boolean;
   readonly breakdown?: readonly ConsensusVoteBreakdown[];
   readonly evidence?: Readonly<Record<string, unknown>>;
   readonly badgeText?: string;

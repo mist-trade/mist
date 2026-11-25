@@ -83,6 +83,8 @@ export class StrategyEvaluationKernel {
   private readonly preWarmActual = new Map<number, number>();
   private readonly preWarmEvaluated = new Set<number>();
   private readonly preWarmStatus = new Map<number, PrewarmStatus>();
+  private readonly surveillancePeriods: ReadonlySet<number>;
+  private readonly surveillanceCursors = new Map<number, number>();
 
   private publicBarCount = 0;
   private emittedSignalCount = 0;
@@ -130,6 +132,18 @@ export class StrategyEvaluationKernel {
       this.budgets.set(period, budget);
       this.windows.set(period, new StrategySeriesImputer());
     }
+    const surveillanceSet = new Set<number>();
+    for (const rawPeriod of config.surveillancePeriods ?? []) {
+      assertPositiveInteger(rawPeriod, 'surveillancePeriods');
+      surveillanceSet.add(rawPeriod);
+    }
+    for (const plan of config.plans) {
+      for (const rawPeriod of plan.surveillancePeriods ?? []) {
+        assertPositiveInteger(rawPeriod, 'plan.surveillancePeriods');
+        surveillanceSet.add(rawPeriod);
+      }
+    }
+    this.surveillancePeriods = surveillanceSet;
     // 跨标的上下文窗口：按声明创建独立滑窗（与自身窗口同机制，仅落窗不求值）
     for (const plan of config.plans) {
       for (const req of plan.externalContextRequirements ?? []) {
@@ -205,6 +219,14 @@ export class StrategyEvaluationKernel {
       return [];
     }
 
+    // 轻量监控周期快路径（如日线计划挂载 5m 穿透）：跳过主策略树与滑窗，公开相直通 virtualExitPolicy.onBar
+    if (
+      !this.windows.has(bar.period) &&
+      this.surveillancePeriods.has(bar.period)
+    ) {
+      return this.pushSurveillanceBar(bar);
+    }
+
     const window = this.windowOf(bar.period);
     const cursor = this.cursors.get(bar.period);
     if (cursor !== undefined && bar.timestamp.getTime() <= cursor) {
@@ -255,31 +277,53 @@ export class StrategyEvaluationKernel {
       return [];
     }
 
+    // 同 Bar 先出后进（Exit-Before-Entry）：先对前序已持仓执行虚拟出场巡检，
+    // 再求值当期决策流并注册本根新信号，杜绝新建仓在同一根 Bar 内立即误触发出场。
+    const virtualExits = this.evaluateVirtualExitsOnBar(bar);
     const signals = await this.evaluatePublic(bar);
-    const virtualExits = this.advanceVirtualExits(bar, signals);
+    this.notifyVirtualExitSignals(signals);
     const emitted =
-      virtualExits.length === 0 ? signals : [...signals, ...virtualExits];
+      virtualExits.length === 0
+        ? signals
+        : signals.length === 0
+          ? virtualExits
+          : [...virtualExits, ...signals];
     this.emittedSignalCount += emitted.length;
     return emitted;
   }
 
-  /**
-   * 推进虚拟出场：先消费本 bar 的真实信号，再由策略实现推进并返回出场提案。
-   */
-  private advanceVirtualExits(
-    bar: StrategyBar,
-    signals: readonly KernelSignal[],
-  ): readonly KernelSignal[] {
+  private pushSurveillanceBar(bar: StrategyBar): readonly KernelSignal[] {
+    const ts = bar.timestamp.getTime();
+    const cursor = this.surveillanceCursors.get(bar.period);
+    if (cursor !== undefined && ts <= cursor) {
+      return [];
+    }
+    this.surveillanceCursors.set(bar.period, ts);
+    if (ts < this.publicFrom.getTime()) {
+      return [];
+    }
+    this.publicBarCount += 1;
+    const virtualExits = this.evaluateVirtualExitsOnBar(bar);
+    this.emittedSignalCount += virtualExits.length;
+    return virtualExits;
+  }
+
+  private evaluateVirtualExitsOnBar(bar: StrategyBar): readonly KernelSignal[] {
     const policy = this.virtualExitPolicy;
     if (!policy) return [];
-    for (const signal of signals) {
-      policy.onSignal(signal);
-    }
     const proposals = policy.onBar(bar, bar.period);
     if (proposals.length === 0) return [];
     return proposals.map((proposal) =>
       this.buildVirtualExitSignal(proposal, bar),
     );
+  }
+
+  private notifyVirtualExitSignals(signals: readonly KernelSignal[]): void {
+    const policy = this.virtualExitPolicy;
+    if (!policy || signals.length === 0) return;
+    for (const signal of signals) {
+      policy.onSignal(signal);
+    }
   }
 
   private buildVirtualExitSignal(
@@ -292,6 +336,7 @@ export class StrategyEvaluationKernel {
       versionId: channel.versionId,
       signalKind: 'exit',
       channel,
+      triggerPeriod: bar.period,
       intent: 'EXIT',
       originPluginId: proposal.ownerPluginId,
       signalTime: bar.timestamp,
@@ -561,6 +606,7 @@ export class StrategyEvaluationKernel {
       versionId: plan.versionId,
       signalKind: plan.signalKind ?? (isBuy ? 'entry' : 'exit'),
       channel,
+      triggerPeriod: bar.period,
       intent,
       ...(originPluginId ? { originPluginId } : {}),
       signalTime: bar.timestamp,
@@ -602,10 +648,11 @@ export class StrategyEvaluationKernel {
     if (!Array.isArray(trace)) return undefined;
     for (let i = trace.length - 1; i >= 0; i--) {
       const item = trace[i];
-      if (item?.badgeText && typeof item.badgeText === 'string') {
+      if (!item || item.passed === false) continue;
+      if (item.badgeText && typeof item.badgeText === 'string') {
         return item.badgeText;
       }
-      const ev = item?.evidence as Record<string, unknown> | undefined;
+      const ev = item.evidence as Record<string, unknown> | undefined;
       if (ev?.badgeText && typeof ev.badgeText === 'string') {
         return ev.badgeText;
       }
@@ -614,7 +661,7 @@ export class StrategyEvaluationKernel {
   }
 
   /**
-   * 归属插件：取轨迹中最后一个与最终 action 一致的插件节点。
+   * 归属插件：取轨迹中最后一个已通过且与最终 action 一致的插件节点。
    * 仅用于归因观测；通道归属始终按 (definitionId, period)，与插件无关。
    */
   private findOriginPluginId(decision: DecisionResult): string | undefined {
@@ -622,22 +669,13 @@ export class StrategyEvaluationKernel {
     if (!Array.isArray(trace)) return undefined;
     for (let i = trace.length - 1; i >= 0; i--) {
       const item = trace[i];
-      if (!item?.pluginId) continue;
+      if (!item?.pluginId || item.passed === false) continue;
       if (item.action === undefined || item.action === decision.action) {
         return item.pluginId;
       }
     }
     return undefined;
   }
-}
-
-interface ExternalWindowState {
-  readonly securityCode: string;
-  readonly period: number;
-  readonly imputer: StrategySeriesImputer;
-  readonly budget: number;
-  cursor?: number;
-  preWarmActual: number;
 }
 
 interface ExternalWindowState {

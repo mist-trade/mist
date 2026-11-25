@@ -3,6 +3,7 @@
  * 离线幂等、报告同源。
  */
 import type { StrategyBar } from '@app/market-data';
+import { formatShanghaiDateString } from '@app/timezone';
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
 import type { FactorOpinion, FactorPlugin } from '../factor/factor.types';
 import { InMemoryFactorPluginRegistry } from '../factor/factor-plugin-registry';
@@ -234,5 +235,530 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
 
     expect(result.report).toContain('形态买入 ✓');
     expect(result.report).toContain('防守出场·stop ✓');
+  });
+
+  it('next_bar_open 模式：日线 T 发令严格按 T+1 Open 成交，T+1 当日盘中卖出被冻结，跨日后触发卖出按 Next-Bar Open 成交', async () => {
+    class TwoSignalsPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.two-signals';
+      public readonly name = '定时买卖测试';
+      public readonly category = 'TECHNICAL' as const;
+      public readonly version = '1.0.0';
+      public readonly description =
+        'Day1 BUY, Day2 intraday SELL(被T+1拦截), Day3 SELL';
+
+      public async evaluate(ctx: {
+        timestamp: Date;
+        period: number;
+      }): Promise<FactorOpinion> {
+        const day = formatShanghaiDateString(ctx.timestamp);
+        if (ctx.period === 1440 && day === '2026-01-05') {
+          return { action: 'BUY', confidence: 0.9, reason: 'd1 buy' };
+        }
+        if (
+          ctx.period === 30 &&
+          ctx.timestamp.toISOString() === '2026-01-06T02:00:00.000Z'
+        ) {
+          return {
+            action: 'SELL',
+            confidence: 0.9,
+            reason: 'd2 intraday blocked',
+          };
+        }
+        if (ctx.period === 1440 && day === '2026-01-07') {
+          return { action: 'SELL', confidence: 0.9, reason: 'd3 sell' };
+        }
+        return { action: 'NEUTRAL', confidence: 0, reason: 'hold' };
+      }
+    }
+
+    const dailyBar = (
+      dayIso: string,
+      open: number,
+      close: number,
+    ): StrategyBar => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'tdx',
+      period: 1440,
+      timestamp: new Date(dayIso),
+      open,
+      high: Math.max(open, close) + 0.2,
+      low: Math.min(open, close) - 0.2,
+      close,
+      volume: '1000',
+      amount: '10000',
+      type: 'complete',
+    });
+    const bar30 = (
+      utcIso: string,
+      open: number,
+      close: number,
+    ): StrategyBar => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'tdx',
+      period: 30,
+      timestamp: new Date(utcIso),
+      open,
+      high: Math.max(open, close) + 0.1,
+      low: Math.min(open, close) - 0.1,
+      close,
+      volume: '500',
+      amount: '5000',
+      type: 'complete',
+    });
+
+    // 上海 00:00 = UTC 前一日 16:00
+    const bars1440 = [
+      dailyBar('2026-01-04T16:00:00.000Z', 10.0, 10.2), // 2026-01-05 BUY signal
+      dailyBar('2026-01-05T16:00:00.000Z', 10.5, 10.8), // 2026-01-06 open 10.5 BUY fill
+      dailyBar('2026-01-06T16:00:00.000Z', 10.9, 11.1), // 2026-01-07 SELL signal (effective 01-07 15:01)
+      dailyBar('2026-01-07T16:00:00.000Z', 11.4, 11.6), // 2026-01-08 open 11.4 SELL fill
+    ];
+    // 2026-01-06 日内 10:00 (02:00Z) & 10:30 (02:30Z) 均应在 30m 组中因 T+1 被冻结
+    const bars30 = [
+      bar30('2026-01-06T01:35:00.000Z', 10.5, 10.55), // 09:35 (不匹配，用 10:00 测试 BUY 后卖出)
+      bar30('2026-01-06T02:00:00.000Z', 10.6, 10.7), // 10:00 BUY fill 后同日 30m 发出 SELL
+      bar30('2026-01-06T02:30:00.000Z', 10.75, 10.8), // 10:30 撮合窗口应对上述 10:00 SELL 判定 T1_FROZEN
+    ];
+
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new TwoSignalsPlugin());
+    const flow: DecisionFlowNode = {
+      id: 'guard_both',
+      type: 'GUARD',
+      name: '定时测试门禁',
+      pluginId: 'plugin.test.two-signals',
+      requiredAction: 'BOTH',
+      onPass: {
+        id: 'term_inherit',
+        type: 'TERMINAL',
+        action: 'INHERIT',
+        signalTag: 'NEXT_BAR_TEST',
+      },
+    };
+
+    const result = await runTradingPipeline({
+      barsByPeriod: new Map([
+        [1440, bars1440],
+        [30, bars30],
+      ]),
+      plans: [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow,
+          ruleSnapshot: Object.freeze({}),
+          period: 1440,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 2,
+          versionId: 1,
+          flow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+      registry,
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bars1440[0].timestamp,
+      executionMode: 'next_bar_open',
+      executionPeriod: 30,
+      feeEnabled: false,
+      slippageRatio: 0,
+    });
+
+    // 验证 2026-01-06 日内 30m 卖出被 T1_FROZEN 拦截
+    const t1Rejections = result.groups.flatMap((g) => g.decision.rejections);
+    expect(t1Rejections.some((r) => r.reason === 'T1_FROZEN')).toBe(true);
+    expect(result.fills).toHaveLength(2);
+    expect(result.fills[0]?.side).toBe('BUY');
+    expect(Number(result.fills[0]?.priceLi)).toBe(10_500);
+    expect(result.fills[0]?.tradingDay).toBe('2026-01-06');
+    expect(result.fills[1]?.side).toBe('SELL');
+    expect(Number(result.fills[1]?.priceLi)).toBe(11_400);
+    expect(result.fills[1]?.tradingDay).toBe('2026-01-08');
+  });
+
+  it('next_bar_open + 5m 监控：15:00 尾盘 5m 击穿顺延至次交易日首根 5m 开盘成交', async () => {
+    const { PriceLevelExitPolicy } = await import(
+      '../virtual-exit/price-level-exit.policy'
+    );
+    class Day1BuyStopPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.d1-buy-5m-stop';
+      public readonly name = '日线买5m防';
+      public readonly category = 'TECHNICAL' as const;
+      public readonly version = '1.0.0';
+      public readonly description = 'd1 buy + 5m price stop';
+
+      public async evaluate(ctx: { timestamp: Date }): Promise<FactorOpinion> {
+        return ctx.timestamp.toISOString() === '2026-01-04T16:00:00.000Z'
+          ? { action: 'BUY', confidence: 0.9, reason: 'd1 buy' }
+          : { action: 'NEUTRAL', confidence: 0, reason: 'hold' };
+      }
+    }
+
+    const custom5mExitPolicy: import('../virtual-exit/virtual-exit.port').VirtualExitPolicyPort =
+      {
+        configure: () => {},
+        onSignal: () => {},
+        onBar: (bar, period) => {
+          if (period === 5 && bar.close <= 9.2) {
+            return [
+              {
+                channel: { definitionId: 1, versionId: 1, period: 1440 },
+                ownerPluginId: 'plugin.test.d1-buy-5m-stop',
+                ruleId: 'test:5m',
+                exitKind: 'INTRADAY_STOP',
+                reason: '5m 击穿',
+                badgeText: '5m止损',
+              },
+            ];
+          }
+          return [];
+        },
+      };
+    void PriceLevelExitPolicy;
+
+    const make5mBar = (
+      utcIso: string,
+      open: number,
+      close: number,
+    ): StrategyBar => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'tdx',
+      period: 5,
+      timestamp: new Date(utcIso),
+      open,
+      high: Math.max(open, close),
+      low: Math.min(open, close),
+      close,
+      volume: '100',
+      amount: '1000',
+      type: 'complete',
+    });
+    const make1dBar = (
+      utcIso: string,
+      open: number,
+      close: number,
+    ): StrategyBar => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'tdx',
+      period: 1440,
+      timestamp: new Date(utcIso),
+      open,
+      high: Math.max(open, close),
+      low: Math.min(open, close),
+      close,
+      volume: '1000',
+      amount: '10000',
+      type: 'complete',
+    });
+
+    // D1 (01-05): 日线发射 BUY
+    // D2 (01-06): 首根 5m (09:35=01:35Z) 以 open=10.2 成交（当日 T+1 冻结）
+    // D3 (01-07): 15:00 尾盘 5m (07:00Z) 收盘 9.0 触发卖出，当日已无后续 5m，顺延 D4 首根 5m open=8.85 成交
+    const bars1d = [
+      make1dBar('2026-01-04T16:00:00.000Z', 10.0, 10.0), // 01-05
+      make1dBar('2026-01-05T16:00:00.000Z', 10.2, 10.4), // 01-06
+      make1dBar('2026-01-06T16:00:00.000Z', 10.1, 9.0), // 01-07
+      make1dBar('2026-01-07T16:00:00.000Z', 8.85, 9.1), // 01-08
+    ];
+    const bars5m = [
+      make5mBar('2026-01-06T01:35:00.000Z', 10.2, 10.3), // 01-06 09:35 (BUY fill @ 10.2)
+      make5mBar('2026-01-07T06:55:00.000Z', 9.9, 9.8), // 01-07 14:55 (safe)
+      make5mBar('2026-01-07T07:00:00.000Z', 9.7, 9.0), // 01-07 15:00 (EXIT trigger)
+      make5mBar('2026-01-08T01:35:00.000Z', 8.85, 8.95), // 01-08 09:35 (SELL fill @ 8.85)
+    ];
+
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new Day1BuyStopPlugin());
+    const flow: DecisionFlowNode = {
+      id: 'guard_d1',
+      type: 'GUARD',
+      name: '日线入场',
+      pluginId: 'plugin.test.d1-buy-5m-stop',
+      requiredAction: 'BUY',
+      onPass: { id: 'term_buy', type: 'TERMINAL', action: 'BUY' },
+    };
+
+    const result = await runTradingPipeline({
+      barsByPeriod: new Map([
+        [1440, bars1d],
+        [5, bars5m],
+      ]),
+      plans: [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow,
+          ruleSnapshot: Object.freeze({}),
+          period: 1440,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+      surveillancePeriods: [5],
+      registry,
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bars1d[0].timestamp,
+      virtualExitPolicy: custom5mExitPolicy,
+      executionMode: 'next_bar_open',
+      executionPeriod: 5,
+      feeEnabled: false,
+      slippageRatio: 0,
+    });
+
+    expect(result.fills).toHaveLength(2);
+    expect(Number(result.fills[0]?.priceLi)).toBe(10_200);
+    expect(result.fills[0]?.fillTime?.toISOString()).toBe(
+      '2026-01-06T01:35:00.000Z',
+    );
+    expect(Number(result.fills[1]?.priceLi)).toBe(8_850);
+    expect(result.fills[1]?.fillTime?.toISOString()).toBe(
+      '2026-01-08T01:35:00.000Z',
+    );
+  });
+
+  it('next_bar_open + 5m 监控：盘中（非 15:00）5m 击穿应于同日下一根 5m 开盘立即成交，不得延误至次日', async () => {
+    class Day1BuyPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.d1-buy-intraday-5m';
+      public readonly name = '日线买盘中5m防';
+      public readonly category = 'TECHNICAL' as const;
+      public readonly version = '1.0.0';
+      public readonly description = 'd1 buy + intraday 5m stop';
+
+      public async evaluate(ctx: { timestamp: Date }): Promise<FactorOpinion> {
+        return ctx.timestamp.toISOString() === '2026-01-04T16:00:00.000Z'
+          ? { action: 'BUY', confidence: 0.9, reason: 'd1 buy' }
+          : { action: 'NEUTRAL', confidence: 0, reason: 'hold' };
+      }
+    }
+
+    const midday5mStopPolicy: import('../virtual-exit/virtual-exit.port').VirtualExitPolicyPort =
+      {
+        configure: () => {},
+        onSignal: () => {},
+        onBar: (bar, period) => {
+          if (period === 5 && bar.low <= 9.2) {
+            return [
+              {
+                channel: { definitionId: 1, versionId: 1, period: 1440 },
+                ownerPluginId: 'plugin.test.d1-buy-intraday-5m',
+                ruleId: 'test:5m-midday',
+                exitKind: 'INTRADAY_DEFENSE_BREAKDOWN',
+                reason: '盘中5m击穿',
+                badgeText: '次级破线逃命',
+              },
+            ];
+          }
+          return [];
+        },
+      };
+
+    const make5mBar = (
+      utcIso: string,
+      open: number,
+      close: number,
+      low = Math.min(open, close),
+    ): StrategyBar => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'tdx',
+      period: 5,
+      timestamp: new Date(utcIso),
+      open,
+      high: Math.max(open, close),
+      low,
+      close,
+      volume: '100',
+      amount: '1000',
+      type: 'complete',
+    });
+    const make1dBar = (
+      utcIso: string,
+      open: number,
+      close: number,
+    ): StrategyBar => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'tdx',
+      period: 1440,
+      timestamp: new Date(utcIso),
+      open,
+      high: Math.max(open, close),
+      low: Math.min(open, close),
+      close,
+      volume: '1000',
+      amount: '10000',
+      type: 'complete',
+    });
+
+    const bars1d = [
+      make1dBar('2026-01-04T16:00:00.000Z', 10.0, 10.0), // 01-05 signal
+      make1dBar('2026-01-05T16:00:00.000Z', 10.2, 10.4), // 01-06 fill
+      make1dBar('2026-01-06T16:00:00.000Z', 10.1, 8.9), // 01-07
+      make1dBar('2026-01-07T16:00:00.000Z', 8.5, 8.6), // 01-08
+    ];
+    const bars5m = [
+      make5mBar('2026-01-06T01:35:00.000Z', 10.2, 10.3), // 01-06 09:35 BUY fill
+      make5mBar('2026-01-07T01:50:00.000Z', 9.5, 9.3, 9.15), // 01-07 09:50 midday 5m breakdown!
+      make5mBar('2026-01-07T01:55:00.000Z', 9.28, 9.25), // 01-07 09:55 Next-5m-Bar Open SELL fill @ 9.28
+      make5mBar('2026-01-08T01:35:00.000Z', 8.5, 8.6), // 01-08 09:35 (too late if buggy!)
+    ];
+
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new Day1BuyPlugin());
+    const flow: DecisionFlowNode = {
+      id: 'guard_d1',
+      type: 'GUARD',
+      name: '日线入场',
+      pluginId: 'plugin.test.d1-buy-intraday-5m',
+      requiredAction: 'BUY',
+      onPass: { id: 'term_buy', type: 'TERMINAL', action: 'BUY' },
+    };
+
+    const result = await runTradingPipeline({
+      barsByPeriod: new Map([
+        [1440, bars1d],
+        [5, bars5m],
+      ]),
+      plans: [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow,
+          ruleSnapshot: Object.freeze({}),
+          period: 1440,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+      surveillancePeriods: [5],
+      registry,
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bars1d[0].timestamp,
+      virtualExitPolicy: midday5mStopPolicy,
+      executionMode: 'next_bar_open',
+      executionPeriod: 5,
+      feeEnabled: false,
+      slippageRatio: 0,
+    });
+
+    expect(result.fills).toHaveLength(2);
+    expect(result.fills[1]?.tradingDay).toBe('2026-01-07');
+    expect(Number(result.fills[1]?.priceLi)).toBe(9_280);
+    expect(result.fills[1]?.fillTime?.toISOString()).toBe(
+      '2026-01-07T01:55:00.000Z',
+    );
+  });
+
+  it('多外部标的同一 availabilityKey 与 period 下按 securityId / securityCode 确定性升序入窗', async () => {
+    const orderSeen: number[] = [];
+    class SpyExtOrderPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.spy-ext-order';
+      public readonly name = '顺序探针';
+      public readonly category = 'TECHNICAL' as const;
+      public readonly version = '1.0.0';
+      public readonly description = 'records eval';
+
+      public resolveExternalContextRequirements() {
+        return [
+          { securityCode: 'EXT_B', securityId: 20, period: 1440, minBars: 1 },
+          { securityCode: 'EXT_C', securityId: 30, period: 1440, minBars: 1 },
+        ];
+      }
+
+      public async evaluate(): Promise<FactorOpinion> {
+        return { action: 'NEUTRAL', confidence: 0, reason: 'spy' };
+      }
+    }
+
+    const ts = new Date('2026-01-04T16:00:00.000Z');
+    const mkExtBar = (
+      securityId: number,
+      securityCode: string,
+    ): StrategyBar => ({
+      securityId,
+      securityCode,
+      source: 'tdx',
+      period: 1440,
+      timestamp: ts,
+      open: 10,
+      high: 10,
+      low: 10,
+      close: 10,
+      volume: '100',
+      amount: '1000',
+      type: 'complete',
+    });
+
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new SpyExtOrderPlugin());
+    const flow: DecisionFlowNode = {
+      id: 'g',
+      type: 'GUARD',
+      name: 'g',
+      pluginId: 'plugin.test.spy-ext-order',
+      requiredAction: 'BUY',
+      onPass: { id: 't', type: 'TERMINAL', action: 'BUY' },
+    };
+
+    const makeRun = async (extBars: StrategyBar[]) => {
+      const mainBar = mkExtBar(1, '000001');
+      const r = await runTradingPipeline({
+        barsByPeriod: new Map([[1440, [...extBars, mainBar]]]),
+        plans: [
+          {
+            definitionId: 1,
+            versionId: 1,
+            flow,
+            ruleSnapshot: Object.freeze({}),
+            period: 1440,
+            requiredBarCount: 1,
+            contextRequirements: {},
+            externalContextRequirements: [
+              {
+                securityCode: 'EXT_B',
+                securityId: 20,
+                period: 1440,
+                minBars: 1,
+              },
+              {
+                securityCode: 'EXT_C',
+                securityId: 30,
+                period: 1440,
+                minBars: 1,
+              },
+            ],
+          },
+        ],
+        registry,
+        securityId: 1,
+        securityCode: '000001',
+        publicFrom: ts,
+      });
+      void orderSeen;
+      return r;
+    };
+
+    const rForward = await makeRun([
+      mkExtBar(20, 'EXT_B'),
+      mkExtBar(30, 'EXT_C'),
+    ]);
+    const rReverse = await makeRun([
+      mkExtBar(30, 'EXT_C'),
+      mkExtBar(20, 'EXT_B'),
+    ]);
+    expect(rReverse).toEqual(rForward);
   });
 });

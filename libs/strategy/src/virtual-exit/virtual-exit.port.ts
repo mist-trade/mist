@@ -94,7 +94,7 @@ export interface VirtualExitProposal {
 /**
  * 虚拟出场策略端口。
  *
- * 内核在每个求值周期 bar 上调用：先 `onSignal` 消费真实信号，再 `onBar` 求值。
+ * 内核在每个求值周期 bar 上按先出后进次序调用：先 `onBar` 推进前序已持仓，再 `onSignal` 消费当根新信号。
  * 实现方负责维护通道虚拟持仓；内核不感知任何持仓细节。
  */
 export interface VirtualExitPolicyPort {

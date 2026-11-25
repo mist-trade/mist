@@ -18,6 +18,7 @@ import {
   ORDER_SIDES,
   ORDER_STATUSES,
   ORDER_TYPES,
+  TRADING_LAYER_DEFAULTS,
 } from '../strategy.constants';
 
 import type {
@@ -57,6 +58,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
   >();
 
   private readonly slippageRatio: number;
+  private readonly lotSize: number;
   private readonly feeConfig?: BrokerExecutionOptions['feeConfig'];
 
   registerSecurity(
@@ -73,12 +75,19 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     if (typeof options === 'number') {
       this.availableCashLi = yuanToLi(options);
       this.slippageRatio = EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO;
+      this.lotSize = TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE;
     } else {
       this.availableCashLi = yuanToLi(
         options?.initialCash ?? DEFAULT_BROKER_INITIAL_CASH,
       );
       this.slippageRatio =
         options?.slippageRatio ?? EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO;
+      const requestedLotSize =
+        options?.lotSize ?? TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE;
+      this.lotSize =
+        Number.isSafeInteger(requestedLotSize) && requestedLotSize > 0
+          ? requestedLotSize
+          : TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE;
       this.feeConfig = options?.feeConfig;
     }
   }
@@ -120,7 +129,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     }
 
     if (dto.side === ORDER_SIDES.BUY) {
-      const isRoundLot = dto.quantity % 100 === 0;
+      const isRoundLot = dto.quantity % this.lotSize === 0;
       if (!isRoundLot) {
         return rejected(ORDER_REJECT_REASONS.INVALID_LOT_SIZE);
       }

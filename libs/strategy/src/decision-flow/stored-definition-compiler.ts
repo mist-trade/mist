@@ -22,6 +22,8 @@ export interface StoredDefinitionCompileInput {
   /** version.rule 原始 JSON */
   readonly rule: Record<string, unknown>;
   readonly signalKind?: StrategySignalKind;
+  /** 可选评估主周期（透传给插件 resolveContextRequirements，缺省保持插件默认） */
+  readonly evaluationPeriod?: number;
 }
 
 export interface CompiledStoredDefinition {
@@ -94,7 +96,11 @@ export function compileStoredDefinitionVersion(
           typeof input.rule.requiredBarCount === 'number'
             ? input.rule.requiredBarCount
             : DECISION_FLOW_DEFAULT_REQUIRED_BAR_COUNT,
-        contextRequirements: deriveContextRequirements(flow, registry),
+        contextRequirements: deriveContextRequirements(
+          flow,
+          registry,
+          input.evaluationPeriod,
+        ),
         externalContextRequirements: deriveExternalContextRequirements(
           flow,
           registry,
@@ -116,7 +122,11 @@ export function compileStoredDefinitionVersion(
         return {
           flow,
           requiredBarCount: compilation.plan.requiredBarCount,
-          contextRequirements: deriveContextRequirements(flow, registry),
+          contextRequirements: deriveContextRequirements(
+            flow,
+            registry,
+            input.evaluationPeriod,
+          ),
           externalContextRequirements: deriveExternalContextRequirements(
             flow,
             registry,
@@ -141,7 +151,11 @@ export function compileStoredDefinitionVersion(
         flow,
         requiredBarCount:
           chanPlan.requiredBarCount ?? DEFAULT_REQUIRED_BAR_COUNT,
-        contextRequirements: deriveContextRequirements(flow, registry),
+        contextRequirements: deriveContextRequirements(
+          flow,
+          registry,
+          input.evaluationPeriod,
+        ),
         externalContextRequirements: deriveExternalContextRequirements(
           flow,
           registry,
@@ -259,6 +273,7 @@ function collectPluginReferences(
 export function deriveContextRequirements(
   flow: DecisionFlowNode,
   registry: FactorPluginRegistry = factorPluginRegistry,
+  evaluationPeriod?: number,
 ): Readonly<Record<number, number>> {
   const references = collectPluginReferences(flow);
   if (references.size === 0) return {};
@@ -274,7 +289,10 @@ export function deriveContextRequirements(
         `decision flow references unknown factor plugin: ${pluginId}`,
       );
     }
-    const resolved = plugin.resolveContextRequirements?.(params);
+    const resolved =
+      evaluationPeriod !== undefined
+        ? plugin.resolveContextRequirements?.(params, { evaluationPeriod })
+        : plugin.resolveContextRequirements?.(params);
     if (!resolved) continue;
     for (const [rawPeriod, rawBars] of Object.entries(resolved)) {
       const period = Number(rawPeriod);

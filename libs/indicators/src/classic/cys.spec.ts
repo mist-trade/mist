@@ -131,4 +131,13 @@ describe('computeIndexCysSeries', () => {
     expect(obs.cys).toBeCloseTo(0.0, 4);
     expect(obs.cyc).toBeCloseTo(3000.0, 4);
   });
+
+  it('guards zero or non-positive CYC entries safely via zero fallback', () => {
+    const result = computeIndexCysSeries([0, 100], [0, 90], [0, 95], {
+      period: 5,
+    });
+    expect(result.cyc[0]).toBe(0);
+    expect(result.cys[0]).toBe(0);
+    expect(result.cyc[1]).toBeGreaterThan(0);
+  });
 });

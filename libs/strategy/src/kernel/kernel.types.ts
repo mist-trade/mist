@@ -41,6 +41,11 @@ export interface KernelPlan {
    * 并以 `series.<securityCode>.<period>` 注入黑板。任一窗口不足 → fail-closed。
    */
   readonly externalContextRequirements?: readonly ExternalContextRequirement[];
+  /**
+   * 轻量监控周期（可选，如日线策略挂载 [5] 分钟穿透）：
+   * 跳过重型决策流与滑窗，仅在公开相直通 virtualExitPolicy.onBar(bar, period)。
+   */
+  readonly surveillancePeriods?: readonly number[];
 }
 
 export interface KernelConfig {
@@ -58,6 +63,8 @@ export interface KernelConfig {
    * 具体算法由外部实现注入（私仓），内核不感知任何持仓细节。
    */
   readonly virtualExitPolicy?: VirtualExitPolicyPort;
+  /** 附加轻量监控周期（如 [5]），与 plan.surveillancePeriods 自动并集 */
+  readonly surveillancePeriods?: readonly number[];
   /**
    * 多周期：不再有单值 period——内核周期集合 = ∪ plans 的求值周期 ∪ contextRequirements keys，
    * 每周期一个独立滑窗（StrategySeriesImputer）与单调游标。
@@ -90,8 +97,10 @@ export interface KernelSignal {
   readonly definitionId: number;
   readonly versionId: number;
   readonly signalKind: 'entry' | 'exit';
-  /** 通道引用：账本归属依据。阶段一仅为观测字段，账本仍按标的。 */
+  /** 通道引用：账本归属的最小单元（主策略周期）。 */
   readonly channel?: SignalChannelRef;
+  /** 实际触发该信号的 Bar 周期（例如 5m 次级穿透平仓主通道 1440m 仓位时为 5）。 */
+  readonly triggerPeriod?: number;
   /** 信号意图。阶段一由 action 推导（SELL → EXIT），编译期一致性校验在阶段二启用。 */
   readonly intent?: SignalIntent;
   /** 产出最终决策 opinion 的插件 id，仅归因，不参与归属判断。 */

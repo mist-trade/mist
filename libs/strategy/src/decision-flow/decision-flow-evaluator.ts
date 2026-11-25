@@ -93,6 +93,7 @@ export class DecisionFlowEvaluator {
           name: node.name,
           action: opinion.action,
           confidence: opinion.confidence,
+          passed,
           reason: directionConsistent
             ? opinion.reason
             : `方向隔离阻断：上游已确立【${inheritedAction}】决策，与本门禁要求【${node.requiredAction}】方向冲突`,
@@ -131,7 +132,7 @@ export class DecisionFlowEvaluator {
             node.onFail,
             context,
             trace,
-            nextScore,
+            currentScore,
             inheritedAction,
             inheritedMeta,
           );
@@ -262,16 +263,17 @@ export class DecisionFlowEvaluator {
             ? 0
             : (earnedScore / totalWeight) * 100;
 
+        const passed = !vetoTriggered && calculatedScore >= node.threshold;
+
         trace.push({
           nodeId: node.id,
           type: 'CONSENSUS',
           name: node.name,
           score: calculatedScore,
           threshold: node.threshold,
+          passed,
           breakdown,
         });
-
-        const passed = !vetoTriggered && calculatedScore >= node.threshold;
         const nextInheritedAction =
           targetAction === DECISION_ACTIONS.BUY ||
           targetAction === DECISION_ACTIONS.SELL
@@ -366,6 +368,7 @@ export class DecisionFlowEvaluator {
     trace: readonly DecisionExecutionTraceItem[],
   ): Readonly<Record<string, unknown>> | undefined {
     for (let i = trace.length - 1; i >= 0; i--) {
+      if (trace[i].passed === false) continue;
       const ev = trace[i].evidence as Record<string, unknown> | undefined;
       if (ev && typeof ev === 'object' && Object.keys(ev).length > 0) {
         return ev;
@@ -379,6 +382,7 @@ export class DecisionFlowEvaluator {
   ): string | undefined {
     for (let i = trace.length - 1; i >= 0; i--) {
       const item = trace[i];
+      if (item.passed === false) continue;
       if (item.badgeText) return item.badgeText;
       const ev = item.evidence as Record<string, unknown> | undefined;
       if (ev?.badgeText && typeof ev.badgeText === 'string') {

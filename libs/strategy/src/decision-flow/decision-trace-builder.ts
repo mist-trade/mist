@@ -51,6 +51,7 @@ export class DecisionExecutionTraceBuilder {
     const keyMilestones: string[] = [];
 
     for (const item of result.trace) {
+      if (item.passed === false) continue;
       if (item.type === 'GUARD' && item.reason) {
         keyMilestones.push(item.name ? `门禁[${item.name}]通过` : '门禁通过');
       } else if (item.type === 'CONSENSUS' && item.breakdown) {

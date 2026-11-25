@@ -76,6 +76,11 @@ export interface FactorContext {
   };
 }
 
+export interface ContextRequirementResolveOptions {
+  /** 策略评估主周期（用于未在 params 显式指定周期时自适应推导上下文周期） */
+  readonly evaluationPeriod?: number;
+}
+
 export interface FactorPluginMetadata {
   /** 全局唯一ID，命名规范：plugin.<category>.<name>，如 'plugin.chan.bsp', 'plugin.fundamental.roe' */
   readonly id: string;
@@ -106,6 +111,7 @@ export interface FactorPluginMetadata {
    */
   resolveContextRequirements?(
     params?: Record<string, unknown>,
+    options?: ContextRequirementResolveOptions,
   ): Readonly<Record<number, number>>;
 
   /**

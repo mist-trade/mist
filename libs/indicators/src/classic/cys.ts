@@ -2,7 +2,6 @@ import pl from 'nodejs-polars';
 import { IndicatorInputError, IndicatorValueError } from '../errors';
 import {
   computeCycSeries,
-  computeIndexCycSeries,
   CycOptions,
   IndexCycOptions,
   DEFAULT_CYC_PERIOD,
@@ -31,9 +30,14 @@ export interface IndexCysOptions extends IndexCycOptions {
 
 export const DEFAULT_CYS_PERIOD = DEFAULT_CYC_PERIOD;
 
+const COL_HIGH = 'high';
+const COL_LOW = 'low';
 const COL_CLOSE = 'close';
 const COL_CYC = 'cyc';
 const COL_CYS = 'cys';
+const TYPICAL_PRICE_DIVISOR = 3.0;
+const CYS_PERCENT_SCALE = 100.0;
+const EMA_ALPHA_NUMERATOR = 2;
 
 /**
  * Computes authentic Compass Market Gain/Loss Rate (CYS, 市场盈亏指标) using Polars vectorized operators:
@@ -136,6 +140,13 @@ export function computeIndexCysSeries(
     );
   }
 
+  const period = options?.period ?? DEFAULT_CYS_PERIOD;
+  if (period <= 0) {
+    throw new IndicatorInputError(
+      `computeIndexCysSeries period must be positive; got ${period}`,
+    );
+  }
+
   const len = closes.length;
   if (len === 0) {
     return {
@@ -145,27 +156,51 @@ export function computeIndexCysSeries(
     };
   }
 
-  const cycResult = computeIndexCycSeries(highs, lows, closes, options);
+  const alpha = EMA_ALPHA_NUMERATOR / (period + 1);
+  const highSeries = pl.Series(COL_HIGH, Float64Array.from(highs));
+  const lowSeries = pl.Series(COL_LOW, Float64Array.from(lows));
+  const closeSeries = pl.Series(COL_CLOSE, Float64Array.from(closes));
 
-  const df = pl.DataFrame({
-    [COL_CLOSE]: pl.Series(COL_CLOSE, closes as any).cast(pl.Float64),
-    [COL_CYC]: pl.Series(COL_CYC, cycResult.cyc as any).cast(pl.Float64),
-  });
+  // 单遍 Polars Series SIMD：免除双 DataFrame 往返 FFI 序列化开销，数值与表达式路径逐位对齐
+  const cycSeries = highSeries
+    .plus(lowSeries)
+    .plus(closeSeries)
+    .div(TYPICAL_PRICE_DIVISOR)
+    .ewmMean({ alpha, adjust: false });
+  const rawCyc = cycSeries.toArray() as number[];
 
-  const cysExpr = pl
-    .when(pl.col(COL_CYC).gt(0))
-    .then(
-      pl.col(COL_CLOSE).sub(pl.col(COL_CYC)).div(pl.col(COL_CYC)).mul(100.0),
-    )
-    .otherwise(pl.lit(0.0));
-
-  const calculated = df.select(cysExpr.alias(COL_CYS));
-  const rawCys = calculated.getColumn(COL_CYS).toArray() as number[];
+  let rawCys: number[];
+  if (cycSeries.gt(0).all()) {
+    rawCys = closeSeries
+      .minus(cycSeries)
+      .div(cycSeries)
+      .mul(CYS_PERCENT_SCALE)
+      .toArray() as number[];
+  } else {
+    const df = pl.DataFrame({
+      [COL_CLOSE]: closeSeries,
+      [COL_CYC]: cycSeries,
+    });
+    const cysExpr = pl
+      .when(pl.col(COL_CYC).gt(0))
+      .then(
+        pl
+          .col(COL_CLOSE)
+          .sub(pl.col(COL_CYC))
+          .div(pl.col(COL_CYC))
+          .mul(CYS_PERCENT_SCALE),
+      )
+      .otherwise(pl.lit(0.0));
+    rawCys = df
+      .select(cysExpr.alias(COL_CYS))
+      .getColumn(COL_CYS)
+      .toArray() as number[];
+  }
 
   return {
     begIndex: 0,
     cys: rawCys,
-    cyc: cycResult.cyc,
+    cyc: rawCyc,
   };
 }
 

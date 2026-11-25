@@ -118,6 +118,8 @@ export interface BrokerExecutionOptions {
   readonly initialCash?: number;
   /** 冲击滑点比例，默认 0.001（0.1%） */
   readonly slippageRatio?: number;
+  /** 最小买入整手单位，默认 100（指数净值对账等连续份额场景可传 1） */
+  readonly lotSize?: number;
   /** 费率设置 */
   readonly feeConfig?: BrokerFeeConfig;
 }

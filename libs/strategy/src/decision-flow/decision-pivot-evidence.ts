@@ -20,7 +20,8 @@ export function extractPivotEvidence(
   result: DecisionResult,
 ): DecisionPivotEvidence | null {
   for (const item of result.trace) {
-    const evidence = item?.evidence;
+    if (!item || item.passed === false) continue;
+    const evidence = item.evidence;
     if (!evidence || typeof evidence !== 'object') continue;
     const raw = evidence as RawPivotEvidence;
     // 仅接受显式买卖点类型字段；`type` 过于泛化（DSL 快照的 k.type 等）不入列

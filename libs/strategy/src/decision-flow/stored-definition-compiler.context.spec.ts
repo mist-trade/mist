@@ -284,4 +284,41 @@ describe('stored definition compiler — external context requirements derivatio
       }),
     ).toThrowError(/securityCode/);
   });
+
+  it('forwards evaluationPeriod into plugin.resolveContextRequirements options', () => {
+    factorPluginRegistry.register({
+      id: 'plugin.period-aware',
+      name: 'period-aware',
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'period-aware test plugin',
+      resolveContextRequirements: (_params, options) => ({
+        [options?.evaluationPeriod ?? 1440]: 120,
+      }),
+      evaluate: async () => ({
+        action: 'NEUTRAL',
+        confidence: 0,
+        reason: 'noop',
+      }),
+    });
+
+    const compiledDefault = compileStoredDefinitionVersion({
+      kind: 'decision_flow',
+      rule: guardNode('plugin.period-aware') as unknown as Record<
+        string,
+        unknown
+      >,
+    });
+    expect(compiledDefault.contextRequirements).toEqual({ 1440: 120 });
+
+    const compiled30m = compileStoredDefinitionVersion({
+      kind: 'decision_flow',
+      rule: guardNode('plugin.period-aware') as unknown as Record<
+        string,
+        unknown
+      >,
+      evaluationPeriod: 30,
+    });
+    expect(compiled30m.contextRequirements).toEqual({ 30: 120 });
+  });
 });
