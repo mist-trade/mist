@@ -100,3 +100,10 @@ export const POSITION_DECIMAL_PLACES = Object.freeze({
 export const POSITION_EXIT_REASONS = Object.freeze({
   SIGNAL_EXIT: 'SIGNAL_EXIT',
 } as const);
+
+export const TRADING_LAYER_DEFAULTS = Object.freeze({
+  DEFAULT_CASH_ALLOCATION_RATIO: 0.95,
+  DEFAULT_HARD_STOP_LOSS_RATIO: -0.08,
+  DEFAULT_LOT_SIZE: 100,
+  DEFAULT_SEED_CAPITAL: 1_000_000,
+} as const);

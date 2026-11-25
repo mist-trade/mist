@@ -3,7 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { VirtualFillEventEntity } from '@app/shared-data';
 import type { VirtualFillEvent, VirtualFillLogPort } from '@app/strategy';
-import { yuanToLi } from '@app/strategy';
+import { liToYuan, yuanToLi } from '@app/strategy';
 
 /**
  * 账本持久化端口的 TypeORM 实现（REQ-ADAPT-04：域核心定义、app 层实现）。
@@ -34,7 +34,7 @@ export class VirtualFillLogService implements VirtualFillLogPort {
         securityCode: event.securityCode,
         side: event.side,
         quantity: event.quantity,
-        price: (Number(event.priceLi) / 1000).toFixed(3),
+        price: liToYuan(event.priceLi).toFixed(3),
         fees: event.feesLi.toString(),
         netAmount: event.netAmountLi.toString(),
         tradingDay: event.tradingDay,

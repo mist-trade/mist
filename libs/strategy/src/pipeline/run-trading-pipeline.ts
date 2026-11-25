@@ -28,7 +28,7 @@ import {
 } from '../trading';
 import type { KernelSignal } from '../kernel/kernel.types';
 import { calculateExecutionFeesLi } from '../trading/fees';
-import { ORDER_SIDES } from '../strategy.constants';
+import { ORDER_SIDES, TRADING_LAYER_DEFAULTS } from '../strategy.constants';
 
 export interface PipelineInput {
   /** 内存 Bars（离线 K 线），键 = 周期 */
@@ -72,7 +72,10 @@ export async function runTradingPipeline(
 ): Promise<PipelineResult> {
   const seedCapitalLi = input.seedCapitalLi ?? DEFAULT_SEED_LI;
   const engine = new TradingEngine({
-    sizing: createAllInWithBuffer(input.cashAllocationRatio ?? 0.95),
+    sizing: createAllInWithBuffer(
+      input.cashAllocationRatio ??
+        TRADING_LAYER_DEFAULTS.DEFAULT_CASH_ALLOCATION_RATIO,
+    ),
     riskRules: input.riskRules ?? createDefaultRiskRules(),
   });
 

@@ -254,8 +254,17 @@ export class AlertChannelDeliveryService {
     };
 
     const fillEvents = await this.fillLog.loadBySecurity(securityId);
+    // 排除属于当前批次自身的成交记录（应对多渠道扇出与重试）：
+    // 若兄弟渠道已抢先回填或此前 attempt 曾写入成交，fold 快照必须排除当前组，
+    // 确保 engine.decide 始终基于组前历史状态求值，杜绝 ALREADY_HOLDING 自拒绝（REQ-LEDGER-03）。
+    const currentAlertEventIds = new Set(
+      items.map((item) => String(item.alertEvent.id)),
+    );
+    const priorFills = fillEvents.filter(
+      (fill) => !currentAlertEventIds.has(fill.idempotencyKey),
+    );
     const snapshot = foldVirtualFills(
-      fillEvents,
+      priorFills,
       this.seedCapitalLi,
       tradingDay,
     );

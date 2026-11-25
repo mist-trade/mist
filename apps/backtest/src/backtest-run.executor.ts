@@ -32,10 +32,12 @@ import {
   ExternalFactorPluginLoader,
   HistoricalBarSource,
   mapKernelSignalToPersistencePayload,
+  ORDER_STATUSES,
   ORDER_TYPES,
   PositionStateMachine,
   SimulatedBroker,
   StrategyEvaluationKernel,
+  TRADING_LAYER_DEFAULTS,
   TradingEngine,
   shanghaiMidnight,
   yuanToLi,
@@ -467,10 +469,12 @@ export class BacktestRunExecutor {
     const capitalLedger = new CapitalLedger({
       initialCash: DEFAULT_BROKER_INITIAL_CASH,
     });
-    // 交易层统一引擎（组4 迁移）：裁决/仓位/巡检出自同一管线；硬止损沿袭 -0.08
+    // 交易层统一引擎（组4 迁移）：裁决/仓位/巡检出自同一管线；硬止损沿袭
     // 显式声明（归属待拍板，design 11.4），预算比例统一 0.95（原 0.995）。
     const tradingEngine = new TradingEngine({
-      riskRules: createDefaultRiskRules(-0.08),
+      riskRules: createDefaultRiskRules(
+        TRADING_LAYER_DEFAULTS.DEFAULT_HARD_STOP_LOSS_RATIO,
+      ),
     });
 
     // 信号按 Bar 缓冲成组：drive 序为 push → onBar(T) → onSignal(T)，组内信号在
@@ -510,9 +514,6 @@ export class BacktestRunExecutor {
       },
       signalTime: Date,
     ): void => {
-      if (broker.getOpenOrders().some((o) => o.securityCode === securityCode)) {
-        return; // 既有挂单在途（如一字跌停顺延的卖单）——沿用旧守卫，不叠加挂单
-      }
       broker.submitOrder({
         securityId,
         securityCode,
@@ -549,6 +550,19 @@ export class BacktestRunExecutor {
         })),
       };
       pendingSignals.length = 0;
+
+      // 既有在途挂单（如上一周期一字跌停顺延的 BLOCKED 卖单）——不叠加新指令
+      if (
+        broker
+          .getOpenOrders()
+          .some(
+            (o) =>
+              o.securityCode === securityCode &&
+              o.status === ORDER_STATUSES.BLOCKED,
+          )
+      ) {
+        return;
+      }
 
       const decision = tradingEngine.decide(group, buildAccountSnapshot());
       for (const instruction of decision.instructions) {
@@ -636,6 +650,13 @@ export class BacktestRunExecutor {
             },
           );
           for (const instruction of riskInstructions) {
+            if (
+              broker
+                .getOpenOrders()
+                .some((o) => o.securityCode === securityCode)
+            ) {
+              continue; // 既有挂单在途（如当前 Bar 刚由信号下单或跌停顺延），不叠加风控单
+            }
             submitInstruction(instruction, bar.timestamp);
           }
         }

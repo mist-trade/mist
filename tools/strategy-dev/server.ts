@@ -48,7 +48,11 @@ import { StressTestingSuiteOrchestrator } from '../../libs/strategy/src/stress-t
 import { InMemoryFactorPluginRegistry } from '../../libs/strategy/src/factor/factor-plugin-registry';
 import { ensureStandardPluginsRegistered } from '../../libs/strategy/src/factor/standard-plugins';
 import { ExternalFactorPluginLoader } from '../../libs/strategy/src/factor/external-plugin-loader';
-import { ORDER_TYPES } from '../../libs/strategy/src/strategy.constants';
+import {
+  ORDER_STATUSES,
+  ORDER_TYPES,
+  TRADING_LAYER_DEFAULTS,
+} from '../../libs/strategy/src/strategy.constants';
 import type { DecisionFlowNode } from '../../libs/strategy/src/decision-flow/decision-flow.types';
 import type { ExternalContextRequirement } from '../../libs/strategy/src/kernel/kernel.types';
 import {
@@ -925,9 +929,13 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         options.strategyDefinitionId === 2 ||
         options.strategyDefinitionId === 3));
   // 交易层统一引擎（组5 迁移）：裁决/仓位/巡检出同一管线；enableStopLoss 语义
-  // 沿袭——关闭时无任何巡检规则（含 systemic），开启时挂载 systemic + hardStop -0.08。
+  // 沿袭——关闭时无任何巡检规则（含 systemic），开启时挂载 systemic + hardStop。
   const tradingEngine = new TradingEngine({
-    riskRules: enableStopLoss ? createDefaultRiskRules(-0.08) : [],
+    riskRules: enableStopLoss
+      ? createDefaultRiskRules(
+          TRADING_LAYER_DEFAULTS.DEFAULT_HARD_STOP_LOSS_RATIO,
+        )
+      : [],
   });
 
   // 信号按 Bar 缓冲成组（与回测迁移同构）：drive 序 push → onBar(T) → onSignal(T)，
@@ -964,9 +972,6 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     },
     signalTime: Date,
   ): void => {
-    if (broker.getOpenOrders().some((o) => o.securityCode === options.code)) {
-      return; // 既有挂单在途——沿袭旧守卫，不叠加挂单
-    }
     broker.submitOrder({
       securityId: DEFAULT_DEV_SECURITY_ID,
       securityCode: options.code,
@@ -1002,6 +1007,19 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       })),
     };
     pendingSignals.length = 0;
+
+    // 既有在途挂单（如上一周期一字跌停顺延的 BLOCKED 卖单）——不叠加新指令
+    if (
+      broker
+        .getOpenOrders()
+        .some(
+          (o) =>
+            o.securityCode === options.code &&
+            o.status === ORDER_STATUSES.BLOCKED,
+        )
+    ) {
+      return;
+    }
 
     const decision = tradingEngine.decide(
       group,
@@ -1076,6 +1094,11 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
           },
         );
         for (const instruction of riskInstructions) {
+          if (
+            broker.getOpenOrders().some((o) => o.securityCode === options.code)
+          ) {
+            continue; // 既有挂单在途（如当前 Bar 刚由信号下单或跌停顺延），不叠加风控单
+          }
           submitInstruction(instruction, bar.timestamp);
         }
       }

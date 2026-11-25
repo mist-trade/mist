@@ -11,8 +11,11 @@ import type {
   SizingStrategy,
 } from './domain.types';
 import { applyRatioLi } from './money';
+import { TRADING_LAYER_DEFAULTS } from '../strategy.constants';
 
-export function createAllInWithBuffer(ratio = 0.95): SizingStrategy {
+export function createAllInWithBuffer(
+  ratio: number = TRADING_LAYER_DEFAULTS.DEFAULT_CASH_ALLOCATION_RATIO,
+): SizingStrategy {
   return ({
     cashLi,
     priceLi,

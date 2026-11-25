@@ -402,4 +402,38 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
       status: StrategyAlertStatus.FAILED,
     });
   });
+
+  it('excludes current group fills from prior attempts or sibling channels to prevent self-rejection', async () => {
+    // 模拟兄弟渠道已抢先执行并回填了当前 alertEvent 1 的 fill 事件
+    fillLog.loadBySecurity.mockResolvedValue([
+      {
+        idempotencyKey: '1',
+        securityId: 9,
+        securityCode: '000001',
+        side: 'BUY',
+        quantity: 100,
+        priceLi: 12500n,
+        feesLi: 5000n,
+        netAmountLi: -1255000n,
+        tradingDay: '2026-08-12',
+      },
+    ]);
+    primeGroup(
+      [delivery({ strategyAlertEventId: 1 })],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [{ status: StrategyAlertDeliveryStatus.SENT }],
+    );
+    adapter.send.mockResolvedValue({ status: 'sent' });
+
+    await service.run(groupJob('wechat', [1]), 0, 5);
+
+    // 排除自身的 fill 后，快照重现组前状态，正常产出买入指令而不是被判定 ALREADY_HOLDING
+    expect(adapter.send).toHaveBeenCalledWith({
+      text: expect.stringContaining('▶ 买入'),
+    });
+    expect(adapter.send).not.toHaveBeenCalledWith({
+      text: expect.stringContaining('ALREADY_HOLDING'),
+    });
+  });
 });

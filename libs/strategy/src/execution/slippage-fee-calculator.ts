@@ -6,7 +6,7 @@
  * 旧路径按「分」取整、本路径按「厘」取整：差异属厘级舍入，由黄金回放
  * diff 归类标注（REQ-ISO-04）。
  */
-import { isEtfSecurity } from '@app/market-data';
+import { calculateExecutionFeesLi, type FeeConfigLi } from '../trading/fees';
 import { EXECUTION_RULES, ORDER_SIDES } from '../strategy.constants';
 import type { BrokerFeeConfig, FeeDetails, OrderSide } from './execution.types';
 import { applyRatioLi, liToYuan, yuanToLi } from '../trading/money';
@@ -29,10 +29,7 @@ export function applySlippage(
 }
 
 /**
- * A 股精确规费计算（佣金、过户费、印花税）
- * - 佣金：双向默认万 2.5，最低保底 5 元（支持通过 feeConfig 调整，支持免五为 0）
- * - 过户费：双向默认万 0.1
- * - 印花税：仅卖出征收万 5；若为 ETF 则免征（严格为 0）
+ * A 股精确规费计算（佣金、过户费、印花税）——外部 float 适配器，核心委托 calculateExecutionFeesLi
  */
 export function calculateExecutionFees(
   side: OrderSide,
@@ -44,36 +41,32 @@ export function calculateExecutionFees(
 ): FeeDetails {
   const fillPriceLi = yuanToLi(fillPrice);
   const turnoverLi = fillPriceLi * BigInt(quantity);
-  const commissionRate =
-    feeConfig?.commissionRate ?? EXECUTION_RULES.DEFAULT_COMMISSION_RATE;
-  const minCommission =
-    feeConfig?.minCommission ?? EXECUTION_RULES.MIN_COMMISSION;
-  const transferFeeRate =
-    feeConfig?.transferFeeRate ?? EXECUTION_RULES.TRANSFER_FEE_RATE;
-  const stampDutyRate =
-    feeConfig?.stampDutyRate ?? EXECUTION_RULES.STAMP_DUTY_RATE;
+  const feeConfigLi: FeeConfigLi | undefined = feeConfig
+    ? {
+        commissionRate: feeConfig.commissionRate,
+        minCommissionLi:
+          feeConfig.minCommission !== undefined
+            ? BigInt(Math.round(feeConfig.minCommission * 1000))
+            : undefined,
+        transferFeeRate: feeConfig.transferFeeRate,
+        stampDutyRate: feeConfig.stampDutyRate,
+      }
+    : undefined;
 
-  const rawCommissionLi = applyRatioLi(turnoverLi, commissionRate);
-  const minCommissionLi = BigInt(Math.round(minCommission * 1000));
-  const commissionLi =
-    minCommission > 0
-      ? rawCommissionLi > minCommissionLi
-        ? rawCommissionLi
-        : minCommissionLi
-      : rawCommissionLi;
-  const transferFeeLi = applyRatioLi(turnoverLi, transferFeeRate);
-  const isEtf = isEtfSecurity(securityCode);
-  const stampDutyLi =
-    side === ORDER_SIDES.SELL && !isEtf
-      ? applyRatioLi(turnoverLi, stampDutyRate)
-      : 0n;
+  const feesLi = calculateExecutionFeesLi(
+    side,
+    fillPriceLi,
+    quantity,
+    securityCode,
+    feeConfigLi,
+  );
   const slippageCostLi = applyRatioLi(turnoverLi, slippageRatio);
 
   return {
-    commission: liToYuan(commissionLi),
-    transferFee: liToYuan(transferFeeLi),
-    stampDuty: liToYuan(stampDutyLi),
+    commission: liToYuan(feesLi.commissionLi),
+    transferFee: liToYuan(feesLi.transferFeeLi),
+    stampDuty: liToYuan(feesLi.stampDutyLi),
     slippageCost: liToYuan(slippageCostLi),
-    totalFees: liToYuan(commissionLi + transferFeeLi + stampDutyLi),
+    totalFees: liToYuan(feesLi.totalFeesLi),
   };
 }

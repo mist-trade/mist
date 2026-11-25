@@ -76,3 +76,9 @@ export type {
   SerializedLogEntry,
 } from './golden';
 export { runGoldenScenario, serializeAccount } from './golden';
+export {
+  ORDER_SIDES,
+  ORDER_TYPES,
+  ORDER_STATUSES,
+  TRADING_LAYER_DEFAULTS,
+} from '../strategy.constants';

@@ -6,14 +6,19 @@
  * T+1：BUY 事件以 tradingDay 构造 entryTime（上海日界），使
  * isEnteredToday 与快照 tradingDay 的比较精确成立。
  */
+import { formatShanghaiDateString } from '@app/timezone';
 import { ORDER_SIDES } from '../strategy.constants';
 import type { AccountSnapshot, TradingPositionState } from './domain.types';
 import type { VirtualFillEvent } from './fill-log.port';
 import type { Li } from './money';
 
 /** 上海日界的交易日至 → Date（供 entryTime/isEnteredToday 比较）。 */
-function tradingDayToDate(tradingDay: string): Date {
-  return new Date(`${tradingDay}T00:00:00+08:00`);
+function tradingDayToDate(tradingDay: string | Date): Date {
+  const dayStr =
+    tradingDay instanceof Date
+      ? formatShanghaiDateString(tradingDay)
+      : String(tradingDay).slice(0, 10);
+  return new Date(`${dayStr}T00:00:00+08:00`);
 }
 
 interface MutableFoldPosition {

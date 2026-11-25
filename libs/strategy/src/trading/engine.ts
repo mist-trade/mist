@@ -8,7 +8,7 @@
  */
 import type { StrategyBar } from '@app/market-data';
 import { formatShanghaiDateString } from '@app/timezone';
-import { ORDER_SIDES } from '../strategy.constants';
+import { ORDER_SIDES, TRADING_LAYER_DEFAULTS } from '../strategy.constants';
 import type {
   AccountSnapshot,
   AttributedSignal,
@@ -59,12 +59,16 @@ export class TradingEngine {
   private readonly feeConfig?: FeeConfigLi;
 
   constructor(deps: TradingEngineDeps = {}) {
-    this.sizing = deps.sizing ?? createAllInWithBuffer(0.95);
+    this.sizing =
+      deps.sizing ??
+      createAllInWithBuffer(
+        TRADING_LAYER_DEFAULTS.DEFAULT_CASH_ALLOCATION_RATIO,
+      );
     this.entryRules = deps.entryRules ?? createDefaultEntryRules(this.sizing);
     this.exitRules = deps.exitRules ?? createDefaultExitRules();
     this.riskRules = deps.riskRules ?? createDefaultRiskRules();
     this.groupOrdering = deps.groupOrdering ?? sellFirstByConfidence;
-    this.lotSize = deps.lotSize ?? 100;
+    this.lotSize = deps.lotSize ?? TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE;
     this.feeConfig = deps.feeConfig;
   }
 
