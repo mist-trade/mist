@@ -1,3 +1,6 @@
+> **状态：已作废并归档（2026-11-26 经架构评审与用户确认正式作废，归档至 `archive/2026-11-26-obsolete-lifecycle-driven-kline-reconciliation/`）。**
+> **作废理由**：收盘后数据同步已由专门的 `mist-market-data-sync` 技能自动化稳定承接，实时盘中行情由 Sealed Candle Ingress 机制守门，无需在边缘 Windows Python 桥引入脆弱的反向对账、主动推送与 Migration 034 审计表。
+
 # Proposal: lifecycle-driven-kline-reconciliation
 
 ## Why

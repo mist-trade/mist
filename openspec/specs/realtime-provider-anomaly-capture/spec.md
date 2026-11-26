@@ -1,4 +1,9 @@
-## ADDED Requirements
+# realtime-provider-anomaly-capture Specification
+
+## Purpose
+Define the observation, capture, categorization, and sanitization boundaries for naturally occurring runtime anomalies in TDX and QMT providers without artificial fault injection.
+
+## Requirements
 
 ### Requirement: Provider anomalies are observed rather than manufactured
 
@@ -97,45 +102,3 @@ It MUST NOT manufacture journal, lease, callback or native failures.
   `reconciliationRequired`, retained-recovery aggregate and last durable
   sequence/hash summary
 - **AND** it MUST NOT repeat a native mutation solely to complete evidence
-
-#### Scenario: A real QMT owner or callback anomaly occurs
-- **WHEN** owner fencing, callback cessation, queue loss or callback shape
-  produces a real runtime anomaly
-- **THEN** evidence MUST preserve current owner/build identity and bounded local
-  diagnostics
-- **AND** it MUST not expose lease token or complete callback native data
-
-### Requirement: Deferred anomaly evidence does not block normal-path release
-
-A release whose normal-path gates pass SHALL NOT fail solely because a real
-provider anomaly has not occurred. The release manifest SHALL link this change
-and preserve every deferred branch as `not-observed`.
-
-#### Scenario: Normal QMT and TDX HIL passes without an anomaly
-- **WHEN** typed control, freshness, cleanup, recovery and protected-data gates
-  pass and no real negative branch occurs
-- **THEN** the current release MAY complete without synthetic fault evidence
-- **AND** the manifest MUST list each deferred branch and this change as its
-  future capture owner
-
-#### Scenario: A later incident changes the understood contract
-- **WHEN** reviewed real evidence contradicts the current provider assumption
-- **THEN** contract or recovery behavior MUST be changed through a separate
-  reviewed OpenSpec delta
-- **AND** the incident bundle alone MUST NOT silently alter production behavior
-
-### Requirement: Quantity contract deviations use the same dormant capture boundary
-
-TDX and QMT realtime quantity anomalies SHALL be captured only after a naturally occurring missing-field,
-type, grammar, scale, range, counter-jump or accepted-profile deviation. Evidence SHALL retain source, field,
-bounded reason, artifact identity and observation window without retaining a complete raw native snapshot.
-
-#### Scenario: Quantity negative behavior exists only in deterministic tests
-- **WHEN** malformed, missing or drifting quantity behavior has not occurred in the real runtime
-- **THEN** the live incident status MUST remain `not-observed`
-- **AND** deterministic adapter tests MAY prove fail-closed behavior without blocking normal-path release
-
-#### Scenario: A real quantity profile contradiction appears
-- **WHEN** reviewed evidence contradicts the accepted source/runtime quantity profile or counter semantics
-- **THEN** the incident bundle MUST preserve the bounded observed facts and current artifact identity
-- **AND** product mode MUST remain off or shadow until a separate reviewed OpenSpec delta changes the contract

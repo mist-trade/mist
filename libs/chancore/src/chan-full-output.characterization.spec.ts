@@ -14,7 +14,12 @@ import {
   createChanFullOutputFixture,
 } from './chan-full-output.characterization.fixture';
 import { createChanDuanAnchorFixture } from './chan-duan-anchor.characterization.fixture';
-import { DuanStatus, DuanType, TrendDirection } from './contracts';
+import {
+  ChannelLevel,
+  DuanStatus,
+  DuanType,
+  TrendDirection,
+} from './contracts';
 import type { ChanBiOptions } from './contracts';
 
 const EXPECTED_FULL_OUTPUT_SHA256 =
@@ -227,8 +232,7 @@ describe('ChanCore full-output differential characterization', () => {
     });
   });
 
-  // 临时跳过：段中枢扩张与延伸逻辑已按用户指令临时注释
-  it.skip('locks Duan-level sequential resolution (adjacent wave overlap retains separate sequential units in phaseB)', () => {
+  it('locks Duan-level sequential resolution (adjacent wave overlap retains separate sequential units in phaseB)', () => {
     const duans = createDuanExpansionFixture();
     const { phaseA, phaseB } = ChanCore.createDuanChannels(duans);
 
@@ -236,15 +240,17 @@ describe('ChanCore full-output differential characterization', () => {
     expect(phaseB).toHaveLength(3);
     const nonExpanded = phaseB.filter((c) => !c.expanded);
     expect(nonExpanded).toHaveLength(2);
-    expect(nonExpanded[0].zd).toBe(7);
-    expect(nonExpanded[0].zg).toBe(9);
-    expect(nonExpanded[1].zd).toBe(2);
-    expect(nonExpanded[1].zg).toBe(4);
+    expect(nonExpanded[0].zd).toBe(6);
+    expect(nonExpanded[0].zg).toBe(8);
+    expect(nonExpanded[1].zd).toBe(11);
+    expect(nonExpanded[1].zg).toBe(14);
     const expandedBox = phaseB.find((c) => c.expanded);
     expect(expandedBox).toBeDefined();
+    expect(expandedBox!.expanded).toBe(true);
+    expect(expandedBox!.upgradedLevel).toBe(ChannelLevel.Macro);
 
     const payload = {
-      algorithmVersion: 7,
+      algorithmVersion: 8,
       duans: duans.map(toContractDuan),
       output: {
         phaseA: phaseA.map(toContractDuanChannel),
@@ -303,9 +309,9 @@ describe('ChanCore full-output differential characterization', () => {
   });
 });
 
-/** Duan-level central-extension fingerprint（add-chan-central-extension 新增）。 */
+/** Duan-level central-extension fingerprint（a+3+b 架构下两相邻扩展段中枢指纹锁定）。 */
 const EXPECTED_DUAN_EXPANSION_SHA256 =
-  '1ec94b9651216e819031bfad08a9a9fde6c97b7b29e4985c0afdcf742f758ea7';
+  'a44c7cc7ae497931360bcbea9fb07d35dc3d8963681c937da7259759592d004e';
 
 /** Duan lesson-71 first-Bi-break fingerprint（restore-chan-duan-first-bi-break 更新）。 */
 const EXPECTED_DUAN_71_SHA256 =
@@ -340,15 +346,17 @@ function toContractDuanChannel(channel: ChanDuanChannel) {
   };
 }
 
-/** 段级扩张 fixture（同 central-expansion.spec 的集成样例）。 */
+/** 段级扩张 fixture（与 duan-channel.spec 的 Phase B 扩展样例对齐）。 */
 function createDuanExpansionFixture(): ChanDuan[] {
   return [
-    makeDuan(0, 'up', 11, 4),
-    makeDuan(1, 'down', 9, 6),
-    makeDuan(2, 'up', 10, 7),
-    makeDuan(3, 'down', 8, 1),
-    makeDuan(4, 'up', 6, 1),
-    makeDuan(5, 'down', 4, 2),
+    makeDuan(0, 'up', 10, 0),
+    makeDuan(1, 'down', 10, 2),
+    makeDuan(2, 'up', 8, 2),
+    makeDuan(3, 'down', 8, 6),
+    makeDuan(4, 'up', 14, 6),
+    makeDuan(5, 'down', 14, 9),
+    makeDuan(6, 'up', 15, 9),
+    makeDuan(7, 'down', 15, 11),
   ];
 }
 

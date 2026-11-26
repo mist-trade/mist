@@ -1,6 +1,9 @@
-# market-breadth-gauge Specification Delta
+# market-breadth-gauge Specification
 
-## ADDED Requirements
+## Purpose
+Define the pure mathematical functions and operators in `libs/indicators` for volume-weighted cost (CYC) and price deviation (CYS13) across individual stocks and broad-market indices using Rust `nodejs-polars` SIMD expressions, along with cross-sectional breadth calculation and ingestion contracts.
+
+## Requirements
 
 ### Requirement: Dual-Track Authentic CYS13 Vectorized Operators (Stock vs Index)
 The `libs/indicators` module SHALL provide pure mathematical functions covering both individual stocks and broad-market indices via Rust `nodejs-polars` SIMD expressions:

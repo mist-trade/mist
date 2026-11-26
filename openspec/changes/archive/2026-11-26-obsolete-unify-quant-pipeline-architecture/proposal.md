@@ -1,3 +1,6 @@
+> **状态：已作废并归档（2026-11-26 经架构评审与用户确认正式作废，归档至 `archive/2026-11-26-obsolete-unify-quant-pipeline-architecture/`）。**
+> **作废理由**：2026-11-26 归档变更 `add-virtual-trading-layer` 已经全面收口为「两层单向架构（信号层 → 完整交易引擎）」，并落地了 `runTradingPipeline` 统一门面及四端同构门禁；同时 `apps/backtest` 生产栈已正式退役，原定管道抽离与回测重构不再需要。
+
 # Proposal: 统一量化时序管道（Quant Pipeline）架构与策略库资产收敛
 
 ## 1. 背景与核心痛点

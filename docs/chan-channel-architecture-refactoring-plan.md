@@ -352,41 +352,41 @@ export interface ChanDivergence {
 #### 套件 2：笔中枢（ChanBiChannel & BiStateMachine）重构套件（`bi-channel.spec.ts`、`channel-lifecycle.spec.ts`）
 - **覆盖范围**：原 `channel.ts` 重命名为 `bi-channel.ts`，状态机重构为 `BiStateMachine`；
 - **TDD 先行用例设计**：
-  - [ ] **用例 1（初生锁定）**：输入 1 根进入笔 + 3 根内部交叠笔，断言 `bis.length === 3`，`entryBi` 独立挂载，`zg/zd` 正确锁定；
-  - [ ] **用例 2（动态收窄）**：输入后续内部震荡笔，断言 $[ZD, ZG]$ 动态向内收缩（`min(zg)` / `max(zd)`），且 `gg/dd` 取内部构件极值；
-  - [ ] **用例 3（解耦隔离）**：当离开笔冲出时，断言 `bis` 数组**绝对不包含**离开笔，`leaveBi` 单独确立；
-  - [ ] **用例 4（4 大离开规则）**：顺势突破确认三买/三卖、2s/2b 衰竭、极限反穿截断、新中枢新生，逐一验证封存；
-  - [ ] **用例 5（Phase B）**：同向且 $[ZD, ZG]$ 重叠合并为延伸中枢；$[ZD, ZG]$ 无交集但 $[DD, GG]$ 有交集追加扩展大框；
-  - [ ] **用例 6（彻底清场）**：断言生成的 `ChanBiChannel` 对象中无任何 `displayStartId` / `displayEndId` 字段。
+  - [x] **用例 1（初生锁定）**：输入 1 根进入笔 + 3 根内部交叠笔，断言 `bis.length === 3`，`entryBi` 独立挂载，`zg/zd` 正确锁定；
+  - [x] **用例 2（动态收窄）**：输入后续内部震荡笔，断言 $[ZD, ZG]$ 动态向内收缩（`min(zg)` / `max(zd)`），且 `gg/dd` 取内部构件极值；
+  - [x] **用例 3（解耦隔离）**：当离开笔冲出时，断言 `bis` 数组**绝对不包含**离开笔，`leaveBi` 单独确立；
+  - [x] **用例 4（4 大离开规则）**：顺势突破确认三买/三卖、2s/2b 衰竭、极限反穿截断、新中枢新生，逐一验证封存；
+  - [x] **用例 5（Phase B）**：同向且 $[ZD, ZG]$ 重叠合并为延伸中枢；$[ZD, ZG]$ 无交集但 $[DD, GG]$ 有交集追加扩展大框；
+  - [x] **用例 6（彻底清场）**：断言生成的 `ChanBiChannel` 对象中无任何 `displayStartId` / `displayEndId` 字段。
 
 #### 套件 3：段中枢（ChanDuanChannel & DuanStateMachine）7 大场景全景套件（`duan-channel.spec.ts`）
 - **覆盖范围**：段中枢生命周期引擎、原典第 20 课恒定区间、7 大穷尽终结场景、级别升级；
 - **TDD 先行用例设计**：
-  - [ ] **用例 1（初生双重角色分支 A - 直接完满）**：输入 3 段走势，第 3 段向上突破并被第 4 段确立三买，断言：`duans.length === 1`（纯中间振荡段），`entryDuan = S0`，`leaveDuan = S2`，`type = Complete`，基线 3 段瞬间完满；
-  - [ ] **用例 2（初生双重角色分支 B - 延伸吸纳）**：第 3 段未能突破或拉回，断言：`duans.length === 2`（`S1, S2` 均成为内部段），维持 `UnComplete`；
-  - [ ] **用例 3（原典第 20 课恒定区间）**：连续吸纳 4、5、6 根内部段，断言：$[ZD, ZG]$ 恒定等于前 3 段锁定的交叠区间，绝对不发生动态收窄；
-  - [ ] **用例 4（场景 1 与级别升级）**：内部段延伸达到 9 段，断言：`duans.length === 9`，`expanded === true`，`upgradedLevel === ChannelLevel.Macro`，而 `level === ChannelLevel.Duan` 保持不变！
-  - [ ] **用例 5（场景 2 向上三买离开）**：$curr.high > ZG \land pullback.low > ZG$，断言：旧中枢在 $curr$ 处完满封存，`leaveDuan = curr`；
-  - [ ] **用例 6（场景 3 向下三卖离开）**：$curr.low < ZD \land pullback.high < ZD$，断言：旧中枢向下完满封存，`leaveDuan = curr`；
-  - [ ] **用例 7（场景 4 极值转折衰竭）**：冲破 $GG$ 后回踩未破 $ZD$，二次冲高未创新高（二卖），断言：在极值突破段处封存离开；
-  - [ ] **用例 8（场景 5 极限反向贯穿）**：单段从上向下暴穿 $ZD$ 与 $DD$，断言：立即截断封存旧中枢，贯穿段不入内部；
-  - [ ] **用例 9（场景 6 中枢新生强制闭合）**：后续走势在不重叠区间走出独立新 3 段核心，断言：旧中枢强制闭合，新中枢独立建立；
-  - [ ] **用例 10（场景 7 数据尾部）**：走势在最新段未完结，断言：输出 `type: UnComplete`；
-  - [ ] **用例 11（Phase B 扩展升级）**：两个相邻段中枢 $[ZD, ZG]$ 无重叠但 $[DD, GG]$ 有重叠，断言：生成大框，`expanded: true`，`upgradedLevel: ChannelLevel.Macro`，`level: ChannelLevel.Duan`。
+  - [x] **用例 1（初生双重角色分支 A - 直接完满）**：输入 3 段走势，第 3 段向上突破并被第 4 段确立三买，断言：`duans.length === 1`（纯中间振荡段），`entryDuan = S0`，`leaveDuan = S2`，`type = Complete`，基线 3 段瞬间完满；
+  - [x] **用例 2（初生双重角色分支 B - 延伸吸纳）**：第 3 段未能突破或拉回，断言：`duans.length === 2`（`S1, S2` 均成为内部段），维持 `UnComplete`；
+  - [x] **用例 3（原典第 20 课恒定区间）**：连续吸纳 4、5、6 根内部段，断言：$[ZD, ZG]$ 恒定等于前 3 段锁定的交叠区间，绝对不发生动态收窄；
+  - [x] **用例 4（场景 1 与级别升级）**：内部段延伸达到 9 段，断言：`duans.length === 9`，`expanded === true`，`upgradedLevel === ChannelLevel.Macro`，而 `level === ChannelLevel.Duan` 保持不变！
+  - [x] **用例 5（场景 2 向上三买离开）**：$curr.high > ZG \land pullback.low > ZG$，断言：旧中枢在 $curr$ 处完满封存，`leaveDuan = curr`；
+  - [x] **用例 6（场景 3 向下三卖离开）**：$curr.low < ZD \land pullback.high < ZD$，断言：旧中枢向下完满封存，`leaveDuan = curr`；
+  - [x] **用例 7（场景 4 极值转折衰竭）**：冲破 $GG$ 后回踩未破 $ZD$，二次冲高未创新高（二卖），断言：在极值突破段处封存离开；
+  - [x] **用例 8（场景 5 极限反向贯穿）**：单段从上向下暴穿 $ZD$ 与 $DD$，断言：立即截断封存旧中枢，贯穿段不入内部；
+  - [x] **用例 9（场景 6 中枢新生强制闭合）**：后续走势在不重叠区间走出独立新 3 段核心，断言：旧中枢强制闭合，新中枢独立建立；
+  - [x] **用例 10（场景 7 数据尾部）**：走势在最新段未完结，断言：输出 `type: UnComplete`；
+  - [x] **用例 11（Phase B 扩展升级）**：两个相邻段中枢 $[ZD, ZG]$ 无重叠但 $[DD, GG]$ 有重叠，断言：生成大框，`expanded: true`，`upgradedLevel: ChannelLevel.Macro`，`level: ChannelLevel.Duan`。
 
 #### 套件 4：买卖点与背驰双级别求值套件（`buy-sell-point.spec.ts`、`divergence.spec.ts`）
 - **覆盖范围**：买卖点输出增加 `level`，背驰输出增加 `level`，彻底拔除历史 `slice` 补丁；
 - **TDD 先行用例设计**：
-  - [ ] **用例 1（笔级别 BSP/背驰）**：输入 `ChanBiChannel`，断言输出的买卖点与背驰对象中 `level === ChannelLevel.Bi`；
-  - [ ] **用例 2（段级别 BSP/背驰）**：输入 `ChanDuanChannel`，断言输出的买卖点与背驰对象中 `level === ChannelLevel.Duan`；
-  - [ ] **用例 3（直接进出对比）**：断言进出段直接使用 `entryBi vs leaveBi` / `entryDuan vs leaveDuan`，断言买卖点与背驰在无任何历史切片偏移补丁下计算精准。
+  - [x] **用例 1（笔级别 BSP/背驰）**：输入 `ChanBiChannel`，断言输出的买卖点与背驰对象中 `level === ChannelLevel.Bi`；
+  - [x] **用例 2（段级别 BSP/背驰）**：输入 `ChanDuanChannel`，断言输出的买卖点与背驰对象中 `level === ChannelLevel.Duan`；
+  - [x] **用例 3（直接进出对比）**：断言进出段直接使用 `entryBi vs leaveBi` / `entryDuan vs leaveDuan`，断言买卖点与背驰在无任何历史切片偏移补丁下计算精准。
 
 #### 套件 5：前端绘图适配器与接口契约套件（`chan-visual.adapter.spec.ts`、`chan.controller.spec.ts`）
 - **覆盖范围**：`ChanVisualAdapter` 绘图色块范围、REST API 端点；
 - **TDD 先行用例设计**：
-  - [ ] **用例 1（几何色块起止）**：断言中枢绘制矩形的起止坐标严格对齐 `units[0].startTime` 至 `units.at(-1).endTime`，绝无 `bis[1]` 或 `centralExitBi.startTime` 偏移补丁；
-  - [ ] **用例 2（扩展标签渲染）**：当中枢带有 `upgradedLevel === ChannelLevel.Macro` 时，断言生成的指令中包含 `[高一级扩展]` 文本；
-  - [ ] **用例 3（REST API 对称性）**：`POST /v1/chan/bi-channel` 与 `POST /v1/chan/duan-channel` 返回结构严格符合 VO 规范。
+  - [x] **用例 1（几何色块起止）**：断言中枢绘制矩形的起止坐标严格对齐 `units[0].startTime` 至 `units.at(-1).endTime`，绝无 `bis[1]` 或 `centralExitBi.startTime` 偏移补丁；
+  - [x] **用例 2（扩展标签渲染）**：当中枢带有 `upgradedLevel === ChannelLevel.Macro` 时，断言生成的指令中包含 `[高一级扩展]` 文本；
+  - [x] **用例 3（REST API 对称性）**：`POST /v1/chan/bi-channel` 与 `POST /v1/chan/duan-channel` 返回结构严格符合 VO 规范。
 
 ---
 
