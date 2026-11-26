@@ -26,7 +26,7 @@ Mist 是面向 A 股市场的核心量化计算与行情服务系统。采用 Ne
 - **统一策略求值内核（StrategyEvaluationKernel）**：单一 push 生产管线，实现**实时行情推送 ≡ 单步推演仿真 ≡ 离线批量回测**三链路增量信号 100% 逐条同构。
 - **法定双时间戳契约**：`signalTime`（决策确立时刻 = 确认 Bar 闭合时间戳）与 `pivotTime`（形态几何极值点时间戳）物理分离，交易在 Next-Bar（$t_{fill} \ge t+1 > t_{signal}$）因果撮合，从源头杜绝未来函数。
 - **流式推演仿真与环境隔离（libs/strategy/src/simulation）**：以已密封 K 线推流，SSE（`text/event-stream`）长连接实时推流几何与增量信号；支持单步前后步进与帧缓存；具备本地开发环境刚性隔离与只读离线复盘能力。
-- **多渠道告警通知投递**：基于第 2 层战术事件（`TacticalEvent`）驱动企业微信机器人、飞书、Webhook 矩阵投递与 OpenObserve 告警联动，杜绝高频状态刷屏。
+- **完整统一交易引擎与交易手册投递**：按「信号层 → 完整交易引擎」两层单向架构运行；交易引擎统一承载信号聚合分组（`groupSignals`）、规则管线裁决（`TradingEngine`）、整数厘事件溯源账本（`virtual_fill_events`）、撮合（`SimulatedBroker`）与正式交易手册输出，经企业微信/飞书/Webhook 矩阵分发与 OpenObserve 告警联动。真实账本风控平仓在交易引擎内部闭环，绝不反向回灌信号层。
 - **收盘权威数据同步与检查点对账**：收盘后自动从数据源拉取权威 K 线覆盖入库，由 `034_create_collector_sync_events.sql` 驱动检查点防抖对账，确保历史数据纯净。
 
 ---
@@ -45,7 +45,7 @@ mist (NestJS Monorepo)
 └── libs/
     ├── chancore/                  # 纯数学缠论核心库（分型/宽笔/线段/中枢/买卖点）
     ├── indicators/                # Rust nodejs-polars SIMD 向量化指标计算库
-    ├── strategy/                  # 统一策略求值内核、决策流树、因子插件、推演仿真与撮合执行层
+    ├── strategy/                  # 信号层求值内核/决策流/因子插件、虚拟出场端口、完整交易引擎（聚合/裁决/账本/撮合/门面）与仿真引擎
     ├── signal/                    # 实时信号调度与注册表客户端
     ├── market-data/               # 行情领域模型、vendor 供应商导入与数据源映射
     ├── visual-command/            # 图元绘图指令标准化定义 (VisualCommand)
@@ -82,7 +82,7 @@ pnpm install
 cp .env.example .env
 ```
 
-执行单向递增数据库迁移（当前基线至 `034_create_collector_sync_events.sql`，严禁使用 `synchronize: true`）：
+执行单向递增数据库迁移（当前基线至 `037_create_virtual_fill_events.sql`，严禁使用 `synchronize: true`）：
 ```bash
 pnpm run db:migrate
 ```

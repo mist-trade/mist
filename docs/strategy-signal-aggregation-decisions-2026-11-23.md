@@ -1,7 +1,7 @@
 # 策略信号聚合与 K 线左右标口径 — 讨论纪要
 
-- 日期：2026-11-23
-- 状态：时间模型已实施（2026-11-23）；战术事件层已整体删除（2026-11-24）；下一步重新设计消息聚合、状态过滤与时间口径
+- 日期：2026-11-23（2026-11-26 架构口径终审收口）
+- 状态：**已落地并完成架构口径收口（2026-11-26）**；时间模型已实施（11-23）、战术事件层已整体删除（11-24）、完整交易引擎已落地并归档（11-25/11-26）。**注意：文内早期“三层（信号层 → 聚合层 → 交易层）”与“仅发消息不做账本”表述仅作历史讨论记录保留，最终权威口径以文末第十二节与 `AGENTS.md` 两层单向架构（信号层 → 完整交易引擎）为准**
 - 适用范围：公共策略 + 私有策略的买卖点聚合、飞书通知、人工交易
 - 关系：本文件取代 `openspec/changes/add-orderbook-execution-pipeline/` 中的订单簿撮合、
   账本、独立执行进程设计；那份设计不再作为实施依据
@@ -1374,3 +1374,17 @@ OpenSpec `add-virtual-trading-layer` 全组任务完成，四链路（实时/回
 - **语义变化（基线重跑覆盖）**：预算比例 0.995→0.95 统一；组内顺序统一先出后进；厘级舍入（分→厘）。
 - **硬止损归属已拍板（2026-11-25，架构总纲）**：**引擎不出方案，全部由插件决定；引擎只负责接受信号然后撮合交易**。硬止损由策略定义 DSL params 声明（`plugin.exit.price-defense` 转换规则绑定），公共域 `PriceLevelExitPolicy` 按虚拟持仓求值产出 exit 信号（与真实信号同构）；引擎风控仅 systemicCrunch 常驻；出场归因 exitReason 'HARD_STOP_LOSS' → 'VIRTUAL_EXIT'（exitKind 在信号 contextSnapshot）。golden surveillance 场景重写：回放器特例（surveil 指令不推进账本导致双重卖出）同步消除，与回测真实时序对齐。
 - **开源对齐**：五仓调研（Nautilus/LEAN/backtrader/freqtrade/vnpy）确认四项从零基准全部为生产验证模式（design 12）。
+
+---
+
+## 十二、架构口径最终收口（2026-11-26 终审定稿）
+
+为消除早期“信号层 → 聚合层 → 交易层”分段及“双账本回灌”带来的口径歧义，全系统正式固化以下两条架构铁律（同步落盘于工作区 `AGENTS.md` 与 `openspec/specs/trading-engine/spec.md`）：
+
+1. **两层单向架构（取消“聚合层 → 交易层”独立分段）**：
+   - 全系统收口为 **「信号层 → 完整交易引擎」** 两层线性架构；
+   - **完整交易引擎（Unified Trading Engine）** 内部统一涵盖：**信号聚合**（持久化 + `groupSignals` 按 `(securityId, effectiveTime)` 分组 + fanout/channel V2）、**规则裁决与资金账本**（`TradingEngine.decide` / `surveilBar`、`SizingStrategy`、`virtual_fill_events` / `PositionStateMachine`）、**模拟/虚拟撮合**（`SimulatedBroker` 或实时假定成交）与**正式交易指令输出**（`TradeInstruction[]` + `TradeRejection[]` + 交易手册 `buildTradingManual`）。
+2. **双账本严格单向隔离与真实账本内部闭环（原 Task 10.1 永久作废）**：
+   - 信号层内策略/插件维护的私有虚拟持仓状态机，**唯一目的是支撑策略/插件产出买卖信号（特别是出场信号）**，完全自维护、零资金/DB 耦合；
+   - 交易引擎维护的真实/虚拟执行账本自身触发的任何风控平仓（如 `systemicCrunch`）或账本处置，**必须在交易引擎内部闭环并直接输出交易指令**；**严禁向信号层反向发信号**，也**严禁将 `virtual_fill_events` 或 `AccountSnapshot` 反向注入回信号层或策略虚拟账本**。
+   - 跨层状态偏差（如因资金不足/一字板拒买导致的后续多余出场信号）由交易引擎通过 `NO_POSITION` / `ALREADY_HOLDING` 等结构化拒绝安全拦截并在交易手册中显式审计。

@@ -1,20 +1,18 @@
-# OpenSpec 缺口清单（2026-10-15 修订，基线 10-15）
+# OpenSpec 缺口清单（2026-11-26 修订，基线 11-26）
 
 > 本文件是 Mist 平台 OpenSpec 缺口全景的**唯一权威清单**。**更新任何 change 状态时同步修订本文件。**
 
 ## 状态速览
 
-- `specs/`：**108 个已采纳 spec**（新增 `strategy-evaluation-contract` 外部插件守卫细化、`strategy-evaluation-pipeline` 等）
-- `changes/`：**6 个 active change**（`upgrade-backtest-decision-and-parity-engine` 待执行，`add-pre-market-strategy-hydration` 规格已重写待计划，`integrate-native-terminal-visualization` 部分延期，`capture-realtime-provider-anomalies` 待真实被动触发，`introduce-naked-k-volume-plugin-and-clean-legacy` 与 `introduce-volatility-squeeze-and-vpci-plugins` 任务完成待归档）
-- **核心架构演进闭环**（2026-09 ~ 2026-10）：
-  - 策略统一 push 求值内核与三链路同构落地，双时间戳 `pivot_time` 落盘（`unify-strategy-evaluation-pipeline` 归档）
-  - 缠论 9 段延伸升级与波动扩展解耦（`differentiate-chan-central-extension-upgrade-and-expansion` 归档）
-  - 离开段极值与三类买卖点刚性硬门禁（`enforce-chan-channel-departure-extreme-guard` 归档）
-  - 多级别背驰与一类点趋势背驰纯化（`remediate-chan-divergence-multi-level-gates` 归档）
-  - 动态外部因子插件与私有策略隔离（`support-external-factor-plugins` 归档）
-  - Rust Polars 斐波那契指标、因子插件与 TV 工业可视化（`add-chan-fibonacci-overlay` 归档）
-  - 死代码/环境断线清理与公开仓 CI 守卫恢复（`cleanup-dead-code-env-and-restore-ci` 归档）
-  - candle 降级判定退役收口：tombstone 冻结 + 死壳清理 + mist-deploy HIL 断言退役（`retire-candle-degraded-verdict` 归档）
+- `openspec/specs/`：**120 个已采纳 Live Spec**（2026-11-26 新增 `trading-engine` 完整交易引擎权威规范，同步更新 `decision-flow-engine` 同构出场插件规约与 `backtest-trade-decision` 替代注记）
+- `openspec/changes/`：**2 个活跃未实施 Change**（`lifecycle-driven-kline-reconciliation`、`unify-quant-pipeline-architecture`）
+- **核心架构演进闭环（2026-10 ~ 2026-11）**：
+  - **两层单向架构与完整交易引擎最终定稿（2026-11-26 归档 `add-virtual-trading-layer`）**：取消“聚合层 → 交易层”独立分段，全系统收口为 **「信号层 → 完整交易引擎（含聚合、裁决、整数厘账本、撮合与交易手册正式指令输出）」**；正式作废原 Task 10.1 双账本反向注入，确立「策略/插件私有虚拟账本仅用于产出信号；真实账本平仓在交易引擎内部闭环，严禁反向发信号或注入状态到信号层」铁律
+  - **出场插件同构化与决策树收敛（2026-11-26 归档 `isomorphic-decision-flow-exit-engine`）**：14/14 任务完成，`category: 'EXIT'` 插件与外部加载器、决策树 `SELL` 分流与归因透传全部落地
+  - **战术事件层退役（2026-11-24）**：`TacticalEventAggregator`（EdgeDetector / TemporalWindowEngine / CooldownTracker）整体删除，`tactical-event-pipeline` 冻结为退役记录；`role: 'context'` 插件纪律落地
+  - **历史订单簿提案作废归档（2026-11-26 归档 `obsolete-add-orderbook-execution-pipeline`）**：不再实施独立订单簿撮合与 `apps/execution`，由完整交易引擎取代
+  - **PA 纯数学核心与视觉适配器落地（2026-11-25）**：`@app/pacore`（FVG / WickGap / PinBar / Sweep / GapProjection / Neckline）+ `PaVisualAdapter` + `toPaKSeries` 纯边界映射落地
+  - **通用虚拟出场与 5m 监护周期传播（2026-11-25 ~ 11-26）**：硬止损从交易引擎退役回归信号层 `PriceDefenseExitPlugin` / `PriceLevelExitPolicy`，内核支持 `surveillancePeriods` 轻量监护周期与同 Bar 先出后进
 
 ---
 
@@ -22,43 +20,37 @@
 
 | Change | 进度 | 状态与说明 |
 |---|---|---|
-| `upgrade-backtest-decision-and-parity-engine` | 0/15 | 未开始：量化回测决策状态机、严格 A 股模拟撮合与 Exit Trinity 出局三部曲（Migration 027）+ Phase 0 对账地基（信号身份/预热贯通/推演身份） |
-| `add-pre-market-strategy-hydration` | 0/24 | 规格已按统一内核（RealtimeKernelPool）重写（10-15）：09:20 盘前预热屏障 + Polars 质检 + 跨日守卫；待实施计划确认后落地 |
-| `integrate-native-terminal-visualization` | 4/12 | 阶段一通用指令层完成；阶段二 QMT 哑执行器与阶段三通达信 DLL 插件 deferred |
-| `capture-realtime-provider-anomalies` | 13/14 | 被动契约：只读采集器/脱敏/Runbook 均已就绪，§4.3 等首个真实 incident 自然发生后复盘 |
-| `introduce-naked-k-volume-plugin-and-clean-legacy` | 3/3 | Polars 量能指标（VOL/VMA/OBV/RPP/VWAP）与遗留清理；任务全完成，待归档 |
-| `introduce-volatility-squeeze-and-vpci-plugins` | 3/3 | Polars 波动率（Squeeze）与 VPCI 量价指标；任务全完成，待归档 |
+| `lifecycle-driven-kline-reconciliation` | 0/20 | 未开始：数据源生命周期驱动的 K 线自愈对账（TDX/QMT 终端重启与心跳驱动自动缺口回填，依赖真实宿主机终端环境验证） |
+| `unify-quant-pipeline-architecture` | 0/15 | 未开始：`libs/strategy` 物理包瘦身与统一 `QuantPipeline(Source, Kernel, Sinks[])` 重构（注：部分管线门面能力已由 `runTradingPipeline` 提前满足，启动前需按 2026-11-26 两层架构重审边界） |
 
 ---
 
-## 2. 近期归档（2026-09 ~ 2026-10-15）
+## 2. 近期归档（2026-10-16 ~ 2026-11-26）
 
-| 日期 | Change | 内容与进度 |
+| 日期 | Change | 内容与状态 |
 |---|---|---|
-| **10-14** | `retire-candle-degraded-verdict` | 16/16：candle 窗口化降级判定退役（08-09 OTel 迁移删除实现后收口）——live spec tombstone 冻结、`*LastFailureAtMs` 死壳与窗口 env/常量清理、mist-deploy HIL 断言退役 |
-| **10-14** | `cleanup-dead-code-env-and-restore-ci` | 25/25：死代码 A1–A9 清除、`'off'\|'shadow'\|'on'` 联合收敛至 canonical、env 双向接线（5 键补声明 + TDX 心跳消费）、公开仓 CI 守卫恢复（外部插件测试守卫）、全仓 600519/茅台换 000001（mist + mist-fe 含 fixtures 重签） |
-| **10-13** | `add-external-regime-and-tactical-plugins` | 18/18：宏观环境体制与多级别战术插件动态接入 + 主仓 BSP 标签纯透传 + 展示元数据逐字透传契约（茅台残留清除由 cleanup change 收尾） |
-| **10-12** | `unify-strategy-evaluation-pipeline` | 14/14：统一求值内核 push 化、双 BarSource 适配、RealtimeKernelPool、双时间戳 Migration 026、三链路同构门禁 |
-| **10-12** | `differentiate-chan-central-extension-upgrade-and-expansion` | 11/11：段中枢 9 段延伸升级（深紫）与波动重叠扩展（玫紫虚线）彻底正交解耦 |
-| **10-12** | `enforce-chan-channel-departure-extreme-guard` | 11/11：离开段破极值与三类点确认硬门禁，防大周期反向走势泄漏 |
-| **10-12** | `remediate-chan-divergence-multi-level-gates` | 12/12：双级别背驰硬门禁对齐与一类买卖点严格趋势背驰纯化（BUG-CHAN-009） |
-| **10-12** | `support-external-factor-plugins` | 13/13：支持外部目录动态加载私有因子插件，主仓彻底解耦私有战术 |
-| **10-12** | `add-chan-fibonacci-overlay` | 15/15：Rust Polars 向量化斐波那契指标、因子插件与 TradingView 官方色带可视化 |
+| **11-26** | `2026-11-26-add-virtual-trading-layer` | **已完成归档**（Groups 1–9 全部完成，Task 10.1 架构评审驳回永久作废；Live Spec 沉淀至 `openspec/specs/trading-engine/spec.md`）：完整交易引擎落地（`groupSignals` 聚合 + `TradingEngine` 规则管线 + 整数厘 `virtual_fill_events` migration 037 + `SimulatedBroker` 厘算术移植 + `buildTradingManual` 交易手册 + `runTradingPipeline` 门面 + 四端同构门禁），退役 `ExecutionRiskArbiter` / `PositionStateMachine.onSignal` / 信号列表渲染 |
+| **11-26** | `2026-11-26-isomorphic-decision-flow-exit-engine` | **已完成归档**（14/14 完成；Live Spec 同步至 `openspec/specs/decision-flow-engine/spec.md`）：出场插件 `category: 'EXIT'` 同构契约、外部加载器平权注册、决策流 `BranchNode` / `TerminalNode(SELL)` 归因透传与虚拟持仓纯化 |
+| **11-26** | `2026-11-26-obsolete-add-orderbook-execution-pipeline` | **已作废归档**（2026-11-23 作废，2026-11-26 归档）：原独立订单簿撮合、多组子账本与 `apps/execution` 进程方案不再实施，由 `trading-engine` 完整交易引擎取代 |
+| **11-14** | `2026-10-*`（13 个历史变更批量归档） | 涵盖 `upgrade-backtest-decision-and-parity-engine`、`introduce-canonical-market-series`、`support-multi-period-evaluation`、`add-backtest-intraday-execution`、`add-vendor-market-data-import`、`implement-cys13-market-breadth-and-panic-gauge`、`integrate-native-terminal-visualization`、`capture-realtime-provider-anomalies` 等历史阶段收口 |
 
 ---
 
-## 5. 跨环境与实盘运行验收（HIL 待办）
+## 3. 跨环境与生产部署验收（HIL / Ops 待办）
 
-以下属于在代码与单测已完成后，依赖 **Windows 宿主 + 真实行情终端 + 交易时段** 的在线验收与调优：
+以下属于代码与单测已完成，但依赖 **Windows 宿主机 + 生产 MySQL / 真实行情终端** 的上线与实盘验收项：
 
-1. **实时策略实盘观察与切 On 决策**：`REALTIME_PRODUCTIZATION_MODE=shadow` 实盘运行观察，评估切换为 `on`。
-2. **实时订阅断流恢复实盘演练**：真实 TDX/QMT 进程重启后断流检测与 A7 告警阈值实盘校准。
-3. **盘前巡检与收盘同步生产观察**：部署到 Windows Appliance（`mist-schedule` 容器）后观察 09:05 简报与 22:30/06:30 同步任务。
+1. **生产库 Migration 037 与虚拟账本配置上线**：在生产 MySQL 执行 `037_create_virtual_fill_events.sql`（及前置 035/036），并在 `notification` 容器配置 `NOTIFICATION_VIRTUAL_SEED_CAPITAL`（默认 `1000000`），验证实时交易手册投递与 `virtual_fill_events` 幂等落库。
+2. **实时策略实盘观察与切 On 决策**：`REALTIME_PRODUCTIZATION_MODE=shadow` 实盘运行观察，评估切换为 `on`。
+3. **实时订阅断流恢复实盘演练**：真实 TDX/QMT 进程重启后断流检测与告警阈值实盘校准。
 
 ---
 
-## 6. 明确废弃与已清理项
+## 4. 明确作废与已清理项
 
-- `feat/strategy-portfolio-backtesting`（多策略组合回测）：已标记**废弃**，清理过时远端分支。
-- `migrate-stack-to-linux-node-with-ssh-tunnel`（Linux 迁移）：提案已**放弃并删除**。
-- `feat/realtime-subscription-recovery`：已完全合并至 master，清理过时分支。
+- `add-virtual-trading-layer` **Task 10.1**（`virtual_fill_events` 反向注入 `VirtualExitPolicyPort`）：**2026-11-26 架构评审正式驳回并永久作废**——信号层策略私有虚拟账本仅用于产出信号，真实账本平仓在交易引擎内部闭环，严禁反向注入或反向发信号。
+- `add-orderbook-execution-pipeline`（订单簿撮合与独立执行进程）：**2026-11-23 作废，2026-11-26 归档**。
+- `tactical-event-pipeline`（`TacticalEventAggregator` 边沿/窗口/冷却中间层）：**2026-11-24 整体删除并冻结退役**。
+- `ExecutionRiskArbiter` 与 `PositionStateMachine.onSignal` / 旧 `ExitPolicyPort`：**2026-11-25 彻底退役删除**。
+- `feat/strategy-portfolio-backtesting`（历史多策略组合回测分支）：已废弃。
+- `migrate-stack-to-linux-node-with-ssh-tunnel`（Linux 迁移）：已放弃并删除。

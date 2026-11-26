@@ -51,3 +51,14 @@ The decision flow engine SHALL execute the identical evaluation logic in both of
 #### Scenario: Parity test verifies identical execution
 - **WHEN** an identical historical slice of bars is fed into backtest executor and realtime evaluation harness
 - **THEN** the emitted signals, action opinions, confidence scores, and decision traces MUST match 100%
+
+### Requirement: Isomorphic Exit Plugins And Signal-Layer Virtual Position Context
+Exit factor plugins SHALL implement the standard `FactorPlugin` contract with `category: 'EXIT'` and SHALL be discovered and registered identically to entry plugins via `ExternalFactorPluginLoader` and `FactorPluginRegistry`.
+
+- Decision flow `BranchNode`, `GuardNode`, `ConsensusNode`, and `TerminalNode` SHALL support `SELL` exit routing (including `position.virtual.state` predicates) and preserve `matchedSignalId` / `badgeText` / `displayTag` attribution in `DecisionTrace`.
+- Any virtual position state machine maintained in the signal layer (`VirtualExitPolicyPort` or plugin-side trackers) exists **solely to compute and emit `KernelSignal`s**; it SHALL remain strictly decoupled from trading-engine cash balances, `virtual_fill_events`, and broker execution ledgers.
+
+#### Scenario: External EXIT plugin registers alongside entry plugins
+- **WHEN** `ExternalFactorPluginLoader.loadPlugins()` loads a bundle containing `category: 'EXIT'` plugins
+- **THEN** those plugins MUST be registered in `FactorPluginRegistry` on equal footing with entry plugins
+- **AND** when no external bundle is present, the loader MUST gracefully no-op without breaking open-source CI

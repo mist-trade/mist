@@ -1,6 +1,10 @@
 # backtest-trade-decision Specification
 
 ## Purpose
+> [!NOTE] PARTIALLY SUPERSEDED (2026-11-26 `add-virtual-trading-layer` → `openspec/specs/trading-engine/spec.md`)
+> Decision arbitration, position sizing, integer-li ledger accounting, and formal instruction output have been consolidated into the **Unified Trading Engine** (`openspec/specs/trading-engine/spec.md`).
+> Specifically: `ExecutionRiskArbiter`, `PositionStateMachine.onSignal`, legacy `ExitPolicyPort`, and engine-hardcoded `HARD_STOP_LOSS` are retired. Strategy-level stop-loss / exit rules are now evaluated in the signal layer via `VirtualExitPolicyPort` / `PriceLevelExitPolicy`, while `PositionStateMachine` serves purely as an accounting ledger and `SimulatedBroker` retains Next-Bar A-share causal matching semantics.
+
 Define the unified quantitative backtest decision state machine, Exit Trinity lifecycle management,
 lookahead-free A-share execution simulation, and three-dimensional parity verification for Mist.
 

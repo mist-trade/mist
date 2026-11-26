@@ -1,5 +1,5 @@
-> **状态：已作废（2026-11-23）。** 本变化中的订单簿撮合、账本、独立执行进程不再实施；
-> 最新结论见 `docs/strategy-signal-aggregation-decisions-2026-11-23.md`。
+> **状态：已作废并归档（2026-11-23 作废，2026-11-26 归档）。** 本变化不再实施；
+> 最新权威口径见 `openspec/specs/trading-engine/spec.md` 与 `docs/strategy-signal-aggregation-decisions-2026-11-23.md`。
 
 # 实施任务清单：信号聚合与订单簿执行管线 (Tasks)
 

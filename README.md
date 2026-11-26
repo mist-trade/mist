@@ -26,7 +26,7 @@ Mist is the core quantitative compute & market-data engine tailored for the **Ch
 - **Unified Strategy Evaluation Kernel (StrategyEvaluationKernel)**: Single push production pipeline ensuring that **live push ≡ simulation replay ≡ batch backtesting** incremental signals are 100% isomorphic.
 - **Dual-Timestamp Statutory Contract**: `signalTime` (decision confirmation time = sealed bar timestamp) and `pivotTime` (morphological extreme endpoint timestamp) are physically separated. Orders are executed on Next-Bar ($t_{fill} \ge t+1 > t_{signal}$), completely eliminating lookahead bias.
 - **Streaming Simulation Engine (libs/strategy/src/simulation)**: Push-drives simulation on sealed candles with single-direction SSE (`text/event-stream`) streaming for geometry commands and accumulated signals. Enforces strict local development isolation with automatic read-only replay fallback in production.
-- **Discrete Multi-Channel Alert Delivery**: Consumes discrete Tier-2 Tactical Events (`TacticalEvent`) with edge transition detection and tactical cooldowns to drive WeCom, Feishu, and generic Webhook matrices without alert flooding.
+- **Unified Trading Engine & Trading Manual Delivery**: Follows the two-layer unidirectional architecture (Signal Layer → Unified Trading Engine). The trading engine consolidates signal grouping (`groupSignals`), rule-pipeline arbitration (`TradingEngine`), event-sourced integer-li virtual ledger (`virtual_fill_events`), matching (`SimulatedBroker`), and formal Trading Manual rendering delivered across WeCom, Feishu, and Webhook channels. Real-ledger risk exits close strictly inside the trading engine without feeding back into the signal layer.
 - **Authoritative Post-Close Sync & Checkpoint Audit**: Automatically ingests authoritative EOD K-lines to overwrite intraday data, backed by migration 034 checkpoint sync events for historical purity.
 
 ---
@@ -45,7 +45,7 @@ mist (NestJS Monorepo)
 └── libs/
     ├── chancore/                  # Pure math Chan Theory core library (fractal / wide Bi / Duan / Zhongshu / BSP)
     ├── indicators/                # Rust nodejs-polars SIMD vectorized indicator library
-    ├── strategy/                  # Unified evaluation kernel, decision flow tree, factor plugins, simulation engine & broker matching
+    ├── strategy/                  # Signal evaluation kernel, decision flow, factor plugins, unified trading engine (aggregation/rules/ledger/matching/pipeline) & simulation engine
     ├── signal/                    # Realtime signal dispatch & registry client
     ├── market-data/               # Market domain models, vendor data importer & source mappings
     ├── visual-command/            # Standardized geometry visual commands (VisualCommand)
@@ -82,7 +82,7 @@ Copy the env template:
 cp .env.example .env
 ```
 
-Run forward-only DB migrations (currently baseline `034_create_collector_sync_events.sql`; `synchronize: true` is strictly forbidden):
+Run forward-only DB migrations (currently baseline `037_create_virtual_fill_events.sql`; `synchronize: true` is strictly forbidden):
 ```bash
 pnpm run db:migrate
 ```

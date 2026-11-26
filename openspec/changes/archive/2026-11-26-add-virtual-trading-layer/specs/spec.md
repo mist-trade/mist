@@ -169,14 +169,10 @@ dev / 私有研究）的最终产物同源同构；本文档中"指令报告"自
 
 ---
 
-## 三、边界与不变式 (Boundaries & Invariants)
+## 三、边界与不变式 (Boundaries & Invariants，2026-11-26 终审收口)
 
-- 信号层零改动：内核 / 决策流 / 虚拟出场子系统照旧（出场信号仍是 KernelSignal）；
-- 聚合层分组与契约 V2 零改动：fanout payload / jobId / sweep / replay 照旧；
-- 聚合层信号列表渲染退役，渲染权移交交易层报告模块；
-- 防未来函数不变：`signalTime ≡ StrategyBar.timestamp`、Next-Bar 撮合、严禁
-  `pivotPrice` 入场或作为绩效基准；
-- 实时执行端 = 人工下单：无券商 API、无自动下单（2026-11-23 定稿）；
-- 已知偏差（interim）：出场策略通道持仓（私仓 MultiLotVirtualPosition）按
-  KernelSignal 推进，与本层 fill 事实存在理论偏差面（资金不足拒绝入场时的幻影
-  批次）；归一路径见 design.md 第四节，作为 follow-up 任务跟踪。
+- **两层单向架构**：取消独立的“聚合层 → 交易层”分段，全系统收口为「信号层 → 完整交易引擎」；信号聚合分组（`groupSignals` + 契约 V2）、规则管线裁决、事件溯源账本、撮合与交易手册输出均归属于完整交易引擎；
+- **信号层纯度与私有账本定界**：内核 / 决策流 / 虚拟出场子系统仅负责产出 `KernelSignal`；策略/插件维护的私有虚拟持仓状态机唯一目的是产出买卖信号，与交易引擎账本物理隔离、零资金/DB 耦合；
+- **真实账本内部闭环（严禁反向注入）**：交易引擎真实/虚拟执行账本自身触发的任何风控平仓或账户处置必须在交易引擎内部闭环并直接输出交易指令，**严禁向信号层反向发信号**，亦**严禁将 `virtual_fill_events` / `AccountSnapshot` 反向注入回信号层**（原 Task 10.1 已永久作废）；跨层状态偏差由交易引擎通过 `NO_POSITION` 等结构化拒绝显式审计拦截；
+- **防未来函数不变**：`signalTime ≡ StrategyBar.timestamp`、Next-Bar 撮合、严禁 `pivotPrice` 入场或作为绩效基准；
+- **实时执行端 = 人工下单**：无券商 API、无自动下单（2026-11-23 定稿）。

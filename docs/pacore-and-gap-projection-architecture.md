@@ -65,7 +65,7 @@
 2. **三棒 FVG 与长影线 Wick Gap 提供全天候客观微观标尺**：
    即使无隔夜跳空，资金脉冲推动仍会在任意周期（`5m` / `30m` / `1d`）留下清晰的三棒影线非重叠空隙（`FairValueGap`）或单根极长影线（`WickGap` / `PinBar`）。
 3. **纯几何与下游解耦定界**：
-   `@app/pacore` 仅负责识别上述客观结构、追踪回补状态并计算对称/标准差几何投射值；**不定义任何买点、卖点、盈亏比、止损幅度或撮合规则**（上述决策归属下游策略与交易层）。
+   `@app/pacore` 仅负责识别上述客观结构、追踪回补状态并计算对称/标准差几何投射值；**不定义任何买点、卖点、盈亏比、止损幅度或撮合规则**（上述决策归属下游信号层与完整交易引擎）。
 
 ---
 
@@ -175,8 +175,8 @@ stateDiagram-v2
    - 唯一合法转换入口为 [`libs/strategy/src/analysis/pure-bar-mapper.ts`](../libs/strategy/src/analysis/pure-bar-mapper.ts#L57-L72) 中的 `toPaKSeries`，逐字复制 `StrategyBar.timestamp` 至 `PaK.time`，不做任何时间偏移或取整。
 2. **输入校验边界 (`assertPaKSeries`)**：
    - [`assertPaKSeries`](../libs/pacore/src/internal/assert-pa-k-series.ts#L4-L39) 校验数组非空、`high >= low`、OHLC 有限无 NaN 及 `time` 严格单调递增（注意：当前实现暂未校验 `<= 0` 价格）。
-3. **交易层/策略层彻底外置**：
-   - 上层决策流求值（`StrategyEvaluationKernel`）、聚合分组（`groupSignals`）、交易裁决与账本（`TradingEngine`）以及具体信号/出场策略逻辑均位于 `@app/pacore` 之外，**不在本包或本文档中耦合任何交易规则**。
+3. **策略信号层与交易引擎彻底外置**：
+   - 上层信号层求值（`StrategyEvaluationKernel`）以及下游完整交易引擎（含 `groupSignals` 聚合分组、`TradingEngine` 裁决与账本、`SimulatedBroker` 撮合与交易手册输出）均位于 `@app/pacore` 之外，**不在本包或本文档中耦合任何交易规则**。
 
 ---
 
@@ -223,11 +223,11 @@ mist/libs/pacore/
                     │ 纯几何输出                    │ 纯数学消费 (via toPaKSeries)
                     ▼                               ▼
 ┌────────────────────────────────────┐  ┌────────────────────────────────┐
-│       libs/visual-command          │  │   下游消费边界 (策略/交易层)     │
+│       libs/visual-command          │  │   下游消费边界 (两层单向架构)    │
 │     (图元适配器: PaVisualAdapter)    │  │                                │
 │  • BandVisualCommand: FVG 色带     │  │  • 信号层: StrategyEvaluationKernel │
-│  • LineVisualCommand: CE虚线 /     │  │  • 聚合层: groupSignals         │
-│    1:1投射点线 / 颈线与扩展线       │  │  • 交易层: TradingEngine        │
+│  • LineVisualCommand: CE虚线 /     │  │  • 完整交易引擎: groupSignals 聚合 │
+│    1:1投射点线 / 颈线与扩展线       │  │    + TradingEngine 裁决/账本/撮合  │
 │  • Icon/TextVisualCommand: Pin标记 │  │  (策略规则与专有Alpha严格外置)    │
 └────────────────────────────────────┘  └────────────────────────────────┘
 ```

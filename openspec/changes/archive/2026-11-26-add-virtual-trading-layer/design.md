@@ -1,25 +1,28 @@
-# 技术设计：虚拟交易层与统一 TradingEngine (Design)
+# 技术设计：完整交易引擎与虚拟账本 (Design)
 
-## 一、分层拓扑与数据流
+> **2026-11-26 归档与口径收口声明**：
+> 1. **两层单向架构收口**：不再区分“聚合层 → 交易层”两段，统一收口为 **「信号层 → 完整交易引擎」**（交易引擎内部统一包含信号聚合分组 `groupSignals`、规则管线裁决、事件溯源账本、撮合与交易手册正式指令输出）；
+> 2. **双账本单向闭环定稿（Task 10.1 正式作废）**：信号层策略/插件维护的私有虚拟持仓仅用于产出信号；真实/执行账本自身触发的平仓与风控处置必须在交易引擎内部闭环，**严禁向信号层反向发信号或注入 `virtual_fill_events` / `AccountSnapshot`**。
+
+## 一、分层拓扑与数据流（2026-11-26 两层收口）
 
 ```text
-信号层  KernelSignal[]（每 definition 每根 Bar 一条，含虚拟出场子系统产出的出场信号）
-  → 聚合层  持久化（StrategySignal / StrategyAlertEvent 1:1）
-            → 按 (securityId, effectiveTime) 现算分组（契约 V2 fanout）
-  → 交易层  TradingEngine.decide(信号组, 账户快照) → TradingDecision
-            ├─ TradeInstruction[]（票 / 方向 / 仓位 / 理由 / 归因链）
-            ├─ TradeRejection[]（被拒信号 + 结构化原因）
-            └─ 账户投影（假定成交后的现金与持仓）
-            虚拟账本回填（virtual_fill_events，幂等）
-  → 执行    回测执行端 = SimulatedBroker（Next-Bar 真实撮合，指令先入待撮合队列）
-            实时执行端 = 交易手册 → 人（人工下单）
-            dev 执行端 = 与回测同构（本地撮合）
-            私有研究端 = runTradingPipeline 门面（内存端口，零基础设施，见第八节）
+1. 信号层  KernelSignal[]（每 definition 每根 Bar 一条，含策略侧虚拟出场状态机产出的出场信号）
+     │  严格单向流（严禁反向发信号或回灌账户状态）
+     ▼
+2. 完整交易引擎（Unified Trading Engine）
+   ├─ 聚合与持久化：StrategySignal / StrategyAlertEvent 1:1 落库 + 按 (securityId, effectiveTime) 现算分组（groupSignals / 契约 V2 fanout）
+   ├─ 裁决与账本：TradingEngine.decide(信号组, 账户快照) / surveilBar → TradingDecision
+   │             ├─ TradeInstruction[]（票 / 方向 / 仓位 / 理由 / 归因链）
+   │             ├─ TradeRejection[]（被拒信号 + 结构化原因）
+   │             └─ 账户投影 + 虚拟账本回填（virtual_fill_events，幂等）
+   ├─ 撮合与执行：回测/dev = SimulatedBroker（Next-Bar / Next-5m-Bar 真实撮合）
+   │             实时 = 虚拟账本假定成交 → 交易手册 → 人（人工下单）
+   │             离线研究 = runTradingPipeline 门面（内存端口，零基础设施，见第八节）
+   └─ 正式交易指令输出：buildTradingManual 交易手册 + TradeInstruction[]
 ```
 
-职责不变式：聚合层做归因分组、不裁决交易；交易层做裁决与账本、不渲染归因分组；
-裁决发生在**持久化之后**（消费全部已归因信号，被拒者连同原因输出）——这与
-TacticalEvent（持久化前吞信号）有本质区别。
+职责不变式：信号层专注行情与策略求值（产出 `KernelSignal`）；完整交易引擎在信号持久化后统一完成归因分组、裁决、账本记账、撮合与正式指令输出（消费全部已归因信号，被拒者连同原因显式输出）——这与 TacticalEvent（持久化前吞信号）有本质区别。
 
 ## 二、域模型
 
@@ -176,26 +179,19 @@ CREATE TABLE IF NOT EXISTS `virtual_fill_events` (
 | 重启 | 无状态恢复问题——快照永远可由日志重放 |
 | 回测 | 不触 DB——内存端口注入，随跑随弃 |
 
-## 四、与虚拟出场子系统（virtual-exit）的一致性
+## 四、与信号层虚拟出场子系统（virtual-exit）的单向边界（2026-11-26 终审定稿）
 
-现有事实：内核内置虚拟出场子系统（`VirtualExitPolicyPort.onSignal/onBar`，
-私仓实现维护通道级虚拟持仓 `MultiLotVirtualPosition`），出场提案经内核转为
-`KernelSignal(exit)`。交易层上线后出现**两份持仓事实**：
+现有事实：内核内置虚拟出场子系统（`VirtualExitPolicyPort.onSignal/onBar`，由信号层/外部策略插件独立维护策略级虚拟持仓状态机），出场提案经内核转为 `KernelSignal(exit)`。完整交易引擎上线后，系统内存在职责完全正交的两套账本：
 
-| 账本 | 推进依据 | 用途 |
-|---|---|---|
-| 出场策略通道持仓（私仓） | KernelSignal（onSignal 逐条推进） | 生成出场信号 |
-| 交易层虚拟账本（本 change） | 指令假定成交（virtual_fill_events） | 裁决 / 仓位 / 指令 |
+| 账本 | 所属层 | 推进依据 | 唯一用途 |
+|---|---|---|---|
+| 策略侧虚拟持仓状态机（插件/信号层） | 信号层 | `KernelSignal`（`onSignal` 逐条推进，零资金/DB 耦合） | 仅用于支撑策略/插件生成出场信号 |
+| 交易引擎执行账本（本 change） | 完整交易引擎 | 裁决指令成交（`virtual_fill_events` / `SimulatedBroker`） | 资金/持仓裁决、仓位计算、风控闭环与指令输出 |
 
-**一致性要求与路径**：
+**单向闭环不变式（2026-11-26 拍板，原 Task 10.1 反向注入设想已永久作废）**：
 
-1. 本阶段（本 change）：交易层 fill 为**成交事实的单一事实源**；出场策略持仓按既有
-   onSignal 推进。已知偏差面：交易层拒绝入场（资金不足 / T+1）而出场策略已记账的
-   "幻影批次"——单票全仓模型下仅资金不足一种，100 万种子资金下概率极低；引擎在
-   `ALREADY_HOLDING` 判断上两账本天然一致（都由同一入场信号推进）。
-2. 下一阶段（follow-up，本 change  tasks 中的独立任务）：`VirtualExitPolicyPort`
-   增补账户视图注入（onBar 附带 `AccountSnapshot` 或 fill 事实端口），私仓
-   `MultiLotVirtualPosition` 改为从 `virtual_fill_events` 派生批次，两账本归一。
+1. **严禁反向注入或反向发信号**：策略侧虚拟持仓状态机由策略/插件自身独立维护，**绝对禁止**将交易引擎的 `virtual_fill_events` 或 `AccountSnapshot` 反向注入回 `VirtualExitPolicyPort`；交易引擎真实账本自身触发的任何风控平仓（如 `systemicCrunch`）也**必须在交易引擎内部直接闭环并输出交易指令，严禁反向发信号到信号层**。
+2. **跨层偏差的安全收口**：信号层虚拟持仓与交易引擎账本之间可能因资金不足、已有持仓、一字板拒买等产生偏差；此类偏差由交易引擎在裁决阶段通过结构化预检（`NO_POSITION` / `ALREADY_HOLDING` / `T1_FROZEN` / `INSUFFICIENT_CASH`）安全拦截并在交易手册中显式审计输出，绝不污染账本，亦不通过跨层反向耦合破坏信号层纯度与微服务单向拓扑。
 
 ## 五、执行端适配（四条链路）
 

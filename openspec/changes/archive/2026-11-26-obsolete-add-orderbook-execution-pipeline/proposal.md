@@ -1,5 +1,6 @@
-> **状态：已作废（2026-11-23）。** 本变化中的订单簿撮合、账本、独立执行进程不再实施；
-> 最新结论见 `docs/strategy-signal-aggregation-decisions-2026-11-23.md`。
+> **状态：已作废并归档（2026-11-23 作废，2026-11-26 归档至 `archive/2026-11-26-obsolete-add-orderbook-execution-pipeline/`）。**
+> 本变化中的订单簿撮合、多组子账本、独立 `apps/execution` 进程不再实施；
+> 已由完整交易引擎架构（`openspec/specs/trading-engine/spec.md` 与 `docs/strategy-signal-aggregation-decisions-2026-11-23.md` 第十二节）彻底取代。
 
 # 变化提案：信号聚合与订单簿执行管线 (Proposal)
 
