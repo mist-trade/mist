@@ -2,7 +2,6 @@ import type { ProjectedStrategyBar, StrategyBar } from '@app/market-data';
 import { StrategySeriesImputer } from '@app/market-data';
 import { DECISION_ACTIONS } from '../strategy.constants';
 import type {
-  ConfidenceLevel,
   DecisionResult,
   DecisionExecutionTraceItem,
 } from '../decision-flow/decision-flow.types';
@@ -344,8 +343,6 @@ export class StrategyEvaluationKernel {
       pivotTime: null,
       pivotPrice: null,
       signalType: 'VIRTUAL_EXIT',
-      confidence: proposal.confidence ?? 0.9,
-      confidenceLevel: 'HIGH',
       badgeText: proposal.badgeText,
       displayTag: `VIRTUAL_EXIT_${proposal.exitKind}`,
       decisionTrace: {
@@ -526,7 +523,7 @@ export class StrategyEvaluationKernel {
 
   /** context 角色（2026-11-24 定稿，决策文档 7.1.1）：对决策流中引用到的每个
    *  role:'context' 插件 (pluginId, params) 组合每 Bar 预求值一次，opinion 写入
-   *  黑板；GUARD/EXTRACTOR/CONSENSUS 节点按相同键读缓存，不再逐 flow 重复求值。
+   *  黑板；GUARD/EXTRACTOR 节点按相同键读缓存，不再逐 flow 重复求值。
    *  context 插件严禁作为终端信号发射源（状态可见性走 decisionTrace.trace）。 */
   private async prefetchContextOpinions(context: FactorContext): Promise<void> {
     for (const spec of this.contextPrefetchSpecs) {
@@ -614,16 +611,12 @@ export class StrategyEvaluationKernel {
       pivotTime: pivot?.pivotTime ?? null,
       pivotPrice: pivot?.pivotPrice ?? null,
       signalType: decision.signalTag ?? decision.action ?? 'decision_flow',
-      confidence: decision.confidence,
-      confidenceLevel: decision.confidenceLevel as ConfidenceLevel,
       badgeText,
       displayTag: decision.displayTag,
       styleMeta: decision.styleMeta,
       decisionTrace: {
         status: decision.status,
         action: decision.action,
-        confidence: decision.confidence,
-        confidenceLevel: decision.confidenceLevel,
         signalTag: decision.signalTag,
         badgeText,
         reason: decision.reason,
@@ -632,8 +625,6 @@ export class StrategyEvaluationKernel {
       },
       contextSnapshot: {
         action: decision.action,
-        confidence: decision.confidence,
-        confidenceLevel: decision.confidenceLevel,
         signalTag: decision.signalTag,
         badgeText,
         reason: decision.reason,

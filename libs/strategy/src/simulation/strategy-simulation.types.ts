@@ -25,7 +25,6 @@ export interface SimulationSignal {
   readonly signalType: string;
   readonly badgeText: string;
   readonly isBuy: boolean;
-  readonly confidence: number;
   readonly decisionTrace: Record<string, unknown> | null;
   readonly securityCode: string;
   readonly period: number;

@@ -1388,3 +1388,16 @@ OpenSpec `add-virtual-trading-layer` 全组任务完成，四链路（实时/回
    - 信号层内策略/插件维护的私有虚拟持仓状态机，**唯一目的是支撑策略/插件产出买卖信号（特别是出场信号）**，完全自维护、零资金/DB 耦合；
    - 交易引擎维护的真实/虚拟执行账本自身触发的任何风控平仓（如 `systemicCrunch`）或账本处置，**必须在交易引擎内部闭环并直接输出交易指令**；**严禁向信号层反向发信号**，也**严禁将 `virtual_fill_events` 或 `AccountSnapshot` 反向注入回信号层或策略虚拟账本**。
    - 跨层状态偏差（如因资金不足/一字板拒买导致的后续多余出场信号）由交易引擎通过 `NO_POSITION` / `ALREADY_HOLDING` 等结构化拒绝安全拦截并在交易手册中显式审计。
+
+### 12.2 同向归并与全链路置信度子系统物理退役（2026-11-26 落地）
+
+为彻底收口 `Task 10.2` 并清除非统计意义的启发式数值，系统完成以下演进（对应 OpenSpec `consolidate-same-direction-signals-and-remove-confidence`）：
+
+1. **两阶段同向归并（取代 `sellFirstByConfidence` 排序竞争）**：
+   - `ordering.ts` 物理删除，改为 `libs/strategy/src/trading/consolidation.ts`。
+   - 同一 `(securityId, effectiveTime)` 组内先孤立拦截损坏信号（`triggerPrice <= 0` → `INVALID_PRICE`），再按 **Phase 1 归并全部有效 `EXIT` → 释放现金与持仓 → Phase 2 归并全部有效 `ENTRY`** 最多各产出 1 条正式指令，全员以平等 `contributors` 进入归因并在交易手册呈现 `共振(N)`，彻底消除同向伪拒绝。
+   - 实时 `virtual_fill_events` 零 DDL 兼容（按正整数 `alertEventId` 数值升序选举主锚点，并在 `instruction` JSON 附加 `contributorKeys` / `contributorsSummary`）；离线合成幂等键补全 `period` 与 `signalType`；`SimulatedBroker` 补全一字跌停卖单 `BLOCKED` 联动撤配对买单守卫。
+2. **全链路置信度子系统物理退役（仅保留 `libs/indicators/src/risk-performance` 统计 VaR/CVaR 参数）**：
+   - 物理移除 `FactorOpinion.confidence`、`DecisionResult.{confidence, confidenceLevel}`、`KernelSignal.{confidence, confidenceLevel}`、`GuardNode.minConfidence` 与 `ConsensusNode`。
+   - `compileStoredDefinitionVersion` 与 `StrategyDefinitionService` 对含 `minConfidence`、`CONSENSUS` 或未知节点的规则执行严格 Fail-Closed 拒收（零兼容忽略）。
+   - 前向迁移 `038_drop_signal_confidence_columns.sql` 删除信号表 `confidence` / `confidence_level` 列并停用当前版本仍含废弃字段的已启用策略；`mist-fe` 与外部插件仓同步清理完成。

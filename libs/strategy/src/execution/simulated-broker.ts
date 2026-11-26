@@ -47,6 +47,7 @@ interface MutablePositionSlot {
 export class SimulatedBroker implements ExecutionBrokerPort {
   private availableCashLi: Li;
   private readonly pendingOrders = new Map<string, Order>();
+  private readonly orderLog = new Map<string, Order>();
   private readonly positionMap = new Map<string, MutablePositionSlot>();
   private readonly prevCloseMap = new Map<string, number>();
   private readonly lastBarDateMap = new Map<string, string>();
@@ -125,13 +126,17 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     });
 
     if (dto.quantity <= 0) {
-      return rejected(ORDER_REJECT_REASONS.CAUSALITY_VIOLATION);
+      const order = rejected(ORDER_REJECT_REASONS.CAUSALITY_VIOLATION);
+      this.orderLog.set(order.orderId, order);
+      return order;
     }
 
     if (dto.side === ORDER_SIDES.BUY) {
       const isRoundLot = dto.quantity % this.lotSize === 0;
       if (!isRoundLot) {
-        return rejected(ORDER_REJECT_REASONS.INVALID_LOT_SIZE);
+        const order = rejected(ORDER_REJECT_REASONS.INVALID_LOT_SIZE);
+        this.orderLog.set(order.orderId, order);
+        return order;
       }
     } else {
       const pos = this.positionMap.get(dto.securityCode);
@@ -140,11 +145,13 @@ export class SimulatedBroker implements ExecutionBrokerPort {
 
       if (available < dto.quantity) {
         const isT1Locked = frozen >= dto.quantity;
-        return rejected(
+        const order = rejected(
           isT1Locked
             ? ORDER_REJECT_REASONS.T1_LOCKED_SHARES
             : ORDER_REJECT_REASONS.INSUFFICIENT_SHARES,
         );
+        this.orderLog.set(order.orderId, order);
+        return order;
       }
     }
 
@@ -165,6 +172,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     };
 
     this.pendingOrders.set(orderId, order);
+    this.orderLog.set(orderId, order);
     return order;
   }
 
@@ -175,6 +183,10 @@ export class SimulatedBroker implements ExecutionBrokerPort {
       order.status === ORDER_STATUSES.PENDING ||
       order.status === ORDER_STATUSES.BLOCKED
     ) {
+      this.orderLog.set(orderId, {
+        ...order,
+        status: ORDER_STATUSES.CANCELLED,
+      });
       this.pendingOrders.delete(orderId);
       return true;
     }
@@ -217,6 +229,10 @@ export class SimulatedBroker implements ExecutionBrokerPort {
           const fill = this.executeFill(order, fillPrice, bar.timestamp);
           if (fill) {
             fills.push(fill);
+            this.orderLog.set(orderId, {
+              ...order,
+              status: ORDER_STATUSES.FILLED,
+            });
             this.pendingOrders.delete(orderId);
           }
         } else if (bar.low <= order.stopPrice) {
@@ -225,6 +241,10 @@ export class SimulatedBroker implements ExecutionBrokerPort {
           const fill = this.executeFill(order, fillPrice, bar.timestamp);
           if (fill) {
             fills.push(fill);
+            this.orderLog.set(orderId, {
+              ...order,
+              status: ORDER_STATUSES.FILLED,
+            });
             this.pendingOrders.delete(orderId);
           }
         }
@@ -232,81 +252,123 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     }
 
     // 阶段 2：Next-Bar Open 订单撮合 (MARKET 与 LIMIT 订单)
-    for (const [orderId, order] of this.pendingOrders.entries()) {
-      if (
+    // 先出后进（2a 处理所有适格 SELL → 2b 处理所有适格 BUY），保证卖出释放资金与跌停堵单可见
+    const eligibleEntries = Array.from(this.pendingOrders.entries()).filter(
+      ([, order]) =>
         order.securityCode === secCode &&
         order.orderType !== ORDER_TYPES.STOP &&
         (order.status === ORDER_STATUSES.PENDING ||
-          order.status === ORDER_STATUSES.BLOCKED)
+          order.status === ORDER_STATUSES.BLOCKED) &&
+        bar.timestamp.getTime() > order.signalTime.getTime(),
+    );
+
+    const sellEntries = eligibleEntries.filter(
+      ([, order]) => order.side === ORDER_SIDES.SELL,
+    );
+    const buyEntries = eligibleEntries.filter(
+      ([, order]) => order.side === ORDER_SIDES.BUY,
+    );
+
+    for (const [orderId, order] of sellEntries) {
+      if (isOneWordLimitDown(bar, prevClose, securityName)) {
+        // 一字跌停无法卖出，挂起顺延至下一周期
+        const blockedOrder: Order = {
+          ...order,
+          status: ORDER_STATUSES.BLOCKED,
+          rejectReason: ORDER_REJECT_REASONS.SELL_BLOCKED_LIMIT_DOWN,
+        };
+        this.pendingOrders.set(orderId, blockedOrder);
+        this.orderLog.set(orderId, blockedOrder);
+        continue;
+      }
+
+      const fillPrice = applySlippage(
+        bar.open,
+        ORDER_SIDES.SELL,
+        this.slippageRatio,
+      );
+      const fill = this.executeFill(order, fillPrice, bar.timestamp);
+      if (fill) {
+        fills.push(fill);
+        this.orderLog.set(orderId, {
+          ...order,
+          status: ORDER_STATUSES.FILLED,
+        });
+        this.pendingOrders.delete(orderId);
+      } else {
+        // 无法成交（如无持仓或可用份额不足），标记拒单并移除，防止悬挂死锁
+        const rejectedOrder: Order = {
+          ...order,
+          status: ORDER_STATUSES.REJECTED,
+          rejectReason: ORDER_REJECT_REASONS.INSUFFICIENT_SHARES,
+        };
+        this.orderLog.set(orderId, rejectedOrder);
+        this.pendingOrders.delete(orderId);
+      }
+    }
+
+    const hasBlockedSell = Array.from(this.pendingOrders.values()).some(
+      (order) =>
+        order.securityCode === secCode &&
+        order.side === ORDER_SIDES.SELL &&
+        order.status === ORDER_STATUSES.BLOCKED,
+    );
+
+    for (const [orderId, order] of buyEntries) {
+      if (hasBlockedSell) {
+        // 配对卖单或同标的存量卖单处于一字跌停 BLOCKED，撤销同轮 BUY 防止吞掉残留现金
+        const cancelledOrder: Order = {
+          ...order,
+          status: ORDER_STATUSES.CANCELLED,
+          rejectReason: ORDER_REJECT_REASONS.PAIRED_SELL_BLOCKED_LIMIT_DOWN,
+        };
+        this.orderLog.set(orderId, cancelledOrder);
+        this.pendingOrders.delete(orderId);
+        continue;
+      }
+
+      if (isOneWordLimitUp(bar, prevClose, securityName)) {
+        // 一字涨停无法买入，直接拒单（净移除，原语义）
+        const rejectedOrder: Order = {
+          ...order,
+          status: ORDER_STATUSES.REJECTED,
+          rejectReason: ORDER_REJECT_REASONS.BUY_REJECTED_LIMIT_UP,
+        };
+        this.orderLog.set(orderId, rejectedOrder);
+        this.pendingOrders.delete(orderId);
+        continue;
+      }
+
+      if (
+        order.orderType === ORDER_TYPES.LIMIT &&
+        order.limitPrice !== undefined &&
+        bar.open > order.limitPrice
       ) {
-        // 因果律断言：必须满足 t_bar > t_signal
-        if (bar.timestamp.getTime() <= order.signalTime.getTime()) {
-          continue;
-        }
+        // 限价买单高于开盘价暂不成交
+        continue;
+      }
 
-        if (order.side === ORDER_SIDES.BUY) {
-          if (isOneWordLimitUp(bar, prevClose, securityName)) {
-            // 一字涨停无法买入，直接拒单（净移除，原语义）
-            this.pendingOrders.delete(orderId);
-            continue;
-          }
-
-          if (
-            order.orderType === ORDER_TYPES.LIMIT &&
-            order.limitPrice !== undefined &&
-            bar.open > order.limitPrice
-          ) {
-            // 限价买单高于开盘价暂不成交
-            continue;
-          }
-
-          const basePrice =
-            order.orderType === ORDER_TYPES.LIMIT &&
-            order.limitPrice !== undefined
-              ? Math.min(bar.open, order.limitPrice)
-              : bar.open;
-          const fillPrice = applySlippage(
-            basePrice,
-            ORDER_SIDES.BUY,
-            this.slippageRatio,
-          );
-          const fill = this.executeFill(order, fillPrice, bar.timestamp);
-          if (fill) {
-            fills.push(fill);
-            this.pendingOrders.delete(orderId);
-          } else {
-            this.pendingOrders.delete(orderId);
-          }
-        } else if (order.side === ORDER_SIDES.SELL) {
-          if (isOneWordLimitDown(bar, prevClose, securityName)) {
-            // 一字跌停无法卖出，挂起顺延至下一周期
-            this.pendingOrders.set(orderId, {
-              ...order,
-              status: ORDER_STATUSES.BLOCKED,
-              rejectReason: ORDER_REJECT_REASONS.SELL_BLOCKED_LIMIT_DOWN,
-            });
-            continue;
-          }
-
-          const fillPrice = applySlippage(
-            bar.open,
-            ORDER_SIDES.SELL,
-            this.slippageRatio,
-          );
-          const fill = this.executeFill(order, fillPrice, bar.timestamp);
-          if (fill) {
-            fills.push(fill);
-            this.pendingOrders.delete(orderId);
-          } else {
-            // 无法成交（如无持仓或可用份额不足），标记拒单并移除，防止悬挂死锁
-            this.pendingOrders.set(orderId, {
-              ...order,
-              status: ORDER_STATUSES.REJECTED,
-              rejectReason: ORDER_REJECT_REASONS.INSUFFICIENT_SHARES,
-            });
-            this.pendingOrders.delete(orderId);
-          }
-        }
+      const basePrice =
+        order.orderType === ORDER_TYPES.LIMIT && order.limitPrice !== undefined
+          ? Math.min(bar.open, order.limitPrice)
+          : bar.open;
+      const fillPrice = applySlippage(
+        basePrice,
+        ORDER_SIDES.BUY,
+        this.slippageRatio,
+      );
+      const fill = this.executeFill(order, fillPrice, bar.timestamp);
+      if (fill) {
+        fills.push(fill);
+        this.orderLog.set(orderId, {
+          ...order,
+          status: ORDER_STATUSES.FILLED,
+        });
+        this.pendingOrders.delete(orderId);
+      } else {
+        const latest = this.pendingOrders.get(orderId);
+        if (latest) this.orderLog.set(orderId, latest);
+        this.pendingOrders.delete(orderId);
       }
     }
 
@@ -358,6 +420,10 @@ export class SimulatedBroker implements ExecutionBrokerPort {
         o.status === ORDER_STATUSES.PENDING ||
         o.status === ORDER_STATUSES.BLOCKED,
     );
+  }
+
+  getOrder(orderId: string): Order | undefined {
+    return this.orderLog.get(orderId);
   }
 
   private executeFill(

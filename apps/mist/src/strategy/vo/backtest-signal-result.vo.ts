@@ -24,13 +24,6 @@ export class BacktestSignalResultVo {
     description: '买卖点/信号类型 (如 first_buy, second_sell 等)',
   })
   signalType?: string;
-  @ApiPropertyOptional({ description: '决策流综合置信度得分 (0~100)' })
-  confidence?: number | null;
-  @ApiPropertyOptional({
-    description: '置信度分级',
-    enum: ['HIGH', 'MEDIUM', 'LOW'],
-  })
-  confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
   @ApiPropertyOptional({
     description: '白盒决策推导轨迹与证据快照',
     type: 'object',

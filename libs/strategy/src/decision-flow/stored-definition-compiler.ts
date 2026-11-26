@@ -57,6 +57,13 @@ export class StoredDefinitionCompileError extends Error {
 const CHAN_BSP_UNITS = new Set(['bi', 'duan']);
 const CHAN_BSP_DIRECTIONS = new Set(['buy', 'sell', 'both']);
 const DECISION_FLOW_DEFAULT_REQUIRED_BAR_COUNT = 50;
+const ERROR_CODE_FLOW_INVALID: StoredDefinitionCompileErrorCode =
+  'DECISION_FLOW_RULE_INVALID';
+const NODE_TYPE_GUARD = 'GUARD';
+const NODE_TYPE_BRANCH = 'BRANCH';
+const NODE_TYPE_EXTRACTOR = 'EXTRACTOR';
+const NODE_TYPE_TERMINAL = 'TERMINAL';
+const RETIRED_MIN_CONFIDENCE_KEY = 'minConfidence';
 
 /**
  * 存量策略定义统一编译入口（编译边界唯一收口）。
@@ -83,13 +90,8 @@ export function compileStoredDefinitionVersion(
         rootNode?: DecisionFlowNode;
         requiredBarCount?: unknown;
       };
-      const flow = (payload?.rootNode ?? payload) as DecisionFlowNode;
-      if (!flow || typeof flow !== 'object' || !flow.id || !flow.type) {
-        throw new StoredDefinitionCompileError(
-          'DECISION_FLOW_RULE_INVALID',
-          'decision flow rule payload is not a valid DecisionFlowNode',
-        );
-      }
+      const rawFlow = payload?.rootNode ?? payload;
+      const flow = validateDecisionFlowTree(rawFlow);
       return {
         flow,
         requiredBarCount:
@@ -221,7 +223,103 @@ function validateChanBspRule(
 }
 
 /**
- * 遍历决策流树收集全部插件引用（GUARD/EXTRACTOR 单插件，CONSENSUS 多插件）。
+ * 递归校验决策流树（严格 fail-closed、零兼容忽略）：
+ * - 任一节点包含已退役 `minConfidence`（非 undefined）→ 抛 `DECISION_FLOW_RULE_INVALID`；
+ * - 任一节点 `type === 'CONSENSUS'` 或未知节点类型 → 抛 `DECISION_FLOW_RULE_INVALID`；
+ * - 缺失必要结构（id/type/子节点）→ 抛 `DECISION_FLOW_RULE_INVALID`。
+ */
+export function validateDecisionFlowTree(rawRoot: unknown): DecisionFlowNode {
+  const activePath = new Set<object>();
+  const validated = new Set<object>();
+
+  const visit = (rawNode: unknown, pathDesc: string): void => {
+    if (!rawNode || typeof rawNode !== 'object' || Array.isArray(rawNode)) {
+      throw new StoredDefinitionCompileError(
+        ERROR_CODE_FLOW_INVALID,
+        `decision flow node at ${pathDesc} must be a non-null object`,
+      );
+    }
+
+    if (activePath.has(rawNode)) {
+      throw new StoredDefinitionCompileError(
+        ERROR_CODE_FLOW_INVALID,
+        `decision flow contains a cycle at ${pathDesc}`,
+      );
+    }
+    if (validated.has(rawNode)) return;
+
+    const record = rawNode as Record<string, unknown>;
+    if (typeof record.id !== 'string' || record.id.length === 0) {
+      throw new StoredDefinitionCompileError(
+        ERROR_CODE_FLOW_INVALID,
+        `decision flow node at ${pathDesc} must have a non-empty string id`,
+      );
+    }
+    if (typeof record.type !== 'string' || record.type.length === 0) {
+      throw new StoredDefinitionCompileError(
+        ERROR_CODE_FLOW_INVALID,
+        `decision flow node [${record.id}] at ${pathDesc} must have a string type`,
+      );
+    }
+
+    if (
+      RETIRED_MIN_CONFIDENCE_KEY in record &&
+      record[RETIRED_MIN_CONFIDENCE_KEY] !== undefined
+    ) {
+      throw new StoredDefinitionCompileError(
+        ERROR_CODE_FLOW_INVALID,
+        `decision flow node [${record.id}] contains retired field "${RETIRED_MIN_CONFIDENCE_KEY}"`,
+      );
+    }
+
+    activePath.add(rawNode);
+
+    switch (record.type) {
+      case NODE_TYPE_GUARD:
+        visit(record.onPass, `${record.id}.onPass`);
+        if (record.onFail !== undefined) {
+          visit(record.onFail, `${record.id}.onFail`);
+        }
+        break;
+      case NODE_TYPE_BRANCH: {
+        const branches = record.branches;
+        if (
+          !branches ||
+          typeof branches !== 'object' ||
+          Array.isArray(branches)
+        ) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `decision flow BRANCH node [${record.id}] must define branches`,
+          );
+        }
+        const branchRecord = branches as Record<string, unknown>;
+        visit(branchRecord.true, `${record.id}.branches.true`);
+        visit(branchRecord.false, `${record.id}.branches.false`);
+        break;
+      }
+      case NODE_TYPE_EXTRACTOR:
+        visit(record.next, `${record.id}.next`);
+        break;
+      case NODE_TYPE_TERMINAL:
+        break;
+      default:
+        throw new StoredDefinitionCompileError(
+          ERROR_CODE_FLOW_INVALID,
+          `decision flow node [${record.id}] has unsupported or retired type: ${record.type}`,
+        );
+    }
+
+    activePath.delete(rawNode);
+    validated.add(rawNode);
+  };
+
+  visit(rawRoot, 'root');
+  return rawRoot as DecisionFlowNode;
+}
+
+/**
+ * 遍历决策流树收集全部插件引用（GUARD/EXTRACTOR 节点）。
  */
 function collectPluginReferences(
   root: DecisionFlowNode,
@@ -233,27 +331,20 @@ function collectPluginReferences(
     if (visited.has(node.id)) return;
     visited.add(node.id);
     switch (node.type) {
-      case 'GUARD':
+      case NODE_TYPE_GUARD:
         references.set(node.pluginId, node.params);
         visit(node.onPass);
         if (node.onFail) visit(node.onFail);
         return;
-      case 'BRANCH':
+      case NODE_TYPE_BRANCH:
         visit(node.branches.true);
         visit(node.branches.false);
         return;
-      case 'EXTRACTOR':
+      case NODE_TYPE_EXTRACTOR:
         references.set(node.pluginId, node.params);
         visit(node.next);
         return;
-      case 'CONSENSUS':
-        for (const item of node.plugins) {
-          references.set(item.pluginId, item.params);
-        }
-        visit(node.onSuccess);
-        if (node.onFailure) visit(node.onFailure);
-        return;
-      case 'TERMINAL':
+      case NODE_TYPE_TERMINAL:
         return;
     }
   };

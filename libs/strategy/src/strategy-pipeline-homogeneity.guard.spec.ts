@@ -135,7 +135,6 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
       pluginId: 'plugin.legacy.rule-dsl',
       params: { plan: compiledRule },
       requiredAction: 'BUY' as const,
-      minConfidence: 0.5,
       onPass: {
         id: 'term_pass',
         type: 'TERMINAL' as const,
@@ -372,7 +371,6 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
               ),
             },
             requiredAction: 'BUY' as const,
-            minConfidence: 0.5,
             onPass: {
               id: 'term_pass',
               type: 'TERMINAL' as const,

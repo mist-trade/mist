@@ -533,4 +533,109 @@ describe('SimulatedBroker', () => {
     expect(fills).toHaveLength(1);
     expect(fills[0].fillPrice).toBeGreaterThan(11.0);
   });
+
+  it('TC-13: 一字跌停卖单 BLOCKED 时，同标的配对 BUY 撤单为 PAIRED_SELL_BLOCKED_LIMIT_DOWN 且不消耗残留现金', () => {
+    broker.registerSecurity('600519', { name: '贵州茅台', preClose: 10.0 });
+    // Day 1: 建仓 1000 股（约消耗 10,015 元，保留大量残留现金）
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-14T01:30:00.000Z'),
+      intentId: 'd1-buy',
+    });
+    broker.onBar(
+      createBar('2026-10-14T02:00:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+    broker.settleDayClose('2026-10-14');
+    const cashAfterBuy = broker.getAccount().availableCash;
+
+    // Day 2 盘前提交配对 SELL + BUY（无论提交顺序谁先谁后）
+    const sellOrder = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T01:30:00.000Z'),
+      intentId: 'd2-sell',
+    });
+    const buyOrder = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T01:30:00.000Z'),
+      intentId: 'd2-buy',
+    });
+
+    // Day 2 开盘一字跌停（9.00 = 10.00 × 0.90）：SELL 进入 BLOCKED，配对 BUY 必须撤单
+    const limitDownBar = createBar(
+      '2026-10-15T02:00:00.000Z',
+      9.0,
+      9.0,
+      9.0,
+      9.0,
+      '600519',
+    );
+    const fillsOnLimitDown = broker.onBar(limitDownBar);
+    expect(fillsOnLimitDown).toHaveLength(0);
+    expect(broker.getAccount().availableCash).toBe(cashAfterBuy);
+    expect(broker.getAccount().positions.get('600519')?.totalQuantity).toBe(
+      1000,
+    );
+
+    const openOrders = broker.getOpenOrders();
+    expect(openOrders).toHaveLength(1);
+    expect(openOrders[0].orderId).toBe(sellOrder.orderId);
+    expect(openOrders[0].status).toBe('BLOCKED');
+
+    const cancelledBuy = broker.getOrder(buyOrder.orderId);
+    expect(cancelledBuy?.status).toBe('CANCELLED');
+    expect(cancelledBuy?.rejectReason).toBe('PAIRED_SELL_BLOCKED_LIMIT_DOWN');
+
+    // Day 3 仍在跌停时，新的同标的 BUY 同样受已存在 BLOCKED 卖单保护而撤单
+    broker.settleDayClose('2026-10-15');
+    const secondBuy = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-16T01:30:00.000Z'),
+      intentId: 'd3-buy',
+    });
+    const stillLimitDown = createBar(
+      '2026-10-16T02:00:00.000Z',
+      8.1,
+      8.1,
+      8.1,
+      8.1,
+      '600519',
+    );
+    expect(broker.onBar(stillLimitDown)).toHaveLength(0);
+    expect(broker.getOrder(secondBuy.orderId)?.status).toBe('CANCELLED');
+    expect(broker.getOrder(secondBuy.orderId)?.rejectReason).toBe(
+      'PAIRED_SELL_BLOCKED_LIMIT_DOWN',
+    );
+    expect(broker.getAccount().availableCash).toBe(cashAfterBuy);
+
+    // Day 4 打开跌停后，滞留 BLOCKED 卖单正常成交，新买单可恢复成交
+    broker.settleDayClose('2026-10-16');
+    const openBar = createBar(
+      '2026-10-17T02:00:00.000Z',
+      8.2,
+      8.4,
+      8.1,
+      8.3,
+      '600519',
+    );
+    const sellFills = broker.onBar(openBar);
+    expect(sellFills).toHaveLength(1);
+    expect(sellFills[0].side).toBe('SELL');
+    expect(broker.getOpenOrders()).toHaveLength(0);
+  });
 });

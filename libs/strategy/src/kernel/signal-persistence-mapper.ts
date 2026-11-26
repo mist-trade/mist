@@ -20,12 +20,10 @@ export type PersistableKernelSignal = Pick<
   | 'signalTime'
   | 'triggerPrice'
   | 'signalType'
-  | 'confidence'
 > & {
   readonly channel?: KernelSignal['channel'];
   readonly intent?: KernelSignal['intent'];
   readonly originPluginId?: KernelSignal['originPluginId'];
-  readonly confidenceLevel: KernelSignal['confidenceLevel'] | null;
   readonly pivotTime?: string | Date | null;
   readonly pivotPrice?: number | null;
   readonly decisionTrace?: Readonly<Record<string, unknown>> | null;
@@ -49,8 +47,6 @@ export interface SignalPersistencePayload {
   readonly pivotTime: Date | null;
   readonly triggerPrice: number;
   readonly signalType: string;
-  readonly confidence: number;
-  readonly confidenceLevel: 'HIGH' | 'MEDIUM' | 'LOW' | null;
   readonly decisionTrace: Record<string, unknown> | null;
   readonly contextSnapshot: Record<string, unknown>;
   readonly ruleSnapshot: Record<string, unknown>;
@@ -102,8 +98,6 @@ export function mapKernelSignalToPersistencePayload(
     pivotTime,
     triggerPrice,
     signalType: signal.signalType,
-    confidence: signal.confidence,
-    confidenceLevel: signal.confidenceLevel,
     decisionTrace: signal.decisionTrace ? { ...signal.decisionTrace } : null,
     contextSnapshot,
     ruleSnapshot,

@@ -1,6 +1,6 @@
 # test/parity — 双轨对账集成测试套件（Parity Integration Test Suite）
 
-验证目标：在相同历史区间、相同策略定义/版本、相同标的及周期下，验证“实时链路”与“批量回测”在真实数据库持久化层面上输出的 `KernelSignal`（含双时间戳、方向、细分形态、置信度等）100% 逐条同构。
+验证目标：在相同历史区间、相同策略定义/版本、相同标的及周期下，验证“实时链路”与“批量回测”在真实数据库持久化层面上输出的 `KernelSignal`（含双时间戳、方向、细分形态等）100% 逐条同构。
 
 ## 架构定界
 
@@ -36,5 +36,5 @@ pnpm test:parity
 node test/parity/run.mjs
 ```
 
-- 退出码 `0`：双轨完全一致（`signal_time`、`pivot_time`、`signal_kind`、`signal_type`、`confidence` 逐条对齐）。
+- 退出码 `0`：双轨完全一致（`signal_time`、`pivot_time`、`signal_kind`、`signal_type` 逐条对齐）。
 - 退出码 `1`：检出 mismatch 并详细打印差异行字段。

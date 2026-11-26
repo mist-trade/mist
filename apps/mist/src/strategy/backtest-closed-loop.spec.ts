@@ -384,9 +384,9 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
     expect(signal.securityCode).toBe('000001.SZ');
     expect(signal.signalTime).toBe('2026-01-05T01:30:00.000Z');
 
-    // Verify DecisionFlow result contracts: confidence, confidenceLevel, decisionTrace
-    expect(signal.confidence).toBe(85);
-    expect(signal.confidenceLevel).toBe('HIGH');
+    // Verify DecisionFlow result contracts: decisionTrace without confidence
+    expect(signal.confidence).toBeUndefined();
+    expect(signal.confidenceLevel).toBeUndefined();
     expect(signal.decisionTrace).toBeDefined();
     expect(signal.decisionTrace.status).toBe('SIGNAL_EMITTED');
     expect(signal.decisionTrace.signalTag).toBe('MOMENTUM_BREAKOUT');
@@ -396,7 +396,7 @@ describe('Strategy Backtest Closed-Loop Verification', () => {
     // Verify snapshots
     expect(signal.contextSnapshot).toBeDefined();
     expect(signal.contextSnapshot.action).toBe('BUY');
-    expect(signal.contextSnapshot.confidence).toBe(85);
+    expect(signal.contextSnapshot.confidence).toBeUndefined();
     expect(signal.ruleSnapshot).toBeDefined();
 
     // 5. Query Backtest Runs list via GET /v1/strategy-backtests

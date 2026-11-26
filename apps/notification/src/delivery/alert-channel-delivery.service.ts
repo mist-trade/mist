@@ -19,8 +19,10 @@ import {
   yuanToLi,
   type AttributedSignal,
   type KernelSignal,
+  type SignalContributor,
   type SignalGroupInput,
   type TradeInstruction,
+  type VirtualFillEvent,
   TradingEngine,
 } from '@app/strategy';
 import { formatShanghaiDateString } from '@app/timezone';
@@ -43,6 +45,7 @@ import { VirtualFillLogService } from '../trading/virtual-fill-log.service';
 import { NotificationDeliveryCounters } from './notification-delivery-counters';
 
 const MAX_LAST_ERROR = 1024;
+const RESONANCE_CONTRIBUTOR_SEPARATOR = ' + ';
 
 /**
  * Handles deliver.channel for one (group, channel) job (V2): loads the whole
@@ -313,8 +316,6 @@ export class AlertChannelDeliveryService {
       pivotTime: null,
       pivotPrice: null,
       signalType: signal?.signalType ?? 'signal',
-      confidence: signal?.confidence ?? 0,
-      confidenceLevel: signal?.confidenceLevel ?? 'LOW',
       decisionTrace: (signal?.decisionTrace ?? {}) as Record<string, unknown>,
       contextSnapshot: signal?.contextSnapshot ?? {},
       ruleSnapshot: signal?.ruleSnapshot ?? {},
@@ -325,8 +326,6 @@ export class AlertChannelDeliveryService {
       attribution: {
         strategyName: item.strategyDefinition?.name ?? '',
         periodLabel: formatPeriod(signal?.period),
-        confidence: signal?.confidence ?? undefined,
-        confidenceLevel: signal?.confidenceLevel ?? undefined,
         traceChain: renderTraceChain(signal),
       },
     };
@@ -350,6 +349,20 @@ export class AlertChannelDeliveryService {
       instruction.action === 'BUY'
         ? -(turnoverLi + fees.totalFeesLi)
         : turnoverLi - fees.totalFeesLi;
+    const contributors = instruction.contributors;
+    const instructionSnapshot: NonNullable<VirtualFillEvent['instruction']> = {
+      instructionId: instruction.instructionId,
+      action: instruction.action,
+      reason: instruction.reason,
+      strategyName: instruction.attribution.strategyName,
+      periodLabel: instruction.attribution.periodLabel,
+      ...(contributors && contributors.length > 1
+        ? {
+            contributorKeys: contributors.map((c) => c.idempotencyKey),
+            contributorsSummary: formatContributorsSummary(contributors),
+          }
+        : {}),
+    };
     await this.fillLog.append({
       idempotencyKey: instruction.idempotencyKey,
       securityId,
@@ -360,13 +373,7 @@ export class AlertChannelDeliveryService {
       feesLi: fees.totalFeesLi,
       netAmountLi,
       tradingDay,
-      instruction: {
-        instructionId: instruction.instructionId,
-        action: instruction.action,
-        reason: instruction.reason,
-        strategyName: instruction.attribution.strategyName,
-        periodLabel: instruction.attribution.periodLabel,
-      },
+      instruction: instructionSnapshot,
     });
   }
 
@@ -412,4 +419,21 @@ function toNotificationChannel(
   if (channel === 'qq') return NotificationChannel.QQ;
   if (channel === 'feishu') return NotificationChannel.FEISHU;
   return NotificationChannel.WECHAT;
+}
+
+function formatContributorsSummary(
+  contributors: readonly SignalContributor[],
+): string {
+  const details = contributors
+    .map((contributor) =>
+      [
+        contributor.attribution.strategyName,
+        contributor.attribution.periodLabel,
+        contributor.signalType,
+      ]
+        .filter(Boolean)
+        .join(' '),
+    )
+    .join(RESONANCE_CONTRIBUTOR_SEPARATOR);
+  return `共振(${contributors.length}): ${details}`;
 }

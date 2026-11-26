@@ -25,6 +25,7 @@ import {
   type BacktestTargetIssue,
 } from '@app/shared-data';
 import {
+  buildOfflineSignalIdempotencyKey,
   CapitalLedger,
   compileStoredDefinitionVersion,
   createDefaultRiskRules,
@@ -529,23 +530,28 @@ export class BacktestRunExecutor {
     const flushPendingGroup = (): void => {
       if (pendingSignals.length === 0) return;
       const first = pendingSignals[0]!.signal;
+      const seenKeys = new Map<string, number>();
       const group: SignalGroupInput = {
         securityId,
         securityCode,
         effectiveTime: first.signalTime,
         tradingDay: formatShanghaiDateString(first.signalTime),
-        signals: pendingSignals.map(({ signal }) => ({
-          // 离线合成幂等锚点（与门面离线 scheme 一致，design 8.2）
-          idempotencyKey: `offline-${run.strategyDefinitionId}-${signal.signalTime.getTime()}-${signal.signalKind}`,
-          signal,
-          attribution: {
-            strategyName: `definition-${run.strategyDefinitionId}`,
-            periodLabel: `${run.period}m`,
-            confidence: signal.confidence,
-            confidenceLevel: signal.confidenceLevel,
-            traceChain: renderTraceChainOf(signal.decisionTrace),
-          },
-        })),
+        signals: pendingSignals.map(({ signal }) => {
+          const baseKey = buildOfflineSignalIdempotencyKey(signal, run.period);
+          const count = (seenKeys.get(baseKey) ?? 0) + 1;
+          seenKeys.set(baseKey, count);
+          const idempotencyKey = count === 1 ? baseKey : `${baseKey}-${count}`;
+          return {
+            // 离线合成幂等锚点（与门面离线 scheme 一致，design 3.1）
+            idempotencyKey,
+            signal,
+            attribution: {
+              strategyName: `definition-${run.strategyDefinitionId}`,
+              periodLabel: `${run.period}m`,
+              traceChain: renderTraceChainOf(signal.decisionTrace),
+            },
+          };
+        }),
       };
       pendingSignals.length = 0;
 
@@ -596,8 +602,6 @@ export class BacktestRunExecutor {
             signalType: payload.signalType,
             signalKind: payload.signalKind as StrategySignalKind,
             signalSource: StrategySignalSource.BACKTEST,
-            confidence: payload.confidence,
-            confidenceLevel: payload.confidenceLevel,
             decisionTrace: payload.decisionTrace,
             contextSnapshot: payload.contextSnapshot,
             ruleSnapshot: payload.ruleSnapshot,
@@ -715,8 +719,6 @@ export class BacktestRunExecutor {
           signalType: result.signalType,
           signalKind: result.signalKind,
           signalSource: result.signalSource,
-          confidence: result.confidence,
-          confidenceLevel: result.confidenceLevel,
           decisionTrace: result.decisionTrace,
           contextSnapshot: result.contextSnapshot,
           ruleSnapshot: result.ruleSnapshot,

@@ -11,8 +11,10 @@ import type {
   AccountSnapshot,
   AttributedSignal,
   MacroRegimeSnapshot,
+  SignalContributor,
   SignalGroupInput,
   TradeInstruction,
+  TradeRejection,
   TradingDecision,
   TradingPositionState,
 } from './domain.types';
@@ -25,7 +27,10 @@ export interface GoldenSignalSpec {
   readonly signalKind: 'entry' | 'exit';
   readonly signalType: string;
   readonly triggerPrice: number;
-  readonly confidence?: number;
+  readonly definitionId?: number;
+  readonly period?: number;
+  readonly strategyName?: string;
+  readonly periodLabel?: string;
 }
 
 export interface GoldenGroupEvent {
@@ -56,6 +61,13 @@ export interface GoldenScenario {
 
 /* ───────────────────────── 序列化投影 ───────────────────────── */
 
+export interface SerializedContributor {
+  readonly idempotencyKey: string;
+  readonly signalType: string;
+  readonly strategyName: string;
+  readonly periodLabel: string;
+}
+
 export interface SerializedInstruction {
   readonly instructionId: string;
   readonly idempotencyKey: string;
@@ -64,12 +76,14 @@ export interface SerializedInstruction {
   readonly referencePrice: number;
   readonly estimatedValueLi: string;
   readonly reason: string;
+  readonly contributors?: readonly SerializedContributor[];
 }
 
 export interface SerializedRejection {
   readonly idempotencyKey: string;
   readonly reason: string;
   readonly detail: string;
+  readonly contributors?: readonly SerializedContributor[];
 }
 
 export interface SerializedAccount {
@@ -92,6 +106,15 @@ export interface SerializedLogEntry {
   readonly accountAfter?: SerializedAccount;
 }
 
+function serializeContributor(c: SignalContributor): SerializedContributor {
+  return {
+    idempotencyKey: c.idempotencyKey,
+    signalType: c.signalType,
+    strategyName: c.attribution.strategyName,
+    periodLabel: c.attribution.periodLabel,
+  };
+}
+
 function serializeInstruction(i: TradeInstruction): SerializedInstruction {
   return {
     instructionId: i.instructionId,
@@ -101,6 +124,20 @@ function serializeInstruction(i: TradeInstruction): SerializedInstruction {
     referencePrice: i.referencePrice,
     estimatedValueLi: i.estimatedValueLi.toString(),
     reason: i.reason,
+    ...(i.contributors && i.contributors.length > 1
+      ? { contributors: i.contributors.map(serializeContributor) }
+      : {}),
+  };
+}
+
+function serializeRejection(r: TradeRejection): SerializedRejection {
+  return {
+    idempotencyKey: r.idempotencyKey,
+    reason: r.reason,
+    detail: r.detail,
+    ...(r.contributors && r.contributors.length > 1
+      ? { contributors: r.contributors.map(serializeContributor) }
+      : {}),
   };
 }
 
@@ -121,18 +158,21 @@ export function serializeAccount(a: AccountSnapshot): SerializedAccount {
 
 /* ───────────────────────── 回放运行器 ───────────────────────── */
 
+const DEFAULT_GOLDEN_DEFINITION_ID = 1;
+const DEFAULT_GOLDEN_STRATEGY = 'golden';
+const DEFAULT_GOLDEN_PERIOD_LABEL = '30m';
+
 function buildSignal(spec: GoldenSignalSpec, signalTime: Date): KernelSignal {
   return {
-    definitionId: 1,
+    definitionId: spec.definitionId ?? DEFAULT_GOLDEN_DEFINITION_ID,
     versionId: 1,
     signalKind: spec.signalKind,
+    ...(spec.period !== undefined ? { triggerPeriod: spec.period } : {}),
     signalTime,
     triggerPrice: spec.triggerPrice,
     pivotTime: null,
     pivotPrice: null,
     signalType: spec.signalType,
-    confidence: spec.confidence ?? 0.85,
-    confidenceLevel: 'HIGH',
     decisionTrace: {},
     contextSnapshot: {},
     ruleSnapshot: {},
@@ -147,10 +187,8 @@ function buildAttributed(
     idempotencyKey: spec.key,
     signal: buildSignal(spec, signalTime),
     attribution: {
-      strategyName: 'golden',
-      periodLabel: '30m',
-      confidence: spec.confidence ?? 0.85,
-      confidenceLevel: 'HIGH',
+      strategyName: spec.strategyName ?? DEFAULT_GOLDEN_STRATEGY,
+      periodLabel: spec.periodLabel ?? DEFAULT_GOLDEN_PERIOD_LABEL,
       traceChain: null,
     },
   };
@@ -207,11 +245,7 @@ export function runGoldenScenario(
       log.push({
         event: `group@${event.effectiveTime}`,
         instructions: decision.instructions.map(serializeInstruction),
-        rejections: decision.rejections.map((r) => ({
-          idempotencyKey: r.idempotencyKey,
-          reason: r.reason,
-          detail: r.detail,
-        })),
+        rejections: decision.rejections.map(serializeRejection),
         accountAfter: serializeAccount(account),
       });
     } else {

@@ -1,14 +1,17 @@
 import type {
-  ConfidenceLevel,
   DecisionExecutionTraceItem,
   DecisionResult,
 } from './decision-flow.types';
+import { DECISION_ACTIONS } from '../strategy.constants';
+
+const STATUS_ABORTED = 'ABORTED';
+const NODE_TYPE_GUARD = 'GUARD';
+const MILESTONE_JOINER = ' + ';
+const MILESTONE_SUFFIX = ' -> ';
 
 export interface DecisionTraceSnapshot {
   readonly status: 'SIGNAL_EMITTED' | 'ABORTED';
   readonly action?: 'BUY' | 'SELL';
-  readonly confidence: number;
-  readonly confidenceLevel: ConfidenceLevel;
   readonly signalTag?: string;
   readonly summary: string;
   readonly trace: readonly DecisionExecutionTraceItem[];
@@ -29,8 +32,6 @@ export class DecisionExecutionTraceBuilder {
     return {
       status: result.status,
       action: result.action,
-      confidence: Number(result.confidence.toFixed(1)),
-      confidenceLevel: result.confidenceLevel,
       signalTag: result.signalTag,
       summary,
       trace: result.trace,
@@ -39,37 +40,30 @@ export class DecisionExecutionTraceBuilder {
 
   /**
    * 生成一句话人类可读的决策归因摘要
-   * 示范："[HIGH 88.5%] 门禁(财务安全)通过 + 共识打分(放量突破+北向加仓)达标 -> 买入信号"
+   * 示范："门禁[财务安全门禁]通过 -> 触发买入信号 [BREAKOUT_RESONANCE]"
    */
   public static buildHumanReadableSummary(result: DecisionResult): string {
-    const prefix = `[${result.confidenceLevel} ${result.confidence.toFixed(1)}%]`;
-
-    if (result.status === 'ABORTED') {
-      return `${prefix} 阻断: ${result.reason}`;
+    if (result.status === STATUS_ABORTED) {
+      return `阻断: ${result.reason}`;
     }
 
     const keyMilestones: string[] = [];
 
     for (const item of result.trace) {
       if (item.passed === false) continue;
-      if (item.type === 'GUARD' && item.reason) {
+      if (item.type === NODE_TYPE_GUARD && item.reason) {
         keyMilestones.push(item.name ? `门禁[${item.name}]通过` : '门禁通过');
-      } else if (item.type === 'CONSENSUS' && item.breakdown) {
-        const positiveVoters = item.breakdown
-          .filter((v) => v.action === 'BUY')
-          .map((v) => v.pluginId.replace('plugin.', ''));
-        if (positiveVoters.length > 0) {
-          keyMilestones.push(`共识支持(${positiveVoters.join('+')})`);
-        }
       }
     }
 
     const milestoneText =
-      keyMilestones.length > 0 ? keyMilestones.join(' + ') + ' -> ' : '';
+      keyMilestones.length > 0
+        ? keyMilestones.join(MILESTONE_JOINER) + MILESTONE_SUFFIX
+        : '';
     const actionText =
-      result.action === 'BUY' ? '触发买入信号' : '触发卖出信号';
+      result.action === DECISION_ACTIONS.BUY ? '触发买入信号' : '触发卖出信号';
     const tagText = result.signalTag ? ` [${result.signalTag}]` : '';
 
-    return `${prefix} ${milestoneText}${actionText}${tagText}`;
+    return `${milestoneText}${actionText}${tagText}`;
   }
 }

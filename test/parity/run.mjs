@@ -5,7 +5,7 @@
  * 验证目标：同区间、同策略版本、同标的、同周期下，
  *   ① 实时推流落盘（strategy_signals）
  * 与 ② 批量回测落盘（backtest_signal_results）
- * 在双时间戳、信号类型、方向、置信度等关键字段上 100% 逐条同构。
+ * 在双时间戳、信号类型、方向等关键字段上 100% 逐条同构。
  *
  * 前置条件（本地 docker compose 栈：mysql + redis + mist-backend + signal）：
  *   - 策略定义/版本已存在（decision_flow 或经透明编译的 legacy kind）
@@ -48,7 +48,7 @@ async function connect() {
 async function loadRealtimeSignals(pool) {
   const [rows] = await pool.query(
     `SELECT id, security_id, period, source, signal_time, pivot_time,
-            signal_kind, signal_type, confidence, confidence_level
+            signal_kind, signal_type
        FROM strategy_signals
       WHERE signal_time BETWEEN ? AND ?
         AND period = ?
@@ -62,7 +62,7 @@ async function loadRealtimeSignals(pool) {
 async function loadBacktestSignals(pool, runId) {
   const [rows] = await pool.query(
     `SELECT id, security_code, period, source, signal_time, pivot_time,
-            signal_kind, signal_type, confidence, confidence_level
+            signal_kind, signal_type
        FROM backtest_signal_results
       WHERE backtest_run_id = ?
       ORDER BY signal_time, id`,
@@ -107,7 +107,7 @@ async function runBacktest(apiBase, versionId) {
   throw new Error(`backtest run ${runId} timed out`);
 }
 
-/** 逐条比对：精确按照 signal_time + signal_kind + signal_type 对齐并校验 pivot_time 与 confidence */
+/** 逐条比对：精确按照 signal_time + signal_kind + signal_type 对齐并校验 pivot_time */
 function diff(realtime, backtest) {
   const mismatches = [];
   const key = (row) => {

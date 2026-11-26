@@ -1,0 +1,172 @@
+{
+  "name": "两阶段先出后进归并：2 EXIT 归并全平释放现金 → 2 ENTRY 归并按新资金开仓",
+  "scenario": {
+    "name": "consolidate-multi-exit-then-entry",
+    "securityId": 1,
+    "securityCode": "000001",
+    "seedCapitalLi": "1000000000",
+    "events": [
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-05",
+        "effectiveTime": "2026-01-05T07:35:00Z",
+        "signals": [
+          {
+            "key": "evt-d1-entry",
+            "definitionId": 1,
+            "period": 1440,
+            "strategyName": "策略A",
+            "periodLabel": "日线",
+            "signalKind": "entry",
+            "signalType": "CHAN_SECOND_BUY",
+            "triggerPrice": 10
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-06",
+        "effectiveTime": "2026-01-06T07:35:00Z",
+        "signals": [
+          {
+            "key": "offline-1-30-exit",
+            "definitionId": 1,
+            "period": 30,
+            "strategyName": "策略A",
+            "periodLabel": "30m",
+            "signalKind": "exit",
+            "signalType": "VIRTUAL_EXIT",
+            "triggerPrice": 12
+          },
+          {
+            "key": "offline-2-1440-exit",
+            "definitionId": 2,
+            "period": 1440,
+            "strategyName": "策略B",
+            "periodLabel": "日线",
+            "signalKind": "exit",
+            "signalType": "CHAN_SECOND_SELL",
+            "triggerPrice": 12
+          },
+          {
+            "key": "offline-3-30-entry",
+            "definitionId": 3,
+            "period": 30,
+            "strategyName": "策略C",
+            "periodLabel": "30m",
+            "signalKind": "entry",
+            "signalType": "CHAN_FIRST_BUY",
+            "triggerPrice": 12
+          },
+          {
+            "key": "offline-4-1440-entry",
+            "definitionId": 4,
+            "period": 1440,
+            "strategyName": "策略D",
+            "periodLabel": "日线",
+            "signalKind": "entry",
+            "signalType": "GOLDEN_POCKET",
+            "triggerPrice": 12
+          }
+        ]
+      }
+    ]
+  },
+  "expected": [
+    {
+      "event": "group@2026-01-05T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-evt-d1-entry",
+          "idempotencyKey": "evt-d1-entry",
+          "action": "BUY",
+          "quantity": 95000,
+          "referencePrice": 10,
+          "estimatedValueLi": "950000000",
+          "reason": "CHAN_SECOND_BUY"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "49753000",
+        "tradingDay": "2026-01-05",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 95000,
+            "costPriceLi": "10000",
+            "currentPriceLi": "10000",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-05T07:35:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "event": "group@2026-01-06T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-offline-2-1440-exit",
+          "idempotencyKey": "offline-2-1440-exit",
+          "action": "SELL",
+          "quantity": 95000,
+          "referencePrice": 12,
+          "estimatedValueLi": "1140000000",
+          "reason": "CHAN_SECOND_SELL + VIRTUAL_EXIT",
+          "contributors": [
+            {
+              "idempotencyKey": "offline-2-1440-exit",
+              "signalType": "CHAN_SECOND_SELL",
+              "strategyName": "策略B",
+              "periodLabel": "日线"
+            },
+            {
+              "idempotencyKey": "offline-1-30-exit",
+              "signalType": "VIRTUAL_EXIT",
+              "strategyName": "策略A",
+              "periodLabel": "30m"
+            }
+          ]
+        },
+        {
+          "instructionId": "ti-offline-4-1440-entry",
+          "idempotencyKey": "offline-4-1440-entry",
+          "action": "BUY",
+          "quantity": 94100,
+          "referencePrice": 12,
+          "estimatedValueLi": "1129200000",
+          "reason": "GOLDEN_POCKET + CHAN_FIRST_BUY",
+          "contributors": [
+            {
+              "idempotencyKey": "offline-4-1440-entry",
+              "signalType": "GOLDEN_POCKET",
+              "strategyName": "策略D",
+              "periodLabel": "日线"
+            },
+            {
+              "idempotencyKey": "offline-3-30-entry",
+              "signalType": "CHAN_FIRST_BUY",
+              "strategyName": "策略C",
+              "periodLabel": "30m"
+            }
+          ]
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "59393008",
+        "tradingDay": "2026-01-06",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 94100,
+            "costPriceLi": "12000",
+            "currentPriceLi": "12000",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-06T07:35:00.000Z"
+          }
+        ]
+      }
+    }
+  ]
+}

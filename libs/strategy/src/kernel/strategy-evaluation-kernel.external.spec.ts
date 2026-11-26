@@ -33,8 +33,8 @@ class MacroReaderPlugin implements FactorPlugin {
     const last = series[series.length - 1].rawBar;
     this.seenLastMacroDate.push(formatShanghaiDateString(last.timestamp));
     return last.close < first
-      ? { action: 'BUY', confidence: 0.9, reason: 'macro declining (test)' }
-      : { action: 'NEUTRAL', confidence: 0, reason: 'macro flat (test)' };
+      ? { action: 'BUY', reason: 'macro declining (test)' }
+      : { action: 'NEUTRAL', reason: 'macro flat (test)' };
   }
 }
 
@@ -92,7 +92,6 @@ function makeFlow(): DecisionFlowNode {
     pluginId: 'plugin.test.macro-reader',
     params: {},
     requiredAction: 'BUY',
-    minConfidence: 0.5,
     onPass: {
       id: 'term_macro',
       type: 'TERMINAL',

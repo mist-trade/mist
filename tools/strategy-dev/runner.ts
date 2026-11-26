@@ -222,7 +222,6 @@ async function runStrategyDev(): Promise<void> {
         方向: s.isBuy ? '▲ 买入' : '▼ 卖出',
         撮合基准价: s.triggerPrice.toFixed(2),
         形态止损位: s.pivotPrice ? s.pivotPrice.toFixed(2) : '--',
-        置信度: s.confidence,
       })),
     );
   }

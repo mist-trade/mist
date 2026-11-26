@@ -15,8 +15,7 @@
             "key": "evt-entry-am",
             "signalKind": "entry",
             "signalType": "CHAN_SECOND_BUY",
-            "triggerPrice": 10,
-            "confidence": 0.86
+            "triggerPrice": 10
           }
         ]
       },
@@ -29,8 +28,7 @@
             "key": "evt-exit-pm",
             "signalKind": "exit",
             "signalType": "CHAN_SECOND_SELL",
-            "triggerPrice": 10.5,
-            "confidence": 0.9
+            "triggerPrice": 10.5
           }
         ]
       },
@@ -43,8 +41,7 @@
             "key": "evt-exit-d2",
             "signalKind": "exit",
             "signalType": "CHAN_SECOND_SELL",
-            "triggerPrice": 10.8,
-            "confidence": 0.9
+            "triggerPrice": 10.8
           }
         ]
       }

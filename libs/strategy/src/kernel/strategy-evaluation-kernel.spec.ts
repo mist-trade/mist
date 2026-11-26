@@ -26,7 +26,7 @@ class AlwaysBuyPlugin implements FactorPlugin {
   public readonly paramSchema = {};
 
   public async evaluate(): Promise<FactorOpinion> {
-    return { action: 'BUY', confidence: 0.9, reason: 'always buy (test)' };
+    return { action: 'BUY', reason: 'always buy (test)' };
   }
 }
 
@@ -40,7 +40,7 @@ class AlwaysSellPlugin implements FactorPlugin {
   public readonly paramSchema = {};
 
   public async evaluate(): Promise<FactorOpinion> {
-    return { action: 'SELL', confidence: 0.9, reason: 'always sell (test)' };
+    return { action: 'SELL', reason: 'always sell (test)' };
   }
 }
 
@@ -52,7 +52,6 @@ function createAlwaysSellFlow(): DecisionFlowNode {
     pluginId: 'plugin.test.always-sell',
     params: {},
     requiredAction: 'SELL',
-    minConfidence: 0.5,
     onPass: {
       id: 'term_sell',
       type: 'TERMINAL',
@@ -93,7 +92,6 @@ class SeriesReaderPlugin implements FactorPlugin {
     const last = (series as readonly { rawBar: StrategyBar }[]).at(-1);
     return {
       action: 'BUY',
-      confidence: 0.9,
       reason: 'series read (test)',
       evidence: {
         last5mTimestamp: last?.rawBar.timestamp.toISOString() ?? null,
@@ -110,7 +108,6 @@ function createAlwaysMatchedFlow(): DecisionFlowNode {
     pluginId: 'plugin.test.always-buy',
     params: {},
     requiredAction: 'BUY',
-    minConfidence: 0.5,
     onPass: {
       id: 'term_always',
       type: 'TERMINAL',
@@ -135,7 +132,6 @@ function createSeriesReaderFlow(): DecisionFlowNode {
     pluginId: 'plugin.test.series-reader',
     params: {},
     requiredAction: 'BUY',
-    minConfidence: 0.5,
     onPass: {
       id: 'term_reader',
       type: 'TERMINAL',
@@ -440,7 +436,7 @@ describe('StrategyEvaluationKernel（虚拟出场端口）', () => {
     public readonly paramSchema = {};
 
     public async evaluate(): Promise<FactorOpinion> {
-      return { action: 'BUY', confidence: 0.9, reason: 'always buy (test)' };
+      return { action: 'BUY', reason: 'always buy (test)' };
     }
 
     public virtualExitRules(): readonly VirtualExitRule[] {
@@ -474,7 +470,6 @@ describe('StrategyEvaluationKernel（虚拟出场端口）', () => {
       pluginId: 'plugin.test.rule-declaring',
       params: {},
       requiredAction: 'BUY',
-      minConfidence: 0.5,
       onPass: {
         id: 'term_rule',
         type: 'TERMINAL',
@@ -789,8 +784,8 @@ describe('StrategyEvaluationKernel（多周期窗口）', () => {
       public async evaluate(): Promise<FactorOpinion> {
         this.count += 1;
         return this.count === 1
-          ? { action: 'BUY', confidence: 0.9, reason: '首根建仓' }
-          : { action: 'NEUTRAL', confidence: 0, reason: '观望' };
+          ? { action: 'BUY', reason: '首根建仓' }
+          : { action: 'NEUTRAL', reason: '观望' };
       }
 
       public virtualExitRules() {
@@ -841,7 +836,6 @@ describe('StrategyEvaluationKernel（多周期窗口）', () => {
   it('surveillancePeriods 监控周期直通 virtualExitPolicy 且不触发主周期决策流', async () => {
     const evaluateSpy = jest.fn().mockResolvedValue({
       action: 'BUY',
-      confidence: 0.9,
       reason: 'daily buy',
     });
     const registry = new InMemoryFactorPluginRegistry();
@@ -933,7 +927,6 @@ describe('StrategyEvaluationKernel（多周期窗口）', () => {
       description: 'fail',
       evaluate: async () => ({
         action: 'NEUTRAL',
-        confidence: 0,
         reason: '未满足A',
         badgeText: 'A失败',
         evidence: {
@@ -951,7 +944,6 @@ describe('StrategyEvaluationKernel（多周期窗口）', () => {
       description: 'pass',
       evaluate: async () => ({
         action: 'BUY',
-        confidence: 0.95,
         reason: 'B突破成立',
         badgeText: 'B突破',
         evidence: {
@@ -1005,7 +997,6 @@ describe('StrategyEvaluationKernel（多周期窗口）', () => {
 
     const signals = await kernel.push(bar);
     expect(signals).toHaveLength(1);
-    expect(signals[0]?.confidence).toBe(95);
     expect(signals[0]?.originPluginId).toBe('plugin.guard.pass-b');
     expect(signals[0]?.badgeText).toBe('B突破');
     expect(signals[0]?.pivotPrice).toBe(10.5);

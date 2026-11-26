@@ -103,12 +103,11 @@ describe('FibonacciRetracementPlugin (Chan swing anchor)', () => {
     expect('period' in plugin.paramSchema).toBe(false);
   });
 
-  it('returns NEUTRAL with 0 confidence when bars are insufficient for the bi derivation', async () => {
+  it('returns NEUTRAL when bars are insufficient for the bi derivation', async () => {
     const context = makeContext(toBars(pullbackSeries().slice(0, 49)));
     const opinion = await plugin.evaluate(context);
 
     expect(opinion.action).toBe('NEUTRAL');
-    expect(opinion.confidence).toBe(0.0);
     expect(opinion.reason).toContain('K线数量不足');
   });
 
@@ -125,7 +124,6 @@ describe('FibonacciRetracementPlugin (Chan swing anchor)', () => {
     const opinion = await plugin.evaluate(context);
 
     expect(opinion.action).toBe('NEUTRAL');
-    expect(opinion.confidence).toBe(0.0);
     expect(opinion.reason).toContain('不回退滚动窗口');
     expect(opinion.evidence?.insufficientSwing).toBe(true);
   });
@@ -135,7 +133,6 @@ describe('FibonacciRetracementPlugin (Chan swing anchor)', () => {
     const opinion = await plugin.evaluate(context);
 
     expect(opinion.action).toBe('BUY');
-    expect(opinion.confidence).toBe(0.75);
     expect(opinion.reason).toContain('黄金口袋');
     expect(opinion.evidence?.isGoldenPocket).toBe(true);
     expect(Number(opinion.evidence?.ratio)).toBeCloseTo(0.6158, 4);
@@ -154,7 +151,6 @@ describe('FibonacciRetracementPlugin (Chan swing anchor)', () => {
     const opinion = await plugin.evaluate(context, { direction: 'rebound' });
 
     expect(opinion.action).toBe('SELL');
-    expect(opinion.confidence).toBe(0.75);
     expect(opinion.reason).toContain('黄金口袋');
     expect(opinion.evidence?.isGoldenPocket).toBe(true);
     expect(Number(opinion.evidence?.ratio)).toBeCloseTo(0.5462, 4);

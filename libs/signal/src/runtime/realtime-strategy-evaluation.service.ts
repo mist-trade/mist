@@ -30,8 +30,6 @@ export interface ShadowStrategyCandidate {
   /** 信号类型标签（决策流 signalTag ?? action） */
   readonly signalType: string;
   readonly barType: StrategyBar['type'];
-  readonly confidence: number;
-  readonly confidenceLevel: 'HIGH' | 'MEDIUM' | 'LOW' | null;
   readonly decisionTrace: Record<string, unknown> | null;
   readonly contextSnapshot: Readonly<Record<string, unknown>>;
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
@@ -159,8 +157,6 @@ function toCandidate(
     pivotPrice: signal.pivotPrice,
     signalType: signal.signalType,
     barType: bar.type,
-    confidence: signal.confidence,
-    confidenceLevel: signal.confidenceLevel,
     decisionTrace: signal.decisionTrace,
     contextSnapshot: signal.contextSnapshot,
     ruleSnapshot: signal.ruleSnapshot,

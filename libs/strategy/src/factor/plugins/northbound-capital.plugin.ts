@@ -67,7 +67,6 @@ export class NorthboundCapitalPlugin implements FactorPlugin {
     if (netInflowWan === undefined) {
       return {
         action: 'NEUTRAL',
-        confidence: 0.0,
         reason: '未检测到北向资金数据，保持中立弃权',
       };
     }
@@ -84,13 +83,8 @@ export class NorthboundCapitalPlugin implements FactorPlugin {
       const netInflowYuan = netInflowWan * 10000;
       const inflowRatio = netInflowYuan / turnoverAmount;
       if (inflowRatio >= minInflowRatio) {
-        const excess = Math.min(
-          1.0,
-          (inflowRatio - minInflowRatio) / minInflowRatio,
-        );
         return {
           action: 'BUY',
-          confidence: Math.min(0.95, 0.75 + excess * 0.2),
           reason: `北向资金净流入占比 ${(inflowRatio * 100).toFixed(2)}% (阈值: ${(minInflowRatio * 100).toFixed(2)}%)，外资大幅加仓`,
           evidence: {
             netInflowWan,
@@ -104,7 +98,6 @@ export class NorthboundCapitalPlugin implements FactorPlugin {
       if (inflowRatio <= -minInflowRatio) {
         return {
           action: 'SELL',
-          confidence: 0.85,
           reason: `北向资金大幅净流出占比 ${(Math.abs(inflowRatio) * 100).toFixed(2)}% (阈值: ${(minInflowRatio * 100).toFixed(2)}%)，存在机构减仓风险`,
           evidence: {
             netInflowWan,
@@ -117,7 +110,6 @@ export class NorthboundCapitalPlugin implements FactorPlugin {
 
       return {
         action: 'NEUTRAL',
-        confidence: 0.0,
         reason: `北向资金流动平稳 (占比 ${(inflowRatio * 100).toFixed(2)}%)，未触发增减仓异动`,
         evidence: {
           netInflowWan,
@@ -128,15 +120,8 @@ export class NorthboundCapitalPlugin implements FactorPlugin {
     }
 
     if (netInflowWan >= minInflowWan) {
-      const excess = Math.min(
-        1.0,
-        (netInflowWan - minInflowWan) / minInflowWan,
-      );
-      const confidence = Math.min(0.95, 0.75 + excess * 0.2);
-
       return {
         action: 'BUY',
-        confidence,
         reason: `北向资金净流入 ${netInflowWan.toFixed(1)} 万元 (阈值: ${minInflowWan} 万元)，主力加仓意愿强烈`,
         evidence: {
           netInflowWan,
@@ -148,7 +133,6 @@ export class NorthboundCapitalPlugin implements FactorPlugin {
     if (netInflowWan <= -minInflowWan) {
       return {
         action: 'SELL',
-        confidence: 0.85,
         reason: `北向资金大幅净流出 ${Math.abs(netInflowWan).toFixed(1)} 万元，存在机构减仓风险`,
         evidence: {
           netInflowWan,
@@ -159,7 +143,6 @@ export class NorthboundCapitalPlugin implements FactorPlugin {
 
     return {
       action: 'NEUTRAL',
-      confidence: 0.0,
       reason: `北向资金流动平稳 (${netInflowWan.toFixed(1)} 万元)，未触发增减仓异动`,
       evidence: {
         netInflowWan,

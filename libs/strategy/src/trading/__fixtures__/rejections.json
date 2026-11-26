@@ -15,8 +15,7 @@
             "key": "evt-entry-d1",
             "signalKind": "entry",
             "signalType": "CHAN_SECOND_BUY",
-            "triggerPrice": 10,
-            "confidence": 0.86
+            "triggerPrice": 10
           }
         ]
       },
@@ -29,15 +28,13 @@
             "key": "evt-entry-d2-dup",
             "signalKind": "entry",
             "signalType": "CHAN_FIRST_BUY",
-            "triggerPrice": 11,
-            "confidence": 0.92
+            "triggerPrice": 11
           },
           {
             "key": "evt-exit-d2",
             "signalKind": "exit",
             "signalType": "CHAN_SECOND_SELL",
-            "triggerPrice": 12,
-            "confidence": 0.9
+            "triggerPrice": 12
           }
         ]
       },
@@ -50,15 +47,13 @@
             "key": "evt-exit-d3-empty",
             "signalKind": "exit",
             "signalType": "CHAN_SECOND_SELL",
-            "triggerPrice": 12,
-            "confidence": 0.9
+            "triggerPrice": 12
           },
           {
             "key": "evt-entry-d3-rich",
             "signalKind": "entry",
             "signalType": "CHAN_SECOND_BUY",
-            "triggerPrice": 20000,
-            "confidence": 0.86
+            "triggerPrice": 20000
           }
         ]
       }

@@ -477,7 +477,6 @@ describe('CandleFinalizedJobProcessor', () => {
               pluginId: 'plugin.legacy.rule-dsl',
               params: {},
               requiredAction: 'BUY',
-              minConfidence: 0.5,
               onPass: {
                 id: 'term_pass',
                 type: 'TERMINAL',

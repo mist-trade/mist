@@ -2,6 +2,7 @@ import type { DecisionFlowNode } from './decision-flow.types';
 import {
   compileStoredDefinitionVersion,
   deriveContextRequirements,
+  StoredDefinitionCompileError,
 } from './stored-definition-compiler';
 import {
   factorPluginRegistry,
@@ -43,7 +44,6 @@ function pluginWith(
     ...(requirements ? { resolveContextRequirements: () => requirements } : {}),
     evaluate: async () => ({
       action: 'NEUTRAL',
-      confidence: 0,
       reason: 'noop',
     }),
   };
@@ -225,7 +225,6 @@ describe('stored definition compiler — external context requirements derivatio
         ext) as FactorPlugin['resolveExternalContextRequirements'],
       evaluate: async () => ({
         action: 'NEUTRAL',
-        confidence: 0,
         reason: 'noop',
       }),
     };
@@ -297,7 +296,6 @@ describe('stored definition compiler — external context requirements derivatio
       }),
       evaluate: async () => ({
         action: 'NEUTRAL',
-        confidence: 0,
         reason: 'noop',
       }),
     });
@@ -320,5 +318,132 @@ describe('stored definition compiler — external context requirements derivatio
       evaluationPeriod: 30,
     });
     expect(compiled30m.contextRequirements).toEqual({ 30: 120 });
+  });
+});
+
+describe('stored definition compiler — fail-closed retired fields & node types', () => {
+  afterEach(() => {
+    factorPluginRegistry.clear();
+  });
+
+  function registerStub(id: string): void {
+    factorPluginRegistry.register(pluginWith(id));
+  }
+
+  function captureCompileError(
+    fn: () => unknown,
+  ): StoredDefinitionCompileError {
+    try {
+      fn();
+    } catch (error) {
+      expect(error).toBeInstanceOf(StoredDefinitionCompileError);
+      return error as StoredDefinitionCompileError;
+    }
+    throw new Error('expected StoredDefinitionCompileError to be thrown');
+  }
+
+  it('fails closed when a root or nested GUARD node carries retired minConfidence', () => {
+    registerStub('plugin.a');
+
+    const withRootMinConfidence = {
+      id: 'guard_root',
+      type: 'GUARD',
+      name: 'root',
+      pluginId: 'plugin.a',
+      requiredAction: 'BUY',
+      minConfidence: 0.5,
+      onPass: { id: 'term', type: 'TERMINAL', action: 'BUY', reason: 'ok' },
+    };
+
+    const rootErr = captureCompileError(() =>
+      compileStoredDefinitionVersion({
+        kind: 'decision_flow',
+        rule: withRootMinConfidence as unknown as Record<string, unknown>,
+      }),
+    );
+    expect(rootErr.code).toBe('DECISION_FLOW_RULE_INVALID');
+    expect(rootErr.message).toContain('minConfidence');
+
+    const withNestedMinConfidence = {
+      id: 'branch_root',
+      type: 'BRANCH',
+      name: 'branch',
+      condition: { attributeKey: 'x', operator: 'eq', value: 1 },
+      branches: {
+        true: { id: 't1', type: 'TERMINAL', action: 'ABORT', reason: 'no' },
+        false: {
+          id: 'guard_nested',
+          type: 'GUARD',
+          name: 'nested',
+          pluginId: 'plugin.a',
+          requiredAction: 'BUY',
+          minConfidence: 0.6,
+          onPass: {
+            id: 't2',
+            type: 'TERMINAL',
+            action: 'BUY',
+            reason: 'ok',
+          },
+        },
+      },
+    };
+
+    const nestedErr = captureCompileError(() =>
+      compileStoredDefinitionVersion({
+        kind: 'decision_flow',
+        rule: withNestedMinConfidence as unknown as Record<string, unknown>,
+      }),
+    );
+    expect(nestedErr.code).toBe('DECISION_FLOW_RULE_INVALID');
+    expect(nestedErr.message).toContain('minConfidence');
+  });
+
+  it('fails closed when a flow contains a retired CONSENSUS node', () => {
+    registerStub('plugin.a');
+
+    const withConsensus = {
+      id: 'guard_root',
+      type: 'GUARD',
+      name: 'root',
+      pluginId: 'plugin.a',
+      requiredAction: 'BUY',
+      onPass: {
+        id: 'consensus_retired',
+        type: 'CONSENSUS',
+        name: 'legacy consensus',
+        threshold: 70,
+        plugins: [{ pluginId: 'plugin.a', weight: 100 }],
+        onSuccess: {
+          id: 'term_ok',
+          type: 'TERMINAL',
+          action: 'BUY',
+          reason: 'ok',
+        },
+      },
+    };
+
+    const err = captureCompileError(() =>
+      compileStoredDefinitionVersion({
+        kind: 'decision_flow',
+        rule: withConsensus as unknown as Record<string, unknown>,
+      }),
+    );
+    expect(err.code).toBe('DECISION_FLOW_RULE_INVALID');
+  });
+
+  it('fails closed when a flow contains an unrecognized node type', () => {
+    const unknownNode = {
+      id: 'weird_node',
+      type: 'UNKNOWN_NODE_TYPE',
+      name: 'weird',
+    };
+
+    const err = captureCompileError(() =>
+      compileStoredDefinitionVersion({
+        kind: 'decision_flow',
+        rule: unknownNode as unknown as Record<string, unknown>,
+      }),
+    );
+    expect(err.code).toBe('DECISION_FLOW_RULE_INVALID');
   });
 });

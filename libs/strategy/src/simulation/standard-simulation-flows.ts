@@ -47,7 +47,6 @@ export function createChanBspDecisionFlow(
       deduplicate,
     },
     requiredAction,
-    minConfidence: 0.6,
     onPass: {
       id: 'term_chan_bsp_passed',
       type: 'TERMINAL',

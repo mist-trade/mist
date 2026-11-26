@@ -87,7 +87,6 @@ export interface VirtualExitProposal {
   readonly exitKind: string;
   readonly reason: string;
   readonly badgeText: string;
-  readonly confidence?: number;
   readonly evidence?: Readonly<Record<string, unknown>>;
 }
 

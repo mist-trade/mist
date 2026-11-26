@@ -27,8 +27,8 @@ completed and valid Chan unit** — a bi by default, selectable via the `units: 
 derived through the shared `@app/chancore` pipeline using the same `Complete && Valid` filter contract
 as `plugin.chan.bsp`. It SHALL evaluate whether the latest price is in the Golden Pocket of that swing
 and emit a structured `FactorOpinion` with action (`BUY` on the pullback of an upward unit, `SELL` on
-the rebound of a downward unit, or `NEUTRAL`), confidence score, human-readable reason, and structured
-`evidence`.
+the rebound of a downward unit, or `NEUTRAL`), human-readable reason, and structured `evidence` (without
+a heuristic `confidence` score).
 1. The swing's `high` / `low` SHALL come from the unit's extremes; the retracement ratio SHALL be
    `(high − close) / (high − low)` for an upward unit and `(close − low) / (high − low)` for a downward
    unit. Levels, zone and Golden Pocket classification SHALL reuse the existing pure functions
@@ -45,7 +45,7 @@ the rebound of a downward unit, or `NEUTRAL`), confidence score, human-readable 
 
 - **WHEN** the last completed valid upward bi exists and price pulls back into the Golden Pocket
   ($0.500 \sim 0.618$) of that swing
-- **THEN** the plugin MUST return `action: 'BUY'` with confidence $\ge 0.75$
+- **THEN** the plugin MUST return `action: 'BUY'`
 - **AND** the `evidence` MUST include levels, ratio, and TradingView styles
 
 #### Scenario: Rebound branch uses the completed downward unit

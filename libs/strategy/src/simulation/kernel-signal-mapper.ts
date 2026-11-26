@@ -27,7 +27,6 @@ export function mapKernelSignalToSimulationSignal(
     signalType,
     badgeText,
     isBuy,
-    confidence: signal.confidence,
     decisionTrace: signal.decisionTrace,
     securityCode: options.securityCode,
     period: options.period,

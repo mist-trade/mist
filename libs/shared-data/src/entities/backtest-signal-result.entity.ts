@@ -98,23 +98,6 @@ export class BacktestSignalResult implements StrategySignalParityRecord {
   })
   signalSource: StrategySignalSource = StrategySignalSource.BACKTEST;
 
-  @Column({
-    name: 'confidence',
-    type: 'decimal',
-    precision: 5,
-    scale: 2,
-    nullable: true,
-  })
-  confidence?: number | null;
-
-  @Column({
-    name: 'confidence_level',
-    type: 'enum',
-    enum: ['HIGH', 'MEDIUM', 'LOW'],
-    nullable: true,
-  })
-  confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
-
   @Column({ name: 'context_snapshot', type: 'json' })
   contextSnapshot!: Record<string, unknown>;
 

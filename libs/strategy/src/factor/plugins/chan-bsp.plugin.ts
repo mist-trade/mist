@@ -33,7 +33,6 @@ import {
   CHAN_BSP_DIRECTIONS,
   DEFAULT_REQUIRED_BARS_DUAN,
   DEFAULT_REQUIRED_BARS_BI,
-  BSP_CONFIDENCE,
   CANDIDATE_BSP_TYPES,
 } from '../../strategy.constants';
 
@@ -171,7 +170,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     if ((readContextSeries(context, context.period) ?? []).length < minBars) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
-        confidence: 0.0,
         reason: `K线不足${minBars}根(当前${(readContextSeries(context, context.period) ?? []).length}根)，无法确立缠论结构`,
       };
     }
@@ -182,7 +180,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     if (klines.length === 0) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
-        confidence: 0.0,
         reason: '有效行情数据为空，未形成缠论K线',
       };
     }
@@ -207,7 +204,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     if (matchedEvents.length === 0) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
-        confidence: 0.0,
         reason: '未检测到满足条件的缠论买卖点',
         evidence: {
           geometry,
@@ -254,7 +250,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       if (candidateEvents.length === 0) {
         return {
           action: DECISION_ACTIONS.NEUTRAL,
-          confidence: 0.0,
           reason: '缠论买卖点已在先前批次发射，无需重复触发',
         };
       }
@@ -276,21 +271,18 @@ export class ChanBspFactorPlugin implements FactorPlugin {
       if (!confirmedFenxing) {
         return {
           action: DECISION_ACTIONS.NEUTRAL,
-          confidence: 0.0,
           reason: '当前最新K线未确立有效分型扳机(笔内延伸或包含)',
         };
       }
       if (isBuy && confirmedFenxing.type !== FenxingType.Bottom) {
         return {
           action: DECISION_ACTIONS.NEUTRAL,
-          confidence: 0.0,
           reason: '检测到买点结构，但最新确立分型为顶分型而非底分型',
         };
       }
       if (!isBuy && confirmedFenxing.type !== FenxingType.Top) {
         return {
           action: DECISION_ACTIONS.NEUTRAL,
-          confidence: 0.0,
           reason: '检测到卖点结构，但最新确立分型为底分型而非顶分型',
         };
       }
@@ -322,7 +314,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     }
 
     const action = isBuy ? DECISION_ACTIONS.BUY : DECISION_ACTIONS.SELL;
-    const confidence = this.computeConfidence(latestEvent.type);
     const unitLabel = params.units === CHAN_BSP_UNITS.DUAN ? '线段' : '笔';
     const pointLabel = this.formatPointName(latestEvent.type);
     const badgeText = this.formatBadgeText(latestEvent.type);
@@ -340,7 +331,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
 
     return {
       action,
-      confidence,
       reason: `缠论${unitLabel}级${pointLabel}确认 (价格: ${latestEvent.price.toFixed(2)})`,
       badgeText,
       evidence: {
@@ -565,22 +555,6 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     if (event.type.startsWith('third_') && points.third === false) return false;
 
     return true;
-  }
-
-  private computeConfidence(type: ChanBspType): number {
-    switch (type) {
-      case CANDIDATE_BSP_TYPES.FIRST_BUY:
-      case CANDIDATE_BSP_TYPES.FIRST_SELL:
-        return BSP_CONFIDENCE.FIRST;
-      case CANDIDATE_BSP_TYPES.THIRD_BUY:
-      case CANDIDATE_BSP_TYPES.THIRD_SELL:
-        return BSP_CONFIDENCE.THIRD;
-      case CANDIDATE_BSP_TYPES.SECOND_BUY:
-      case CANDIDATE_BSP_TYPES.SECOND_SELL:
-        return BSP_CONFIDENCE.SECOND;
-      default:
-        return BSP_CONFIDENCE.DEFAULT;
-    }
   }
 
   private formatPointName(type: ChanBspType): string {

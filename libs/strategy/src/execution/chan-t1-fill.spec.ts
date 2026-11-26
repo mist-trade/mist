@@ -83,7 +83,6 @@ it('chan T+1 一致性：确认 bar 收盘出信号，同 bar 不成交，次根
           pluginId: 'plugin.chan.bsp',
           params: { units: 'bi', direction: 'buy' },
           requiredAction: 'BUY',
-          minConfidence: 0.5,
           onPass: {
             id: 'term',
             type: 'TERMINAL',
@@ -129,8 +128,6 @@ it('chan T+1 一致性：确认 bar 收盘出信号，同 bar 不成交，次根
           attribution: {
             strategyName: 't1-guard',
             periodLabel: '日线',
-            confidence: signal.confidence,
-            confidenceLevel: signal.confidenceLevel,
             traceChain: null,
           },
         })),

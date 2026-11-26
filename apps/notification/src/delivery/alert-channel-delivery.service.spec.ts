@@ -65,8 +65,6 @@ function makeSignal(overrides: Record<string, unknown> = {}) {
     signalKind: 'entry',
     period: 30,
     signalTime: new Date('2026-08-12T09:35:00+08:00'),
-    confidence: 88.5,
-    confidenceLevel: 'HIGH',
     contextSnapshot: { triggerPrice: 12.5, badgeText: '二买' },
     decisionTrace: {
       trace: [
@@ -140,8 +138,6 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
       id: 6,
       strategyDefinitionId: 4,
       signalKind: 'exit',
-      confidence: 80.4,
-      confidenceLevel: 'MEDIUM',
       contextSnapshot: { triggerPrice: 12.1, badgeText: '顶背离' },
     });
     primeGroup(
@@ -435,5 +431,69 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
     expect(adapter.send).not.toHaveBeenCalledWith({
       text: expect.stringContaining('ALREADY_HOLDING'),
     });
+  });
+
+  it('consolidates resonant same-direction entries and records contributorKeys in virtual fill instruction JSON', async () => {
+    const buyA = makeSignal({
+      id: 5,
+      strategyDefinitionId: 3,
+      period: 30,
+      signalType: 'first_buy',
+    });
+    const buyB = makeSignal({
+      id: 6,
+      strategyDefinitionId: 4,
+      period: 1440,
+      signalType: 'golden_pocket',
+      decisionTrace: {
+        trace: [{ pluginId: 'plugin.fib', name: '斐波那契' }],
+      },
+    });
+    deliveries.find.mockImplementation((opts: any) => {
+      if (opts?.where?.channel !== undefined) {
+        return [
+          delivery({ id: 7, strategyAlertEventId: 2 }),
+          delivery({ id: 8, strategyAlertEventId: 10 }),
+        ];
+      }
+      return [{ status: StrategyAlertDeliveryStatus.SENT }];
+    });
+    alertEvents.find.mockResolvedValue([
+      { id: 10, strategySignalId: 6 },
+      { id: 2, strategySignalId: 5 },
+    ]);
+    signals.find.mockResolvedValue([buyA, buyB]);
+    securities.find.mockResolvedValue([
+      { id: 9, code: '000001', name: '平安银行' },
+    ]);
+    strategyDefinitions.find.mockResolvedValue([
+      { id: 3, name: '策略A' },
+      { id: 4, name: '策略B' },
+    ]);
+    adapter.send.mockResolvedValue({
+      status: 'sent',
+      providerMessageId: 'mid-resonance',
+    });
+
+    await service.run(groupJob('wechat', [10, 2]), 0, 5);
+
+    expect(fillLog.append).toHaveBeenCalledTimes(1);
+    expect(fillLog.append).toHaveBeenCalledWith(
+      expect.objectContaining({
+        idempotencyKey: '2',
+        instruction: expect.objectContaining({
+          instructionId: 'ti-2',
+          action: 'BUY',
+          contributorKeys: ['2', '10'],
+          contributorsSummary:
+            '共振(2): 策略A 30m first_buy + 策略B 日线 golden_pocket',
+        }),
+      }),
+    );
+    const text = adapter.send.mock.calls[0][0].text as string;
+    expect(text).toContain(
+      '共振(2): 策略A 30m first_buy + 策略B 日线 golden_pocket',
+    );
+    expect(text).not.toContain('ALREADY_HOLDING');
   });
 });

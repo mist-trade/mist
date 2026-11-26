@@ -88,7 +88,7 @@ describe('BacktestRunQueryService', () => {
   });
 
   describe('listSignals', () => {
-    it('returns signals with confidence, confidenceLevel, and decisionTrace', async () => {
+    it('returns signals with decisionTrace without confidence fields', async () => {
       runRepo.findOne.mockResolvedValue({
         id: 1,
         status: BacktestRunStatus.COMPLETED,
@@ -103,8 +103,6 @@ describe('BacktestRunQueryService', () => {
           period: 1,
           pivotTime: new Date('2026-01-05T01:28:00Z'),
           signalType: 'first_buy',
-          confidence: 85,
-          confidenceLevel: 'HIGH',
           decisionTrace: { status: 'SIGNAL_EMITTED', signalTag: 'TEST' },
           contextSnapshot: { price: 10.5 },
           ruleSnapshot: { type: 'TERMINAL' },
@@ -132,8 +130,6 @@ describe('BacktestRunQueryService', () => {
         effectiveTime: '2026-01-05T01:31:00.000Z',
         pivotTime: '2026-01-05T01:28:00.000Z',
         signalType: 'first_buy',
-        confidence: 85,
-        confidenceLevel: 'HIGH',
         decisionTrace: { status: 'SIGNAL_EMITTED', signalTag: 'TEST' },
         contextSnapshot: { price: 10.5 },
         ruleSnapshot: { type: 'TERMINAL' },
@@ -143,10 +139,12 @@ describe('BacktestRunQueryService', () => {
         expect.arrayContaining([
           'result.period',
           'result.signalType',
-          'result.confidence',
-          'result.confidenceLevel',
           'result.decisionTrace',
         ]),
+      );
+      expect(qb.select.mock.calls[0][0]).not.toContain('result.confidence');
+      expect(qb.select.mock.calls[0][0]).not.toContain(
+        'result.confidenceLevel',
       );
     });
   });

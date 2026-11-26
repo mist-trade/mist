@@ -45,7 +45,6 @@
       "deduplicate": true
     },
     "requiredAction": "BOTH",
-    "minConfidence": 0.5,
     "onPass": {
       "id": "term_chan_bsp_standard",
       "type": "TERMINAL",

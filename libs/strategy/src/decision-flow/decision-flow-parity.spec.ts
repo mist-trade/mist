@@ -117,7 +117,6 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
       if (legacyOutcome.status === 'evaluated' && legacyOutcome.matched) {
         expect(flowResult.status).toBe('SIGNAL_EMITTED');
         expect(flowResult.action).toBe('BUY');
-        expect(flowResult.confidence).toBe(80);
       } else {
         expect(flowResult.status).toBe('ABORTED');
       }
@@ -125,7 +124,7 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
   });
 
   it('guarantees identical parity in real-time step evaluation vs batch evaluation for composite decision tree', async () => {
-    // 构造一个多节点复合决策流：门禁 -> 加权共识 -> 终结执行
+    // 构造一个多节点复合决策流：环境门禁 -> 动量门禁 -> 终结执行
     registry.register({
       id: 'plugin.guard.regime',
       name: 'Regime Guard',
@@ -134,7 +133,6 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
       description: '',
       evaluate: async () => ({
         action: 'BUY',
-        confidence: 0.95,
         reason: '大盘多头',
       }),
     });
@@ -151,7 +149,6 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
         const isUp = (lastBar.ohlc.effective?.close ?? 0) > 10.5;
         return {
           action: isUp ? 'BUY' : 'NEUTRAL',
-          confidence: isUp ? 0.88 : 0.0,
           reason: isUp ? '动量向上' : '动量不足',
         };
       },
@@ -163,14 +160,13 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
       name: '环境门禁',
       pluginId: 'plugin.guard.regime',
       requiredAction: 'BUY',
-      minConfidence: 0.9,
       onPass: {
-        id: 'consensus_eval',
-        type: 'CONSENSUS',
-        name: '共识打分',
-        threshold: 80.0,
-        plugins: [{ pluginId: 'plugin.tech.momentum', weight: 100 }],
-        onSuccess: {
+        id: 'guard_momentum',
+        type: 'GUARD',
+        name: '动量门禁',
+        pluginId: 'plugin.tech.momentum',
+        requiredAction: 'BUY',
+        onPass: {
           id: 'term_emit',
           type: 'TERMINAL',
           action: 'BUY',
@@ -211,7 +207,6 @@ describe('Phase 3: Parity Verification (Legacy DSL vs Decision Flow Tree)', () =
     const resB = await evaluator.evaluate(compositeTree, ctxB);
     expect(resB.status).toBe('SIGNAL_EMITTED');
     expect(resB.action).toBe('BUY');
-    expect(resB.confidence).toBe(88.0);
     expect(resB.signalTag).toBe('MOMENTUM_BREAKOUT');
   });
 });

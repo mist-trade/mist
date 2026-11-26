@@ -34,8 +34,6 @@ export class StrategySignalService {
 
     return signals.map((signal) => ({
       ...signal,
-      confidence: signal.confidence ?? null,
-      confidenceLevel: signal.confidenceLevel ?? null,
       decisionTrace: signal.decisionTrace ?? null,
       effectiveTime: availabilityKey({
         period: signal.period,

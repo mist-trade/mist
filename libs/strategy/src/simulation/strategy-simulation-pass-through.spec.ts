@@ -29,7 +29,6 @@ class CustomAlphaFactorPlugin implements FactorPlugin {
   public async evaluate(): Promise<FactorOpinion> {
     return {
       action: this.action,
-      confidence: 0.95,
       reason: `Alpha 自主判定: ${this.customBadge}`,
       badgeText: this.customBadge,
       displayTag: 'ALPHA_LEFT_POINT',
@@ -73,7 +72,6 @@ function createFlow(
     pluginId,
     params: {},
     requiredAction: action,
-    minConfidence: 0.5,
     onPass: {
       id: 'term_custom',
       type: 'TERMINAL',
@@ -165,8 +163,6 @@ describe('策略推演纯透传专项测试 (Strategy Simulation Pass-Through Sp
       pivotTime: '2026-08-26T09:30:00.000Z',
       pivotPrice: 14.8,
       signalType: 'custom_signal_type',
-      confidence: 0.95,
-      confidenceLevel: 'HIGH' as const,
       badgeText: '突破型三买',
       decisionTrace: { badgeText: '突破型三买', trace: [] },
       contextSnapshot: { badgeText: '突破型三买' },
@@ -197,8 +193,6 @@ describe('策略推演纯透传专项测试 (Strategy Simulation Pass-Through Sp
       pivotTime: null,
       pivotPrice: null,
       signalType: 'first_buy', // 即使 signalType 名为 first_buy，也绝不查死字典强行转成 "1买"
-      confidence: 0.8,
-      confidenceLevel: 'MEDIUM' as const,
       decisionTrace: { trace: [] },
       contextSnapshot: {},
       ruleSnapshot: {},
@@ -306,7 +300,7 @@ describe('StrategySimulationSession — 跨标的 bar 因果归并（任务3）'
         | undefined;
       const last = raw?.[raw.length - 1]?.rawBar.close ?? -1;
       this.lastMacroClose = last;
-      return { action: 'BUY', confidence: 0.9, reason: `macro=${last}` };
+      return { action: 'BUY', reason: `macro=${last}` };
     }
   }
 
@@ -352,7 +346,6 @@ describe('StrategySimulationSession — 跨标的 bar 因果归并（任务3）'
         name: 'gate',
         pluginId: 'plugin.test.macro-echo',
         requiredAction: 'BUY',
-        minConfidence: 0.5,
         onPass: {
           id: 'term',
           type: 'TERMINAL',

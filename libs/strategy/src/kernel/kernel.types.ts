@@ -1,7 +1,4 @@
-import type {
-  DecisionFlowNode,
-  ConfidenceLevel,
-} from '../decision-flow/decision-flow.types';
+import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
 import type { FactorPluginRegistry } from '../factor/factor-plugin-registry';
 import type { VirtualExitPolicyPort } from '../virtual-exit/virtual-exit.port';
 
@@ -114,8 +111,6 @@ export interface KernelSignal {
   /** 形态几何极值点价格（初始止损关键参考基准），无 pivot 语义时为 null */
   readonly pivotPrice: number | null;
   readonly signalType: string;
-  readonly confidence: number;
-  readonly confidenceLevel: ConfidenceLevel;
   readonly badgeText?: string;
   readonly displayTag?: string;
   readonly styleMeta?: Readonly<{

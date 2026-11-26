@@ -59,12 +59,6 @@ export class StrategySignalVo {
   @ApiProperty({ enum: StrategySignalKind })
   signalKind!: StrategySignalKind;
 
-  @ApiPropertyOptional({ type: Number, nullable: true })
-  confidence!: number | null;
-
-  @ApiPropertyOptional({ type: String, nullable: true })
-  confidenceLevel!: string | null;
-
   @ApiPropertyOptional({ type: Object, nullable: true })
   decisionTrace!: Record<string, unknown> | null;
 

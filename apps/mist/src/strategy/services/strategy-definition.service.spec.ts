@@ -373,4 +373,171 @@ describe('StrategyDefinitionService', () => {
       /missing or belongs to another definition/,
     );
   });
+
+  describe('decision_flow strict fail-closed validation', () => {
+    const validDecisionFlowRule = {
+      requiredBarCount: 60,
+      rootNode: {
+        id: 'guard_chan_bsp',
+        type: 'GUARD',
+        name: '缠论买卖点门禁',
+        pluginId: 'plugin.chan.bsp',
+        params: {
+          units: 'bi',
+          direction: 'both',
+          points: { first: true, second: true, third: true },
+        },
+        requiredAction: 'BOTH',
+        onPass: {
+          id: 'term_pass',
+          type: 'TERMINAL',
+          action: 'INHERIT',
+          signalTag: 'CHAN_BSP',
+          reason: '买卖点确立',
+        },
+        onFail: {
+          id: 'term_fail',
+          type: 'TERMINAL',
+          action: 'ABORT',
+          reason: '未触发',
+        },
+      },
+    };
+
+    it('creates and enables a valid decision_flow definition using a registered plugin', async () => {
+      const { service, versions } = createHarness();
+
+      const strategy = await service.create({
+        ...createDto,
+        kind: StrategyKind.DECISION_FLOW,
+        rule: validDecisionFlowRule,
+      });
+
+      expect(strategy).toMatchObject({
+        kind: StrategyKind.DECISION_FLOW,
+        status: StrategyStatus.DRAFT,
+      });
+      expect(versions[0].validationSummary).toEqual({
+        ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
+        kind: 'decision_flow',
+        rootNodeType: 'GUARD',
+        requiredBarCount: 60,
+      });
+      await expect(service.enable(strategy.id)).resolves.toMatchObject({
+        status: StrategyStatus.ENABLED,
+      });
+    });
+
+    it('rejects creating a decision_flow with retired minConfidence at root or nested nodes', async () => {
+      const { service, definitions, versions } = createHarness();
+
+      await expect(
+        service.create({
+          ...createDto,
+          kind: StrategyKind.DECISION_FLOW,
+          rule: {
+            rootNode: {
+              ...validDecisionFlowRule.rootNode,
+              minConfidence: 0.5,
+            },
+          },
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'DECISION_FLOW_RULE_INVALID',
+          }),
+        }),
+      );
+
+      await expect(
+        service.create({
+          ...createDto,
+          kind: StrategyKind.DECISION_FLOW,
+          rule: {
+            rootNode: {
+              ...validDecisionFlowRule.rootNode,
+              onPass: {
+                id: 'nested_guard',
+                type: 'GUARD',
+                name: '嵌套门禁',
+                pluginId: 'plugin.chan.bsp',
+                requiredAction: 'BUY',
+                minConfidence: 0.6,
+                onPass: {
+                  id: 'term_nested_pass',
+                  type: 'TERMINAL',
+                  action: 'BUY',
+                },
+              },
+            },
+          },
+        }),
+      ).rejects.toThrow(BadRequestException);
+
+      expect(definitions).toHaveLength(0);
+      expect(versions).toHaveLength(0);
+    });
+
+    it('rejects creating a decision_flow with retired CONSENSUS or unregistered plugin', async () => {
+      const { service } = createHarness();
+
+      await expect(
+        service.create({
+          ...createDto,
+          kind: StrategyKind.DECISION_FLOW,
+          rule: {
+            rootNode: {
+              id: 'consensus_root',
+              type: 'CONSENSUS',
+              plugins: [],
+              onSuccess: { id: 'term_ok', type: 'TERMINAL', action: 'BUY' },
+            },
+          },
+        }),
+      ).rejects.toThrow(
+        expect.objectContaining({
+          response: expect.objectContaining({
+            code: 'DECISION_FLOW_RULE_INVALID',
+          }),
+        }),
+      );
+
+      await expect(
+        service.create({
+          ...createDto,
+          kind: StrategyKind.DECISION_FLOW,
+          rule: {
+            rootNode: {
+              ...validDecisionFlowRule.rootNode,
+              pluginId: 'plugin.nonexistent.test',
+            },
+          },
+        }),
+      ).rejects.toThrow(BadRequestException);
+    });
+
+    it('fails closed on enable and findById when a stored decision_flow version has retired fields', async () => {
+      const { service, versions } = createHarness();
+      const strategy = await service.create({
+        ...createDto,
+        kind: StrategyKind.DECISION_FLOW,
+        rule: validDecisionFlowRule,
+      });
+
+      versions[0].rule = {
+        rootNode: {
+          ...validDecisionFlowRule.rootNode,
+          minConfidence: 0.5,
+        },
+      };
+
+      await expect(service.enable(strategy.id)).rejects.toThrow(
+        BadRequestException,
+      );
+      await expect(service.findById(strategy.id)).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
 });

@@ -13,8 +13,6 @@ function createSignal(
     signalTime: new Date('2026-10-28T09:30:00.000Z'),
     triggerPrice: 3900.25,
     signalType: 'third_sell',
-    confidence: 90,
-    confidenceLevel: 'HIGH',
     contextSnapshot: { origin: 'unit-test' },
     ruleSnapshot: {},
     ...overrides,

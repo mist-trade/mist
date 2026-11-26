@@ -1,0 +1,181 @@
+{
+  "name": "同向归并拒绝：T1_FROZEN 多 EXIT 与 ALREADY_HOLDING 多 ENTRY 均合并为单条拒绝并附带数值排序 contributors",
+  "scenario": {
+    "name": "consolidate-rejected-group",
+    "securityId": 1,
+    "securityCode": "000001",
+    "seedCapitalLi": "1000000000",
+    "events": [
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-05",
+        "effectiveTime": "2026-01-05T07:35:00Z",
+        "signals": [
+          {
+            "key": "1",
+            "strategyName": "策略A",
+            "periodLabel": "30m",
+            "signalKind": "entry",
+            "signalType": "CHAN_SECOND_BUY",
+            "triggerPrice": 10
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-05",
+        "effectiveTime": "2026-01-05T14:30:00Z",
+        "signals": [
+          {
+            "key": "20",
+            "strategyName": "策略B",
+            "periodLabel": "30m",
+            "signalKind": "exit",
+            "signalType": "SELL_A",
+            "triggerPrice": 10.5
+          },
+          {
+            "key": "3",
+            "strategyName": "策略C",
+            "periodLabel": "日线",
+            "signalKind": "exit",
+            "signalType": "SELL_B",
+            "triggerPrice": 10.6
+          }
+        ]
+      },
+      {
+        "kind": "group",
+        "tradingDay": "2026-01-06",
+        "effectiveTime": "2026-01-06T07:35:00Z",
+        "signals": [
+          {
+            "key": "10",
+            "strategyName": "策略B",
+            "periodLabel": "30m",
+            "signalKind": "entry",
+            "signalType": "BUY_A",
+            "triggerPrice": 11
+          },
+          {
+            "key": "2",
+            "strategyName": "策略C",
+            "periodLabel": "日线",
+            "signalKind": "entry",
+            "signalType": "BUY_B",
+            "triggerPrice": 11.2
+          }
+        ]
+      }
+    ]
+  },
+  "expected": [
+    {
+      "event": "group@2026-01-05T07:35:00Z",
+      "instructions": [
+        {
+          "instructionId": "ti-1",
+          "idempotencyKey": "1",
+          "action": "BUY",
+          "quantity": 95000,
+          "referencePrice": 10,
+          "estimatedValueLi": "950000000",
+          "reason": "CHAN_SECOND_BUY"
+        }
+      ],
+      "rejections": [],
+      "accountAfter": {
+        "cashLi": "49753000",
+        "tradingDay": "2026-01-05",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 95000,
+            "costPriceLi": "10000",
+            "currentPriceLi": "10000",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-05T07:35:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "event": "group@2026-01-05T14:30:00Z",
+      "instructions": [],
+      "rejections": [
+        {
+          "idempotencyKey": "3",
+          "reason": "T1_FROZEN",
+          "detail": "当日买入股份 T+1 冻结，不可卖出",
+          "contributors": [
+            {
+              "idempotencyKey": "3",
+              "signalType": "SELL_B",
+              "strategyName": "策略C",
+              "periodLabel": "日线"
+            },
+            {
+              "idempotencyKey": "20",
+              "signalType": "SELL_A",
+              "strategyName": "策略B",
+              "periodLabel": "30m"
+            }
+          ]
+        }
+      ],
+      "accountAfter": {
+        "cashLi": "49753000",
+        "tradingDay": "2026-01-05",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 95000,
+            "costPriceLi": "10000",
+            "currentPriceLi": "10000",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-05T07:35:00.000Z"
+          }
+        ]
+      }
+    },
+    {
+      "event": "group@2026-01-06T07:35:00Z",
+      "instructions": [],
+      "rejections": [
+        {
+          "idempotencyKey": "2",
+          "reason": "ALREADY_HOLDING",
+          "detail": "虚拟账户已持仓 95000 股（成本 10000 厘）",
+          "contributors": [
+            {
+              "idempotencyKey": "2",
+              "signalType": "BUY_B",
+              "strategyName": "策略C",
+              "periodLabel": "日线"
+            },
+            {
+              "idempotencyKey": "10",
+              "signalType": "BUY_A",
+              "strategyName": "策略B",
+              "periodLabel": "30m"
+            }
+          ]
+        }
+      ],
+      "accountAfter": {
+        "cashLi": "49753000",
+        "tradingDay": "2026-01-06",
+        "positions": [
+          {
+            "securityId": 1,
+            "holdingQuantity": 95000,
+            "costPriceLi": "10000",
+            "currentPriceLi": "10000",
+            "realizedPnlLi": "0",
+            "entryTime": "2026-01-05T07:35:00.000Z"
+          }
+        ]
+      }
+    }
+  ]
+}

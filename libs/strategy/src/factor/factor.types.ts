@@ -18,12 +18,6 @@ export interface FactorOpinion {
   /** 插件观点：看多(BUY)、看空/风控(SELL)、弃权/中立(NEUTRAL) */
   readonly action: FactorAction;
 
-  /**
-   * 插件对自己当前判断的确信度 (0.0 ~ 1.0)
-   * 例如：确信一买成立填 0.9；微弱背驰但未完全确认填 0.55
-   */
-  readonly confidence: number;
-
   /** 人类可读的原因说明，用于白盒归因和前端展示 */
   readonly reason: string;
 

@@ -18,6 +18,7 @@ import type { VirtualExitPolicyPort } from '../virtual-exit/virtual-exit.port';
 import type { BrokerFeeConfig } from '../execution/execution.types';
 import { SimulatedBroker } from '../execution/simulated-broker';
 import {
+  buildOfflineSignalIdempotencyKey,
   createAllInWithBuffer,
   createDefaultRiskRules,
   groupSignals,
@@ -226,23 +227,29 @@ function buildSignalGroupInput(
   group: SignalGroup<KernelSignal>,
   input: PipelineInput,
 ): SignalGroupInput {
+  const seenKeys = new Map<string, number>();
   return {
     securityId: input.securityId,
     securityCode: input.securityCode,
     effectiveTime: group.descriptor.effectiveTime,
     tradingDay: group.descriptor.tradingDay,
-    signals: group.members.map((signal) => ({
-      // 离线合成幂等锚点（REQ-FACADE-04）
-      idempotencyKey: `offline-${signal.definitionId}-${signal.signalTime.getTime()}-${signal.signalKind}`,
-      signal,
-      attribution: {
-        strategyName: `definition-${signal.definitionId}`,
-        periodLabel: `${resolveSignalPeriod(signal, input)}m`,
-        confidence: signal.confidence,
-        confidenceLevel: signal.confidenceLevel,
-        traceChain: renderTraceChainOf(signal.decisionTrace),
-      },
-    })),
+    signals: group.members.map((signal) => {
+      const period = resolveSignalPeriod(signal, input);
+      const baseKey = buildOfflineSignalIdempotencyKey(signal, period);
+      const count = (seenKeys.get(baseKey) ?? 0) + 1;
+      seenKeys.set(baseKey, count);
+      const idempotencyKey = count === 1 ? baseKey : `${baseKey}-${count}`;
+      return {
+        // 离线合成幂等锚点（REQ-FACADE-04）
+        idempotencyKey,
+        signal,
+        attribution: {
+          strategyName: `definition-${signal.definitionId}`,
+          periodLabel: `${period}m`,
+          traceChain: renderTraceChainOf(signal.decisionTrace),
+        },
+      };
+    }),
   };
 }
 

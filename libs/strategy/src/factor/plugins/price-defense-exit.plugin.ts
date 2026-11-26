@@ -44,7 +44,6 @@ export class PriceDefenseExitPlugin implements FactorPlugin {
     // 仅通过 virtualExitRules 声明虚拟出场规则。
     return {
       action: DECISION_ACTIONS.NEUTRAL,
-      confidence: 0,
       reason: PRICE_DEFENSE_SKIP_REASON,
       displayTag: PRICE_DEFENSE_DISPLAY_TAG,
     };

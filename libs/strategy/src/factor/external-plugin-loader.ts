@@ -61,6 +61,7 @@ export function isFactorPlugin(obj: unknown): obj is FactorPlugin {
 export class ExternalFactorPluginLoader {
   private static customPaths: string[] = [];
   private static disabled = false;
+  private static isLoadingPlugins = false;
 
   /**
    * 设置是否禁用外部插件加载（主要用于单元测试与基线隔离）
@@ -82,32 +83,38 @@ export class ExternalFactorPluginLoader {
   public static resetConfiguration(): void {
     this.customPaths = [];
     this.disabled = false;
+    this.isLoadingPlugins = false;
   }
 
   /**
    * 扫描并加载所有合法的外部因子插件实例
    */
   public static loadPlugins(): readonly FactorPlugin[] {
-    if (this.disabled) {
+    if (this.disabled || this.isLoadingPlugins) {
       return [];
     }
 
-    const candidatePaths = this.getCandidatePaths();
-    const discoveredPlugins = new Map<string, FactorPlugin>();
+    this.isLoadingPlugins = true;
+    try {
+      const candidatePaths = this.getCandidatePaths();
+      const discoveredPlugins = new Map<string, FactorPlugin>();
 
-    for (const candPath of candidatePaths) {
-      const entryFiles = this.resolveEntryFiles(candPath);
-      for (const entryFile of entryFiles) {
-        const plugins = this.tryLoadModule(entryFile);
-        for (const plugin of plugins) {
-          if (!discoveredPlugins.has(plugin.id)) {
-            discoveredPlugins.set(plugin.id, plugin);
+      for (const candPath of candidatePaths) {
+        const entryFiles = this.resolveEntryFiles(candPath);
+        for (const entryFile of entryFiles) {
+          const plugins = this.tryLoadModule(entryFile);
+          for (const plugin of plugins) {
+            if (!discoveredPlugins.has(plugin.id)) {
+              discoveredPlugins.set(plugin.id, plugin);
+            }
           }
         }
       }
-    }
 
-    return Array.from(discoveredPlugins.values());
+      return Array.from(discoveredPlugins.values());
+    } finally {
+      this.isLoadingPlugins = false;
+    }
   }
 
   /**
@@ -368,6 +375,10 @@ export class ExternalFactorPluginLoader {
     }
 
     if (typeof cand === 'function') {
+      const proto = (cand as { prototype?: { evaluate?: unknown } }).prototype;
+      if (!proto || typeof proto.evaluate !== 'function') {
+        return;
+      }
       try {
         const inst = new (cand as new () => unknown)();
         if (isFactorPlugin(inst)) {

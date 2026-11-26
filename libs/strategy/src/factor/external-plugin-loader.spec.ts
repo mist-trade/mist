@@ -33,7 +33,6 @@ describe('ExternalFactorPluginLoader', () => {
         description: 'Test plugin',
         evaluate: async (): Promise<FactorOpinion> => ({
           action: 'NEUTRAL',
-          confidence: 0,
           reason: 'test',
         }),
       };
@@ -84,7 +83,7 @@ describe('ExternalFactorPluginLoader', () => {
             category: 'CHAN',
             version: '1.0.0',
             description: 'Alpha 1',
-            evaluate: async () => ({ action: 'BUY', confidence: 0.8, reason: 'ok' })
+            evaluate: async () => ({ action: 'BUY', reason: 'ok' })
           },
           {
             id: 'plugin.private.alpha2',
@@ -92,7 +91,7 @@ describe('ExternalFactorPluginLoader', () => {
             category: 'TECHNICAL',
             version: '1.0.0',
             description: 'Alpha 2',
-            evaluate: async () => ({ action: 'NEUTRAL', confidence: 0, reason: 'hold' })
+            evaluate: async () => ({ action: 'NEUTRAL', reason: 'hold' })
           }
         ];
       `,
@@ -119,7 +118,7 @@ describe('ExternalFactorPluginLoader', () => {
             category: 'REGIME',
             version: '1.0.0',
             description: 'Factory Foo',
-            evaluate: async () => ({ action: 'NEUTRAL', confidence: 0.5, reason: 'regime' })
+            evaluate: async () => ({ action: 'NEUTRAL', reason: 'regime' })
           }
         ];
       `,
@@ -147,7 +146,7 @@ describe('ExternalFactorPluginLoader', () => {
             this.description = 'Class plugin';
           }
           async evaluate() {
-            return { action: 'SELL', confidence: 0.9, reason: 'risk' };
+            return { action: 'SELL', reason: 'risk' };
           }
         }
         exports.CustomPlugin = CustomPlugin;
@@ -174,7 +173,7 @@ describe('ExternalFactorPluginLoader', () => {
             category: 'AI_SENTIMENT',
             version: '1.0.0',
             description: 'Reg P1',
-            evaluate: async () => ({ action: 'NEUTRAL', confidence: 0, reason: 'neutral' })
+            evaluate: async () => ({ action: 'NEUTRAL', reason: 'neutral' })
           }
         ];
       `,
@@ -208,7 +207,7 @@ describe('ExternalFactorPluginLoader', () => {
             category: 'EXIT',
             version: '1.0.0',
             description: 'Test exit',
-            evaluate: async () => ({ action: 'SELL', confidence: 0.9, reason: 'hit exit' })
+            evaluate: async () => ({ action: 'SELL', reason: 'hit exit' })
           }
         ];
       `,

@@ -39,8 +39,6 @@ function entrySignal(triggerPrice: number): KernelSignal {
     pivotTime: null,
     pivotPrice: null,
     signalType: 'CHAN_SECOND_BUY',
-    confidence: 0.86,
-    confidenceLevel: 'HIGH',
     decisionTrace: {},
     contextSnapshot: {},
     ruleSnapshot: {},

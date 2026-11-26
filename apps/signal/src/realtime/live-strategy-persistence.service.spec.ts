@@ -32,8 +32,6 @@ describe('LiveStrategyPersistenceService', () => {
       strategyVersionId: 7,
       securityId: 9,
       signalTime: new Date('2026-08-04T06:44:00.000Z'),
-      confidence: 85.5,
-      confidenceLevel: 'HIGH',
       decisionTrace: { flowId: 'test_flow' },
       contextSnapshot: {
         k: { type: 'incomplete', close: 28 },
@@ -215,8 +213,6 @@ function candidate() {
     pivotPrice: null,
     signalType: 'LEGACY_DSL',
     barType: 'incomplete' as const,
-    confidence: 85.5,
-    confidenceLevel: 'HIGH' as const,
     decisionTrace: { flowId: 'test_flow' },
     contextSnapshot: { k: { type: 'incomplete', close: 28 } },
     ruleSnapshot: { field: 'k.close', operator: 'gt', value: 27 },

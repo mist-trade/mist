@@ -67,8 +67,6 @@ export class LiveStrategyPersistenceService {
           signalSource: StrategySignalSource.LIVE,
           signalKind: payload.signalKind as StrategySignalKind,
           signalType: payload.signalType,
-          confidence: payload.confidence,
-          confidenceLevel: payload.confidenceLevel,
           decisionTrace: payload.decisionTrace,
           contextSnapshot: payload.contextSnapshot,
           ruleSnapshot: payload.ruleSnapshot,

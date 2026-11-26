@@ -522,7 +522,7 @@ describe('BacktestRunExecutor 统一内核回放', () => {
     expect(completedUpdate.status).toBe(BacktestRunStatus.COMPLETED);
   });
 
-  it('replays a decision_flow plan and saves confidence and decisionTrace', async () => {
+  it('replays a decision_flow plan and saves decisionTrace without confidence', async () => {
     const fixture = executor();
     const flowRun = {
       ...fixture.current,
@@ -579,6 +579,10 @@ describe('BacktestRunExecutor 统一内核回放', () => {
         }),
       }),
     );
+    const createdPayload =
+      fixture.dependencies.resultRepository.create.mock.calls[0][0];
+    expect(createdPayload).not.toHaveProperty('confidence');
+    expect(createdPayload).not.toHaveProperty('confidenceLevel');
     const completedUpdate = completedUpdateCall(fixture);
     expect(completedUpdate.signalCount).toBe(3);
     expect(fixture.dependencies.resultRepository.insert).toHaveBeenCalledWith(
@@ -620,6 +624,13 @@ describe('BacktestRunExecutor 统一内核回放', () => {
             name: '价格防守出场规则声明',
             pluginId: 'plugin.exit.price-defense',
             params: { stopLossRatio: -0.08 },
+            requiredAction: 'BOTH',
+            onPass: {
+              id: 'term_price_defense_abort',
+              type: 'TERMINAL',
+              action: 'ABORT',
+              reason: '价格防守出场规则仅声明虚拟出场',
+            },
           },
         },
         requiredBarCount: 1,

@@ -1,22 +1,33 @@
 /**
- * TradingEngine——交易层域核心（design.md 2.4）。
+ * TradingEngine——交易层域核心（design.md 第二节）。
  *
  * 纯函数：快照进 → 决策出，不触 DB、不触撮合；同组同快照 → 逐字段相同输出
- * （REQ-ENGINE-01）。入场与出场同走规则管线（REQ-ENGINE-03），先出后进
- * （REQ-ENGINE-02），拒绝必须显式（REQ-ENGINE-04），合成 Bar 因果等价
- * （REQ-ENGINE-05），整数厘算术（REQ-ENGINE-07）。
+ * （REQ-ENGINE-01）。组内采用「先出后进 + 两阶段同向归并」（Phase 1 归并 EXIT →
+ * 释放现金与持仓 → Phase 2 归并 ENTRY），禁止按置信度排序竞争（REQ-ENGINE-02），
+ * 拒绝必须显式（REQ-ENGINE-04），合成 Bar 因果等价（REQ-ENGINE-05），整数厘算术
+ * （REQ-ENGINE-07）。
  */
 import type { StrategyBar } from '@app/market-data';
 import { formatShanghaiDateString } from '@app/timezone';
-import { ORDER_SIDES, TRADING_LAYER_DEFAULTS } from '../strategy.constants';
+import {
+  ORDER_SIDES,
+  POSITION_EXIT_REASONS,
+  TRADING_LAYER_DEFAULTS,
+} from '../strategy.constants';
+import {
+  consolidateGroupByDirection,
+  toSignalContributor,
+} from './consolidation';
 import type {
   AccountSnapshot,
   AttributedSignal,
   MacroRegimeSnapshot,
   Rule,
+  SignalContributor,
   SignalGroupInput,
   SizingStrategy,
   TradeInstruction,
+  TradeRejection,
   TradingDecision,
   TradingPositionState,
 } from './domain.types';
@@ -28,11 +39,21 @@ import {
   createDefaultRiskRules,
   firstRiskVerdict,
   firstVerdict,
-  resolveIntent,
   type RiskRule,
 } from './rules';
-import { sellFirstByConfidence, type GroupOrderingStrategy } from './ordering';
 import { createAllInWithBuffer } from './sizing';
+
+const INTENT_ENTRY = 'ENTRY' as const;
+const INTENT_EXIT = 'EXIT' as const;
+const REJECT_INVALID_PRICE = 'INVALID_PRICE';
+const REJECT_NO_POSITION = 'NO_POSITION';
+const REJECT_T1_FROZEN = 'T1_FROZEN';
+const REJECT_INSUFFICIENT_CASH = 'INSUFFICIENT_CASH';
+const VERDICT_REJECT = 'REJECT';
+const SYNTHETIC_SOURCE = 'synthetic';
+const RESONANCE_REASON_SEPARATOR = ' + ';
+const RISK_STRATEGY_NAME = 'RISK_SURVEILLANCE';
+const RISK_PERIOD_LABEL = 'bar';
 
 export interface TradingEngineDeps {
   /** 入场规则管线（首条终局 Verdict 生效） */
@@ -43,8 +64,6 @@ export interface TradingEngineDeps {
   readonly riskRules?: readonly RiskRule[];
   /** 仓位策略（与裁决分离） */
   readonly sizing?: SizingStrategy;
-  /** 组内排序策略（interim 先出后进） */
-  readonly groupOrdering?: GroupOrderingStrategy;
   readonly lotSize?: number;
   readonly feeConfig?: FeeConfigLi;
 }
@@ -54,7 +73,6 @@ export class TradingEngine {
   private readonly exitRules: readonly Rule[];
   private readonly riskRules: readonly RiskRule[];
   private readonly sizing: SizingStrategy;
-  private readonly groupOrdering: GroupOrderingStrategy;
   private readonly lotSize: number;
   private readonly feeConfig?: FeeConfigLi;
 
@@ -67,13 +85,12 @@ export class TradingEngine {
     this.entryRules = deps.entryRules ?? createDefaultEntryRules(this.sizing);
     this.exitRules = deps.exitRules ?? createDefaultExitRules();
     this.riskRules = deps.riskRules ?? createDefaultRiskRules();
-    this.groupOrdering = deps.groupOrdering ?? sellFirstByConfidence;
     this.lotSize = deps.lotSize ?? TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE;
     this.feeConfig = deps.feeConfig;
   }
 
   /**
-   * 信号组裁决：合成 Bar → 规则管线 → 指令/拒绝 + 假定成交账户投影。
+   * 信号组裁决：价格隔离 → Phase 1 归并出场 → Phase 2 归并入场 → 假定成交账户投影。
    */
   decide(
     group: SignalGroupInput,
@@ -83,162 +100,46 @@ export class TradingEngine {
     const cash = { li: snapshot.cashLi };
     const positions = new Map<number, TradingPositionState>(snapshot.positions);
     const instructions: TradeInstruction[] = [];
-    const rejections: Array<TradingDecision['rejections'][number]> = [];
+    const rejections: TradeRejection[] = [];
 
-    const ordered = this.groupOrdering.order(group.signals);
+    const { invalidPriceSignals, validExits, validEntries } =
+      consolidateGroupByDirection(group.signals);
 
-    for (const attributed of ordered) {
-      const signal = attributed.signal;
-      const intent = resolveIntent(signal);
-      const priceLi = yuanToLi(signal.triggerPrice);
-      const raw = positions.get(group.securityId);
-      const position = raw && raw.holdingQuantity > 0 ? raw : null;
+    // 隔离无效价格信号：单条受损信号绝不毒害同向共振伙伴
+    for (const invalidSig of invalidPriceSignals) {
+      rejections.push({
+        idempotencyKey: invalidSig.idempotencyKey,
+        signal: invalidSig,
+        reason: REJECT_INVALID_PRICE,
+        detail: 'triggerPrice ≤ 0',
+      });
+    }
 
-      // 结构性预检（账户状态，非信号裁决——REQ-ENGINE-03）：出场侧
-      if (intent === 'EXIT') {
-        if (position === null) {
-          rejections.push({
-            idempotencyKey: attributed.idempotencyKey,
-            signal: attributed,
-            reason: 'NO_POSITION',
-            detail: '虚拟账户空仓',
-          });
-          continue;
-        }
-        if (isEnteredToday(position, snapshot.tradingDay)) {
-          rejections.push({
-            idempotencyKey: attributed.idempotencyKey,
-            signal: attributed,
-            reason: 'T1_FROZEN',
-            detail: '当日买入股份 T+1 冻结，不可卖出',
-          });
-          continue;
-        }
-      }
-
-      const ctx = {
-        signal: attributed,
-        intent,
-        syntheticBar: buildSyntheticBar(
-          group,
-          signal.signalTime,
-          signal.triggerPrice,
-        ),
-        priceLi,
-        position,
-        cashLi: cash.li,
+    // Phase 1：归并同向有效 EXIT 桶（最多产出 1 条全平 SELL 指令或 1 条归并拒绝）
+    if (validExits.length > 0) {
+      this.evaluateExitBucket({
+        validExits,
+        group,
+        tradingDay: snapshot.tradingDay,
         macroRegime,
-        lotSize: this.lotSize,
-      };
+        cash,
+        positions,
+        instructions,
+        rejections,
+      });
+    }
 
-      const verdict = firstVerdict(
-        intent === 'EXIT' ? this.exitRules : this.entryRules,
-        ctx,
-      );
-      if (verdict === null) {
-        // 管线含 fallback，不应到达；防御性兜底满足 REQ-ENGINE-04
-        rejections.push({
-          idempotencyKey: attributed.idempotencyKey,
-          signal: attributed,
-          reason: 'INVALID_PRICE',
-          detail: '规则管线未产出终局裁决（防御性兜底）',
-        });
-        continue;
-      }
-
-      if (verdict.action === 'REJECT') {
-        rejections.push({
-          idempotencyKey: attributed.idempotencyKey,
-          signal: attributed,
-          reason: verdict.reason,
-          detail: verdict.detail,
-        });
-        continue;
-      }
-
-      // 指令装配 + 假定成交
-      if (verdict.side === ORDER_SIDES.BUY) {
-        const fees = calculateExecutionFeesLi(
-          ORDER_SIDES.BUY,
-          priceLi,
-          verdict.quantity,
-          group.securityCode,
-          this.feeConfig,
-        );
-        const turnoverLi = priceLi * BigInt(verdict.quantity);
-        const totalLi = turnoverLi + fees.totalFeesLi;
-        if (cash.li < totalLi) {
-          rejections.push({
-            idempotencyKey: attributed.idempotencyKey,
-            signal: attributed,
-            reason: 'INSUFFICIENT_CASH',
-            detail: `现金 ${cash.li} 厘不足以覆盖含费总额 ${totalLi} 厘`,
-          });
-          continue;
-        }
-        cash.li -= totalLi;
-        positions.set(group.securityId, {
-          securityId: group.securityId,
-          securityCode: group.securityCode,
-          holdingQuantity: verdict.quantity,
-          costPriceLi: turnoverLi / BigInt(verdict.quantity),
-          entryTime: signal.signalTime,
-          currentPriceLi: priceLi,
-          realizedPnlLi: 0n,
-        });
-        instructions.push(
-          buildInstruction(
-            attributed,
-            'BUY',
-            verdict.quantity,
-            priceLi,
-            verdict.reason,
-          ),
-        );
-      } else {
-        if (position === null) {
-          // 防御性：预检已覆盖，类型收窄用
-          rejections.push({
-            idempotencyKey: attributed.idempotencyKey,
-            signal: attributed,
-            reason: 'NO_POSITION',
-            detail: '虚拟账户空仓',
-          });
-          continue;
-        }
-        const sellQty = Math.min(verdict.quantity, position.holdingQuantity);
-        const fees = calculateExecutionFeesLi(
-          ORDER_SIDES.SELL,
-          priceLi,
-          sellQty,
-          group.securityCode,
-          this.feeConfig,
-        );
-        const turnoverLi = priceLi * BigInt(sellQty);
-        const proceedsLi = turnoverLi - fees.totalFeesLi;
-        const costBasisLi = position.costPriceLi * BigInt(sellQty);
-        cash.li += proceedsLi;
-        const remaining = position.holdingQuantity - sellQty;
-        if (remaining <= 0) {
-          positions.delete(group.securityId);
-        } else {
-          positions.set(group.securityId, {
-            ...position,
-            holdingQuantity: remaining,
-            currentPriceLi: priceLi,
-            realizedPnlLi: position.realizedPnlLi + (proceedsLi - costBasisLi),
-          });
-        }
-        instructions.push(
-          buildInstruction(
-            attributed,
-            'SELL',
-            sellQty,
-            priceLi,
-            verdict.reason,
-          ),
-        );
-      }
+    // Phase 2：在 Phase 1 释放资金与持仓后的快照上归并同向有效 ENTRY 桶
+    if (validEntries.length > 0) {
+      this.evaluateEntryBucket({
+        validEntries,
+        group,
+        macroRegime,
+        cash,
+        positions,
+        instructions,
+        rejections,
+      });
     }
 
     return {
@@ -253,9 +154,8 @@ export class TradingEngine {
   }
 
   /**
-   * Bar 巡检（per-bar 风控，回测/dev 共用）：systemicCrunch → hardStop，
-   * 首条风控 Verdict 生效；产出保护性清仓指令（不推进账本——成交仍由
-   * 各执行端撮合层承担）。
+   * Bar 巡检（per-bar 风控，回测/dev 共用）：systemicCrunch → 保护性清仓指令
+   * （不推进账本——成交仍由各执行端撮合层承担）。
    */
   surveilBar(
     bar: Pick<
@@ -284,7 +184,7 @@ export class TradingEngine {
       {
         instructionId: `ti-${idempotencyKey}`,
         idempotencyKey,
-        action: 'SELL',
+        action: ORDER_SIDES.SELL,
         quantity: Math.min(verdict.quantity, position.holdingQuantity),
         referencePrice: bar.close,
         estimatedValueLi:
@@ -292,12 +192,259 @@ export class TradingEngine {
           BigInt(Math.min(verdict.quantity, position.holdingQuantity)),
         reason: verdict.reason,
         attribution: {
-          strategyName: 'RISK_SURVEILLANCE',
-          periodLabel: 'bar',
+          strategyName: RISK_STRATEGY_NAME,
+          periodLabel: RISK_PERIOD_LABEL,
           traceChain: null,
         },
       },
     ];
+  }
+
+  private evaluateExitBucket(params: {
+    readonly validExits: readonly AttributedSignal[];
+    readonly group: SignalGroupInput;
+    readonly tradingDay: string;
+    readonly macroRegime?: MacroRegimeSnapshot;
+    readonly cash: { li: Li };
+    readonly positions: Map<number, TradingPositionState>;
+    readonly instructions: TradeInstruction[];
+    readonly rejections: TradeRejection[];
+  }): void {
+    const {
+      validExits,
+      group,
+      tradingDay,
+      macroRegime,
+      cash,
+      positions,
+      instructions,
+      rejections,
+    } = params;
+    const primary = validExits[0];
+    const contributors = validExits.map(toSignalContributor);
+    const raw = positions.get(group.securityId);
+    const position = raw && raw.holdingQuantity > 0 ? raw : null;
+
+    if (position === null) {
+      rejections.push({
+        idempotencyKey: primary.idempotencyKey,
+        signal: primary,
+        contributors,
+        reason: REJECT_NO_POSITION,
+        detail: '虚拟账户空仓',
+      });
+      return;
+    }
+
+    if (isEnteredToday(position, tradingDay)) {
+      rejections.push({
+        idempotencyKey: primary.idempotencyKey,
+        signal: primary,
+        contributors,
+        reason: REJECT_T1_FROZEN,
+        detail: '当日买入股份 T+1 冻结，不可卖出',
+      });
+      return;
+    }
+
+    const priceLi = yuanToLi(primary.signal.triggerPrice);
+    const ctx = {
+      signal: primary,
+      intent: INTENT_EXIT,
+      syntheticBar: buildSyntheticBar(
+        group,
+        primary.signal.signalTime,
+        primary.signal.triggerPrice,
+      ),
+      priceLi,
+      position,
+      cashLi: cash.li,
+      macroRegime,
+      lotSize: this.lotSize,
+    };
+
+    const verdict = firstVerdict(this.exitRules, ctx);
+    if (verdict === null) {
+      rejections.push({
+        idempotencyKey: primary.idempotencyKey,
+        signal: primary,
+        contributors,
+        reason: REJECT_INVALID_PRICE,
+        detail: '规则管线未产出终局裁决（防御性兜底）',
+      });
+      return;
+    }
+
+    if (verdict.action === VERDICT_REJECT) {
+      rejections.push({
+        idempotencyKey: primary.idempotencyKey,
+        signal: primary,
+        contributors,
+        reason: verdict.reason,
+        detail: verdict.detail,
+      });
+      return;
+    }
+
+    const sellQty = Math.min(verdict.quantity, position.holdingQuantity);
+    const fees = calculateExecutionFeesLi(
+      ORDER_SIDES.SELL,
+      priceLi,
+      sellQty,
+      group.securityCode,
+      this.feeConfig,
+    );
+    const turnoverLi = priceLi * BigInt(sellQty);
+    const proceedsLi = turnoverLi - fees.totalFeesLi;
+    const costBasisLi = position.costPriceLi * BigInt(sellQty);
+    cash.li += proceedsLi;
+    const remaining = position.holdingQuantity - sellQty;
+    if (remaining <= 0) {
+      positions.delete(group.securityId);
+    } else {
+      positions.set(group.securityId, {
+        ...position,
+        holdingQuantity: remaining,
+        currentPriceLi: priceLi,
+        realizedPnlLi: position.realizedPnlLi + (proceedsLi - costBasisLi),
+      });
+    }
+
+    const reason =
+      validExits.length > 1
+        ? [
+            ...new Set(
+              validExits.map(
+                (e) => e.signal.signalType || POSITION_EXIT_REASONS.SIGNAL_EXIT,
+              ),
+            ),
+          ].join(RESONANCE_REASON_SEPARATOR)
+        : verdict.reason;
+
+    instructions.push(
+      buildInstruction(
+        primary,
+        ORDER_SIDES.SELL,
+        sellQty,
+        priceLi,
+        reason,
+        contributors,
+      ),
+    );
+  }
+
+  private evaluateEntryBucket(params: {
+    readonly validEntries: readonly AttributedSignal[];
+    readonly group: SignalGroupInput;
+    readonly macroRegime?: MacroRegimeSnapshot;
+    readonly cash: { li: Li };
+    readonly positions: Map<number, TradingPositionState>;
+    readonly instructions: TradeInstruction[];
+    readonly rejections: TradeRejection[];
+  }): void {
+    const {
+      validEntries,
+      group,
+      macroRegime,
+      cash,
+      positions,
+      instructions,
+      rejections,
+    } = params;
+    const primary = validEntries[0];
+    const contributors = validEntries.map(toSignalContributor);
+    const raw = positions.get(group.securityId);
+    const position = raw && raw.holdingQuantity > 0 ? raw : null;
+    const priceLi = yuanToLi(primary.signal.triggerPrice);
+
+    const ctx = {
+      signal: primary,
+      intent: INTENT_ENTRY,
+      syntheticBar: buildSyntheticBar(
+        group,
+        primary.signal.signalTime,
+        primary.signal.triggerPrice,
+      ),
+      priceLi,
+      position,
+      cashLi: cash.li,
+      macroRegime,
+      lotSize: this.lotSize,
+    };
+
+    const verdict = firstVerdict(this.entryRules, ctx);
+    if (verdict === null) {
+      rejections.push({
+        idempotencyKey: primary.idempotencyKey,
+        signal: primary,
+        contributors,
+        reason: REJECT_INVALID_PRICE,
+        detail: '规则管线未产出终局裁决（防御性兜底）',
+      });
+      return;
+    }
+
+    if (verdict.action === VERDICT_REJECT) {
+      rejections.push({
+        idempotencyKey: primary.idempotencyKey,
+        signal: primary,
+        contributors,
+        reason: verdict.reason,
+        detail: verdict.detail,
+      });
+      return;
+    }
+
+    const fees = calculateExecutionFeesLi(
+      ORDER_SIDES.BUY,
+      priceLi,
+      verdict.quantity,
+      group.securityCode,
+      this.feeConfig,
+    );
+    const turnoverLi = priceLi * BigInt(verdict.quantity);
+    const totalLi = turnoverLi + fees.totalFeesLi;
+    if (cash.li < totalLi) {
+      rejections.push({
+        idempotencyKey: primary.idempotencyKey,
+        signal: primary,
+        contributors,
+        reason: REJECT_INSUFFICIENT_CASH,
+        detail: `现金 ${cash.li} 厘不足以覆盖含费总额 ${totalLi} 厘`,
+      });
+      return;
+    }
+
+    cash.li -= totalLi;
+    positions.set(group.securityId, {
+      securityId: group.securityId,
+      securityCode: group.securityCode,
+      holdingQuantity: verdict.quantity,
+      costPriceLi: turnoverLi / BigInt(verdict.quantity),
+      entryTime: primary.signal.signalTime,
+      currentPriceLi: priceLi,
+      realizedPnlLi: 0n,
+    });
+
+    const reason =
+      validEntries.length > 1
+        ? [
+            ...new Set(
+              validEntries.map((e) => e.signal.signalType || verdict.reason),
+            ),
+          ].join(RESONANCE_REASON_SEPARATOR)
+        : verdict.reason;
+
+    instructions.push(
+      buildInstruction(
+        primary,
+        ORDER_SIDES.BUY,
+        verdict.quantity,
+        priceLi,
+        reason,
+        contributors,
+      ),
+    );
   }
 }
 
@@ -320,7 +467,7 @@ function buildSyntheticBar(
   return {
     securityId: group.securityId,
     securityCode: group.securityCode,
-    source: 'synthetic',
+    source: SYNTHETIC_SOURCE,
     period: 0,
     timestamp: signalTime,
     open: triggerPrice,
@@ -339,6 +486,7 @@ function buildInstruction(
   quantity: number,
   priceLi: Li,
   reason: string,
+  contributors: readonly SignalContributor[],
 ): TradeInstruction {
   return {
     instructionId: `ti-${attributed.idempotencyKey}`,
@@ -349,6 +497,7 @@ function buildInstruction(
     estimatedValueLi: priceLi * BigInt(quantity),
     reason,
     attribution: attributed.attribution,
+    contributors,
     signal: attributed.signal,
   };
 }

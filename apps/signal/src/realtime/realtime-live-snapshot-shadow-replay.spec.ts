@@ -110,7 +110,6 @@ describe.each(REALTIME_LIVE_SNAPSHOT_FIXTURES)(
                 ),
               },
               requiredAction: 'BUY',
-              minConfidence: 0.5,
               onPass: {
                 id: 'term_pass',
                 type: 'TERMINAL',

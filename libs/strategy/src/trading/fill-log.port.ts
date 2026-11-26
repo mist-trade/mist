@@ -35,6 +35,8 @@ export interface VirtualFillEvent {
         readonly reason: string;
         readonly strategyName: string;
         readonly periodLabel: string;
+        readonly contributorKeys?: readonly string[];
+        readonly contributorsSummary?: string;
       }
     | undefined;
 }

@@ -126,7 +126,7 @@ function writeTestPlugin(dir: string): void {
       version: '1.0.0',
       description: 'session test plugin',
       resolveContextRequirements: () => ({ 1440: 5 }),
-      evaluate: async () => ({ action: 'NEUTRAL', confidence: 0.5, reason: 'noop' }),
+      evaluate: async () => ({ action: 'NEUTRAL', reason: 'noop' }),
     };
     module.exports = { plugins: [plugin] };
   `;
@@ -281,7 +281,6 @@ describe('dev server multi-period backtest (session level)', () => {
           pluginId: 'plugin.test.daily-context',
           params: {},
           requiredAction: 'BOTH',
-          minConfidence: 0.5,
           onPass: {
             id: 'term_pass',
             type: 'TERMINAL',

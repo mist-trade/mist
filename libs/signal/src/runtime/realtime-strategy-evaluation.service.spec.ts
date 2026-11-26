@@ -49,8 +49,6 @@ function kernelSignal(overrides?: Partial<KernelSignal>): KernelSignal {
     pivotTime: '2026-08-04T06:40:00.000Z',
     pivotPrice: 10.1,
     signalType: 'LEGACY_DSL',
-    confidence: 85,
-    confidenceLevel: 'HIGH',
     decisionTrace: { status: 'SIGNAL_EMITTED' },
     contextSnapshot: { action: 'BUY' },
     ruleSnapshot: Object.freeze({}),

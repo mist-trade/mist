@@ -10,8 +10,6 @@ import {
 } from '../factor/factor-plugin-registry';
 import { ensureStandardPluginsRegistered } from '../factor/standard-plugins';
 import type {
-  ConfidenceLevel,
-  ConsensusVoteBreakdown,
   DecisionExecutionTraceItem,
   DecisionFlowNode,
   DecisionResult,
@@ -22,9 +20,20 @@ export interface DecisionFlowEvaluatorOptions {
   readonly registry?: FactorPluginRegistry;
 }
 
+const NODE_TYPE_GUARD = 'GUARD';
+const NODE_TYPE_BRANCH = 'BRANCH';
+const NODE_TYPE_EXTRACTOR = 'EXTRACTOR';
+const NODE_TYPE_TERMINAL = 'TERMINAL';
+const ACTION_INHERIT = 'INHERIT';
+const ACTION_ABORT = 'ABORT';
+const ACTION_BOTH = 'BOTH';
+const ACTION_ANY = 'ANY';
+const STATUS_ABORTED = 'ABORTED';
+const STATUS_SIGNAL_EMITTED = 'SIGNAL_EMITTED';
+
 /**
  * 树状决策流通用求值器 (DecisionFlowEvaluator)
- * 采用 Top-Down 递归求值算法，支持毫秒级短路剪枝、黑板属性流转与局部加权打分
+ * 采用 Top-Down 递归求值算法，支持毫秒级短路剪枝与黑板属性流转
  */
 export class DecisionFlowEvaluator {
   private readonly registry: FactorPluginRegistry;
@@ -39,16 +48,14 @@ export class DecisionFlowEvaluator {
     context: FactorContext,
   ): Promise<DecisionResult> {
     const trace: DecisionExecutionTraceItem[] = [];
-    let activeScore: number | undefined;
 
-    return this.evaluateNode(rootNode, context, trace, activeScore);
+    return this.evaluateNode(rootNode, context, trace);
   }
 
   private async evaluateNode(
     node: DecisionFlowNode,
     context: FactorContext,
     trace: DecisionExecutionTraceItem[],
-    currentScore?: number,
     inheritedAction?: 'BUY' | 'SELL',
     inheritedMeta?: {
       readonly badgeText?: string;
@@ -60,16 +67,16 @@ export class DecisionFlowEvaluator {
     },
   ): Promise<DecisionResult> {
     switch (node.type) {
-      case 'GUARD': {
+      case NODE_TYPE_GUARD: {
         const opinion = await this.resolveOpinion(
           node.pluginId,
           context,
           node.params,
         );
 
-        const minConf = node.minConfidence ?? 0.0;
         const actionMatches =
-          node.requiredAction === 'BOTH' || node.requiredAction === 'ANY'
+          node.requiredAction === ACTION_BOTH ||
+          node.requiredAction === ACTION_ANY
             ? opinion.action === DECISION_ACTIONS.BUY ||
               opinion.action === DECISION_ACTIONS.SELL
             : opinion.action === node.requiredAction;
@@ -79,20 +86,18 @@ export class DecisionFlowEvaluator {
         // 则上游方向必须与门禁期望方向严格一致，绝对禁止将 SELL 信号送入 BUY 门禁或反向篡改。
         const directionConsistent =
           !inheritedAction ||
-          node.requiredAction === 'BOTH' ||
-          node.requiredAction === 'ANY' ||
+          node.requiredAction === ACTION_BOTH ||
+          node.requiredAction === ACTION_ANY ||
           node.requiredAction === inheritedAction;
 
-        const passed =
-          actionMatches && directionConsistent && opinion.confidence >= minConf;
+        const passed = actionMatches && directionConsistent;
 
         trace.push({
           nodeId: node.id,
-          type: 'GUARD',
+          type: NODE_TYPE_GUARD,
           pluginId: node.pluginId,
           name: node.name,
           action: opinion.action,
-          confidence: opinion.confidence,
           passed,
           reason: directionConsistent
             ? opinion.reason
@@ -102,9 +107,6 @@ export class DecisionFlowEvaluator {
           displayTag: opinion.displayTag,
           styleMeta: opinion.styleMeta,
         });
-
-        const nextScore =
-          currentScore ?? Number((opinion.confidence * 100).toFixed(1));
 
         const nextInheritedAction =
           opinion.action === DECISION_ACTIONS.BUY ||
@@ -123,7 +125,6 @@ export class DecisionFlowEvaluator {
             node.onPass,
             context,
             trace,
-            nextScore,
             nextInheritedAction,
             nextInheritedMeta,
           );
@@ -132,26 +133,23 @@ export class DecisionFlowEvaluator {
             node.onFail,
             context,
             trace,
-            currentScore,
             inheritedAction,
             inheritedMeta,
           );
         }
 
         return {
-          status: 'ABORTED',
-          confidence: 0,
-          confidenceLevel: 'LOW',
+          status: STATUS_ABORTED,
           reason: `前置门禁[${node.name}]未通过: ${opinion.reason}`,
           trace,
         };
       }
 
-      case 'BRANCH': {
+      case NODE_TYPE_BRANCH: {
         const conditionResult = this.resolveCondition(node.condition, context);
         trace.push({
           nodeId: node.id,
-          type: 'BRANCH',
+          type: NODE_TYPE_BRANCH,
           name: node.name,
           conditionResult,
         });
@@ -163,13 +161,12 @@ export class DecisionFlowEvaluator {
           nextNode,
           context,
           trace,
-          currentScore,
           inheritedAction,
           inheritedMeta,
         );
       }
 
-      case 'EXTRACTOR': {
+      case NODE_TYPE_EXTRACTOR: {
         const opinion = await this.resolveOpinion(
           node.pluginId,
           context,
@@ -184,7 +181,7 @@ export class DecisionFlowEvaluator {
 
         trace.push({
           nodeId: node.id,
-          type: 'EXTRACTOR',
+          type: NODE_TYPE_EXTRACTOR,
           pluginId: node.pluginId,
           name: node.name,
           exportedKey: node.exportAttributeKey,
@@ -204,135 +201,28 @@ export class DecisionFlowEvaluator {
           node.next,
           context,
           trace,
-          currentScore,
           inheritedAction,
           nextInheritedMeta,
         );
       }
 
-      case 'CONSENSUS': {
-        const targetAction = node.targetAction ?? DECISION_ACTIONS.BUY;
-        const vetoAction =
-          targetAction === DECISION_ACTIONS.BUY
-            ? DECISION_ACTIONS.SELL
-            : DECISION_ACTIONS.BUY;
-        let totalWeight = 0;
-        let earnedScore = 0;
-        let vetoTriggered = false;
-        let vetoReason = '';
-        const breakdown: ConsensusVoteBreakdown[] = [];
-
-        const evaluationPromises = node.plugins.map(async (item) => {
-          const opinion = await this.resolveOpinion(
-            item.pluginId,
-            context,
-            item.params,
-          );
-          return { item, opinion };
-        });
-
-        const results = await Promise.all(evaluationPromises);
-
-        for (const { item, opinion } of results) {
-          totalWeight += item.weight;
-          const isVetoItem = item.isVeto === true;
-          const itemVetoTriggered = isVetoItem && opinion.action === vetoAction;
-
-          if (itemVetoTriggered) {
-            vetoTriggered = true;
-            vetoReason = `插件[${pluginName(item.pluginId)}]行使一票否决权: ${opinion.reason}`;
-          }
-
-          if (opinion.action === targetAction) {
-            earnedScore += item.weight * opinion.confidence;
-          }
-
-          breakdown.push({
-            pluginId: item.pluginId,
-            weight: item.weight,
-            action: opinion.action,
-            confidence: opinion.confidence,
-            reason: opinion.reason,
-            isVeto: isVetoItem,
-            vetoTriggered: itemVetoTriggered,
-          });
-        }
-
-        const calculatedScore =
-          vetoTriggered || totalWeight === 0
-            ? 0
-            : (earnedScore / totalWeight) * 100;
-
-        const passed = !vetoTriggered && calculatedScore >= node.threshold;
-
-        trace.push({
-          nodeId: node.id,
-          type: 'CONSENSUS',
-          name: node.name,
-          score: calculatedScore,
-          threshold: node.threshold,
-          passed,
-          breakdown,
-        });
-        const nextInheritedAction =
-          targetAction === DECISION_ACTIONS.BUY ||
-          targetAction === DECISION_ACTIONS.SELL
-            ? targetAction
-            : inheritedAction;
-
-        if (passed) {
-          return this.evaluateNode(
-            node.onSuccess,
-            context,
-            trace,
-            calculatedScore,
-            nextInheritedAction,
-            inheritedMeta,
-          );
-        } else if (node.onFailure) {
-          return this.evaluateNode(
-            node.onFailure,
-            context,
-            trace,
-            calculatedScore,
-            nextInheritedAction,
-            inheritedMeta,
-          );
-        }
-
-        return {
-          status: 'ABORTED',
-          confidence: calculatedScore,
-          confidenceLevel: this.resolveConfidenceLevel(calculatedScore),
-          reason: vetoTriggered
-            ? vetoReason
-            : `局部加权打分(${calculatedScore.toFixed(1)})未达门槛(${node.threshold.toFixed(1)})`,
-          trace,
-        };
-      }
-
-      case 'TERMINAL': {
+      case NODE_TYPE_TERMINAL: {
         const finalAction =
-          node.action === 'INHERIT'
+          node.action === ACTION_INHERIT
             ? inheritedAction || DECISION_ACTIONS.BUY
             : node.action;
 
         trace.push({
           nodeId: node.id,
-          type: 'TERMINAL',
+          type: NODE_TYPE_TERMINAL,
           action: finalAction,
           signalTag: node.signalTag,
           reason: node.reason,
         });
 
-        const confidence = currentScore ?? (finalAction === 'ABORT' ? 0 : 85);
-        const confidenceLevel = this.resolveConfidenceLevel(confidence);
-
-        if (finalAction === 'ABORT') {
+        if (finalAction === ACTION_ABORT) {
           return {
-            status: 'ABORTED',
-            confidence,
-            confidenceLevel,
+            status: STATUS_ABORTED,
             signalTag: node.signalTag,
             reason: node.reason ?? '决策流执行终止',
             trace,
@@ -346,14 +236,12 @@ export class DecisionFlowEvaluator {
         const evidence = this.findEvidenceFromTrace(trace);
 
         return {
-          status: 'SIGNAL_EMITTED',
+          status: STATUS_SIGNAL_EMITTED,
           action: finalAction,
-          confidence,
-          confidenceLevel,
           signalTag: node.signalTag,
           reason:
             node.reason ??
-            `决策流信号发射 (${finalAction === 'BUY' ? '买入/开仓' : '卖出/平仓'})`,
+            `决策流信号发射 (${finalAction === DECISION_ACTIONS.BUY ? '买入/开仓' : '卖出/平仓'})`,
           badgeText,
           displayTag,
           styleMeta,
@@ -495,15 +383,4 @@ export class DecisionFlowEvaluator {
     }
     return undefined;
   }
-
-  public resolveConfidenceLevel(score: number): ConfidenceLevel {
-    if (score >= 80) return 'HIGH';
-    if (score >= 65) return 'MEDIUM';
-    return 'LOW';
-  }
-}
-
-function pluginName(pluginId: string): string {
-  const parts = pluginId.split('.');
-  return parts[parts.length - 1] ?? pluginId;
 }

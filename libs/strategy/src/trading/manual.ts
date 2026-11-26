@@ -5,9 +5,13 @@
  */
 import { formatShanghaiDateTimeString, MINUTES_PER_HOUR } from '@app/timezone';
 import { PERIOD_MINUTES } from '@app/constants';
-import { SIGNAL_KINDS } from '../strategy.constants';
+import { ORDER_SIDES, SIGNAL_KINDS } from '../strategy.constants';
 import { liToYuan } from './money';
-import type { TradingDecision } from './domain.types';
+import type { SignalContributor, TradingDecision } from './domain.types';
+
+const RESONANCE_SEPARATOR = ' + ';
+const TRACE_JOINER = ' → ';
+const TRACE_SUFFIX_PASS = ' ✓';
 
 /**
  * 紧凑 trace 链（2026-11-24 定稿）：每个节点 `短名 ✓`，' → ' 连接。
@@ -35,9 +39,9 @@ export function renderTraceChainOf(decisionTrace: unknown): string | null {
           ? item.pluginId.replace(/^plugin\./, '')
           : null;
     if (!rawName) continue;
-    segments.push(`${rawName} ✓`);
+    segments.push(`${rawName}${TRACE_SUFFIX_PASS}`);
   }
-  return segments.length > 0 ? segments.join(' → ') : null;
+  return segments.length > 0 ? segments.join(TRACE_JOINER) : null;
 }
 
 export interface TradingManualInput {
@@ -72,38 +76,78 @@ function buildHeader(input: TradingManualInput): string {
   return `[Mist 交易手册] ${input.securityCode}${name} | ${formatShanghaiDateTimeString(input.effectiveTime)} ｜ 账户 可用 ${cash}${holdingSeg}`;
 }
 
+function formatContributorSummary(contributor: SignalContributor): string {
+  return [
+    contributor.attribution.strategyName,
+    contributor.attribution.periodLabel,
+    contributor.signalType,
+  ]
+    .filter(Boolean)
+    .join(' ');
+}
+
+function formatContributorTraceLines(
+  contributors: readonly SignalContributor[],
+): string {
+  const lines: string[] = [];
+  for (let idx = 0; idx < contributors.length; idx++) {
+    const contributor = contributors[idx];
+    if (!contributor.attribution.traceChain) continue;
+    const label = [
+      contributor.attribution.strategyName,
+      contributor.attribution.periodLabel,
+    ]
+      .filter(Boolean)
+      .join(' ');
+    const prefix = label ? `[${idx + 1}] ${label}: ` : `[${idx + 1}] `;
+    lines.push(`    ${prefix}${contributor.attribution.traceChain}`);
+  }
+  return lines.length > 0 ? `\n${lines.join('\n')}` : '';
+}
+
 function renderInstruction(i: TradingDecision['instructions'][number]): string {
-  const direction = i.action === 'SELL' ? '卖出' : '买入';
+  const direction = i.action === ORDER_SIDES.SELL ? '卖出' : '买入';
+  const amountText = `${direction} ${i.quantity.toLocaleString('en-US')}股 @ ${i.referencePrice.toFixed(2)} ≈ ${formatYuan(i.estimatedValueLi)}`;
+
+  if (i.contributors && i.contributors.length > 1) {
+    const summary = i.contributors
+      .map(formatContributorSummary)
+      .join(RESONANCE_SEPARATOR);
+    const chain = formatContributorTraceLines(i.contributors);
+    return `▶ ${amountText} ｜ 共振(${i.contributors.length}): ${summary}${chain}`;
+  }
+
   const strategyName = i.attribution.strategyName || '';
   const periodLabel = i.attribution.periodLabel || '';
-  const conf =
-    i.attribution.confidence !== undefined
-      ? ` [${i.attribution.confidenceLevel ?? 'CONF'} ${i.attribution.confidence.toFixed(1)}%]`
-      : '';
   const seg = [strategyName, periodLabel, i.reason].filter(Boolean).join(' ');
   const chain = i.attribution.traceChain
     ? `\n    ${i.attribution.traceChain}`
     : '';
-  return `▶ ${direction} ${i.quantity.toLocaleString('en-US')}股 @ ${i.referencePrice.toFixed(2)} ≈ ${formatYuan(i.estimatedValueLi)} ｜ ${seg}${conf}${chain}`;
+  return `▶ ${amountText} ｜ ${seg}${chain}`;
 }
 
 function renderRejection(r: TradingDecision['rejections'][number]): string {
   const signal = r.signal;
   const direction =
     signal.signal.signalKind === SIGNAL_KINDS.EXIT ? '卖出' : '买入';
+
+  if (r.contributors && r.contributors.length > 1) {
+    const summary = r.contributors
+      .map(formatContributorSummary)
+      .join(RESONANCE_SEPARATOR);
+    const chain = formatContributorTraceLines(r.contributors);
+    return `✗ ${direction}已拒绝：${r.reason}（${r.detail}）｜ 共振(${r.contributors.length}): ${summary}${chain}`;
+  }
+
   const strategyName = signal.attribution.strategyName || '';
   const periodLabel = signal.attribution.periodLabel || '';
-  const conf =
-    signal.attribution.confidence !== undefined
-      ? ` [${signal.attribution.confidenceLevel ?? 'CONF'} ${signal.attribution.confidence.toFixed(1)}%]`
-      : '';
   const seg = [strategyName, periodLabel, signal.signal.signalType]
     .filter(Boolean)
     .join(' ');
   const chain = signal.attribution.traceChain
     ? ` ｜ ${signal.attribution.traceChain}`
     : '';
-  return `✗ ${direction}已拒绝：${r.reason}（${r.detail}）｜ ${seg}${conf}${chain}`;
+  return `✗ ${direction}已拒绝：${r.reason}（${r.detail}）｜ ${seg}${chain}`;
 }
 
 /** 厘 → 元展示（整数省小数；非整数保留至厘位）。 */

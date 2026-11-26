@@ -27,17 +27,23 @@ export interface MacroRegimeSnapshot {
 
 /* ───────────────────────── 输入 ───────────────────────── */
 
+export interface SignalAttribution {
+  readonly strategyName: string;
+  readonly periodLabel: string;
+  readonly traceChain: string | null;
+}
+
+export interface SignalContributor {
+  readonly idempotencyKey: string;
+  readonly signalType: string;
+  readonly attribution: SignalAttribution;
+}
+
 /** 组内单条归因信号。幂等锚点为字符串（实时 = alertEventId 字符串化；离线 = 合成幂等串）。 */
 export interface AttributedSignal {
   readonly idempotencyKey: string;
   readonly signal: KernelSignal;
-  readonly attribution: {
-    readonly strategyName: string;
-    readonly periodLabel: string;
-    readonly confidence?: number;
-    readonly confidenceLevel?: string;
-    readonly traceChain: string | null;
-  };
+  readonly attribution: SignalAttribution;
 }
 
 /** 聚合层产出的一个信号组——交易层的裁决单元。 */
@@ -88,7 +94,9 @@ export interface TradeInstruction {
   readonly estimatedValueLi: Li;
   /** signalType / exitReason */
   readonly reason: string;
-  readonly attribution: AttributedSignal['attribution'];
+  readonly attribution: SignalAttribution;
+  /** 同向归并后的全量触发贡献者（信号驱动时 >= 1；风控巡检为 undefined） */
+  readonly contributors?: readonly SignalContributor[];
   /** 归因信号回链；Bar 巡检产出的风控指令无信号锚，为 undefined */
   readonly signal?: KernelSignal;
 }
@@ -106,6 +114,8 @@ export type TradeRejectionReason =
 export interface TradeRejection {
   readonly idempotencyKey: string;
   readonly signal: AttributedSignal;
+  /** 同向有效信号共同被账户/体制/仓位门禁拒绝时附带全量贡献者 */
+  readonly contributors?: readonly SignalContributor[];
   readonly reason: TradeRejectionReason;
   readonly detail: string;
 }

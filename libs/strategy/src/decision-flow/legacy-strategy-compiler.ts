@@ -16,7 +16,6 @@ export interface LegacyChanBspPlanLike {
     readonly third: boolean;
   };
   readonly requiredBarCount?: number;
-  readonly minConfidence?: number;
 }
 
 /**
@@ -69,7 +68,6 @@ export class LegacyStrategyCompiler {
       pluginId: 'plugin.legacy.rule-dsl',
       params: { plan: toWireSafePlan(plan) },
       requiredAction: action,
-      minConfidence: 0.5,
       onPass: {
         id: 'term_legacy_matched',
         type: 'TERMINAL',
@@ -117,7 +115,6 @@ export class LegacyStrategyCompiler {
         deduplicate: true,
       },
       requiredAction,
-      minConfidence: plan.minConfidence ?? 0.5,
       onPass: {
         id: 'term_chan_bsp_matched',
         type: 'TERMINAL',

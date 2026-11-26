@@ -11,8 +11,6 @@ import {
   type VirtualExitRuleBinding,
 } from './virtual-exit.port';
 
-const DEFAULT_PRICE_LEVEL_CONFIDENCE = 0.9;
-
 /**
  * 价格/时间型虚拟出场规则种类（本求值器可解释的子集）。
  *
@@ -239,7 +237,6 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
       exitKind: rule.kind,
       reason,
       badgeText: `防守出场·${rule.kind}`,
-      confidence: DEFAULT_PRICE_LEVEL_CONFIDENCE,
       evidence,
     };
   }

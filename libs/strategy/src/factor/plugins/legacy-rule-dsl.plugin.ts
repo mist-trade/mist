@@ -16,7 +16,6 @@ export interface LegacyRuleDslPluginParams {
   readonly plan?: CompiledStrategyExecutionPlan;
   readonly rule?: StrategyRuleExpression;
   readonly signalKind?: StrategySignalKind;
-  readonly confidence?: number;
 }
 
 /**
@@ -41,7 +40,6 @@ export class LegacyRuleDslPlugin implements FactorPlugin {
       description: '原始规则表达式 StrategyRuleExpression',
     },
     signalKind: { type: 'string', enum: ['entry', 'exit'], default: 'entry' },
-    confidence: { type: 'number', default: 0.8 },
   };
 
   public async evaluate(
@@ -54,7 +52,6 @@ export class LegacyRuleDslPlugin implements FactorPlugin {
     if (!plan) {
       return {
         action: 'NEUTRAL',
-        confidence: 0.0,
         reason: '未提供有效的规则计划(plan)或规则定义(rule)',
       };
     }
@@ -67,7 +64,6 @@ export class LegacyRuleDslPlugin implements FactorPlugin {
     if (outcome.status === 'unavailable') {
       return {
         action: 'NEUTRAL',
-        confidence: 0.0,
         reason: `存量规则所需数据未就绪: ${outcome.reason}`,
       };
     }
@@ -75,7 +71,6 @@ export class LegacyRuleDslPlugin implements FactorPlugin {
     if (!outcome.matched) {
       return {
         action: 'NEUTRAL',
-        confidence: 0.0,
         reason: '存量规则条件未满足',
         evidence: {
           matched: false,
@@ -86,12 +81,9 @@ export class LegacyRuleDslPlugin implements FactorPlugin {
 
     const isEntry = plan.signalKind === 'entry';
     const action = isEntry ? 'BUY' : 'SELL';
-    const confidence =
-      typeof params?.confidence === 'number' ? params.confidence : 0.8;
 
     return {
       action,
-      confidence,
       reason: `存量规则 DSL 匹配成功 (${isEntry ? '入场/开仓' : '出场/平仓'})`,
       evidence: {
         matched: true,

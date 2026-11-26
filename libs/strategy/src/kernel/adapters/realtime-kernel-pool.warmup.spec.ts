@@ -16,7 +16,7 @@ class AlwaysBuyPlugin implements FactorPlugin {
   public readonly paramSchema = {};
 
   public async evaluate(): Promise<FactorOpinion> {
-    return { action: 'BUY', confidence: 0.9, reason: 'always buy' };
+    return { action: 'BUY', reason: 'always buy' };
   }
 }
 
@@ -44,7 +44,6 @@ function plan(
       name: 'gate',
       pluginId: 'plugin.test.warmup-buy',
       requiredAction: 'BUY',
-      minConfidence: 0.5,
       onPass: {
         id: 'term',
         type: 'TERMINAL',
@@ -215,7 +214,6 @@ describe('RealtimeKernelPool — 跨标的依赖（外部窗口预热与扇出�
       this.lastMacroClose = last;
       return {
         action: 'BUY',
-        confidence: 0.9,
         reason: `macro last close = ${last}`,
       };
     }
@@ -281,7 +279,6 @@ describe('RealtimeKernelPool — 跨标的依赖（外部窗口预热与扇出�
           name: 'gate',
           pluginId: 'plugin.test.macro-reader',
           requiredAction: 'BUY',
-          minConfidence: 0.5,
           onPass: {
             id: 'term',
             type: 'TERMINAL',

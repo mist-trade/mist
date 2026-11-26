@@ -19,7 +19,7 @@ class Echo implements FactorPlugin {
   public calls = 0;
   public async evaluate(): Promise<FactorOpinion> {
     this.calls++;
-    return { action: 'NEUTRAL', confidence: 0, reason: 'x' };
+    return { action: 'NEUTRAL', reason: 'x' };
   }
 }
 
@@ -42,7 +42,6 @@ it('daily stamp consistency: hydration + live-derived bars interleave without cu
           name: 'g',
           pluginId: 'p.echo',
           requiredAction: 'BUY',
-          minConfidence: 0.1,
           onPass: {
             id: 't',
             type: 'TERMINAL',

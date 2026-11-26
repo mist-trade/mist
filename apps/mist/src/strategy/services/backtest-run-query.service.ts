@@ -150,8 +150,6 @@ export class BacktestRunQueryService {
         'result.pivotTime',
         'result.period',
         'result.signalType',
-        'result.confidence',
-        'result.confidenceLevel',
         'result.decisionTrace',
         'result.contextSnapshot',
         'result.ruleSnapshot',
@@ -295,11 +293,6 @@ function mapResult(result: BacktestSignalResult): BacktestSignalResultVo {
     ).toISOString(),
     pivotTime: result.pivotTime ? result.pivotTime.toISOString() : null,
     signalType: result.signalType,
-    confidence:
-      result.confidence !== null && result.confidence !== undefined
-        ? Number(result.confidence)
-        : null,
-    confidenceLevel: result.confidenceLevel ?? null,
     decisionTrace: result.decisionTrace ?? null,
     contextSnapshot: result.contextSnapshot,
     ruleSnapshot: result.ruleSnapshot,

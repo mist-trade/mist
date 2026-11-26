@@ -99,7 +99,6 @@ export class FinancialSafetyGuardPlugin implements FactorPlugin {
     if (roe === undefined && debtRatio === undefined) {
       return {
         action: 'NEUTRAL',
-        confidence: 0.0,
         reason: '未配置财务数据源，基本面门禁中立弃权',
         evidence: { bypassed: true },
       };
@@ -112,7 +111,6 @@ export class FinancialSafetyGuardPlugin implements FactorPlugin {
     if (isRoeSafe && isDebtSafe) {
       return {
         action: passAction,
-        confidence: 0.9,
         reason: `财务基本面达标 (ROE: ${roe ?? 'N/A'}% >= ${minRoe}%, 资产负债率: ${debtRatio ?? 'N/A'}% <= ${maxDebtRatio}%)`,
         evidence: {
           roe,
@@ -126,7 +124,6 @@ export class FinancialSafetyGuardPlugin implements FactorPlugin {
 
     return {
       action: 'SELL',
-      confidence: 0.95,
       reason: `基本面存在财务隐患: ${!isRoeSafe ? `ROE(${roe}%)低于${minRoe}% ` : ''}${!isDebtSafe ? `资产负债率(${debtRatio}%)超过${maxDebtRatio}%` : ''}`,
       evidence: {
         roe,

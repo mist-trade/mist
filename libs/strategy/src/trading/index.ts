@@ -15,6 +15,8 @@ export type {
   MacroRegimeSnapshot,
   Rule,
   RuleContext,
+  SignalAttribution,
+  SignalContributor,
   SizingContext,
   SizingResult,
   SizingStrategy,
@@ -27,8 +29,14 @@ export type {
   TradingPositionState,
   Verdict,
 } from './domain.types';
-export { sellFirstByConfidence } from './ordering';
-export type { GroupOrderingStrategy } from './ordering';
+export {
+  buildOfflineSignalIdempotencyKey,
+  compareContributorOrder,
+  consolidateGroupByDirection,
+  isPositiveBase10IntegerKey,
+  toSignalContributor,
+} from './consolidation';
+export type { ConsolidatedDirectionBuckets } from './consolidation';
 export { createAllInWithBuffer } from './sizing';
 export {
   createDefaultEntryRules,

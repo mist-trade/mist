@@ -35,7 +35,6 @@ function makePlugin(
     evaluate: jest.fn(
       async (): Promise<FactorOpinion> => ({
         action: 'BUY',
-        confidence: 0.9,
         reason: 'context ok',
       }),
     ),
@@ -53,7 +52,6 @@ function guard(
     name: id,
     pluginId,
     requiredAction: 'BOTH',
-    minConfidence: 0.5,
     onPass: next,
     onFail: {
       id: `${id}-fail`,

@@ -20,7 +20,7 @@ class AlwaysBuyPlugin implements FactorPlugin {
   public readonly paramSchema = {};
 
   public async evaluate(): Promise<FactorOpinion> {
-    return { action: 'BUY', confidence: 0.9, reason: 'always buy (test)' };
+    return { action: 'BUY', reason: 'always buy (test)' };
   }
 }
 
@@ -32,7 +32,6 @@ function createAlwaysBuyFlow(): DecisionFlowNode {
     pluginId: 'plugin.test.always-buy',
     params: {},
     requiredAction: 'BUY',
-    minConfidence: 0.5,
     onPass: {
       id: 'term_buy',
       type: 'TERMINAL',
@@ -114,7 +113,9 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
     expect(result.fills).toHaveLength(
       result.groups.reduce((sum, g) => sum + g.decision.instructions.length, 0),
     );
-    expect(result.fills[0]?.idempotencyKey).toMatch(/^offline-1-\d+-entry$/);
+    expect(result.fills[0]?.idempotencyKey).toMatch(
+      /^offline-1-30-\d+-entry-ALWAYS_BUY$/,
+    );
 
     // 报告同源渲染（REQ-FACADE-05）
     expect(result.report).toContain('[Mist 交易手册] 000001');
@@ -176,8 +177,8 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
       public async evaluate(ctx: { timestamp: Date }): Promise<FactorOpinion> {
         const isFirst = ctx.timestamp.getTime() === Date.UTC(2026, 0, 5, 1, 30);
         return isFirst
-          ? { action: 'BUY', confidence: 0.9, reason: '开仓' }
-          : { action: 'NEUTRAL', confidence: 0.5, reason: '观望' };
+          ? { action: 'BUY', reason: '开仓' }
+          : { action: 'NEUTRAL', reason: '观望' };
       }
 
       public virtualExitRules() {
@@ -198,7 +199,6 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
       pluginId: 'plugin.test.buy-with-stop',
       params: {},
       requiredAction: 'BUY',
-      minConfidence: 0.5,
       onPass: {
         id: 'term_buy',
         type: 'TERMINAL',
@@ -252,7 +252,7 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
       }): Promise<FactorOpinion> {
         const day = formatShanghaiDateString(ctx.timestamp);
         if (ctx.period === 1440 && day === '2026-01-05') {
-          return { action: 'BUY', confidence: 0.9, reason: 'd1 buy' };
+          return { action: 'BUY', reason: 'd1 buy' };
         }
         if (
           ctx.period === 30 &&
@@ -260,14 +260,13 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
         ) {
           return {
             action: 'SELL',
-            confidence: 0.9,
             reason: 'd2 intraday blocked',
           };
         }
         if (ctx.period === 1440 && day === '2026-01-07') {
-          return { action: 'SELL', confidence: 0.9, reason: 'd3 sell' };
+          return { action: 'SELL', reason: 'd3 sell' };
         }
-        return { action: 'NEUTRAL', confidence: 0, reason: 'hold' };
+        return { action: 'NEUTRAL', reason: 'hold' };
       }
     }
 
@@ -398,8 +397,8 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
 
       public async evaluate(ctx: { timestamp: Date }): Promise<FactorOpinion> {
         return ctx.timestamp.toISOString() === '2026-01-04T16:00:00.000Z'
-          ? { action: 'BUY', confidence: 0.9, reason: 'd1 buy' }
-          : { action: 'NEUTRAL', confidence: 0, reason: 'hold' };
+          ? { action: 'BUY', reason: 'd1 buy' }
+          : { action: 'NEUTRAL', reason: 'hold' };
       }
     }
 
@@ -538,8 +537,8 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
 
       public async evaluate(ctx: { timestamp: Date }): Promise<FactorOpinion> {
         return ctx.timestamp.toISOString() === '2026-01-04T16:00:00.000Z'
-          ? { action: 'BUY', confidence: 0.9, reason: 'd1 buy' }
-          : { action: 'NEUTRAL', confidence: 0, reason: 'hold' };
+          ? { action: 'BUY', reason: 'd1 buy' }
+          : { action: 'NEUTRAL', reason: 'hold' };
       }
     }
 
@@ -679,7 +678,7 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
       }
 
       public async evaluate(): Promise<FactorOpinion> {
-        return { action: 'NEUTRAL', confidence: 0, reason: 'spy' };
+        return { action: 'NEUTRAL', reason: 'spy' };
       }
     }
 
@@ -760,5 +759,122 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
       mkExtBar(20, 'EXT_B'),
     ]);
     expect(rReverse).toEqual(rForward);
+  });
+
+  it('同刻多策略同向共振与 VIRTUAL_EXIT 共存：离线幂等键互异、同向归并无 ALREADY_HOLDING 假拒绝', async () => {
+    class MultiSignalPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.multi-resonance';
+      public readonly name = '共振测试插件';
+      public readonly category = 'TECHNICAL' as const;
+      public readonly version = '1.0.0';
+      public readonly description = 'bar1 BUY, bar2 SELL';
+
+      public async evaluate(ctx: {
+        timestamp: Date;
+        period: number;
+      }): Promise<FactorOpinion> {
+        const ts = ctx.timestamp.toISOString();
+        if (ts === '2026-01-05T02:00:00.000Z') {
+          return { action: 'BUY', reason: `buy-${ctx.period}` };
+        }
+        if (ts === '2026-01-06T02:00:00.000Z') {
+          return { action: 'SELL', reason: `sell-${ctx.period}` };
+        }
+        return { action: 'NEUTRAL', reason: 'hold' };
+      }
+    }
+
+    const bar1 = makeBar(new Date('2026-01-05T02:00:00.000Z'), 10);
+    const bar2 = makeBar(new Date('2026-01-06T02:00:00.000Z'), 9);
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new MultiSignalPlugin());
+
+    const makeFlow = (tag: string): DecisionFlowNode => ({
+      id: `guard_${tag}`,
+      type: 'GUARD',
+      name: `门禁_${tag}`,
+      pluginId: 'plugin.test.multi-resonance',
+      requiredAction: 'BOTH',
+      onPass: {
+        id: `term_${tag}`,
+        type: 'TERMINAL',
+        action: 'INHERIT',
+        signalTag: tag,
+      },
+    });
+
+    const virtualExitPolicy: import('../virtual-exit/virtual-exit.port').VirtualExitPolicyPort =
+      {
+        configure: () => {},
+        onSignal: () => {},
+        onBar: (bar) => {
+          if (bar.timestamp.toISOString() === '2026-01-06T02:00:00.000Z') {
+            return [
+              {
+                channel: { definitionId: 1, versionId: 1, period: 30 },
+                ownerPluginId: 'plugin.test.multi-resonance',
+                ruleId: 'stop:1',
+                exitKind: 'STOP',
+                reason: '虚拟止损',
+                badgeText: '止损',
+              },
+            ];
+          }
+          return [];
+        },
+      };
+
+    const result = await runTradingPipeline({
+      barsByPeriod: new Map([[30, [bar1, bar2]]]),
+      plans: [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow: makeFlow('FLOW_A'),
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 2,
+          versionId: 1,
+          flow: makeFlow('FLOW_B'),
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+      registry,
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bar1.timestamp,
+      virtualExitPolicy,
+      feeEnabled: false,
+    });
+
+    // Bar 1: 2 条 ENTRY 归并为 1 条 BUY 指令（2 contributors），0 条 ALREADY_HOLDING
+    expect(result.groups[0].decision.instructions).toHaveLength(1);
+    expect(result.groups[0].decision.instructions[0].action).toBe('BUY');
+    expect(result.groups[0].decision.instructions[0].contributors).toHaveLength(
+      2,
+    );
+    expect(result.groups[0].decision.rejections).toHaveLength(0);
+
+    // Bar 2: 同 definitionId=1 + period=30 同时产出 VIRTUAL_EXIT 与 FLOW_A 退出 + FLOW_B 退出，
+    // 幂等键均唯一且归并为 1 条 SELL 指令（3 contributors）
+    const day2Group = result.groups[1].group;
+    const day2Keys = day2Group.signals.map((s) => s.idempotencyKey);
+    expect(new Set(day2Keys).size).toBe(3);
+    expect(result.groups[1].decision.instructions).toHaveLength(1);
+    expect(result.groups[1].decision.instructions[0].action).toBe('SELL');
+    expect(result.groups[1].decision.instructions[0].contributors).toHaveLength(
+      3,
+    );
+    expect(result.groups[1].decision.rejections).toHaveLength(0);
+    expect(result.report).toContain('共振(2):');
+    expect(result.report).toContain('共振(3):');
+    expect(result.report).not.toContain('%');
   });
 });

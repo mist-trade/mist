@@ -30,6 +30,7 @@ import { SimulatedBroker } from '../../libs/strategy/src/execution/simulated-bro
 import { PositionStateMachine } from '../../libs/strategy/src/position/position-state-machine';
 import { CapitalLedger } from '../../libs/strategy/src/position/capital-ledger';
 import {
+  buildOfflineSignalIdempotencyKey,
   TradingEngine,
   createDefaultRiskRules,
   renderTraceChainOf,
@@ -661,7 +662,6 @@ function createSinglePluginFlow(pluginId: string): DecisionFlowNode {
     pluginId,
     params,
     requiredAction: 'BOTH',
-    minConfidence: 0.5,
     onPass: {
       id: `term_${safeId}_pass`,
       type: 'TERMINAL',
@@ -986,22 +986,30 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   const flushPendingGroup = (currentBar: StrategyBar): void => {
     if (pendingSignals.length === 0) return;
     const first = pendingSignals[0]!.signal;
+    const seenKeys = new Map<string, number>();
     const group: SignalGroupInput = {
       securityId: DEFAULT_DEV_SECURITY_ID,
       securityCode: options.code,
       effectiveTime: first.signalTime,
       tradingDay: formatShanghaiDateString(first.signalTime),
-      signals: pendingSignals.map(({ signal }) => ({
-        idempotencyKey: `offline-${options.strategyDefinitionId ?? 0}-${signal.signalTime.getTime()}-${signal.signalKind}`,
-        signal,
-        attribution: {
-          strategyName: `definition-${options.strategyDefinitionId ?? 0}`,
-          periodLabel: `${options.period}m`,
-          confidence: signal.confidence,
-          confidenceLevel: signal.confidenceLevel,
-          traceChain: renderTraceChainOf(signal.decisionTrace),
-        },
-      })),
+      signals: pendingSignals.map(({ signal }) => {
+        const baseKey = buildOfflineSignalIdempotencyKey(
+          signal,
+          options.period,
+        );
+        const count = (seenKeys.get(baseKey) ?? 0) + 1;
+        seenKeys.set(baseKey, count);
+        const idempotencyKey = count === 1 ? baseKey : `${baseKey}-${count}`;
+        return {
+          idempotencyKey,
+          signal,
+          attribution: {
+            strategyName: `definition-${options.strategyDefinitionId ?? 0}`,
+            periodLabel: `${options.period}m`,
+            traceChain: renderTraceChainOf(signal.decisionTrace),
+          },
+        };
+      }),
     };
     pendingSignals.length = 0;
 
@@ -2117,8 +2125,6 @@ const server = http.createServer(async (req, res) => {
         }).toISOString(),
         pivotTime: sig.pivotTime || sig.signalTime,
         signalType: sig.signalType,
-        confidence: sig.confidence,
-        confidenceLevel: 'HIGH',
         decisionTrace: sig.decisionTrace,
         contextSnapshot: {
           type: sig.signalType,

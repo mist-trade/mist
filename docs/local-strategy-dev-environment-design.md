@@ -151,7 +151,7 @@ export function loadCanonicalKlines(options: KLineLoadOptions): ChanK[] {
    - 打开 `http://localhost:3000/backtests`；
    - 页面直接渲染本地数据生成的 TradingView 原生 K 线；
    - 黄色笔折线、洋红色线段、笔中枢阴影与策略的 `▲ 一买`、`▲ 二买`、`▼ 一卖` 标签完全融合展示；
-   - 点击买卖点图钉，右侧滑出抽屉，实时显示该点的 MACD 能量面积、背驰比例、置信度与触发理由。
+   - 点击买卖点图钉，右侧滑出抽屉，实时显示该点的 MACD 能量面积、背驰比例与触发理由。
 
 ---
 

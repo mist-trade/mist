@@ -4,7 +4,6 @@ export type DecisionFlowNode =
   | GuardNode
   | BranchNode
   | ExtractorNode
-  | ConsensusNode
   | TerminalNode;
 
 /**
@@ -25,8 +24,6 @@ export interface GuardNode {
   readonly params?: Record<string, unknown>;
   /** 期望通过的动作，通常为 'BUY'，多空并存时可指定为 'BOTH' 或 'ANY' */
   readonly requiredAction: FactorAction | 'BOTH' | 'ANY';
-  /** 最低置信度要求（低于此置信度视作门禁未过，默认 0.0） */
-  readonly minConfidence?: number;
   /** 门禁通过后流向的下一个节点 */
   readonly onPass: DecisionFlowNode;
   /** 门禁未通过后流向的节点（可选，若未指定则默认静默 Abort 剪枝） */
@@ -71,37 +68,6 @@ export interface ExtractorNode {
 }
 
 /**
- * 局部加权共识节点挂载的插件配置
- */
-export interface ConsensusPluginWeight {
-  readonly pluginId: string;
-  /** 权重分值（所有项权重相加通常为 100） */
-  readonly weight: number;
-  /** 是否拥有一票否决权（若为 true 且该插件投了 SELL，综合得分直接归零） */
-  readonly isVeto?: boolean;
-  readonly params?: Record<string, unknown>;
-}
-
-/**
- * 局部加权共识节点：在决策树分支末端对多个平行因子进行局部并联打分
- */
-export interface ConsensusNode {
-  readonly id: string;
-  readonly type: 'CONSENSUS';
-  readonly name: string;
-  /** 综合置信度最低触发阈值 (0.0 ~ 100.0) */
-  readonly threshold: number;
-  /** 期望共识达成动作（通常为 'BUY'，卖出/风控分支可指定为 'SELL'，默认为 'BUY'） */
-  readonly targetAction?: FactorAction;
-  /** 挂载的投票插件列表 */
-  readonly plugins: readonly ConsensusPluginWeight[];
-  /** 打分达标后流向的下一个节点（通常为 TerminalNode） */
-  readonly onSuccess: DecisionFlowNode;
-  /** 打分未达标流向的节点（可选，默认终止） */
-  readonly onFailure?: DecisionFlowNode;
-}
-
-/**
  * 终结执行节点：决策流的叶子节点，负责发出交易信号或记录终止阻断
  */
 export interface TerminalNode {
@@ -116,38 +82,21 @@ export interface TerminalNode {
 }
 
 /**
- * 共识节点投票明细
- */
-export interface ConsensusVoteBreakdown {
-  readonly pluginId: string;
-  readonly weight: number;
-  readonly action: FactorAction;
-  readonly confidence: number;
-  readonly reason: string;
-  readonly isVeto?: boolean;
-  readonly vetoTriggered?: boolean;
-}
-
-/**
  * 决策流节点白盒执行轨迹明细
  */
 export interface DecisionExecutionTraceItem {
   readonly nodeId: string;
-  readonly type: 'GUARD' | 'BRANCH' | 'EXTRACTOR' | 'CONSENSUS' | 'TERMINAL';
+  readonly type: 'GUARD' | 'BRANCH' | 'EXTRACTOR' | 'TERMINAL';
   /** 产出该节点意见的插件 id（BRANCH/TERMINAL 等非插件节点为空） */
   readonly pluginId?: string;
   readonly name?: string;
   readonly action?: FactorAction | 'ABORT';
   readonly signalTag?: string;
-  readonly confidence?: number;
-  readonly score?: number;
-  readonly threshold?: number;
   readonly reason?: string;
   readonly exportedKey?: string;
   readonly conditionResult?: boolean;
-  /** GUARD / CONSENSUS 节点是否通过（用于隔离 onFail 路径上的失败轨迹项） */
+  /** GUARD 节点是否通过（用于隔离 onFail 路径上的失败轨迹项） */
   readonly passed?: boolean;
-  readonly breakdown?: readonly ConsensusVoteBreakdown[];
   readonly evidence?: Readonly<Record<string, unknown>>;
   readonly badgeText?: string;
   readonly displayTag?: string;
@@ -159,18 +108,12 @@ export interface DecisionExecutionTraceItem {
 
 export type DecisionStatus = 'SIGNAL_EMITTED' | 'ABORTED';
 
-export type ConfidenceLevel = 'HIGH' | 'MEDIUM' | 'LOW';
-
 /**
  * 决策流最终求值结果
  */
 export interface DecisionResult {
   readonly status: DecisionStatus;
   readonly action?: 'BUY' | 'SELL';
-  /** 最终综合置信度 (0.0 ~ 100.0) */
-  readonly confidence: number;
-  /** 置信度评级：HIGH (>=80), MEDIUM (65~79), LOW (<65) */
-  readonly confidenceLevel: ConfidenceLevel;
   /** 业务标签 */
   readonly signalTag?: string;
   /** 人类可读说明 */

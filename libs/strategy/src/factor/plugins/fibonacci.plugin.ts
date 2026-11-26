@@ -15,7 +15,6 @@ import {
   DECISION_ACTIONS,
   DEFAULT_REQUIRED_BARS_BI,
   DEFAULT_REQUIRED_BARS_DUAN,
-  DEFAULT_TECHNICAL_FACTOR_CONFIDENCE,
 } from '../../strategy.constants';
 import type {
   FactorContext,
@@ -91,7 +90,6 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
     if ((readContextSeries(context, context.period) ?? []).length < minBars) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
-        confidence: 0.0,
         reason: `K线数量不足(${(readContextSeries(context, context.period) ?? []).length}/${minBars})，无法确立缠论${unitLabel}结构`,
       };
     }
@@ -102,7 +100,6 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
     if (klines.length === 0) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
-        confidence: 0.0,
         reason: '有效行情数据为空，未形成缠论K线',
       };
     }
@@ -111,7 +108,6 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
     if (!unit) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
-        confidence: 0.0,
         reason: `尚未形成已确认的缠论${unitLabel}，斐波那契锚点不可用（不回退滚动窗口）`,
         evidence: {
           units,
@@ -129,7 +125,6 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
     if (swingDirection === null) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
-        confidence: 0.0,
         reason: `最近已确认的缠论${unitLabel}方向未知，无法判定斐波那契口径`,
         evidence: {
           units,
@@ -169,7 +164,6 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
       if (obs.isGoldenPocket) {
         return {
           action: DECISION_ACTIONS.BUY,
-          confidence: DEFAULT_TECHNICAL_FACTOR_CONFIDENCE,
           reason: `价格回调至缠论${unitLabel}构成的斐波那契黄金口袋区间 [${goldenPocketBottom} ~ ${goldenPocketTop}] (当前回撤: ${ratioPercent}%)`,
           evidence: {
             ...swingEvidence,
@@ -195,7 +189,6 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
       if (obs.isGoldenPocket) {
         return {
           action: DECISION_ACTIONS.SELL,
-          confidence: DEFAULT_TECHNICAL_FACTOR_CONFIDENCE,
           reason: `价格反弹至缠论${unitLabel}构成的斐波那契黄金口袋阻力区 [${goldenPocketBottom} ~ ${goldenPocketTop}] (当前反弹: ${ratioPercent}%)`,
           evidence: {
             ...swingEvidence,
@@ -231,7 +224,6 @@ export class FibonacciRetracementPlugin implements FactorPlugin {
 
     return {
       action: DECISION_ACTIONS.NEUTRAL,
-      confidence: 0.0,
       reason: `价格处于缠论${unitLabel}的斐波那契${zoneDesc}，未触发黄金口袋共振`,
       evidence: {
         ...swingEvidence,

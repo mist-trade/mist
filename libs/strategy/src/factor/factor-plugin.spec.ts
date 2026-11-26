@@ -78,7 +78,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
         description: 'Test dummy',
         evaluate: async () => ({
           action: 'BUY',
-          confidence: 0.9,
           reason: 'test',
         }),
       };
@@ -121,7 +120,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       });
 
       expect(opinion.action).toBe('BUY');
-      expect(opinion.confidence).toBe(0.9);
       expect(opinion.evidence?.passed).toBe(true);
     });
 
@@ -143,7 +141,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       });
 
       expect(opinion.action).toBe('SELL');
-      expect(opinion.confidence).toBe(0.95);
       expect(opinion.evidence?.passed).toBe(false);
     });
 
@@ -166,7 +163,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       });
 
       expect(opinion.action).toBe('NEUTRAL');
-      expect(opinion.confidence).toBe(0.9);
       expect(opinion.evidence?.passed).toBe(true);
     });
 
@@ -181,7 +177,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
 
       const opinion = await plugin.evaluate(context);
       expect(opinion.action).toBe('NEUTRAL');
-      expect(opinion.confidence).toBe(0.0);
       expect(opinion.evidence?.bypassed).toBe(true);
     });
   });
@@ -200,7 +195,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
 
       const opinion = await plugin.evaluate(context, { minInflowWan: 2000 });
       expect(opinion.action).toBe('BUY');
-      expect(opinion.confidence).toBeGreaterThan(0.75);
     });
 
     it('returns SELL when net outflow exceeds threshold', async () => {
@@ -214,7 +208,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
 
       const opinion = await plugin.evaluate(context, { minInflowWan: 2000 });
       expect(opinion.action).toBe('SELL');
-      expect(opinion.confidence).toBe(0.85);
     });
 
     it('returns BUY based on non-dimensional turnover ratio (minInflowRatio)', async () => {
@@ -254,7 +247,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
 
       const opinion = await plugin.evaluate(context, { requiredBarCount: 50 });
       expect(opinion.action).toBe('NEUTRAL');
-      expect(opinion.confidence).toBe(0.0);
       expect(opinion.reason).toContain('K线不足');
     });
   });
@@ -300,7 +292,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       });
 
       expect(opinion.action).toBe('BUY');
-      expect(opinion.confidence).toBe(0.8);
       expect(opinion.evidence?.matched).toBe(true);
     });
 
@@ -335,7 +326,6 @@ describe('Phase 1: Factor Plugins & Registry', () => {
       });
 
       expect(opinion.action).toBe('NEUTRAL');
-      expect(opinion.confidence).toBe(0.0);
       expect(opinion.evidence?.matched).toBe(false);
     });
   });

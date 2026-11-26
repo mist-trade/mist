@@ -13,8 +13,9 @@ import {
   StrategyStatus,
   StrategyVersion,
 } from '@app/shared-data';
-import type { CompiledStrategyExecutionPlan } from '@app/strategy';
 import {
+  type CompiledStoredDefinition,
+  type CompiledStrategyExecutionPlan,
   StoredDefinitionCompileError,
   compileStoredDefinitionVersion,
 } from '@app/strategy';
@@ -219,15 +220,15 @@ export class StrategyDefinitionService {
     version: StrategyVersion,
     forRealtime: boolean,
   ): void {
-    if (definition.kind === StrategyKind.DECISION_FLOW) {
-      const rootNode = (version.rule as any)?.rootNode;
-      if (!rootNode || !rootNode.type) {
-        throw new BadRequestException('决策流版本规则缺少有效的 rootNode');
-      }
-      return;
-    }
-    if (definition.kind === StrategyKind.CHAN_BSP) {
-      compileStoredDefinitionVersionSafe(definition.kind, version.rule);
+    if (
+      definition.kind === StrategyKind.DECISION_FLOW ||
+      definition.kind === StrategyKind.CHAN_BSP
+    ) {
+      compileStoredDefinitionVersionSafe(
+        definition.kind,
+        version.rule,
+        version.signalKind,
+      );
       return;
     }
     if (forRealtime) {
@@ -248,19 +249,18 @@ export class StrategyDefinitionService {
     validationSummary: Record<string, unknown>;
   } {
     if (kind === StrategyKind.DECISION_FLOW) {
-      const rootNode = (rule as any)?.rootNode;
-      if (!rootNode || !rootNode.type) {
-        throw new BadRequestException(
-          '决策流策略必须包含有效的根节点定义 rootNode',
-        );
-      }
+      const compiled = compileStoredDefinitionVersionSafe(
+        kind,
+        rule,
+        signalKind,
+      );
       return {
         normalizedRule: rule,
         validationSummary: {
           ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
           kind: 'decision_flow',
-          rootNodeType: rootNode.type,
-          requiredBarCount: (rule as any)?.requiredBarCount ?? 50,
+          rootNodeType: compiled.flow.type,
+          requiredBarCount: compiled.requiredBarCount,
         },
       };
     }
@@ -290,12 +290,16 @@ function toValidationSummary(
 function compileStoredDefinitionVersionSafe(
   kind: StrategyKind,
   rule: Record<string, unknown>,
-): void {
+  signalKind?: StrategySignalKind,
+): CompiledStoredDefinition {
   try {
-    compileStoredDefinitionVersion({ kind, rule });
+    return compileStoredDefinitionVersion({ kind, rule, signalKind });
   } catch (error) {
     if (error instanceof StoredDefinitionCompileError) {
-      throw new BadRequestException(error.message);
+      throw new BadRequestException({
+        code: error.code,
+        message: error.message,
+      });
     }
     throw error;
   }

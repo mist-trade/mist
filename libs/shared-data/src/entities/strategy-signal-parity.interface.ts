@@ -19,8 +19,6 @@ export interface StrategySignalParityRecord {
   signalType: string;
   signalKind: StrategySignalKind;
   signalSource: StrategySignalSource;
-  confidence?: number | null;
-  confidenceLevel?: 'HIGH' | 'MEDIUM' | 'LOW' | null;
   contextSnapshot: Record<string, unknown>;
   decisionTrace?: Record<string, unknown> | null;
   ruleSnapshot: Record<string, unknown>;

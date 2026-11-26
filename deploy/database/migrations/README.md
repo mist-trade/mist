@@ -389,3 +389,11 @@ Forward-only. `backtest_runs` 扩展净值时序与回测套件元数据：
 3. 添加 `parent_run_id int NULL` 及外键关联，支持子母回测层级。
 4. 添加 `suite_id varchar(64) NULL`, `stage varchar(32) NULL`, `scenario_id varchar(64) NULL` 及复合索引 `idx_btr_suite`，支持套件批次与压力测试场景切分。
 
+## 038 — drop_signal_confidence_columns
+
+Forward-only. 物理移除信号置信度体系并停用含废弃决策流字段的启用策略：
+1. 从 `strategy_signals` 与 `backtest_signal_results` 删除 `confidence` 与 `confidence_level` 列。
+2. 保留 `strategy_versions.rule` 不可变审计历史，将 `kind = 'decision_flow'` 且 `status = 'enabled'`、其 `current_version_id` 对应 `rule` JSON 仍含 `minConfidence` 键或 `type = 'CONSENSUS'` 节点的 `strategy_definitions` 置为 `disabled`，防止运行时编译边界 fail-closed 启动报错。
+3. **部署顺序要求**：须先部署（或原子窗口同步部署）不再读写 `confidence` / `confidence_level` 的新版应用镜像，再在非交易时段（15:30 后）执行本迁移；回滚需从迁移前库备份恢复并回退应用镜像。
+
+

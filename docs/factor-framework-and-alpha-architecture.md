@@ -1,6 +1,9 @@
 # Mist 多因子体系与现代 Alpha 架构全景设计指南
 ## —— 聚焦 ETF 市场的系统化 CTA 决策流设计
 
+> [!NOTE]
+> **口径演进提示（2026-11-26）**：本文部分早期蓝图段落中的 `FactorOpinion.confidence`、`GUARD.minConfidence` 与 `CONSENSUS` 节点已在生产栈物理退役（`consolidate-same-direction-signals-and-remove-confidence`）。当前决策流仅保留 `GUARD` / `BRANCH` / `EXTRACTOR` / `TERMINAL` 四类节点，多策略/多周期共振由完整交易引擎 `TradingEngine` 的两阶段同向归并原生承载。
+
 > 本文档整理汇总了关于现代量化多因子库、经典量价因子演化历程、工业级量化流水线、个人量化走向系统化 CTA 的必然逻辑、AI 平权时代的陷阱与认知、时序与截面的本质之辨、AlphaGPT 自动因子挖掘架构与定位、聚宽等真实因子平台生态透视、工业界与 Mist 的异同全景对比；重点针对**个股非系统性风险过大**的痛点，将核心战场全面聚焦于**高流动性 ETF 市场**（零印花税、免疫造假退市、趋势纯粹、支持跨境 T+0），并构建了结合 SMC（价格行为/流动性）、订单流筹码分布、宏观波动率与买卖全生命周期闭环的实战决策流蓝图。
 
 ---

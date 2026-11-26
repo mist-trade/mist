@@ -61,7 +61,7 @@ describe('Phase 2: Decision Flow Engine', () => {
   });
 
   describe('GuardNode (Fast-Fail Short-Circuit)', () => {
-    it('passes through onPass when requiredAction and minConfidence are satisfied', async () => {
+    it('passes through onPass when requiredAction is satisfied', async () => {
       registry.register({
         id: 'plugin.guard.mock',
         name: 'Mock Guard',
@@ -70,7 +70,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         description: '',
         evaluate: async () => ({
           action: 'BUY',
-          confidence: 0.9,
           reason: '大盘安全',
         }),
       });
@@ -81,7 +80,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         name: '环境门禁',
         pluginId: 'plugin.guard.mock',
         requiredAction: 'BUY',
-        minConfidence: 0.8,
         onPass: {
           id: 'term_buy',
           type: 'TERMINAL',
@@ -107,7 +105,7 @@ describe('Phase 2: Decision Flow Engine', () => {
       expect(result.trace[1].type).toBe('TERMINAL');
     });
 
-    it('aborts when guard confidence is below minConfidence', async () => {
+    it('aborts when guard action does not match requiredAction', async () => {
       registry.register({
         id: 'plugin.guard.mock',
         name: 'Mock Guard',
@@ -115,9 +113,8 @@ describe('Phase 2: Decision Flow Engine', () => {
         version: '1.0.0',
         description: '',
         evaluate: async () => ({
-          action: 'BUY',
-          confidence: 0.6,
-          reason: '微弱看多',
+          action: 'NEUTRAL',
+          reason: '暂未看多',
         }),
       });
 
@@ -127,7 +124,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         name: '环境门禁',
         pluginId: 'plugin.guard.mock',
         requiredAction: 'BUY',
-        minConfidence: 0.8,
         onPass: {
           id: 'term_buy',
           type: 'TERMINAL',
@@ -158,7 +154,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         description: '',
         evaluate: async () => ({
           action: 'SELL',
-          confidence: 0.9,
           reason: '缠论笔级三卖确认',
         }),
       });
@@ -169,7 +164,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         name: '多空双向门禁',
         pluginId: 'plugin.guard.sell_mock',
         requiredAction: 'BOTH',
-        minConfidence: 0.6,
         onPass: {
           id: 'term_inherit',
           type: 'TERMINAL',
@@ -190,7 +184,6 @@ describe('Phase 2: Decision Flow Engine', () => {
       expect(result.status).toBe('SIGNAL_EMITTED');
       expect(result.action).toBe('SELL');
       expect(result.signalTag).toBe('CHAN_BSP_SIGNAL');
-      expect(result.confidence).toBe(90);
     });
 
     it('enforces directional isolation: prevents SELL signal from entering BUY guard and routes to onFail with SELL preserved', async () => {
@@ -202,7 +195,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         description: '',
         evaluate: async () => ({
           action: 'SELL',
-          confidence: 0.9,
           badgeText: '3卖',
           reason: '缠论笔级三卖确认',
         }),
@@ -216,7 +208,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         description: '',
         evaluate: async () => ({
           action: 'BUY',
-          confidence: 0.85,
           badgeText: '量价真实确认买',
           reason: '放量共振',
         }),
@@ -228,14 +219,12 @@ describe('Phase 2: Decision Flow Engine', () => {
         name: '上游主形态门禁(BOTH)',
         pluginId: 'plugin.guard.upstream_sell',
         requiredAction: 'BOTH',
-        minConfidence: 0.5,
         onPass: {
           id: 'guard_downstream',
           type: 'GUARD',
           name: '下游量价买入增强(BUY)',
           pluginId: 'plugin.guard.downstream_buy',
           requiredAction: 'BUY',
-          minConfidence: 0.5,
           onPass: {
             id: 'term_enhanced_buy',
             type: 'TERMINAL',
@@ -363,7 +352,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         description: '',
         evaluate: async () => ({
           action: 'NEUTRAL',
-          confidence: 1.0,
           reason: '中枢区间提取成功',
           evidence: { zd: 10.5, zg: 12.8 },
         }),
@@ -418,121 +406,11 @@ describe('Phase 2: Decision Flow Engine', () => {
     });
   });
 
-  describe('ConsensusNode (Parallel Weighted Scoring & Veto)', () => {
-    beforeEach(() => {
-      registry.register({
-        id: 'plugin.vote.p1',
-        name: 'Plugin 1',
-        category: 'TECHNICAL',
-        version: '1.0.0',
-        description: '',
-        evaluate: async () => ({
-          action: 'BUY',
-          confidence: 0.9,
-          reason: 'P1看多',
-        }),
-      });
-
-      registry.register({
-        id: 'plugin.vote.p2',
-        name: 'Plugin 2',
-        category: 'CAPITAL',
-        version: '1.0.0',
-        description: '',
-        evaluate: async () => ({
-          action: 'BUY',
-          confidence: 0.8,
-          reason: 'P2看多',
-        }),
-      });
-
-      registry.register({
-        id: 'plugin.vote.veto',
-        name: 'Veto Plugin',
-        category: 'FUNDAMENTAL',
-        version: '1.0.0',
-        description: '',
-        evaluate: async () => ({
-          action: 'SELL',
-          confidence: 0.95,
-          reason: '重大财务雷点',
-        }),
-      });
-    });
-
-    it('calculates weighted score and passes when score exceeds threshold', async () => {
-      // 权重 60 * 0.9 + 40 * 0.8 = 54 + 32 = 86 分
-      const flow: DecisionFlowNode = {
-        id: 'consensus_1',
-        type: 'CONSENSUS',
-        name: '多因子加权共识',
-        threshold: 80.0,
-        plugins: [
-          { pluginId: 'plugin.vote.p1', weight: 60 },
-          { pluginId: 'plugin.vote.p2', weight: 40 },
-        ],
-        onSuccess: {
-          id: 'term_consensus_pass',
-          type: 'TERMINAL',
-          action: 'BUY',
-          signalTag: 'CONSENSUS_BULL',
-        },
-      };
-
-      const context: FactorContext = {
-        securityId: 1,
-        securityCode: '000001',
-        timestamp: new Date(),
-        period: 5,
-        attributes: new Map(),
-      };
-
-      const result = await evaluator.evaluate(flow, context);
-      expect(result.status).toBe('SIGNAL_EMITTED');
-      expect(result.confidence).toBe(86.0);
-      expect(result.confidenceLevel).toBe('HIGH');
-      expect(result.signalTag).toBe('CONSENSUS_BULL');
-    });
-
-    it('aborts immediately when a veto-enabled plugin emits SELL', async () => {
-      const flow: DecisionFlowNode = {
-        id: 'consensus_veto',
-        type: 'CONSENSUS',
-        name: '带一票否决的共识',
-        threshold: 50.0,
-        plugins: [
-          { pluginId: 'plugin.vote.p1', weight: 80 },
-          { pluginId: 'plugin.vote.veto', weight: 20, isVeto: true },
-        ],
-        onSuccess: {
-          id: 'term_pass',
-          type: 'TERMINAL',
-          action: 'BUY',
-        },
-      };
-
-      const context: FactorContext = {
-        securityId: 1,
-        securityCode: '000001',
-        timestamp: new Date(),
-        period: 5,
-        attributes: new Map(),
-      };
-
-      const result = await evaluator.evaluate(flow, context);
-      expect(result.status).toBe('ABORTED');
-      expect(result.confidence).toBe(0);
-      expect(result.reason).toContain('一票否决权');
-    });
-  });
-
   describe('DecisionExecutionTraceBuilder', () => {
-    it('builds structured snapshot and informative human-readable summary', () => {
+    it('builds structured snapshot and informative human-readable summary without confidence badges', () => {
       const result = {
         status: 'SIGNAL_EMITTED' as const,
         action: 'BUY' as const,
-        confidence: 88.5,
-        confidenceLevel: 'HIGH' as const,
         signalTag: 'BREAKOUT_RESONANCE',
         reason: '决策流信号发射 (买入/开仓)',
         trace: [
@@ -541,24 +419,7 @@ describe('Phase 2: Decision Flow Engine', () => {
             type: 'GUARD' as const,
             name: '财务安全门禁',
             action: 'BUY' as const,
-            confidence: 0.95,
             reason: 'ROE达标',
-          },
-          {
-            nodeId: 'consensus_1',
-            type: 'CONSENSUS' as const,
-            name: '共识打分',
-            score: 88.5,
-            threshold: 75.0,
-            breakdown: [
-              {
-                pluginId: 'plugin.technical.breakout',
-                weight: 50,
-                action: 'BUY' as const,
-                confidence: 0.9,
-                reason: '放量突破',
-              },
-            ],
           },
           {
             nodeId: 'term_1',
@@ -570,11 +431,11 @@ describe('Phase 2: Decision Flow Engine', () => {
       };
 
       const snapshot = DecisionExecutionTraceBuilder.buildSnapshot(result);
-      expect(snapshot.confidence).toBe(88.5);
-      expect(snapshot.confidenceLevel).toBe('HIGH');
-      expect(snapshot.summary).toContain('[HIGH 88.5%]');
-      expect(snapshot.summary).toContain('门禁[财务安全门禁]通过');
-      expect(snapshot.summary).toContain('触发买入信号');
+      expect(snapshot.summary).not.toMatch(/\[(HIGH|MEDIUM|LOW)/);
+      expect(snapshot.summary).not.toContain('%');
+      expect(snapshot.summary).toBe(
+        '门禁[财务安全门禁]通过 -> 触发买入信号 [BREAKOUT_RESONANCE]',
+      );
     });
   });
 
@@ -639,7 +500,6 @@ describe('Phase 2: Decision Flow Engine', () => {
           if (pos?.state === 'HOLDING' && pos.activeEntries?.length > 0) {
             return {
               action: 'SELL',
-              confidence: 0.95,
               reason: '跌破成本防守线',
               badgeText: '破位止损',
               displayTag: 'EXIT_STOP',
@@ -650,7 +510,7 @@ describe('Phase 2: Decision Flow Engine', () => {
               },
             };
           }
-          return { action: 'NEUTRAL', confidence: 0, reason: '未触发出场' };
+          return { action: 'NEUTRAL', reason: '未触发出场' };
         },
       });
 
@@ -663,7 +523,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         description: 'Mock entry plugin',
         evaluate: async () => ({
           action: 'BUY',
-          confidence: 0.88,
           reason: '1买触发',
           badgeText: '1买',
         }),
@@ -764,7 +623,7 @@ describe('Phase 2: Decision Flow Engine', () => {
       expect(flatResult.badgeText).toBe('1买');
     });
 
-    it('onFail 保留上游 score 且失败 GUARD 不污染 evidence / badgeText / pivot / traceChain', async () => {
+    it('失败 GUARD 不污染 evidence / badgeText / pivot / traceChain', async () => {
       registry.register({
         id: 'plugin.guard.fail-a',
         name: '门禁A',
@@ -773,7 +632,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         description: 'fail',
         evaluate: async () => ({
           action: 'NEUTRAL',
-          confidence: 0,
           reason: '未触发A',
           badgeText: 'A失败徽标',
           evidence: {
@@ -791,7 +649,6 @@ describe('Phase 2: Decision Flow Engine', () => {
         description: 'pass',
         evaluate: async () => ({
           action: 'BUY',
-          confidence: 0.95,
           reason: 'B突破成立',
           badgeText: 'B突破',
           evidence: {
@@ -839,8 +696,6 @@ describe('Phase 2: Decision Flow Engine', () => {
 
       const result = await evaluator.evaluate(flow, context);
       expect(result.status).toBe('SIGNAL_EMITTED');
-      expect(result.confidence).toBe(95);
-      expect(result.confidenceLevel).toBe('HIGH');
       expect(result.badgeText).toBe('B突破');
       expect(result.evidence).toMatchObject({ eventType: 'TEST_B' });
       expect(result.trace[0]?.passed).toBe(false);

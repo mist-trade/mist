@@ -12,7 +12,7 @@ export interface ContextPrefetchSpec {
 /**
  * 收集一个决策流里所有 role:'context' 插件的 (pluginId, params) 求值组合
  * （2026-11-24 定稿，决策文档 7.1.1）。内核每 Bar 对每个组合预求值一次并写入
- * 黑板；GUARD/EXTRACTOR/CONSENSUS 节点按相同键读缓存，相同参数的组合只求值一次。
+ * 黑板；GUARD/EXTRACTOR 节点按相同键读缓存，相同参数的组合只求值一次。
  */
 export function collectContextPrefetchSpecs(
   flow: DecisionFlowNode,
@@ -39,11 +39,6 @@ export function collectContextPrefetchSpecs(
       case 'EXTRACTOR':
         add(node.pluginId, node.params);
         visit(node.next);
-        break;
-      case 'CONSENSUS':
-        for (const item of node.plugins) add(item.pluginId, item.params);
-        visit(node.onSuccess);
-        visit(node.onFailure);
         break;
       case 'BRANCH':
         if (node.condition.pluginId) add(node.condition.pluginId, undefined);

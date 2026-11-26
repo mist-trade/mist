@@ -36,11 +36,6 @@ export function collectVirtualExitBindings(
         collect(node.pluginId, node.params);
         visit(node.next);
         break;
-      case 'CONSENSUS':
-        for (const item of node.plugins) collect(item.pluginId, item.params);
-        visit(node.onSuccess);
-        visit(node.onFailure);
-        break;
       case 'BRANCH':
         if (node.condition.pluginId)
           collect(node.condition.pluginId, undefined);

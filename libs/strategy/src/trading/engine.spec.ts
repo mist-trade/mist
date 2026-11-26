@@ -1,8 +1,8 @@
 /**
- * TradingEngine 单测（REQ-ENGINE-01/02/03/04/05/07 + REQ-ISO-02）。
+ * TradingEngine 与 buildTradingManual 单测（两阶段同向归并 + 先出后进 + 确定性主锚点 + 无置信度渲染）。
  */
 import { TradingEngine } from './engine';
-import { sellFirstByConfidence } from './ordering';
+import { buildTradingManual } from './manual';
 import { createAllInWithBuffer } from './sizing';
 import { MarketRiskRegime } from './domain.types';
 import type {
@@ -28,8 +28,6 @@ function makeSignal(overrides: Partial<KernelSignal> = {}): KernelSignal {
     pivotTime: null,
     pivotPrice: null,
     signalType: 'CHAN_SECOND_BUY',
-    confidence: 0.88,
-    confidenceLevel: 'HIGH',
     decisionTrace: {},
     contextSnapshot: {},
     ruleSnapshot: {},
@@ -40,7 +38,7 @@ function makeSignal(overrides: Partial<KernelSignal> = {}): KernelSignal {
 function attributed(
   key: string,
   signal: KernelSignal,
-  confidence = signal.confidence,
+  overrides: Partial<AttributedSignal['attribution']> = {},
 ): AttributedSignal {
   return {
     idempotencyKey: key,
@@ -48,9 +46,8 @@ function attributed(
     attribution: {
       strategyName: '全共振战术',
       periodLabel: '30m',
-      confidence,
-      confidenceLevel: 'HIGH',
       traceChain: 'regime ✓ → chan ✓',
+      ...overrides,
     },
   };
 }
@@ -92,7 +89,7 @@ describe('TradingEngine', () => {
     });
   });
 
-  describe('REQ-ENGINE-02 先出后进 + 资金当刻可用', () => {
+  describe('REQ-ENGINE-02 先出后进 + 两阶段同向归并', () => {
     it('同组 EXIT 先于 ENTRY，卖出释放资金可供后续买入', () => {
       const held: TradingPositionState = {
         securityId: 1,
@@ -129,11 +126,244 @@ describe('TradingEngine', () => {
       expect(buy.quantity).toBeGreaterThan(0);
     });
 
-    it('平局规则：同 kind 按置信度降序、同置信度按幂等键字典序', () => {
-      const a = attributed('evt-b', makeSignal({ signalType: 'A' }), 0.9);
-      const b = attributed('evt-a', makeSignal({ signalType: 'B' }), 0.9);
-      const ordered = sellFirstByConfidence.order([a, b]);
-      expect(ordered.map((s) => s.idempotencyKey)).toEqual(['evt-a', 'evt-b']);
+    it('同组多 EXIT + 多 ENTRY 归并为 1 SELL + 1 BUY，完整保留 contributors 且零假拒绝', () => {
+      const held: TradingPositionState = {
+        securityId: 1,
+        securityCode: '000001',
+        holdingQuantity: 8000,
+        costPriceLi: yuanToLi(10),
+        entryTime: new Date('2026-01-14T07:00:00Z'),
+        currentPriceLi: yuanToLi(12),
+        realizedPnlLi: 0n,
+      };
+      const exit30 = attributed(
+        'offline-1-30-exit',
+        makeSignal({
+          definitionId: 1,
+          triggerPeriod: 30,
+          signalKind: 'exit',
+          signalType: 'VIRTUAL_EXIT',
+          triggerPrice: 12.1,
+        }),
+        { strategyName: '策略A', periodLabel: '30m', traceChain: '防守止盈 ✓' },
+      );
+      const exit1440 = attributed(
+        'offline-2-1440-exit',
+        makeSignal({
+          definitionId: 2,
+          triggerPeriod: 1440,
+          signalKind: 'exit',
+          signalType: 'CHAN_SECOND_SELL',
+          triggerPrice: 12.2,
+        }),
+        {
+          strategyName: '策略B',
+          periodLabel: '日线',
+          traceChain: '缠论二卖 ✓',
+        },
+      );
+      const entry30 = attributed(
+        'offline-3-30-entry',
+        makeSignal({
+          definitionId: 3,
+          triggerPeriod: 30,
+          signalKind: 'entry',
+          signalType: 'CHAN_FIRST_BUY',
+          triggerPrice: 12.3,
+        }),
+        { strategyName: '策略C', periodLabel: '30m', traceChain: '一买门禁 ✓' },
+      );
+      const entry1440 = attributed(
+        'offline-4-1440-entry',
+        makeSignal({
+          definitionId: 4,
+          triggerPeriod: 1440,
+          signalKind: 'entry',
+          signalType: 'GOLDEN_POCKET',
+          triggerPrice: 12.4,
+        }),
+        {
+          strategyName: '策略D',
+          periodLabel: '日线',
+          traceChain: '黄金口袋 ✓',
+        },
+      );
+
+      const decision = engine.decide(
+        groupOf([entry30, exit30, entry1440, exit1440]),
+        snapshot(new Map([[1, held]]), yuanToLi(100_000)),
+      );
+
+      expect(decision.rejections).toHaveLength(0);
+      expect(decision.instructions).toHaveLength(2);
+
+      const sell = decision.instructions[0];
+      expect(sell.action).toBe('SELL');
+      expect(sell.quantity).toBe(8000);
+      expect(sell.idempotencyKey).toBe('offline-2-1440-exit');
+      expect(sell.instructionId).toBe('ti-offline-2-1440-exit');
+      expect(sell.referencePrice).toBe(12.2);
+      expect(sell.reason).toBe('CHAN_SECOND_SELL + VIRTUAL_EXIT');
+      expect(sell.contributors?.map((c) => c.idempotencyKey)).toEqual([
+        'offline-2-1440-exit',
+        'offline-1-30-exit',
+      ]);
+
+      const buy = decision.instructions[1];
+      expect(buy.action).toBe('BUY');
+      expect(buy.idempotencyKey).toBe('offline-4-1440-entry');
+      expect(buy.instructionId).toBe('ti-offline-4-1440-entry');
+      expect(buy.referencePrice).toBe(12.4);
+      expect(buy.reason).toBe('GOLDEN_POCKET + CHAN_FIRST_BUY');
+      expect(buy.contributors?.map((c) => c.idempotencyKey)).toEqual([
+        'offline-4-1440-entry',
+        'offline-3-30-entry',
+      ]);
+    });
+
+    it('同组有效 ENTRY + triggerPrice<=0 破坏性 ENTRY：无效价格单独拒单，有效 ENTRY 正常成单', () => {
+      const badEntry = attributed(
+        'evt-bad-entry',
+        makeSignal({ signalKind: 'entry', triggerPrice: 0 }),
+      );
+      const validEntry = attributed(
+        'evt-good-entry',
+        makeSignal({ signalKind: 'entry', triggerPrice: 12.5 }),
+      );
+
+      const decision = engine.decide(
+        groupOf([badEntry, validEntry]),
+        snapshot(),
+      );
+
+      expect(decision.instructions).toHaveLength(1);
+      expect(decision.instructions[0].idempotencyKey).toBe('evt-good-entry');
+      expect(decision.rejections).toHaveLength(1);
+      expect(decision.rejections[0].idempotencyKey).toBe('evt-bad-entry');
+      expect(decision.rejections[0].reason).toBe('INVALID_PRICE');
+    });
+
+    it('同组有效 EXIT + triggerPrice<=0 破坏性 EXIT：无效价格单独拒单，有效 EXIT 正常平仓', () => {
+      const held: TradingPositionState = {
+        securityId: 1,
+        securityCode: '000001',
+        holdingQuantity: 4000,
+        costPriceLi: yuanToLi(10),
+        entryTime: new Date('2026-01-14T07:00:00Z'),
+        currentPriceLi: yuanToLi(12),
+        realizedPnlLi: 0n,
+      };
+      const badExit = attributed(
+        'evt-bad-exit',
+        makeSignal({
+          signalKind: 'exit',
+          signalType: 'CHAN_FIRST_SELL',
+          triggerPrice: -2,
+        }),
+      );
+      const validExit = attributed(
+        'evt-good-exit',
+        makeSignal({
+          signalKind: 'exit',
+          signalType: 'CHAN_SECOND_SELL',
+          triggerPrice: 12.5,
+        }),
+      );
+
+      const decision = engine.decide(
+        groupOf([badExit, validExit]),
+        snapshot(new Map([[1, held]])),
+      );
+
+      expect(decision.instructions).toHaveLength(1);
+      expect(decision.instructions[0].action).toBe('SELL');
+      expect(decision.instructions[0].idempotencyKey).toBe('evt-good-exit');
+      expect(decision.instructions[0].quantity).toBe(4000);
+      expect(decision.rejections).toHaveLength(1);
+      expect(decision.rejections[0].idempotencyKey).toBe('evt-bad-exit');
+      expect(decision.rejections[0].reason).toBe('INVALID_PRICE');
+      expect(decision.accountAfter.positions.has(1)).toBe(false);
+    });
+
+    it('实时正整数 alertEventId 主锚点按数值升序（"2" 胜出 "10"）', () => {
+      const sig10 = attributed(
+        '10',
+        makeSignal({ signalType: 'TYPE_10', triggerPrice: 12.0 }),
+      );
+      const sig2 = attributed(
+        '2',
+        makeSignal({ signalType: 'TYPE_2', triggerPrice: 12.5 }),
+      );
+
+      const decision = engine.decide(groupOf([sig10, sig2]), snapshot());
+
+      expect(decision.instructions).toHaveLength(1);
+      expect(decision.instructions[0].idempotencyKey).toBe('2');
+      expect(decision.instructions[0].instructionId).toBe('ti-2');
+      expect(decision.instructions[0].referencePrice).toBe(12.5);
+      expect(
+        decision.instructions[0].contributors?.map((c) => c.idempotencyKey),
+      ).toEqual(['2', '10']);
+    });
+
+    it('全部同向有效 ENTRY 被持仓门禁拒绝时产 1 条归并拒绝并携带全员 contributors', () => {
+      const held: TradingPositionState = {
+        securityId: 1,
+        securityCode: '000001',
+        holdingQuantity: 1000,
+        costPriceLi: yuanToLi(10),
+        entryTime: new Date('2026-01-10T07:00:00Z'),
+        currentPriceLi: yuanToLi(12),
+        realizedPnlLi: 0n,
+      };
+      const decision = engine.decide(
+        groupOf([
+          attributed('10', makeSignal({ signalType: 'FIRST_BUY' })),
+          attributed('2', makeSignal({ signalType: 'SECOND_BUY' })),
+        ]),
+        snapshot(new Map([[1, held]])),
+      );
+
+      expect(decision.instructions).toHaveLength(0);
+      expect(decision.rejections).toHaveLength(1);
+      expect(decision.rejections[0].idempotencyKey).toBe('2');
+      expect(decision.rejections[0].reason).toBe('ALREADY_HOLDING');
+      expect(
+        decision.rejections[0].contributors?.map((c) => c.idempotencyKey),
+      ).toEqual(['2', '10']);
+    });
+
+    it('全部同向有效 EXIT 被 T+1 冻结拒绝时产 1 条归并拒绝并携带全员 contributors', () => {
+      const heldToday: TradingPositionState = {
+        securityId: 1,
+        securityCode: '000001',
+        holdingQuantity: 1000,
+        costPriceLi: yuanToLi(10),
+        entryTime: SIGNAL_TIME,
+        currentPriceLi: yuanToLi(12),
+        realizedPnlLi: 0n,
+      };
+      const decision = engine.decide(
+        groupOf([
+          attributed(
+            '20',
+            makeSignal({ signalKind: 'exit', signalType: 'SELL_A' }),
+          ),
+          attributed(
+            '3',
+            makeSignal({ signalKind: 'exit', signalType: 'SELL_B' }),
+          ),
+        ]),
+        snapshot(new Map([[1, heldToday]])),
+      );
+
+      expect(decision.instructions).toHaveLength(0);
+      expect(decision.rejections).toHaveLength(1);
+      expect(decision.rejections[0].idempotencyKey).toBe('3');
+      expect(decision.rejections[0].reason).toBe('T1_FROZEN');
+      expect(
+        decision.rejections[0].contributors?.map((c) => c.idempotencyKey),
+      ).toEqual(['3', '20']);
     });
   });
 
@@ -232,8 +462,6 @@ describe('TradingEngine', () => {
         groupOf([attributed('evt-buy', makeSignal())]),
         snapshot(),
       );
-      const nextDay = first.accountAfter.tradingDay;
-      void nextDay;
       const held = first.accountAfter.positions.get(1)!;
       // 构造次日快照：entryTime 已是昨日（T+1 解冻），现价上涨
       const sold: TradingPositionState = {
@@ -337,8 +565,105 @@ describe('TradingEngine', () => {
         `ti-risk-000001-${SIGNAL_TIME.getTime()}-systemic-crunch`,
       );
     });
+  });
 
-    // 2026-11-25 拍板：硬止损退役出引擎（策略定义 → 插件 → 信号层），
-    // 由 virtual-exit/price-level-exit.policy.spec.ts 覆盖等价语义。
+  describe('buildTradingManual（无置信度徽标 + 多贡献者共振渲染）', () => {
+    it('单贡献者指令无置信度徽标', () => {
+      const decision = engine.decide(
+        groupOf([
+          attributed(
+            'evt-1',
+            makeSignal({ triggerPrice: 12.5, signalType: 'first_buy' }),
+            {
+              strategyName: '策略A',
+              periodLabel: '30m',
+              traceChain: '主门禁 ✓ → 买点因子 ✓',
+            },
+          ),
+        ]),
+        snapshot(new Map(), yuanToLi(105_264)), // 95% ≈ 100,000 → 8,000 股
+      );
+      const manual = buildTradingManual({
+        securityCode: '000001',
+        securityName: '平安银行',
+        securityId: 1,
+        effectiveTime: SIGNAL_TIME,
+        decision,
+      });
+
+      expect(manual).toContain(
+        '▶ 买入 8,000股 @ 12.50 ≈ 100,000 ｜ 策略A 30m first_buy\n    主门禁 ✓ → 买点因子 ✓',
+      );
+      expect(manual).not.toMatch(/\[(HIGH|MEDIUM|LOW|CONF)\s/);
+      expect(manual).not.toContain('%');
+    });
+
+    it('多贡献者共振指令展示 共振(N) 与编号归因链，多贡献者拒绝展示 共振(N)', () => {
+      const sigA = attributed(
+        'offline-1-30-a',
+        makeSignal({
+          definitionId: 1,
+          triggerPeriod: 30,
+          triggerPrice: 12.5,
+          signalType: 'first_buy',
+        }),
+        {
+          strategyName: '策略A',
+          periodLabel: '30m',
+          traceChain: '主门禁 ✓ → 买点因子 ✓',
+        },
+      );
+      const sigB = attributed(
+        'offline-2-1440-b',
+        makeSignal({
+          definitionId: 2,
+          triggerPeriod: 1440,
+          triggerPrice: 12.5,
+          signalType: 'golden_pocket',
+        }),
+        {
+          strategyName: '策略B',
+          periodLabel: '日线',
+          traceChain: '趋势过滤 ✓ → 回撤因子 ✓',
+        },
+      );
+      const buyDecision = engine.decide(
+        groupOf([sigA, sigB]),
+        snapshot(new Map(), yuanToLi(105_264)),
+      );
+      const buyManual = buildTradingManual({
+        securityCode: '000001',
+        securityName: '平安银行',
+        securityId: 1,
+        effectiveTime: SIGNAL_TIME,
+        decision: buyDecision,
+      });
+
+      expect(buyManual).toContain(
+        '▶ 买入 8,000股 @ 12.50 ≈ 100,000 ｜ 共振(2): 策略B 日线 golden_pocket + 策略A 30m first_buy',
+      );
+      expect(buyManual).toContain(
+        '    [1] 策略B 日线: 趋势过滤 ✓ → 回撤因子 ✓',
+      );
+      expect(buyManual).toContain('    [2] 策略A 30m: 主门禁 ✓ → 买点因子 ✓');
+      expect(buyManual).not.toContain('%');
+
+      // 持仓状态下再收双入场信号 → 合并拒绝标注 共振(2)
+      const rejectDecision = engine.decide(
+        groupOf([sigA, sigB]),
+        buyDecision.accountAfter,
+      );
+      const rejectManual = buildTradingManual({
+        securityCode: '000001',
+        securityName: '平安银行',
+        securityId: 1,
+        effectiveTime: SIGNAL_TIME,
+        decision: rejectDecision,
+      });
+      expect(rejectManual).toContain(
+        '✗ 买入已拒绝：ALREADY_HOLDING（虚拟账户已持仓 8000 股（成本 12500 厘））｜ 共振(2): 策略B 日线 golden_pocket + 策略A 30m first_buy',
+      );
+      expect(rejectManual).not.toContain('%');
+    });
   });
 });

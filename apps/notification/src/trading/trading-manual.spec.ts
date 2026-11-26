@@ -16,8 +16,6 @@ function signalEntity(overrides: Partial<StrategySignal> = {}): StrategySignal {
     signalTime: new Date('2026-08-12T09:35:00+08:00'),
     signalKind: 'entry' as StrategySignal['signalKind'],
     signalType: 'CHAN_SECOND_BUY',
-    confidence: 88.5,
-    confidenceLevel: 'HIGH',
     contextSnapshot: {},
     ruleSnapshot: {},
     ...overrides,
@@ -38,8 +36,6 @@ describe('buildTradingManual（REQ-MSG-01..03）', () => {
         attribution: {
           strategyName: '全共振战术',
           periodLabel: '30m',
-          confidence: 90.2,
-          confidenceLevel: 'HIGH',
           traceChain: 'regime 门禁 ✓ → chan 二卖 ✓',
         },
       },
@@ -54,8 +50,6 @@ describe('buildTradingManual（REQ-MSG-01..03）', () => {
         attribution: {
           strategyName: '全共振战术',
           periodLabel: '30m',
-          confidence: 88.5,
-          confidenceLevel: 'HIGH',
           traceChain: null,
         },
       },
@@ -74,8 +68,6 @@ describe('buildTradingManual（REQ-MSG-01..03）', () => {
             pivotTime: null,
             pivotPrice: null,
             signalType: 'DIVERGENCE_SELL',
-            confidence: 80.4,
-            confidenceLevel: 'MEDIUM',
             decisionTrace: {},
             contextSnapshot: {},
             ruleSnapshot: {},
@@ -83,8 +75,6 @@ describe('buildTradingManual（REQ-MSG-01..03）', () => {
           attribution: {
             strategyName: '波动压制',
             periodLabel: '60m',
-            confidence: 80.4,
-            confidenceLevel: 'MEDIUM',
             traceChain: null,
           },
         },
@@ -124,8 +114,9 @@ describe('buildTradingManual（REQ-MSG-01..03）', () => {
     expect(text).toContain('▶ 卖出 7,500股 @ 12.50 ≈ 93,750');
     expect(text).toContain('▶ 买入 7,600股 @ 12.34 ≈ 93,784');
     expect(text).toContain('✗ 卖出已拒绝：NO_POSITION（虚拟账户空仓）');
-    // 归因随行（REQ-MSG-03）
-    expect(text).toContain('全共振战术 30m CHAN_SECOND_BUY [HIGH 88.5%]');
+    // 归因随行（REQ-MSG-03，已移除置信度后缀）
+    expect(text).toContain('全共振战术 30m CHAN_SECOND_BUY');
+    expect(text).not.toContain('[HIGH');
     expect(text).toContain('regime 门禁 ✓ → chan 二卖 ✓');
     // 卖出指令先于买入（REQ-MSG-02）
     expect(text.indexOf('▶ 卖出')).toBeLessThan(text.indexOf('▶ 买入'));
