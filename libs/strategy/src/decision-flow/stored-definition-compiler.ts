@@ -228,9 +228,21 @@ function validateChanBspRule(
  * - 任一节点 `type === 'CONSENSUS'` 或未知节点类型 → 抛 `DECISION_FLOW_RULE_INVALID`；
  * - 缺失必要结构（id/type/子节点）→ 抛 `DECISION_FLOW_RULE_INVALID`。
  */
+const VALID_BRANCH_OPERATORS = new Set([
+  'eq',
+  'ne',
+  'gt',
+  'gte',
+  'lt',
+  'lte',
+  'in',
+]);
+const VALID_TERMINAL_ACTIONS = new Set(['BUY', 'SELL', 'ABORT', 'INHERIT']);
+
 export function validateDecisionFlowTree(rawRoot: unknown): DecisionFlowNode {
   const activePath = new Set<object>();
   const validated = new Set<object>();
+  const seenIds = new Map<string, object>();
 
   const visit = (rawNode: unknown, pathDesc: string): void => {
     if (!rawNode || typeof rawNode !== 'object' || Array.isArray(rawNode)) {
@@ -255,6 +267,14 @@ export function validateDecisionFlowTree(rawRoot: unknown): DecisionFlowNode {
         `decision flow node at ${pathDesc} must have a non-empty string id`,
       );
     }
+    const existingWithSameId = seenIds.get(record.id);
+    if (existingWithSameId !== undefined && existingWithSameId !== rawNode) {
+      throw new StoredDefinitionCompileError(
+        ERROR_CODE_FLOW_INVALID,
+        `decision flow contains duplicate node id "${record.id}" at ${pathDesc}`,
+      );
+    }
+    seenIds.set(record.id, rawNode);
     if (typeof record.type !== 'string' || record.type.length === 0) {
       throw new StoredDefinitionCompileError(
         ERROR_CODE_FLOW_INVALID,
@@ -276,12 +296,52 @@ export function validateDecisionFlowTree(rawRoot: unknown): DecisionFlowNode {
 
     switch (record.type) {
       case NODE_TYPE_GUARD:
+        if (
+          typeof record.pluginId !== 'string' ||
+          record.pluginId.trim().length === 0
+        ) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `decision flow GUARD node [${record.id}] must define a non-empty string pluginId`,
+          );
+        }
         visit(record.onPass, `${record.id}.onPass`);
         if (record.onFail !== undefined) {
           visit(record.onFail, `${record.id}.onFail`);
         }
         break;
       case NODE_TYPE_BRANCH: {
+        const condition = record.condition;
+        if (
+          !condition ||
+          typeof condition !== 'object' ||
+          Array.isArray(condition)
+        ) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `decision flow BRANCH node [${record.id}] must define condition`,
+          );
+        }
+        const condRecord = condition as Record<string, unknown>;
+        if (
+          typeof condRecord.operator !== 'string' ||
+          !VALID_BRANCH_OPERATORS.has(condRecord.operator)
+        ) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `decision flow BRANCH node [${record.id}] has invalid condition operator: ${String(condRecord.operator)}`,
+          );
+        }
+        if (
+          condRecord.pluginId !== undefined &&
+          (typeof condRecord.pluginId !== 'string' ||
+            condRecord.pluginId.trim().length === 0)
+        ) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `decision flow BRANCH node [${record.id}] condition.pluginId must be a non-empty string`,
+          );
+        }
         const branches = record.branches;
         if (
           !branches ||
@@ -299,9 +359,36 @@ export function validateDecisionFlowTree(rawRoot: unknown): DecisionFlowNode {
         break;
       }
       case NODE_TYPE_EXTRACTOR:
+        if (
+          typeof record.pluginId !== 'string' ||
+          record.pluginId.trim().length === 0
+        ) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `decision flow EXTRACTOR node [${record.id}] must define a non-empty string pluginId`,
+          );
+        }
+        if (
+          typeof record.exportAttributeKey !== 'string' ||
+          record.exportAttributeKey.trim().length === 0
+        ) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `decision flow EXTRACTOR node [${record.id}] must define a non-empty string exportAttributeKey`,
+          );
+        }
         visit(record.next, `${record.id}.next`);
         break;
       case NODE_TYPE_TERMINAL:
+        if (
+          typeof record.action !== 'string' ||
+          !VALID_TERMINAL_ACTIONS.has(record.action)
+        ) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `decision flow TERMINAL node [${record.id}] has invalid action: ${String(record.action)}`,
+          );
+        }
         break;
       default:
         throw new StoredDefinitionCompileError(
@@ -319,7 +406,7 @@ export function validateDecisionFlowTree(rawRoot: unknown): DecisionFlowNode {
 }
 
 /**
- * 遍历决策流树收集全部插件引用（GUARD/EXTRACTOR 节点）。
+ * 遍历决策流树收集全部插件引用（GUARD/EXTRACTOR 节点及 BRANCH 条件插件）。
  */
 function collectPluginReferences(
   root: DecisionFlowNode,
@@ -337,6 +424,12 @@ function collectPluginReferences(
         if (node.onFail) visit(node.onFail);
         return;
       case NODE_TYPE_BRANCH:
+        if (
+          node.condition.pluginId &&
+          !references.has(node.condition.pluginId)
+        ) {
+          references.set(node.condition.pluginId, undefined);
+        }
         visit(node.branches.true);
         visit(node.branches.false);
         return;

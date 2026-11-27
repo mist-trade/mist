@@ -41,7 +41,10 @@ describe('isEtfSecurity', () => {
     expect(isEtfSecurity('517050')).toBe(true); // 港股通 ETF
     expect(isEtfSecurity('560010')).toBe(true); // 56x ETF
     expect(isEtfSecurity('563000.SH')).toBe(true); // 56x ETF
+    expect(isEtfSecurity('568800')).toBe(true); // 新型 568 ETF
+    expect(isEtfSecurity('519000')).toBe(true); // 519 ETF
     expect(isEtfSecurity('588000')).toBe(true); // 科创 50 ETF
+    expect(isEtfSecurity('589000.SH')).toBe(true); // 589 ETF
     expect(isEtfSecurity('159915')).toBe(true); // 创业板 ETF
     expect(isEtfSecurity('600519')).toBe(false);
     expect(isEtfSecurity('000001')).toBe(false);

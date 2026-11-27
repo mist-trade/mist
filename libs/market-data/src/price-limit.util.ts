@@ -6,7 +6,7 @@ export interface PriceLimits {
   readonly limitDown: number;
 }
 
-export const ETF_SECURITY_PATTERN = /^(51[0-8]|56[0-3]|588|159)\d{3}$/;
+export const ETF_SECURITY_PATTERN = /^(51\d|56\d|58[89]|159)\d{3}$/;
 export const CHINEXT_STAR_SECURITY_PATTERN = /^(30[01]|68[89])\d{3}$/;
 export const BSE_SECURITY_PATTERN = /^(43|83|87|92)\d{4}$/;
 export const ST_SECURITY_PATTERN = /ST/i;

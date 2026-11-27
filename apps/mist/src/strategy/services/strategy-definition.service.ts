@@ -19,7 +19,7 @@ import {
   StoredDefinitionCompileError,
   compileStoredDefinitionVersion,
 } from '@app/strategy';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { CreateStrategyDefinitionDto } from '../dto/create-strategy-definition.dto';
 import { StrategyExecutionPlanService } from '../rules/strategy-execution-plan.service';
 import { SignalRegistryRpcClient } from '../runtime/signal-registry-rpc.client';
@@ -88,11 +88,35 @@ export class StrategyDefinitionService {
     const definitions = await this.definitionRepository.find({
       order: { id: 'DESC' },
     });
+    if (definitions.length === 0) {
+      return definitions;
+    }
+
+    const versionIds: number[] = [];
     for (const definition of definitions) {
-      await this.requireCompiledCurrentVersion(
-        definition,
-        this.versionRepository,
-      );
+      if (definition.currentVersionId == null) {
+        throw new ConflictException(
+          `Strategy definition ${definition.id} has no current version`,
+        );
+      }
+      versionIds.push(definition.currentVersionId);
+    }
+
+    const versions = await this.versionRepository.find({
+      where: { id: In(versionIds) },
+    });
+    const versionsById = new Map(
+      versions.map((version) => [version.id, version]),
+    );
+
+    for (const definition of definitions) {
+      const version = versionsById.get(definition.currentVersionId as number);
+      if (!version || version.strategyDefinitionId !== definition.id) {
+        throw new ConflictException(
+          `Strategy definition ${definition.id} current version ${definition.currentVersionId} is missing or belongs to another definition`,
+        );
+      }
+      this.validateStoredVersion(definition, version, false);
     }
     return definitions;
   }

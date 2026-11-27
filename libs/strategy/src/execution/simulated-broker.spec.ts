@@ -969,4 +969,66 @@ describe('SimulatedBroker', () => {
       'BUY_REJECTED_LIMIT_UP',
     );
   });
+
+  it('TC-20: guards bar.open <= 0, enforces LIMIT SELL price floor, and auto-unlocks un-settled T+1 across day transitions', () => {
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-14T01:30:00.000Z'),
+    });
+    expect(
+      broker.onBar(
+        createBar('2026-10-14T01:31:00.000Z', 10.0, 10.2, 9.9, 10.1, '600519'),
+      ),
+    ).toHaveLength(1);
+
+    // 异常 bar.open <= 0 静默安全返回 []，不成交也不破坏账本
+    expect(
+      broker.onBar(
+        createBar('2026-10-14T02:00:00.000Z', 0, 10.2, 9.9, 10.1, '600519'),
+      ),
+    ).toEqual([]);
+
+    // 未显式调用 settleDayClose('2026-10-14') 直接步入次日 bar，T+1 冻结自动解锁且不重复结算
+    broker.onBar(
+      createBar('2026-10-15T01:30:00.000Z', 10.2, 10.4, 10.1, 10.3, '600519'),
+    );
+    const unlockedPos = broker.getAccount().positions.get('600519');
+    expect(unlockedPos?.availableQuantity).toBe(1000);
+    expect(unlockedPos?.frozenQuantity).toBe(0);
+
+    // 报出 LIMIT 卖单 limitPrice=11.0，次根 open=10.8 < 11.0 暂挂不成交
+    const limitSell = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'LIMIT',
+      limitPrice: 11.0,
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T01:30:00.000Z'),
+    });
+    expect(
+      broker.onBar(
+        createBar(
+          '2026-10-15T01:31:00.000Z',
+          10.8,
+          10.9,
+          10.7,
+          10.85,
+          '600519',
+        ),
+      ),
+    ).toHaveLength(0);
+    expect(broker.getOrder(limitSell.orderId)?.status).toBe('PENDING');
+
+    // 再下一根 open=11.1 >= 11.0 触发限价成交（基础价按 max(11.1, 11.0)=11.1）
+    const limitFills = broker.onBar(
+      createBar('2026-10-15T01:32:00.000Z', 11.1, 11.2, 11.0, 11.15, '600519'),
+    );
+    expect(limitFills).toHaveLength(1);
+    expect(limitFills[0].side).toBe('SELL');
+  });
 });

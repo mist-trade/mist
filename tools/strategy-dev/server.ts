@@ -571,13 +571,8 @@ interface CachedBacktestResult {
   readonly definitionVersionLabel?: string;
 }
 
-// 回测信号内存缓存池 (cacheKey -> cachedResult, runId -> signals/ruleSnapshot)
-const backtestSignalsCache = new Map<string, CachedBacktestResult>();
-const backtestRunSignalsMap = new Map<number, readonly SimulationSignal[]>();
-const backtestRunRuleSnapshotMap = new Map<
-  number,
-  Readonly<Record<string, unknown>>
->();
+const MAX_DEV_BACKTEST_CACHE_ENTRIES = 50;
+const MAX_DEV_RUN_HISTORY = 200;
 
 /** 有界 LRU 内存缓存（防模块级缓存无界增长） */
 class BoundedLruCache<K, V> {
@@ -616,6 +611,19 @@ class BoundedLruCache<K, V> {
     this.cache.clear();
   }
 }
+
+// 回测信号内存缓存池 (有界 LRU，防长期运行内存泄漏)
+const backtestSignalsCache = new BoundedLruCache<string, CachedBacktestResult>(
+  MAX_DEV_BACKTEST_CACHE_ENTRIES,
+);
+const backtestRunSignalsMap = new BoundedLruCache<
+  number,
+  readonly SimulationSignal[]
+>(MAX_DEV_RUN_HISTORY);
+const backtestRunRuleSnapshotMap = new BoundedLruCache<
+  number,
+  Readonly<Record<string, unknown>>
+>(MAX_DEV_RUN_HISTORY);
 
 // 统一绘图指令流模块级有界缓存 (防大时序重复同步阻塞计算)
 const visualCommandsCache = new BoundedLruCache<string, unknown>(
@@ -1796,8 +1804,14 @@ async function handleDevRequest(
         await session.stepNext();
       }
 
+      // 同 ID 重建时先销毁旧会话释放定时器与监听器
+      activeSessions.get(session.sessionId)?.destroy();
+
       // 容量防爆保护：超过最大活跃会话数时淘汰最旧会话
-      if (activeSessions.size >= MAX_DEV_SESSIONS) {
+      if (
+        !activeSessions.has(session.sessionId) &&
+        activeSessions.size >= MAX_DEV_SESSIONS
+      ) {
         const oldestSessionId = activeSessions.keys().next().value;
         if (oldestSessionId) {
           console.log(
@@ -2286,6 +2300,9 @@ async function handleDevRequest(
       };
 
       mockRuns.unshift(newRun);
+      if (mockRuns.length > MAX_DEV_RUN_HISTORY) {
+        mockRuns.length = MAX_DEV_RUN_HISTORY;
+      }
       backtestRunSignalsMap.set(newRun.id, signals);
       backtestRunRuleSnapshotMap.set(newRun.id, ruleSnapshot);
 

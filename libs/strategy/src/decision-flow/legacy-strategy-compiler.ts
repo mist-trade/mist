@@ -60,23 +60,24 @@ export class LegacyStrategyCompiler {
         : compileStoredStrategyRule(ruleOrPlan, signalKind);
 
     const action = plan.signalKind === 'entry' ? 'BUY' : 'SELL';
+    const idSuffix = plan.signalKind === 'exit' ? '_exit' : '';
 
     return {
-      id: 'guard_legacy_rule',
+      id: `guard_legacy_rule${idSuffix}`,
       type: 'GUARD',
       name: '存量规则DSL门禁',
       pluginId: 'plugin.legacy.rule-dsl',
       params: { plan: toWireSafePlan(plan) },
       requiredAction: action,
       onPass: {
-        id: 'term_legacy_matched',
+        id: `term_legacy_matched${idSuffix}`,
         type: 'TERMINAL',
         action,
         signalTag: 'LEGACY_DSL',
         reason: '存量规则条件满足，触发信号',
       },
       onFail: {
-        id: 'term_legacy_unmatched',
+        id: `term_legacy_unmatched${idSuffix}`,
         type: 'TERMINAL',
         action: 'ABORT',
         reason: '存量规则条件未满足',

@@ -173,52 +173,13 @@ describe('PositionStateMachine（纯记账员）', () => {
     expect(psm.getSnapshot().currentPrice).toBe(13.2);
   });
 
-  it('calculateExitQuantity respects configured exitRatio (整手向下取整)', () => {
-    const partialPsm = new PositionStateMachine(1, '600519', {
-      exitRatio: 0.5,
-    });
-    expect(partialPsm.getExitRatio()).toBe(0.5);
-
-    partialPsm.onOrderFilled(
-      createFillEvent(
-        ORDER_SIDES.BUY,
-        10.0,
-        1000,
-        10,
-        new Date('2026-10-15T09:31:00.000Z'),
-      ),
-    );
-
-    // 50% of 1000 = 500
-    expect(partialPsm.calculateExitQuantity()).toBe(500);
-    // 逐次调用 override：30% → 300
-    expect(psm.calculateExitQuantity(0.3)).toBe(0); // 空仓为 0
-    psm.onOrderFilled(
-      createFillEvent(
-        ORDER_SIDES.BUY,
-        10.0,
-        1000,
-        10,
-        new Date('2026-10-15T09:31:00.000Z'),
-      ),
-    );
-    expect(psm.calculateExitQuantity(0.3)).toBe(300);
-  });
-
-  it('validates exitRatio range (must be (0, 1.0])', () => {
+  it('maintains pure full-accounting surface without retired partial exitRatio helpers', () => {
     expect(
-      () =>
-        new PositionStateMachine(1, '600519', {
-          exitRatio: 0,
-        }),
-    ).toThrow('exitRatio must be in range (0, 1.0]');
-
+      (psm as unknown as Record<string, unknown>).calculateExitQuantity,
+    ).toBeUndefined();
     expect(
-      () =>
-        new PositionStateMachine(1, '600519', {
-          exitRatio: 1.5,
-        }),
-    ).toThrow('exitRatio must be in range (0, 1.0]');
+      (psm as unknown as Record<string, unknown>).getExitRatio,
+    ).toBeUndefined();
   });
 
   it('resets entryTime and holdingBars on subsequent buys after position is CLOSED', () => {

@@ -11,6 +11,8 @@ export function collectVirtualExitBindings(
   registry: FactorPluginRegistry,
 ): readonly VirtualExitRuleBinding[] {
   const bindings: VirtualExitRuleBinding[] = [];
+  const seenBindingKeys = new Set<string>();
+  const visitedNodes = new Set<object>();
 
   const collect = (
     pluginId: string,
@@ -20,12 +22,16 @@ export function collectVirtualExitBindings(
     const rules = plugin?.virtualExitRules?.(params);
     if (!rules || rules.length === 0) return;
     for (const rule of rules) {
+      const key = `${pluginId}\u0000${JSON.stringify(rule)}`;
+      if (seenBindingKeys.has(key)) continue;
+      seenBindingKeys.add(key);
       bindings.push({ ownerPluginId: pluginId, rule });
     }
   };
 
   const visit = (node: DecisionFlowNode | undefined): void => {
-    if (!node) return;
+    if (!node || visitedNodes.has(node)) return;
+    visitedNodes.add(node);
     switch (node.type) {
       case 'GUARD':
         collect(node.pluginId, node.params);

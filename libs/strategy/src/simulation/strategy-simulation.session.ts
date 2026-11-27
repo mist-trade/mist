@@ -32,6 +32,16 @@ export const SIMULATION_LOCAL_FIXTURE_IDENTITY = Object.freeze({
  * ② 公开 Bar 逐根 push 并缓存 Frame（stepPrev/向后 seek 只读缓存，
  * 内核单调推进、绝不回退）。
  */
+interface CompactSimulationFrame {
+  readonly cursor: number;
+  readonly total: number;
+  readonly bar: StrategyBar;
+  readonly windowBars: SimulationFrame['windowBars'];
+  readonly signalCount: number;
+  readonly latestSignals: readonly SimulationSignal[];
+  readonly status: SimulationSessionStatus;
+}
+
 export class StrategySimulationSession {
   private readonly kernel: StrategyEvaluationKernel;
   private readonly preWarmBars: readonly StrategyBar[];
@@ -39,7 +49,7 @@ export class StrategySimulationSession {
   private readonly externalPreWarmBars: readonly StrategyBar[];
   private readonly externalPublicBars: readonly StrategyBar[];
   private externalPublicCursor = 0;
-  private readonly frames: (SimulationFrame | undefined)[] = [];
+  private readonly frames: (CompactSimulationFrame | undefined)[] = [];
   private readonly accumulatedSignals: SimulationSignal[] = [];
   private pushedPublicCount = 0;
 
@@ -218,16 +228,32 @@ export class StrategySimulationSession {
     this.setStatus('paused');
   }
 
+  private materializeFrame(
+    compact: CompactSimulationFrame | undefined,
+  ): SimulationFrame | null {
+    if (!compact) return null;
+    return {
+      sessionId: this.sessionId,
+      cursor: compact.cursor,
+      total: compact.total,
+      bar: compact.bar,
+      windowBars: compact.windowBars,
+      signals: this.accumulatedSignals.slice(0, compact.signalCount),
+      latestSignals: compact.latestSignals,
+      status: compact.status,
+    };
+  }
+
   public async stepNext(): Promise<SimulationFrame | null> {
     if (this.cursor >= this.publicBars.length - 1) {
-      return this.frames[this.cursor] ?? null;
+      return this.materializeFrame(this.frames[this.cursor]);
     }
     await this.seedPreWarm();
     const next = this.cursor + 1;
     const cached = this.frames[next];
     if (cached) {
       this.cursor = next;
-      return cached;
+      return this.materializeFrame(cached);
     }
 
     const bar = this.publicBars[next];
@@ -255,18 +281,18 @@ export class StrategySimulationSession {
     );
     this.accumulatedSignals.push(...latestSignals);
 
-    const frame: SimulationFrame = {
-      sessionId: this.sessionId,
+    const compact: CompactSimulationFrame = {
       cursor: next,
       total: this.publicBars.length,
       bar,
       windowBars: this.kernel.readWindow(this.config.period),
-      signals: [...this.accumulatedSignals],
+      signalCount: this.accumulatedSignals.length,
       latestSignals,
       status: next >= this.publicBars.length - 1 ? 'completed' : 'idle',
     };
-    this.frames[next] = frame;
+    this.frames[next] = compact;
     this.cursor = next;
+    const frame = this.materializeFrame(compact)!;
     this.listeners.onFrame?.(frame);
     if (this.isCompleted) {
       this.pause();
@@ -278,12 +304,12 @@ export class StrategySimulationSession {
   public stepPrev(): SimulationFrame | null {
     if (this.cursor <= 0) {
       if (this.cursor === 0) {
-        return this.frames[0] ?? null;
+        return this.materializeFrame(this.frames[0]);
       }
       return null;
     }
     this.cursor -= 1;
-    const frame = this.frames[this.cursor] ?? null;
+    const frame = this.materializeFrame(this.frames[this.cursor]);
     if (frame) {
       this.listeners.onFrame?.(frame);
     }
@@ -299,7 +325,7 @@ export class StrategySimulationSession {
 
     if (clamped <= this.cursor) {
       this.cursor = clamped;
-      return this.frames[this.cursor] ?? null;
+      return this.materializeFrame(this.frames[this.cursor]);
     }
 
     // 向前快进：依次推进补全，并定期 yield 事件循环保障 HTTP 响应
@@ -310,12 +336,12 @@ export class StrategySimulationSession {
       }
     }
 
-    return this.frames[this.cursor] ?? null;
+    return this.materializeFrame(this.frames[this.cursor]);
   }
 
   public getCurrentFrame(): SimulationFrame | null {
     if (this.cursor < 0) return null;
-    return this.frames[this.cursor] ?? null;
+    return this.materializeFrame(this.frames[this.cursor]);
   }
 
   /**

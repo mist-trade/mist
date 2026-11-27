@@ -44,12 +44,16 @@ describe('StrategyDefinitionService', () => {
         versions.push(entity);
         return entity;
       }),
-      find: jest.fn(async ({ where }) =>
-        versions.filter(
+      find: jest.fn(async ({ where }) => {
+        if (where?.id && Array.isArray(where.id.value)) {
+          const idSet = new Set(where.id.value);
+          return versions.filter((version) => idSet.has(version.id));
+        }
+        return versions.filter(
           (version) =>
             version.strategyDefinitionId === where.strategyDefinitionId,
-        ),
-      ),
+        );
+      }),
       findOne: jest.fn(async ({ where }) =>
         versions.find(
           (version) =>

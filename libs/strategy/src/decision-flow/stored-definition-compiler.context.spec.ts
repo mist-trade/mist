@@ -446,4 +446,82 @@ describe('stored definition compiler — fail-closed retired fields & node types
     );
     expect(err.code).toBe('DECISION_FLOW_RULE_INVALID');
   });
+
+  it('fails closed on duplicate distinct node ids and invalid node fields, while deriving BRANCH.condition.pluginId', () => {
+    factorPluginRegistry.register(pluginWith('plugin.branch', { 5: 30 }));
+    factorPluginRegistry.register(pluginWith('plugin.leaf', { 30: 15 }));
+
+    const duplicateIds = {
+      id: 'dup_id',
+      type: 'GUARD',
+      name: 'root',
+      pluginId: 'plugin.leaf',
+      requiredAction: 'BUY',
+      onPass: {
+        id: 'dup_id',
+        type: 'TERMINAL',
+        action: 'BUY',
+        reason: 'ok',
+      },
+    };
+    const dupErr = captureCompileError(() =>
+      compileStoredDefinitionVersion({
+        kind: 'decision_flow',
+        rule: duplicateIds as unknown as Record<string, unknown>,
+      }),
+    );
+    expect(dupErr.code).toBe('DECISION_FLOW_RULE_INVALID');
+
+    const badBranch = {
+      id: 'branch_bad',
+      type: 'BRANCH',
+      name: 'branch',
+      condition: { operator: 'bad_op', attributeKey: 'x', value: 1 },
+      branches: {
+        true: { id: 't1', type: 'TERMINAL', action: 'BUY', reason: 'ok' },
+        false: { id: 't2', type: 'TERMINAL', action: 'ABORT', reason: 'no' },
+      },
+    };
+    expect(
+      captureCompileError(() =>
+        compileStoredDefinitionVersion({
+          kind: 'decision_flow',
+          rule: badBranch as unknown as Record<string, unknown>,
+        }),
+      ).code,
+    ).toBe('DECISION_FLOW_RULE_INVALID');
+
+    const branchWithPlugin = {
+      id: 'branch_plugin',
+      type: 'BRANCH',
+      name: 'branch_plugin',
+      condition: { pluginId: 'plugin.branch', operator: 'eq', value: 'BUY' },
+      branches: {
+        true: {
+          id: 'guard_leaf',
+          type: 'GUARD',
+          name: 'leaf',
+          pluginId: 'plugin.leaf',
+          requiredAction: 'BUY',
+          onPass: {
+            id: 't_buy',
+            type: 'TERMINAL',
+            action: 'BUY',
+            reason: 'ok',
+          },
+        },
+        false: {
+          id: 't_abort',
+          type: 'TERMINAL',
+          action: 'ABORT',
+          reason: 'no',
+        },
+      },
+    };
+    const compiled = compileStoredDefinitionVersion({
+      kind: 'decision_flow',
+      rule: branchWithPlugin as unknown as Record<string, unknown>,
+    });
+    expect(compiled.contextRequirements).toEqual({ 5: 30, 30: 15 });
+  });
 });

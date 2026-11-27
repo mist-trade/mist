@@ -200,6 +200,9 @@ export class SimulatedBroker implements ExecutionBrokerPort {
   }
 
   onBar(bar: StrategyBar): readonly OrderFilledEvent[] {
+    if (!Number.isFinite(bar.open) || bar.open <= 0) {
+      return [];
+    }
     const secCode = bar.securityCode ?? '';
     const currentDateStr = formatShanghaiDateString(bar.timestamp);
     const lastDateStr = this.lastBarDateMap.get(secCode);
@@ -208,6 +211,9 @@ export class SimulatedBroker implements ExecutionBrokerPort {
       const prevDayFinalClose = this.lastBarCloseMap.get(secCode);
       if (prevDayFinalClose !== undefined) {
         this.dailyPreCloseMap.set(secCode, prevDayFinalClose);
+      }
+      if (this.lastSettledDate !== lastDateStr) {
+        this.settleDayClose(lastDateStr);
       }
     }
     this.lastBarDateMap.set(secCode, currentDateStr);
@@ -336,8 +342,21 @@ export class SimulatedBroker implements ExecutionBrokerPort {
         continue;
       }
 
+      if (
+        order.orderType === ORDER_TYPES.LIMIT &&
+        order.limitPrice !== undefined &&
+        bar.open < order.limitPrice
+      ) {
+        // 限价卖单高于开盘价暂不成交
+        continue;
+      }
+
+      const sellBasePrice =
+        order.orderType === ORDER_TYPES.LIMIT && order.limitPrice !== undefined
+          ? Math.max(bar.open, order.limitPrice)
+          : bar.open;
       const fillPrice = applySlippage(
-        bar.open,
+        sellBasePrice,
         ORDER_SIDES.SELL,
         this.slippageRatio,
       );

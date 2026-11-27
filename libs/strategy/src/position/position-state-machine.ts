@@ -7,7 +7,6 @@
  *
  * rehydrate（REQ-LEDGER-01）：`fromFillEvents` 由 fill 事件流 fold 重建持仓。
  */
-import { TRADING_RULES } from '@app/constants';
 import type { StrategyBar } from '@app/market-data';
 import type {
   CreateOrderDto,
@@ -24,7 +23,6 @@ import {
 import type {
   PositionClosedRecord,
   PositionSnapshot,
-  PositionStateMachineOptions,
   PositionStatus,
 } from './position.types';
 
@@ -39,24 +37,12 @@ export class PositionStateMachine {
   private currentPriceLi: Li = 0n;
   private realizedPnlLi: Li = 0n;
   private accumulatedBuyFeesLi: Li = 0n;
-  private readonly exitRatio: number;
   private readonly closedTrades: PositionClosedRecord[] = [];
   private entryReason?: string;
 
-  constructor(
-    securityId: number,
-    securityCode: string,
-    options?: PositionStateMachineOptions,
-  ) {
+  constructor(securityId: number, securityCode: string) {
     this.securityId = securityId;
     this.securityCode = securityCode;
-    this.exitRatio = options?.exitRatio ?? 1.0;
-
-    if (this.exitRatio <= 0 || this.exitRatio > 1.0) {
-      throw new Error(
-        `exitRatio must be in range (0, 1.0], got ${this.exitRatio}`,
-      );
-    }
   }
 
   /** 事件流重建（REQ-LEDGER-01）：依序 fold fill 事件。 */
@@ -64,9 +50,8 @@ export class PositionStateMachine {
     securityId: number,
     securityCode: string,
     events: readonly OrderFilledEvent[],
-    options?: PositionStateMachineOptions,
   ): PositionStateMachine {
-    const machine = new PositionStateMachine(securityId, securityCode, options);
+    const machine = new PositionStateMachine(securityId, securityCode);
     for (const event of events) {
       machine.onOrderFilled(event);
     }
@@ -149,25 +134,6 @@ export class PositionStateMachine {
     }
   }
 
-  /**
-   * 计算平仓股数。
-   * 支持通过 overrideRatio 临时覆盖平仓比例。
-   * 按照 A 股规则按百股（手）向下取整；若计算结果不足一手且持有股数大于零，则平剩余最小单位。
-   */
-  public calculateExitQuantity(overrideRatio?: number): number {
-    const ratio = overrideRatio ?? this.exitRatio;
-    if (ratio >= 1.0) {
-      return this.holdingQuantity;
-    }
-    const targetQty = Math.floor(this.holdingQuantity * ratio);
-    const lotSize = TRADING_RULES.MAIN_BOARD_LOT_SIZE;
-    const roundedQty = Math.floor(targetQty / lotSize) * lotSize;
-    if (roundedQty <= 0) {
-      return Math.min(this.holdingQuantity, lotSize);
-    }
-    return Math.min(this.holdingQuantity, roundedQty);
-  }
-
   onBar(bar: StrategyBar): CreateOrderDto | null {
     if (this.status !== POSITION_STATUSES.HOLDING) {
       return null;
@@ -219,9 +185,5 @@ export class PositionStateMachine {
 
   getStatus(): PositionStatus {
     return this.status;
-  }
-
-  getExitRatio(): number {
-    return this.exitRatio;
   }
 }

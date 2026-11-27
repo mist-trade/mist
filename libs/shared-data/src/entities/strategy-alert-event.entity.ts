@@ -13,6 +13,7 @@ import { StrategySignal } from './strategy-signal.entity';
 
 @Entity({ name: 'strategy_alert_events' })
 @Index('uq_strategy_alert_events_dedupe_key', ['dedupeKey'], { unique: true })
+@Index('idx_strategy_alert_events_status_created', ['status', 'createdAt'])
 export class StrategyAlertEvent {
   @PrimaryGeneratedColumn()
   id!: number;

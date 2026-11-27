@@ -84,14 +84,20 @@ export function imputeSeries(
  * the segment's last anchor and then frozen; a trim drops the oldest bar without
  * recomputing the rest. Trading-day boundaries reset the anchors (no cross-day carry).
  */
+const IMputer_COMPACT_HEAD_THRESHOLD = 64;
+
 export class StrategySeriesImputer {
   private bars: ProjectedStrategyBar[] = [];
+  private head = 0;
+  private cachedReadSnapshot: readonly ProjectedStrategyBar[] | null = null;
   private lastTradingDay: string | null = null;
   private lastOhlc: StrategyOhlcTuple | null = null;
   private lastVolume: string | null = null;
   private lastAmount: string | null = null;
 
   hydrate(bars: readonly StrategyBar[]): void {
+    this.cachedReadSnapshot = null;
+    this.head = 0;
     if (bars.length === 0) {
       this.reset();
       return;
@@ -103,7 +109,7 @@ export class StrategySeriesImputer {
     this.lastAmount = null;
     // The segment's last anchors (within the last trading day only) become the
     // forward-fill source for the first appended bar.
-    for (let i = this.bars.length - 1; i >= 0; i -= 1) {
+    for (let i = this.bars.length - 1; i >= this.head; i -= 1) {
       const projected = this.bars[i];
       if (projected.tradingDay !== this.lastTradingDay) break;
       if (this.lastOhlc === null) this.lastOhlc = projected.ohlc.effective;
@@ -126,7 +132,10 @@ export class StrategySeriesImputer {
     if (!Number.isFinite(timestampMs)) {
       throw new TypeError('series imputation requires a finite timestamp');
     }
-    const last = this.bars.at(-1);
+    const last =
+      this.bars.length > this.head
+        ? this.bars[this.bars.length - 1]
+        : undefined;
     if (last && timestampMs <= last.rawBar.timestamp.getTime()) {
       throw new RangeError(
         'series imputation requires strictly increasing bars per market group',
@@ -153,19 +162,31 @@ export class StrategySeriesImputer {
       amount,
     });
     this.bars.push(projected);
+    this.cachedReadSnapshot = null;
     return projected;
   }
 
   trim(): void {
-    if (this.bars.length > 0) this.bars.shift();
+    if (this.head >= this.bars.length) return;
+    this.head += 1;
+    this.cachedReadSnapshot = null;
+    if (this.head >= IMputer_COMPACT_HEAD_THRESHOLD) {
+      this.bars = this.bars.slice(this.head);
+      this.head = 0;
+    }
   }
 
   read(): readonly ProjectedStrategyBar[] {
-    return Object.freeze([...this.bars]);
+    if (this.cachedReadSnapshot === null) {
+      this.cachedReadSnapshot = Object.freeze(this.bars.slice(this.head));
+    }
+    return this.cachedReadSnapshot;
   }
 
   reset(): void {
     this.bars = [];
+    this.head = 0;
+    this.cachedReadSnapshot = null;
     this.lastTradingDay = null;
     this.lastOhlc = null;
     this.lastVolume = null;

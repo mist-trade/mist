@@ -69,43 +69,65 @@ export class AlertFanoutService {
       return;
     }
 
+    const existingRows = await this.deliveries.find({
+      where: {
+        strategyAlertEventId: In(events.map((event) => event.id)),
+      },
+    });
+    const existingByKey = new Map(
+      existingRows.map((row) => [
+        `${row.strategyAlertEventId}\u0000${row.channel}`,
+        row,
+      ]),
+    );
+
     for (const adapter of this.adapters) {
       const channel = adapter.channel;
+      const missingPayloads = [];
       for (const event of events) {
-        const existing = await this.deliveries.findOne({
-          where: { strategyAlertEventId: event.id, channel },
-        });
-        if (
-          existing &&
-          (existing.status === StrategyAlertDeliveryStatus.SENT ||
-            existing.status === StrategyAlertDeliveryStatus.DEAD_LETTERED)
-        ) {
-          continue; // terminal already
+        const existing = existingByKey.get(`${event.id}\u0000${channel}`);
+        if (existing) {
+          continue;
         }
-        if (!existing) {
-          try {
-            await this.deliveries.save({
-              strategyAlertEventId: event.id,
-              channel,
-              status: StrategyAlertDeliveryStatus.PENDING,
-              attemptCount: 0,
-            });
-          } catch (error) {
-            // Only the unique-constraint race (a concurrent fanout already saved
-            // this (event, channel) row) is expected; anything else must fail the
-            // job loudly — otherwise the row never exists, the channel job is
-            // silently dropped by the worker (no row => return), and the event
-            // disappears with no log and no metric.
-            if (
-              !isUniqueConstraintViolation(
-                error,
-                DELIVERY_ROW_UNIQUE_CONSTRAINT,
-              )
-            ) {
-              this.logger.error(
-                `fanout delivery row creation failed event=${event.id} channel=${channel}: ${toErrorMessage(error)}`,
-              );
-              throw error;
+        missingPayloads.push({
+          strategyAlertEventId: event.id,
+          channel,
+          status: StrategyAlertDeliveryStatus.PENDING,
+          attemptCount: 0,
+        });
+      }
+
+      if (missingPayloads.length > 0) {
+        try {
+          await this.deliveries.save(missingPayloads);
+        } catch (error) {
+          if (
+            missingPayloads.length === 1 &&
+            !isUniqueConstraintViolation(error, DELIVERY_ROW_UNIQUE_CONSTRAINT)
+          ) {
+            this.logger.error(
+              `fanout delivery row creation failed event=${missingPayloads[0].strategyAlertEventId} channel=${channel}: ${toErrorMessage(error)}`,
+            );
+            throw error;
+          }
+          if (missingPayloads.length > 1) {
+            // 仅当批量保存碰撞 unique 键时退回逐条兜底，隔离真正异常与并发重复
+            for (const payload of missingPayloads) {
+              try {
+                await this.deliveries.save(payload);
+              } catch (singleError) {
+                if (
+                  !isUniqueConstraintViolation(
+                    singleError,
+                    DELIVERY_ROW_UNIQUE_CONSTRAINT,
+                  )
+                ) {
+                  this.logger.error(
+                    `fanout delivery row creation failed event=${payload.strategyAlertEventId} channel=${channel}: ${toErrorMessage(singleError)}`,
+                  );
+                  throw singleError;
+                }
+              }
             }
           }
         }

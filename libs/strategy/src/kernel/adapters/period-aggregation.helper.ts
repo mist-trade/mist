@@ -62,6 +62,19 @@ export function shanghaiMidnightOf(timestamp: Date): Date {
   return new Date(utcMidnight - 8 * 60 * 60 * 1000);
 }
 
+function computeHighLowRange(ordered: readonly StrategyBar[]): {
+  readonly high: number;
+  readonly low: number;
+} {
+  let high = -Infinity;
+  let low = Infinity;
+  for (const bar of ordered) {
+    if (bar.high > high) high = bar.high;
+    if (bar.low < low) low = bar.low;
+  }
+  return { high, low };
+}
+
 export function reduceSlot(
   securityId: number,
   source: StrategyBar['source'],
@@ -77,10 +90,12 @@ export function reduceSlot(
   );
   const first = ordered[0];
   const last = ordered.at(-1)!;
+  const { high, low } = computeHighLowRange(ordered);
   // 完整性只按常规成分判：终端桶（左标恰等于槽末）缺席不影响 complete
-  const regularPresent = [...buckets.keys()].filter(
-    (ts) => ts < slotEndMs,
-  ).length;
+  let regularPresent = 0;
+  for (const ts of buckets.keys()) {
+    if (ts < slotEndMs) regularPresent += 1;
+  }
   return Object.freeze({
     securityId,
     securityCode: securityCode ?? first.securityCode,
@@ -88,8 +103,8 @@ export function reduceSlot(
     period,
     timestamp: new Date(slotEndMs),
     open: first.open,
-    high: Math.max(...ordered.map((bar) => bar.high)),
-    low: Math.min(...ordered.map((bar) => bar.low)),
+    high,
+    low,
     close: last.close,
     volume: sumBarQuantity(ordered, 'volume'),
     amount: sumBarQuantity(ordered, 'amount'),
@@ -110,6 +125,7 @@ export function reduceDaily(
   );
   const first = ordered[0];
   const last = ordered.at(-1)!;
+  const { high, low } = computeHighLowRange(ordered);
   return Object.freeze({
     securityId,
     securityCode: securityCode ?? first.securityCode,
@@ -120,8 +136,8 @@ export function reduceDaily(
     // hydration 聚合（deriveDaily）同约定；连续交易日戳严格递增，无碰撞。
     timestamp: new Date(tradingDayMs),
     open: first.open,
-    high: Math.max(...ordered.map((bar) => bar.high)),
-    low: Math.min(...ordered.map((bar) => bar.low)),
+    high,
+    low,
     close: last.close,
     volume: sumBarQuantity(ordered, 'volume'),
     amount: sumBarQuantity(ordered, 'amount'),

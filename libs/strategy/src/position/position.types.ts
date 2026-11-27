@@ -43,8 +43,3 @@ export interface PositionClosedRecord {
   readonly exitReason: string;
   readonly entryReason?: string;
 }
-
-export interface PositionStateMachineOptions {
-  /** 平仓比例，取值范围 (0, 1.0]，默认 1.0（全部平仓） */
-  readonly exitRatio?: number;
-}

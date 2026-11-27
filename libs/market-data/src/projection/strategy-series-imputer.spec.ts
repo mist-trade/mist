@@ -159,4 +159,23 @@ describe('StrategySeriesImputer — [DATA-P1-01] append 与 hydrate 量额零值
       TypeError,
     );
   });
+
+  it('trim 游标前移压缩且只读冻结快照在未发生写入前保持引用与数值不变', () => {
+    const imputer = new StrategySeriesImputer();
+    const totalBars = 75;
+    for (let i = 0; i < totalBars; i += 1) {
+      imputer.append(makeBar(i, { open: 10 + i, close: 10 + i }));
+    }
+    const snapBefore = imputer.read();
+    expect(imputer.read()).toBe(snapBefore);
+    expect(Object.isFrozen(snapBefore)).toBe(true);
+
+    for (let i = 0; i < 68; i += 1) {
+      imputer.trim();
+    }
+    const afterTrim = imputer.read();
+    expect(afterTrim).not.toBe(snapBefore);
+    expect(afterTrim).toHaveLength(totalBars - 68);
+    expect(afterTrim[0].rawBar.open).toBe(10 + 68);
+  });
 });

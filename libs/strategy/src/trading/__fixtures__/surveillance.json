@@ -1,5 +1,5 @@
 {
-  "name": "Bar 巡检：硬止损 -8% 触发保护性清仓（指令不推进账本），systemic 清仓，健康持仓零产出",
+  "name": "Bar 巡检：systemicCrunch 保护性清仓（指令不推进账本），信号层平仓与健康持仓零误触",
   "scenario": {
     "name": "surveillance",
     "securityId": 1,

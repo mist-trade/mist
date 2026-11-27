@@ -22,7 +22,17 @@ export interface LegacyRuleDslPluginParams {
  * 存量规则 DSL 兼容插件
  * 将历史系统中的 StrategyRuleExpression / CompiledStrategyExecutionPlan 无缝封装为通用因子插件
  */
+const MAX_COMPILED_DSL_STRING_CACHE = 128;
+
 export class LegacyRuleDslPlugin implements FactorPlugin {
+  private readonly compiledPlanByRuleObj = new WeakMap<
+    object,
+    Map<StrategySignalKind, CompiledStrategyExecutionPlan>
+  >();
+  private readonly compiledPlanBySerialized = new Map<
+    string,
+    CompiledStrategyExecutionPlan
+  >();
   public readonly id = 'plugin.legacy.rule-dsl';
   public readonly name = '存量规则DSL兼容插件';
   public readonly category = 'TECHNICAL' as const;
@@ -101,10 +111,38 @@ export class LegacyRuleDslPlugin implements FactorPlugin {
       return params.plan;
     }
     if (params?.rule) {
-      return compileStoredStrategyRule(
-        params.rule,
-        params.signalKind ?? 'entry',
-      );
+      const signalKind = params.signalKind ?? 'entry';
+      const byKind = this.compiledPlanByRuleObj.get(params.rule);
+      const hitByObj = byKind?.get(signalKind);
+      if (hitByObj) {
+        return hitByObj;
+      }
+
+      const serialized = `${signalKind}\u0000${JSON.stringify(params.rule)}`;
+      const hitBySerialized = this.compiledPlanBySerialized.get(serialized);
+      if (hitBySerialized) {
+        this.compiledPlanBySerialized.delete(serialized);
+        this.compiledPlanBySerialized.set(serialized, hitBySerialized);
+        return hitBySerialized;
+      }
+
+      const compiled = compileStoredStrategyRule(params.rule, signalKind);
+      if (byKind) {
+        byKind.set(signalKind, compiled);
+      } else {
+        this.compiledPlanByRuleObj.set(
+          params.rule,
+          new Map([[signalKind, compiled]]),
+        );
+      }
+      if (this.compiledPlanBySerialized.size >= MAX_COMPILED_DSL_STRING_CACHE) {
+        const oldestKey = this.compiledPlanBySerialized.keys().next().value;
+        if (oldestKey !== undefined) {
+          this.compiledPlanBySerialized.delete(oldestKey);
+        }
+      }
+      this.compiledPlanBySerialized.set(serialized, compiled);
+      return compiled;
     }
     return undefined;
   }
