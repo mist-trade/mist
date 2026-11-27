@@ -1,7 +1,9 @@
 # volatility-indicators Specification
 
 ## Purpose
-TBD - created by archiving change introduce-volatility-squeeze-and-vpci-plugins. Update Purpose after archive.
+
+Define the pure Polars-vectorized volatility channel math operators (Bollinger Bands and Keltner Channels) in `@app/indicators`, strictly adhering to dual-track TA-Lib alignment and population standard deviation (`ddof = 0`).
+
 ## Requirements
 ### Requirement: Polars-Vectorized Bollinger Bands Operator
 
