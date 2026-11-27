@@ -37,6 +37,9 @@ export interface SignalContributor {
   readonly idempotencyKey: string;
   readonly signalType: string;
   readonly attribution: SignalAttribution;
+  readonly pivotPrice?: number | null;
+  readonly originPluginId?: string | null;
+  readonly ruleSnapshot?: Readonly<Record<string, unknown>>;
 }
 
 /** 组内单条归因信号。幂等锚点为字符串（实时 = alertEventId 字符串化；离线 = 合成幂等串）。 */
@@ -66,6 +69,8 @@ export interface TradingPositionState {
   readonly entryTime?: Date;
   readonly currentPriceLi: Li;
   readonly realizedPnlLi: Li;
+  /** 尚未分摊的累计买入规费（厘），供部分卖出时按比例扣减已实现盈亏 */
+  readonly accumulatedBuyFeesLi?: Li;
 }
 
 /** 交易层账本只读快照（现金组合级、持仓按票）。 */

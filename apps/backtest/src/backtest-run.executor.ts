@@ -25,20 +25,28 @@ import {
   type BacktestTargetIssue,
 } from '@app/shared-data';
 import {
+  applySlippageLi,
+  availabilityKey,
   buildOfflineSignalIdempotencyKey,
+  calculateExecutionFeesLi,
   CapitalLedger,
   compileStoredDefinitionVersion,
   createDefaultRiskRules,
   DEFAULT_BROKER_INITIAL_CASH,
+  EXECUTION_RULES,
   ExternalFactorPluginLoader,
   HistoricalBarSource,
   mapKernelSignalToPersistencePayload,
+  MarketRiskRegime,
+  ORDER_SIDES,
   ORDER_STATUSES,
   ORDER_TYPES,
   PositionStateMachine,
+  recomputeNextBarOpenBuyQuantity,
   SimulatedBroker,
   StrategyEvaluationKernel,
   TradingEngine,
+  TRADING_LAYER_DEFAULTS,
   renderTraceChainOf,
   shanghaiMidnight,
   yuanToLi,
@@ -46,6 +54,7 @@ import {
   type CompiledStoredDefinition,
   type DailyNavSnapshot,
   type KernelSignal,
+  type MacroRegimeSnapshot,
   type PositionClosedRecord,
   type SignalGroupInput,
   type TradingPositionState,
@@ -485,6 +494,7 @@ export class BacktestRunExecutor {
     // 下一根 Bar 开始时统一 engine.decide（持仓/现金快照 = 前一 Bar 收盘后状态，
     // 指令交 Broker 于本 Bar Next-Bar 撮合——与旧"逐信号即时裁决"时序等价）。
     const pendingSignals: { signal: KernelSignal }[] = [];
+    const runMacroRegime = extractMacroRegime(run.contextSnapshot?.macroRegime);
 
     const buildAccountSnapshot = (): AccountSnapshot => {
       const snap = positionMachine.getSnapshot();
@@ -532,17 +542,28 @@ export class BacktestRunExecutor {
       });
     };
 
-    const flushPendingGroup = (): void => {
+    const flushPendingGroup = (nextOpenBar: StrategyBar | null): void => {
       if (pendingSignals.length === 0) return;
       const first = pendingSignals[0]!.signal;
+      const effectivePeriod =
+        first.triggerPeriod ?? first.channel?.period ?? run.period;
+      const effectiveTime = availabilityKey({
+        period: effectivePeriod,
+        timestamp: first.signalTime,
+      });
       const seenKeys = new Map<string, number>();
       const group: SignalGroupInput = {
         securityId,
         securityCode,
-        effectiveTime: first.signalTime,
-        tradingDay: formatShanghaiDateString(first.signalTime),
+        effectiveTime,
+        tradingDay: formatShanghaiDateString(effectiveTime),
         signals: pendingSignals.map(({ signal }) => {
-          const baseKey = buildOfflineSignalIdempotencyKey(signal, run.period);
+          const signalPeriod =
+            signal.triggerPeriod ?? signal.channel?.period ?? run.period;
+          const baseKey = buildOfflineSignalIdempotencyKey(
+            signal,
+            signalPeriod,
+          );
           const count = (seenKeys.get(baseKey) ?? 0) + 1;
           seenKeys.set(baseKey, count);
           const idempotencyKey = count === 1 ? baseKey : `${baseKey}-${count}`;
@@ -552,12 +573,14 @@ export class BacktestRunExecutor {
             signal,
             attribution: {
               strategyName: `definition-${run.strategyDefinitionId}`,
-              periodLabel: `${run.period}m`,
+              periodLabel: `${signalPeriod}m`,
               traceChain: renderTraceChainOf(signal.decisionTrace),
             },
           };
         }),
       };
+      const groupMacroRegime =
+        resolveMacroRegimeFromSignals(pendingSignals) ?? runMacroRegime;
       pendingSignals.length = 0;
 
       // 既有在途挂单（如上一周期一字跌停顺延的 BLOCKED 卖单）——不叠加新指令
@@ -573,10 +596,66 @@ export class BacktestRunExecutor {
         return;
       }
 
-      const decision = tradingEngine.decide(group, buildAccountSnapshot());
+      const decision = tradingEngine.decide(
+        group,
+        buildAccountSnapshot(),
+        groupMacroRegime,
+      );
+      if (!nextOpenBar) {
+        return;
+      }
+
+      let scheduledSellProceedsLi = 0n;
+      const openLi = yuanToLi(nextOpenBar.open);
       for (const instruction of decision.instructions) {
         if (!instruction.signal) continue;
-        submitInstruction(instruction, instruction.signal.signalTime);
+        let submitQty = instruction.quantity;
+        if (instruction.action === ORDER_SIDES.SELL) {
+          const estSellLi = applySlippageLi(
+            openLi,
+            ORDER_SIDES.SELL,
+            EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO,
+          );
+          const sellFees = calculateExecutionFeesLi(
+            ORDER_SIDES.SELL,
+            estSellLi,
+            submitQty,
+            securityCode,
+          );
+          scheduledSellProceedsLi +=
+            estSellLi * BigInt(submitQty) - sellFees.totalFeesLi;
+        } else {
+          const estBuyLi = applySlippageLi(
+            openLi,
+            ORDER_SIDES.BUY,
+            EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO,
+          );
+          const availableCashLi =
+            yuanToLi(broker.getAccount().availableCash) +
+            scheduledSellProceedsLi;
+          submitQty = recomputeNextBarOpenBuyQuantity({
+            cashLi: availableCashLi,
+            fillPriceLi: estBuyLi,
+            requestedQuantity: instruction.quantity,
+            cashAllocationRatio:
+              TRADING_LAYER_DEFAULTS.DEFAULT_CASH_ALLOCATION_RATIO,
+            lotSize: TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE,
+            securityCode,
+            feeEnabled: true,
+            macroRegime: groupMacroRegime,
+          });
+        }
+        if (
+          submitQty <= 0 ||
+          (instruction.action === ORDER_SIDES.BUY &&
+            submitQty < TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE)
+        ) {
+          continue;
+        }
+        submitInstruction(
+          { ...instruction, quantity: submitQty },
+          instruction.signal.signalTime,
+        );
       }
     };
 
@@ -625,7 +704,7 @@ export class BacktestRunExecutor {
         lastSeenBar = bar;
 
         // 1) 上一 Bar 信号组统一裁决 → 指令入待撮合队列（本 Bar Next-Bar 撮合）
-        flushPendingGroup();
+        flushPendingGroup(bar);
 
         // 2) 撮合 + 记账（SimulatedBroker 撮合语义零改动）
         const fills = broker.onBar(bar);
@@ -655,6 +734,7 @@ export class BacktestRunExecutor {
               currentPriceLi: yuanToLi(snap.currentPrice),
               realizedPnlLi: yuanToLi(snap.realizedPnl),
             },
+            runMacroRegime,
           );
           for (const instruction of riskInstructions) {
             if (
@@ -683,8 +763,8 @@ export class BacktestRunExecutor {
     );
     await budget.checkpoint(true);
 
-    // 回放末尾残余信号组补flush（指令入队后无后续 Bar 撮合——与旧路径一致不成交）
-    flushPendingGroup();
+    // 回放末尾残余信号组补 flush（指令入队后无后续 Bar 撮合——与旧路径一致不成交）
+    flushPendingGroup(null);
 
     const finalBar = lastSeenBar as StrategyBar | null;
     if (finalBar && capitalLedger.getNavHistory().length === 0) {
@@ -804,6 +884,52 @@ export class BacktestRunExecutor {
 
 function normalizeCode(value: string): string {
   return value.trim();
+}
+
+function extractMacroRegime(raw: unknown): MacroRegimeSnapshot | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return undefined;
+  }
+  const record = raw as Record<string, unknown>;
+  const regime = record.regime;
+  if (
+    regime !== MarketRiskRegime.NORMAL &&
+    regime !== MarketRiskRegime.ELEVATED_RISK &&
+    regime !== MarketRiskRegime.SYSTEMIC_CRUNCH &&
+    regime !== MarketRiskRegime.LIQUIDITY_FREEZE
+  ) {
+    return undefined;
+  }
+  if (
+    typeof record.marketAtrPercentile !== 'number' ||
+    !Number.isFinite(record.marketAtrPercentile)
+  ) {
+    return undefined;
+  }
+  if (typeof record.isLiquidityFrozen !== 'boolean') {
+    return undefined;
+  }
+  return {
+    regime,
+    marketAtrPercentile: record.marketAtrPercentile,
+    isLiquidityFrozen: record.isLiquidityFrozen,
+    ...(typeof record.marketBreadthRatio === 'number' &&
+    Number.isFinite(record.marketBreadthRatio)
+      ? { marketBreadthRatio: record.marketBreadthRatio }
+      : {}),
+  };
+}
+
+function resolveMacroRegimeFromSignals(
+  items: readonly { readonly signal: KernelSignal }[],
+): MacroRegimeSnapshot | undefined {
+  for (const { signal } of items) {
+    const fromContext = extractMacroRegime(signal.contextSnapshot?.macroRegime);
+    if (fromContext) return fromContext;
+    const fromTrace = extractMacroRegime(signal.decisionTrace?.macroRegime);
+    if (fromTrace) return fromTrace;
+  }
+  return undefined;
 }
 
 function uniqueIssues(

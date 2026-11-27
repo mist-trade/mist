@@ -99,6 +99,7 @@ export class TradingEngine {
   ): TradingDecision {
     const cash = { li: snapshot.cashLi };
     const positions = new Map<number, TradingPositionState>(snapshot.positions);
+    const closedRealizedPnl = new Map<number, Li>();
     const instructions: TradeInstruction[] = [];
     const rejections: TradeRejection[] = [];
 
@@ -124,6 +125,7 @@ export class TradingEngine {
         macroRegime,
         cash,
         positions,
+        closedRealizedPnl,
         instructions,
         rejections,
       });
@@ -137,6 +139,7 @@ export class TradingEngine {
         macroRegime,
         cash,
         positions,
+        closedRealizedPnl,
         instructions,
         rejections,
       });
@@ -207,6 +210,7 @@ export class TradingEngine {
     readonly macroRegime?: MacroRegimeSnapshot;
     readonly cash: { li: Li };
     readonly positions: Map<number, TradingPositionState>;
+    readonly closedRealizedPnl: Map<number, Li>;
     readonly instructions: TradeInstruction[];
     readonly rejections: TradeRejection[];
   }): void {
@@ -217,6 +221,7 @@ export class TradingEngine {
       macroRegime,
       cash,
       positions,
+      closedRealizedPnl,
       instructions,
       rejections,
     } = params;
@@ -297,16 +302,29 @@ export class TradingEngine {
     const turnoverLi = priceLi * BigInt(sellQty);
     const proceedsLi = turnoverLi - fees.totalFeesLi;
     const costBasisLi = position.costPriceLi * BigInt(sellQty);
+    const priorBuyFeesLi = position.accumulatedBuyFeesLi ?? 0n;
+    const allocatedBuyFeesLi =
+      position.holdingQuantity > 0
+        ? (priorBuyFeesLi * BigInt(sellQty)) / BigInt(position.holdingQuantity)
+        : 0n;
+    const remainingBuyFeesLi =
+      priorBuyFeesLi > allocatedBuyFeesLi
+        ? priorBuyFeesLi - allocatedBuyFeesLi
+        : 0n;
+    const nextRealizedPnlLi =
+      position.realizedPnlLi + (proceedsLi - costBasisLi - allocatedBuyFeesLi);
     cash.li += proceedsLi;
     const remaining = position.holdingQuantity - sellQty;
     if (remaining <= 0) {
+      closedRealizedPnl.set(group.securityId, nextRealizedPnlLi);
       positions.delete(group.securityId);
     } else {
       positions.set(group.securityId, {
         ...position,
         holdingQuantity: remaining,
         currentPriceLi: priceLi,
-        realizedPnlLi: position.realizedPnlLi + (proceedsLi - costBasisLi),
+        realizedPnlLi: nextRealizedPnlLi,
+        accumulatedBuyFeesLi: remainingBuyFeesLi,
       });
     }
 
@@ -339,6 +357,7 @@ export class TradingEngine {
     readonly macroRegime?: MacroRegimeSnapshot;
     readonly cash: { li: Li };
     readonly positions: Map<number, TradingPositionState>;
+    readonly closedRealizedPnl: Map<number, Li>;
     readonly instructions: TradeInstruction[];
     readonly rejections: TradeRejection[];
   }): void {
@@ -348,6 +367,7 @@ export class TradingEngine {
       macroRegime,
       cash,
       positions,
+      closedRealizedPnl,
       instructions,
       rejections,
     } = params;
@@ -415,15 +435,30 @@ export class TradingEngine {
       return;
     }
 
+    const priorRealizedPnlLi =
+      position?.realizedPnlLi ??
+      raw?.realizedPnlLi ??
+      closedRealizedPnl.get(group.securityId) ??
+      0n;
+    const prevQty = position?.holdingQuantity ?? 0;
+    const prevCostTotalLi =
+      position !== null ? BigInt(prevQty) * position.costPriceLi : 0n;
+    const nextQty = prevQty + verdict.quantity;
+    const nextCostPriceLi =
+      nextQty > 0 ? (prevCostTotalLi + turnoverLi) / BigInt(nextQty) : 0n;
+    const nextBuyFeesLi =
+      (position?.accumulatedBuyFeesLi ?? 0n) + fees.totalFeesLi;
+
     cash.li -= totalLi;
     positions.set(group.securityId, {
       securityId: group.securityId,
       securityCode: group.securityCode,
-      holdingQuantity: verdict.quantity,
-      costPriceLi: turnoverLi / BigInt(verdict.quantity),
+      holdingQuantity: nextQty,
+      costPriceLi: nextCostPriceLi,
       entryTime: primary.signal.signalTime,
       currentPriceLi: priceLi,
-      realizedPnlLi: 0n,
+      realizedPnlLi: priorRealizedPnlLi,
+      accumulatedBuyFeesLi: nextBuyFeesLi,
     });
 
     const reason =

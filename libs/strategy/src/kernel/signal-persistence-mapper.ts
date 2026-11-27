@@ -4,6 +4,23 @@ function isValidDate(value: unknown): value is Date {
   return value instanceof Date && !Number.isNaN(value.getTime());
 }
 
+function readOptionalFiniteNumber(value: unknown): number | null {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null;
+}
+
+function readOptionalNonEmptyString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
+}
+
+function readOptionalRecord(
+  value: unknown,
+): Readonly<Record<string, unknown>> | null {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return null;
+  }
+  return { ...(value as Record<string, unknown>) };
+}
+
 export interface SignalPersistenceContext {
   readonly securityId: number;
   readonly securityCode?: string;
@@ -26,6 +43,10 @@ export type PersistableKernelSignal = Pick<
   readonly originPluginId?: KernelSignal['originPluginId'];
   readonly pivotTime?: string | Date | null;
   readonly pivotPrice?: number | null;
+  readonly badgeText?: string | null;
+  readonly displayTag?: string | null;
+  readonly styleMeta?: Readonly<Record<string, unknown>> | null;
+  readonly triggerPeriod?: number | null;
   readonly decisionTrace?: Readonly<Record<string, unknown>> | null;
   readonly contextSnapshot?: Readonly<Record<string, unknown>>;
   readonly ruleSnapshot?: Readonly<Record<string, unknown>>;
@@ -45,8 +66,13 @@ export interface SignalPersistencePayload {
   readonly originPluginId: KernelSignal['originPluginId'];
   readonly signalTime: Date;
   readonly pivotTime: Date | null;
+  readonly pivotPrice: number | null;
   readonly triggerPrice: number;
   readonly signalType: string;
+  readonly badgeText: string | null;
+  readonly displayTag: string | null;
+  readonly styleMeta: Readonly<Record<string, unknown>> | null;
+  readonly triggerPeriod: number | null;
   readonly decisionTrace: Record<string, unknown> | null;
   readonly contextSnapshot: Record<string, unknown>;
   readonly ruleSnapshot: Record<string, unknown>;
@@ -70,6 +96,21 @@ export function mapKernelSignalToPersistencePayload(
       : new Date(signal.pivotTime)
     : null;
   const triggerPrice = signal.triggerPrice;
+  const pivotPrice =
+    readOptionalFiniteNumber(signal.pivotPrice) ??
+    readOptionalFiniteNumber(signal.contextSnapshot?.pivotPrice);
+  const badgeText =
+    readOptionalNonEmptyString(signal.badgeText) ??
+    readOptionalNonEmptyString(signal.contextSnapshot?.badgeText);
+  const displayTag =
+    readOptionalNonEmptyString(signal.displayTag) ??
+    readOptionalNonEmptyString(signal.contextSnapshot?.displayTag);
+  const styleMeta =
+    readOptionalRecord(signal.styleMeta) ??
+    readOptionalRecord(signal.contextSnapshot?.styleMeta);
+  const triggerPeriod =
+    readOptionalFiniteNumber(signal.triggerPeriod) ??
+    readOptionalFiniteNumber(signal.contextSnapshot?.triggerPeriod);
 
   const contextSnapshot: Record<string, unknown> = {
     ...signal.contextSnapshot,
@@ -77,6 +118,11 @@ export function mapKernelSignalToPersistencePayload(
     ...(signal.channel ? { channel: signal.channel } : {}),
     ...(signal.intent ? { intent: signal.intent } : {}),
     ...(signal.originPluginId ? { originPluginId: signal.originPluginId } : {}),
+    ...(pivotPrice !== null ? { pivotPrice } : {}),
+    ...(badgeText !== null ? { badgeText } : {}),
+    ...(displayTag !== null ? { displayTag } : {}),
+    ...(styleMeta !== null ? { styleMeta } : {}),
+    ...(triggerPeriod !== null ? { triggerPeriod } : {}),
   };
 
   const ruleSnapshot: Record<string, unknown> = {
@@ -96,8 +142,13 @@ export function mapKernelSignalToPersistencePayload(
     originPluginId: signal.originPluginId,
     signalTime,
     pivotTime,
+    pivotPrice,
     triggerPrice,
     signalType: signal.signalType,
+    badgeText,
+    displayTag,
+    styleMeta,
+    triggerPeriod,
     decisionTrace: signal.decisionTrace ? { ...signal.decisionTrace } : null,
     contextSnapshot,
     ruleSnapshot,

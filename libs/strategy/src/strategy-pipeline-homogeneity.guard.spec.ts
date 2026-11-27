@@ -160,7 +160,7 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
         ? never
         : {
             signalTime: string;
-            pivotTime: string;
+            pivotTime: string | null;
             triggerPrice: number;
             signalType: string;
             isBuy: boolean;
@@ -407,7 +407,7 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
       function toComparableList(
         signals: readonly {
           signalTime: string;
-          pivotTime: string;
+          pivotTime: string | null;
           triggerPrice: number;
           signalType: string;
           isBuy: boolean;
@@ -426,7 +426,7 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
         // Lane A：历史回放（多序列归并）
         const laneA: {
           signalTime: string;
-          pivotTime: string;
+          pivotTime: string | null;
           triggerPrice: number;
           signalType: string;
           isBuy: boolean;
@@ -502,7 +502,7 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
         });
         const laneB: {
           signalTime: string;
-          pivotTime: string;
+          pivotTime: string | null;
           triggerPrice: number;
           signalType: string;
           isBuy: boolean;
@@ -531,7 +531,7 @@ describe('Strategy Pipeline Homogeneity Guard (三链路同构门禁)', () => {
         });
         const laneC: {
           signalTime: string;
-          pivotTime: string;
+          pivotTime: string | null;
           triggerPrice: number;
           signalType: string;
           isBuy: boolean;

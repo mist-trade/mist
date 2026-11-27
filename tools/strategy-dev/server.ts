@@ -16,6 +16,18 @@ import { isValidDate } from '@app/utils';
 import { ChanVisualAdapter } from '../../libs/visual-command/src/adapters/chan-visual.adapter';
 
 import {
+  applySlippageLi,
+  availabilityKey,
+  calculateExecutionFeesLi,
+  HistoricalBarSource,
+  MarketRiskRegime,
+  ORDER_SIDES,
+  recomputeNextBarOpenBuyQuantity,
+  TRADING_LAYER_DEFAULTS,
+  type HistoricalReplaySummary,
+  type MacroRegimeSnapshot,
+} from '@app/strategy';
+import {
   StrategySimulationSession,
   SIMULATION_LOCAL_FIXTURE_IDENTITY,
   type SimulationFrame,
@@ -23,7 +35,6 @@ import {
 } from '../../libs/strategy/src/simulation';
 import {
   StrategyEvaluationKernel,
-  availabilityKey,
   type KernelSignal,
 } from '../../libs/strategy/src/kernel';
 import { SimulatedBroker } from '../../libs/strategy/src/execution/simulated-broker';
@@ -58,11 +69,9 @@ import type { DecisionFlowNode } from '../../libs/strategy/src/decision-flow/dec
 import type { ExternalContextRequirement } from '../../libs/strategy/src/kernel/kernel.types';
 import {
   compileStoredDefinitionVersion,
-  deriveContextRequirements,
   StoredDefinitionCompileError,
   type StoredDefinitionSourceKind,
 } from '../../libs/strategy/src/decision-flow/stored-definition-compiler';
-import { HistoricalBarSource } from '../../libs/strategy/src/kernel/historical-bar-source';
 import {
   InMemoryReplayPort,
   ReplaySeriesMissingError,
@@ -102,6 +111,11 @@ import {
 } from './strategy-dev.constants';
 
 const PORT = Number(process.env.PORT) || DEFAULT_DEV_PORT;
+const DEV_BACKTEST_SLIPPAGE_RATIO = 0.0005;
+const DEV_DEFAULT_INITIAL_CASH = 1_000_000;
+const DEV_DEFAULT_REQUIRED_BAR_COUNT = 300;
+const DEV_DEFAULT_PRE_CLOSE = 1000;
+const DEV_DECISION_FLOW_KIND = 'decision_flow' as const;
 
 // 严格门禁：tools/strategy-dev/server.ts 属于本地开发网关，严禁在生产环境启动
 if (process.env.NODE_ENV === 'production') {
@@ -544,9 +558,26 @@ const activeSessions = new Map<string, StrategySimulationSession>();
 // 活跃 SSE 客户端长连接广播池 (sessionId -> Set<http.ServerResponse>)
 const sessionStreamClients = new Map<string, Set<http.ServerResponse>>();
 
-// 回测信号内存缓存池 (cacheKey -> signals, runId -> signals)
-const backtestSignalsCache = new Map<string, readonly SimulationSignal[]>();
+interface CachedBacktestResult {
+  readonly signals: readonly SimulationSignal[];
+  readonly navSeries: readonly number[];
+  readonly closedTrades: readonly any[];
+  readonly performance: ReturnType<typeof computePerformanceSummary> | null;
+  readonly maxUnderwaterDuration: number | undefined;
+  readonly replay: HistoricalReplaySummary | undefined;
+  readonly ruleSnapshot: Readonly<Record<string, unknown>>;
+  readonly contextRequirements: Readonly<Record<number, number>>;
+  readonly externalContextRequirements: readonly ExternalContextRequirement[];
+  readonly definitionVersionLabel?: string;
+}
+
+// 回测信号内存缓存池 (cacheKey -> cachedResult, runId -> signals/ruleSnapshot)
+const backtestSignalsCache = new Map<string, CachedBacktestResult>();
 const backtestRunSignalsMap = new Map<number, readonly SimulationSignal[]>();
+const backtestRunRuleSnapshotMap = new Map<
+  number,
+  Readonly<Record<string, unknown>>
+>();
 
 /** 有界 LRU 内存缓存（防模块级缓存无界增长） */
 class BoundedLruCache<K, V> {
@@ -673,6 +704,8 @@ function getBacktestCacheKey(options: {
   mode?: string;
   pluginId?: string;
   enableStopLoss?: boolean;
+  initialCash?: number;
+  macroRegime?: MacroRegimeSnapshot;
   strategyDefinitionId?: number;
   /** 插件推导的 context 需求指纹：插件声明变化时使旧缓存失效 */
   contextFingerprint?: string;
@@ -685,7 +718,56 @@ function getBacktestCacheKey(options: {
   const end = isValidDate(options.endDate)
     ? options.endDate.toISOString()
     : options.endDate || '';
-  return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${options.mode || ''}:${options.pluginId || ''}:${Boolean(options.enableStopLoss)}:${options.strategyDefinitionId ?? ''}:${options.contextFingerprint || ''}:${options.definitionVersionLabel || ''}:${start}:${end}`;
+  const macroFingerprint = options.macroRegime
+    ? JSON.stringify(options.macroRegime)
+    : '';
+  return `${options.code}:${options.period}:${Boolean(options.filterFenxingContainment)}:${options.mode || ''}:${options.pluginId || ''}:${Boolean(options.enableStopLoss)}:${options.initialCash ?? DEV_DEFAULT_INITIAL_CASH}:${macroFingerprint}:${options.strategyDefinitionId ?? ''}:${options.contextFingerprint || ''}:${options.definitionVersionLabel || ''}:${start}:${end}`;
+}
+
+function extractMacroRegime(raw: unknown): MacroRegimeSnapshot | undefined {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) {
+    return undefined;
+  }
+  const record = raw as Record<string, unknown>;
+  const regime = record.regime;
+  if (
+    regime !== MarketRiskRegime.NORMAL &&
+    regime !== MarketRiskRegime.ELEVATED_RISK &&
+    regime !== MarketRiskRegime.SYSTEMIC_CRUNCH &&
+    regime !== MarketRiskRegime.LIQUIDITY_FREEZE
+  ) {
+    return undefined;
+  }
+  if (
+    typeof record.marketAtrPercentile !== 'number' ||
+    !Number.isFinite(record.marketAtrPercentile)
+  ) {
+    return undefined;
+  }
+  if (typeof record.isLiquidityFrozen !== 'boolean') {
+    return undefined;
+  }
+  return {
+    regime,
+    marketAtrPercentile: record.marketAtrPercentile,
+    isLiquidityFrozen: record.isLiquidityFrozen,
+    ...(typeof record.marketBreadthRatio === 'number' &&
+    Number.isFinite(record.marketBreadthRatio)
+      ? { marketBreadthRatio: record.marketBreadthRatio }
+      : {}),
+  };
+}
+
+function resolveMacroRegimeFromSignals(
+  items: readonly { readonly signal: KernelSignal }[],
+): MacroRegimeSnapshot | undefined {
+  for (const { signal } of items) {
+    const fromContext = extractMacroRegime(signal.contextSnapshot?.macroRegime);
+    if (fromContext) return fromContext;
+    const fromTrace = extractMacroRegime(signal.decisionTrace?.macroRegime);
+    if (fromTrace) return fromTrace;
+  }
+  return undefined;
 }
 
 /** 有界请求错误：dev 回测链路 fail-closed 的 HTTP 映射载体 */
@@ -849,11 +931,13 @@ interface RunBacktestOptions {
   initialCash?: number;
   runStressSuite?: boolean;
   enableStopLoss?: boolean;
+  macroRegime?: MacroRegimeSnapshot;
 }
 
 // 全量执行仿真并获取回测结果的统一纯净胶水（统一内核 push 驱动 + Next-Bar 因果撮合 + Polars 绩效）
 async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
-  const initialCash = options.initialCash ?? 1_000_000;
+  const initialCash = options.initialCash ?? DEV_DEFAULT_INITIAL_CASH;
+  const runMacroRegime = extractMacroRegime(options.macroRegime);
 
   // 1. 初始化插件注册表并动态加载外部插件（含私有战术插件）
   const registry = new InMemoryFactorPluginRegistry();
@@ -869,7 +953,10 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       ? loadLocalStoredDefinition(options.strategyDefinitionId)
       : null;
   let flow: DecisionFlowNode;
-  let requiredBarCount = 300;
+  let requiredBarCount = DEV_DEFAULT_REQUIRED_BAR_COUNT;
+  let ruleSnapshot: Readonly<Record<string, unknown>>;
+  let contextRequirements: Readonly<Record<number, number>>;
+  let externalContextRequirements: readonly ExternalContextRequirement[];
   let definitionVersionLabel: string | null = null;
   if (storedDefinition) {
     const compiled = compileStoredDefinitionVersion(
@@ -877,11 +964,15 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         kind: storedDefinition.kind,
         rule: storedDefinition.rule,
         signalKind: storedDefinition.signalKind,
+        evaluationPeriod: options.period,
       },
       registry,
     );
     flow = compiled.flow;
     requiredBarCount = compiled.requiredBarCount;
+    ruleSnapshot = compiled.ruleSnapshot;
+    contextRequirements = compiled.contextRequirements;
+    externalContextRequirements = compiled.externalContextRequirements;
     definitionVersionLabel = storedDefinition.versionLabel;
   } else if (
     typeof options.strategyDefinitionId === 'number' &&
@@ -894,38 +985,63 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         ` — 请先执行: pnpm dev:sync --definition ${options.strategyDefinitionId}`,
     );
   } else {
-    flow = createCustomDecisionFlow(
+    const customFlow = createCustomDecisionFlow(
       options.mode,
       options.pluginId,
       options.strategyDefinitionId,
     );
+    const compiled = compileStoredDefinitionVersion(
+      {
+        kind: DEV_DECISION_FLOW_KIND,
+        rule: {
+          rootNode: customFlow,
+          requiredBarCount: DEV_DEFAULT_REQUIRED_BAR_COUNT,
+        },
+        evaluationPeriod: options.period,
+      },
+      registry,
+    );
+    flow = compiled.flow;
+    requiredBarCount = compiled.requiredBarCount;
+    ruleSnapshot = compiled.ruleSnapshot;
+    contextRequirements = compiled.contextRequirements;
+    externalContextRequirements = compiled.externalContextRequirements;
   }
-  // context 需求由插件元数据推导（编译边界唯一实现，调用方不可传 lookback）
-  const contextRequirements = deriveContextRequirements(flow, registry);
 
-  // 3. 缓存键（含 context 指纹与定义版本）
+  // 3. 缓存键（含 context 指纹、宏观体制与定义版本）
   const cacheKey = getBacktestCacheKey({
     ...options,
-    contextFingerprint: JSON.stringify(contextRequirements),
+    initialCash,
+    macroRegime: runMacroRegime,
+    contextFingerprint: JSON.stringify({
+      contextRequirements,
+      externalContextRequirements,
+    }),
     ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
   });
-  const cachedSignals = backtestSignalsCache.get(cacheKey);
+  const cached = backtestSignalsCache.get(cacheKey);
   if (
-    cachedSignals &&
+    cached &&
     !options.runStressSuite &&
     !options.mode &&
     !options.pluginId &&
     !options.strategyDefinitionId
   ) {
     return {
-      signals: cachedSignals,
+      signals: cached.signals,
       kernel: null,
-      navSeries: [],
-      closedTrades: [],
-      performance: null,
+      navSeries: cached.navSeries,
+      closedTrades: cached.closedTrades,
+      performance: cached.performance,
       stressReport: null,
-      replay: undefined,
-      maxUnderwaterDuration: undefined,
+      replay: cached.replay,
+      maxUnderwaterDuration: cached.maxUnderwaterDuration,
+      ruleSnapshot: cached.ruleSnapshot,
+      contextRequirements: cached.contextRequirements,
+      externalContextRequirements: cached.externalContextRequirements,
+      ...(cached.definitionVersionLabel
+        ? { definitionVersionLabel: cached.definitionVersionLabel }
+        : {}),
     };
   }
 
@@ -1001,7 +1117,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         definitionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,
         versionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
         flow,
-        ruleSnapshot: Object.freeze({}),
+        ruleSnapshot,
         period: options.period,
         requiredBarCount,
         contextRequirements,
@@ -1025,12 +1141,12 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   // 8. 初始化因果经纪商与持仓状态机（T+1 / 日结 / 解锁按日线节奏）
   const broker = new SimulatedBroker({
     initialCash,
-    slippageRatio: 0.0005,
+    slippageRatio: DEV_BACKTEST_SLIPPAGE_RATIO,
   });
   const evaluationBars = seriesMap.get(options.period) ?? [];
   broker.registerSecurity(options.code, {
     name: options.code === '000001' ? '上证指数' : options.code,
-    preClose: evaluationBars[0]?.open ?? 1000,
+    preClose: evaluationBars[0]?.open ?? DEV_DEFAULT_PRE_CLOSE,
   });
   const position = new PositionStateMachine(
     DEFAULT_DEV_SECURITY_ID,
@@ -1056,7 +1172,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   // 组内信号于下一根 Bar 开始统一 engine.decide，指令于本 Bar Next-Bar 撮合。
   const pendingSignals: { signal: KernelSignal }[] = [];
 
-  const buildAccountSnapshot = (currentBar: StrategyBar): AccountSnapshot => {
+  const buildAccountSnapshot = (tradingDay: string): AccountSnapshot => {
     const snap = position.getSnapshot();
     const positions = new Map<number, TradingPositionState>();
     if (snap.holdingQuantity > 0) {
@@ -1073,7 +1189,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     return {
       cashLi: yuanToLi(capitalLedger.getCash()),
       positions,
-      tradingDay: formatShanghaiDateString(currentBar.timestamp),
+      tradingDay,
     };
   };
 
@@ -1100,20 +1216,28 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     });
   };
 
-  const flushPendingGroup = (currentBar: StrategyBar): void => {
+  const flushPendingGroup = (
+    snapshotBar: StrategyBar | null,
+    nextOpenBar: StrategyBar | null,
+  ): void => {
     if (pendingSignals.length === 0) return;
     const first = pendingSignals[0]!.signal;
+    const effectivePeriod =
+      first.triggerPeriod ?? first.channel?.period ?? options.period;
+    const effectiveTime = availabilityKey({
+      period: effectivePeriod,
+      timestamp: first.signalTime,
+    });
     const seenKeys = new Map<string, number>();
     const group: SignalGroupInput = {
       securityId: DEFAULT_DEV_SECURITY_ID,
       securityCode: options.code,
-      effectiveTime: first.signalTime,
-      tradingDay: formatShanghaiDateString(first.signalTime),
+      effectiveTime,
+      tradingDay: formatShanghaiDateString(effectiveTime),
       signals: pendingSignals.map(({ signal }) => {
-        const baseKey = buildOfflineSignalIdempotencyKey(
-          signal,
-          options.period,
-        );
+        const signalPeriod =
+          signal.triggerPeriod ?? signal.channel?.period ?? options.period;
+        const baseKey = buildOfflineSignalIdempotencyKey(signal, signalPeriod);
         const count = (seenKeys.get(baseKey) ?? 0) + 1;
         seenKeys.set(baseKey, count);
         const idempotencyKey = count === 1 ? baseKey : `${baseKey}-${count}`;
@@ -1122,12 +1246,14 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
           signal,
           attribution: {
             strategyName: `definition-${options.strategyDefinitionId ?? 0}`,
-            periodLabel: `${options.period}m`,
+            periodLabel: `${signalPeriod}m`,
             traceChain: renderTraceChainOf(signal.decisionTrace),
           },
         };
       }),
     };
+    const groupMacroRegime =
+      resolveMacroRegimeFromSignals(pendingSignals) ?? runMacroRegime;
     pendingSignals.length = 0;
 
     // 既有在途挂单（如上一周期一字跌停顺延的 BLOCKED 卖单）——不叠加新指令
@@ -1143,13 +1269,68 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       return;
     }
 
+    const snapshotTradingDay = snapshotBar
+      ? formatShanghaiDateString(snapshotBar.timestamp)
+      : group.tradingDay;
     const decision = tradingEngine.decide(
       group,
-      buildAccountSnapshot(currentBar),
+      buildAccountSnapshot(snapshotTradingDay),
+      groupMacroRegime,
     );
+    if (!nextOpenBar) {
+      return;
+    }
+
+    let scheduledSellProceedsLi = 0n;
+    const openLi = yuanToLi(nextOpenBar.open);
     for (const instruction of decision.instructions) {
       if (!instruction.signal) continue;
-      submitInstruction(instruction, instruction.signal.signalTime);
+      let submitQty = instruction.quantity;
+      if (instruction.action === ORDER_SIDES.SELL) {
+        const estSellLi = applySlippageLi(
+          openLi,
+          ORDER_SIDES.SELL,
+          DEV_BACKTEST_SLIPPAGE_RATIO,
+        );
+        const sellFees = calculateExecutionFeesLi(
+          ORDER_SIDES.SELL,
+          estSellLi,
+          submitQty,
+          options.code,
+        );
+        scheduledSellProceedsLi +=
+          estSellLi * BigInt(submitQty) - sellFees.totalFeesLi;
+      } else {
+        const estBuyLi = applySlippageLi(
+          openLi,
+          ORDER_SIDES.BUY,
+          DEV_BACKTEST_SLIPPAGE_RATIO,
+        );
+        const availableCashLi =
+          yuanToLi(broker.getAccount().availableCash) + scheduledSellProceedsLi;
+        submitQty = recomputeNextBarOpenBuyQuantity({
+          cashLi: availableCashLi,
+          fillPriceLi: estBuyLi,
+          requestedQuantity: instruction.quantity,
+          cashAllocationRatio:
+            TRADING_LAYER_DEFAULTS.DEFAULT_CASH_ALLOCATION_RATIO,
+          lotSize: TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE,
+          securityCode: options.code,
+          feeEnabled: true,
+          macroRegime: groupMacroRegime,
+        });
+      }
+      if (
+        submitQty <= 0 ||
+        (instruction.action === ORDER_SIDES.BUY &&
+          submitQty < TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE)
+      ) {
+        continue;
+      }
+      submitInstruction(
+        { ...instruction, quantity: submitQty },
+        instruction.signal.signalTime,
+      );
     }
   };
 
@@ -1185,7 +1366,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       lastDateStr = currentDateStr;
 
       // 1) 上一 Bar 信号组统一裁决 → 指令入待撮合队列（本 Bar Next-Bar 撮合）
-      flushPendingGroup(bar);
+      flushPendingGroup(bar, bar);
 
       // 2) 撮合 + 记账（SimulatedBroker 撮合语义零改动）
       const fills = broker.onBar(bar);
@@ -1214,6 +1395,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
             currentPriceLi: yuanToLi(snap.currentPrice),
             realizedPnlLi: yuanToLi(snap.realizedPnl),
           },
+          runMacroRegime,
         );
         for (const instruction of riskInstructions) {
           if (
@@ -1242,7 +1424,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   );
 
   // 回放末尾残余信号组补 flush（指令入队后无后续 Bar 撮合——与旧路径一致不成交）
-  flushPendingGroup(lastEvalBar ?? evaluationBars.at(-1)!);
+  flushPendingGroup(lastEvalBar ?? evaluationBars.at(-1) ?? null, null);
 
   // 最后一根 Bar 的日终结算
   if (lastEvalBar !== null && lastDateStr !== null) {
@@ -1285,6 +1467,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
           enableStopLoss: options.enableStopLoss,
           initialCash,
           runStressSuite: false,
+          ...(runMacroRegime ? { macroRegime: runMacroRegime } : {}),
         });
         return {
           navSeries: scenarioResult.navSeries,
@@ -1317,7 +1500,18 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     !options.pluginId &&
     !options.strategyDefinitionId
   ) {
-    backtestSignalsCache.set(cacheKey, collectedSignals);
+    backtestSignalsCache.set(cacheKey, {
+      signals: collectedSignals,
+      navSeries,
+      closedTrades,
+      performance,
+      maxUnderwaterDuration,
+      replay: replaySummary,
+      ruleSnapshot,
+      contextRequirements,
+      externalContextRequirements,
+      ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
+    });
   }
 
   return {
@@ -1329,6 +1523,9 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     maxUnderwaterDuration,
     stressReport,
     replay: replaySummary,
+    ruleSnapshot,
+    contextRequirements,
+    externalContextRequirements,
     ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
   };
 }
@@ -1993,7 +2190,8 @@ async function handleDevRequest(
         typeof body.pluginId === 'string' ? body.pluginId : undefined;
       const startDate = body.startDate || '1996-12-16T00:00:00.000Z';
       const endDate = body.endDate || '2026-12-31T23:59:59.000Z';
-      const initialCash = Number(body.initialCash) || 1_000_000;
+      const initialCash = Number(body.initialCash) || DEV_DEFAULT_INITIAL_CASH;
+      const macroRegime = extractMacroRegime(body.macroRegime);
       const runStressSuite =
         body.runStressSuite === true || body.runStressSuite === 'true';
       const enableStopLoss =
@@ -2010,11 +2208,15 @@ async function handleDevRequest(
       // 统一走策略树仿真引擎计算
       const {
         signals,
+        navSeries,
         performance,
         stressReport,
         closedTrades,
         replay,
         maxUnderwaterDuration,
+        ruleSnapshot,
+        contextRequirements,
+        externalContextRequirements,
       } = await runUnifiedSimulationBacktest({
         code: symbol,
         period,
@@ -2026,6 +2228,7 @@ async function handleDevRequest(
         initialCash,
         runStressSuite,
         enableStopLoss,
+        ...(macroRegime ? { macroRegime } : {}),
       });
 
       // 计算更细致的交易盈亏统计（区分 Profit Factor 获利因子 与 Payoff Ratio 单笔盈亏比）
@@ -2084,6 +2287,7 @@ async function handleDevRequest(
 
       mockRuns.unshift(newRun);
       backtestRunSignalsMap.set(newRun.id, signals);
+      backtestRunRuleSnapshotMap.set(newRun.id, ruleSnapshot);
 
       sendJson(
         res,
@@ -2119,9 +2323,13 @@ async function handleDevRequest(
                   ) / 100
                 : initialCash,
           },
+          navSeries,
           trades: closedTrades,
           stressReport,
           signalCount: signals.length,
+          ruleSnapshot,
+          contextRequirements,
+          externalContextRequirements,
           ...(replay
             ? {
                 replay: {
@@ -2218,6 +2426,7 @@ async function handleDevRequest(
 
       let signals: readonly SimulationSignal[] | undefined =
         backtestRunSignalsMap.get(runId);
+      let runRuleSnapshot = backtestRunRuleSnapshotMap.get(runId);
 
       if (!signals) {
         // 统一走策略树仿真引擎计算
@@ -2229,7 +2438,9 @@ async function handleDevRequest(
           endDate: matchedRun?.endDate,
         });
         backtestRunSignalsMap.set(runId, result.signals);
+        backtestRunRuleSnapshotMap.set(runId, result.ruleSnapshot);
         signals = result.signals;
+        runRuleSnapshot = result.ruleSnapshot;
       }
 
       const signalResults = (signals || []).map((sig, idx) => ({
@@ -2241,7 +2452,7 @@ async function handleDevRequest(
           period: sig.period,
           timestamp: new Date(sig.signalTime),
         }).toISOString(),
-        pivotTime: sig.pivotTime || sig.signalTime,
+        pivotTime: sig.pivotTime ?? null,
         signalType: sig.signalType,
         decisionTrace: sig.decisionTrace,
         contextSnapshot: {
@@ -2249,22 +2460,14 @@ async function handleDevRequest(
           action: sig.isBuy ? 'BUY' : 'SELL',
           price: sig.triggerPrice,
           triggerPrice: sig.triggerPrice,
-          pivotPrice: sig.pivotPrice ?? sig.triggerPrice,
+          pivotPrice: sig.pivotPrice ?? null,
           time: sig.signalTime,
           signalTime: sig.signalTime,
-          pivotTime: sig.pivotTime || sig.signalTime,
+          pivotTime: sig.pivotTime ?? null,
           badgeText: sig.badgeText,
           signalTag: sig.badgeText,
-          chanBsp: {
-            type: sig.signalType,
-            price: sig.pivotPrice ?? sig.triggerPrice,
-            triggerPrice: sig.triggerPrice,
-            pivotPrice: sig.pivotPrice ?? sig.triggerPrice,
-            level: period,
-            period,
-          },
         },
-        ruleSnapshot: {
+        ruleSnapshot: runRuleSnapshot ?? {
           rule: sig.badgeText,
         },
         createdAt: sig.signalTime,
@@ -2380,6 +2583,7 @@ export {
   runUnifiedSimulationBacktest,
   BoundedLruCache,
   visualCommandsCache,
+  backtestSignalsCache,
   resolveExternalSecurityIds,
   buildExternalSimulationBars,
   handleDevRequest,

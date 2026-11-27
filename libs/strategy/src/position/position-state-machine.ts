@@ -79,10 +79,10 @@ export class PositionStateMachine {
         this.status === POSITION_STATUSES.EMPTY ||
         this.status === POSITION_STATUSES.CLOSED
       ) {
-        this.entryTime = event.fillTime;
         this.entryReason = event.entryReason;
         this.holdingBars = 0;
       }
+      this.entryTime = event.fillTime;
       this.status = POSITION_STATUSES.HOLDING;
 
       const prevCostTotalLi = BigInt(this.holdingQuantity) * this.costPriceLi;

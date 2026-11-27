@@ -98,7 +98,8 @@ export class CandleFinalizedJobProcessor {
     private readonly persistence?: Pick<
       LiveStrategyPersistenceService,
       'persist' | 'publishGroupedDeliveries'
-    >,
+    > &
+      Partial<Pick<LiveStrategyPersistenceService, 'persistBatch'>>,
     private readonly runtimeObservability?: Pick<
       RuntimeObservabilityService,
       'recordTradingDayRollover' | 'recordConsumerRemoval'
@@ -205,7 +206,10 @@ export class CandleFinalizedJobProcessor {
     this.lastJobAcceptedTriggerTime = trigger.timestamp.toISOString();
 
     const candidates: ShadowStrategyCandidate[] = [];
-    const allResults: LiveStrategyPersistenceResult[] = [];
+    const indexedCandidates: {
+      readonly candKey: string;
+      readonly candidate: ShadowStrategyCandidate;
+    }[] = [];
     for (
       let barIndex = 0;
       barIndex < pendingCommit.emitted.length;
@@ -224,35 +228,77 @@ export class CandleFinalizedJobProcessor {
 
       for (let candIndex = 0; candIndex < evaluated.length; candIndex += 1) {
         const candidate = evaluated[candIndex];
-        if (this.mode === 'on') {
-          if (!this.persistence) {
-            throw new Error('on-mode live strategy persistence is unavailable');
-          }
-          const candKey = `${barIndex}:${candIndex}`;
-          const cached = pendingCommit.persistedByCandidate.get(candKey);
-          if (cached) {
-            this.lastPersistenceOutcome = cached.outcome;
-            allResults.push(cached);
-          } else {
-            try {
-              const result = await this.runStage(
-                deadlineAt,
-                'persistence',
-                async (): Promise<LiveStrategyPersistenceResult> => {
-                  const persisted = await this.persistence!.persist(candidate);
-                  pendingCommit.persistedByCandidate.set(candKey, persisted);
-                  return persisted;
-                },
+        indexedCandidates.push({
+          candKey: `${barIndex}:${candIndex}`,
+          candidate,
+        });
+        candidates.push(candidate);
+      }
+    }
+
+    const allResults: LiveStrategyPersistenceResult[] = [];
+    if (this.mode === 'on' && indexedCandidates.length > 0) {
+      if (!this.persistence) {
+        throw new Error('on-mode live strategy persistence is unavailable');
+      }
+      const uncached = indexedCandidates.filter(
+        (item) => !pendingCommit.persistedByCandidate.has(item.candKey),
+      );
+      if (
+        uncached.length > 1 &&
+        typeof this.persistence.persistBatch === 'function'
+      ) {
+        try {
+          const batchResults = await this.runStage(
+            deadlineAt,
+            'persistence',
+            () =>
+              this.persistence!.persistBatch!(
+                uncached.map((item) => item.candidate),
+              ),
+          );
+          for (let i = 0; i < uncached.length; i += 1) {
+            const result = batchResults[i];
+            if (result) {
+              pendingCommit.persistedByCandidate.set(
+                uncached[i].candKey,
+                result,
               );
               this.lastPersistenceOutcome = result.outcome;
-              allResults.push(result);
-            } catch (error) {
-              this.lastPersistenceOutcome = 'failed';
-              throw error;
             }
           }
+        } catch (error) {
+          this.lastPersistenceOutcome = 'failed';
+          throw error;
         }
-        candidates.push(candidate);
+      } else {
+        for (const item of uncached) {
+          try {
+            const result = await this.runStage(
+              deadlineAt,
+              'persistence',
+              async (): Promise<LiveStrategyPersistenceResult> => {
+                const persisted = await this.persistence!.persist(
+                  item.candidate,
+                );
+                pendingCommit.persistedByCandidate.set(item.candKey, persisted);
+                return persisted;
+              },
+            );
+            this.lastPersistenceOutcome = result.outcome;
+          } catch (error) {
+            this.lastPersistenceOutcome = 'failed';
+            throw error;
+          }
+        }
+      }
+
+      for (const item of indexedCandidates) {
+        const persisted = pendingCommit.persistedByCandidate.get(item.candKey);
+        if (persisted) {
+          this.lastPersistenceOutcome = persisted.outcome;
+          allResults.push(persisted);
+        }
       }
     }
 

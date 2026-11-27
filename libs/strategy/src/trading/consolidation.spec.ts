@@ -7,6 +7,7 @@ import {
   buildOfflineSignalIdempotencyKey,
   compareContributorOrder,
   consolidateGroupByDirection,
+  toSignalContributor,
 } from './consolidation';
 
 const SIGNAL_TIME = new Date('2026-01-15T07:35:00.000Z');
@@ -206,6 +207,58 @@ describe('consolidation（同向信号归并原语）', () => {
         '2',
         '10',
       ]);
+    });
+
+    it('严格通过 resolveIntent 判定出场意图（RISK_CUT 入出场桶，intent=ENTRY 即使 signalKind=exit 也不绕过）', () => {
+      const riskCut = makeAttributed('risk-cut', {
+        signalKind: 'entry',
+        intent: 'RISK_CUT',
+        triggerPrice: 11.5,
+      });
+      const explicitEntryOverride = makeAttributed('override-entry', {
+        signalKind: 'exit',
+        intent: 'ENTRY',
+        triggerPrice: 12.0,
+      });
+      const badRiskCut = makeAttributed('bad-risk-cut', {
+        signalKind: 'entry',
+        intent: 'RISK_CUT',
+        triggerPrice: 0,
+      });
+
+      const buckets = consolidateGroupByDirection([
+        explicitEntryOverride,
+        riskCut,
+        badRiskCut,
+      ]);
+
+      expect(buckets.invalidPriceSignals.map((s) => s.idempotencyKey)).toEqual([
+        'bad-risk-cut',
+      ]);
+      expect(buckets.validExits.map((s) => s.idempotencyKey)).toEqual([
+        'risk-cut',
+      ]);
+      expect(buckets.validEntries.map((s) => s.idempotencyKey)).toEqual([
+        'override-entry',
+      ]);
+    });
+  });
+
+  describe('toSignalContributor', () => {
+    it('透传可选元数据 pivotPrice / originPluginId / ruleSnapshot', () => {
+      const sig = makeAttributed('k1', {
+        pivotPrice: 11.8,
+        originPluginId: 'plugin.test.sample',
+        ruleSnapshot: { threshold: 2 },
+      });
+      expect(toSignalContributor(sig)).toEqual({
+        idempotencyKey: 'k1',
+        signalType: 'CHAN_SECOND_BUY',
+        attribution: sig.attribution,
+        pivotPrice: 11.8,
+        originPluginId: 'plugin.test.sample',
+        ruleSnapshot: { threshold: 2 },
+      });
     });
   });
 });

@@ -14,7 +14,7 @@ import {
   groupSignals,
   mapKernelSignalToPersistencePayload,
 } from '@app/strategy';
-import { DataSource as TypeOrmDataSource } from 'typeorm';
+import { DataSource as TypeOrmDataSource, type EntityManager } from 'typeorm';
 import {
   STRATEGY_ALERT_DELIVERY_HANDOFF_PORT,
   type StrategyAlertDeliveryHandoffPort,
@@ -31,6 +31,10 @@ export interface LiveStrategyPersistenceResult {
 }
 
 const ALERT_DEDUPE_CONSTRAINT = 'uq_strategy_alert_events_dedupe_key';
+const INNODB_LOCK_WAIT_TIMEOUT_SQL = 'SET SESSION innodb_lock_wait_timeout = 3';
+const SAVEPOINT_PREFIX = 'sp_candidate_';
+const OUTCOME_CREATED = 'created';
+const OUTCOME_DUPLICATE_SKIPPED = 'duplicate_skipped';
 
 @Injectable()
 export class LiveStrategyPersistenceService {
@@ -49,54 +53,111 @@ export class LiveStrategyPersistenceService {
     let alertEventId: number | null = null;
     try {
       await this.dataSource.transaction(async (manager) => {
-        await manager.query('SET SESSION innodb_lock_wait_timeout = 3');
-        const payload = mapKernelSignalToPersistencePayload(candidate, {
-          securityId: candidate.securityId,
-          source: candidate.source,
-          period: candidate.period,
-          ruleSnapshot: candidate.ruleSnapshot,
-        });
-        const signal = manager.create(StrategySignal, {
-          strategyDefinitionId: payload.definitionId,
-          strategyVersionId: payload.versionId,
-          securityId: payload.securityId,
-          period: payload.period as Period,
-          source: payload.source as MarketDataSource,
-          signalTime: payload.signalTime,
-          pivotTime: payload.pivotTime,
-          signalSource: StrategySignalSource.LIVE,
-          signalKind: payload.signalKind as StrategySignalKind,
-          signalType: payload.signalType,
-          decisionTrace: payload.decisionTrace,
-          contextSnapshot: payload.contextSnapshot,
-          ruleSnapshot: payload.ruleSnapshot,
-        });
-        const savedSignal = await manager.save(StrategySignal, signal);
-
-        const alert = manager.create(StrategyAlertEvent, {
-          strategySignalId: savedSignal.id,
-          status: StrategyAlertStatus.PENDING,
-          dedupeKey: liveStrategyAlertDedupeKey(candidate),
-          deliveryResult: null,
-        });
-        const savedAlert = await manager.save(StrategyAlertEvent, alert);
-        alertEventId = savedAlert.id;
+        await manager.query(INNODB_LOCK_WAIT_TIMEOUT_SQL);
+        alertEventId = await this.insertSignalAndAlert(manager, candidate);
       });
       return {
-        outcome: 'created',
+        outcome: OUTCOME_CREATED,
         alertEventId,
         candidate,
       };
     } catch (error) {
       if (isUniqueConstraintViolation(error, ALERT_DEDUPE_CONSTRAINT)) {
         return {
-          outcome: 'duplicate_skipped',
+          outcome: OUTCOME_DUPLICATE_SKIPPED,
           alertEventId: null,
           candidate,
         };
       }
       throw error;
     }
+  }
+
+  /**
+   * Batch persistence for candidates sharing one 1m trigger: opens a single
+   * transaction with one `SET SESSION innodb_lock_wait_timeout = 3` and guards
+   * each candidate with a savepoint so duplicate-key conflicts roll back only
+   * that candidate's signal row without failing sibling candidates.
+   */
+  async persistBatch(
+    candidates: readonly ShadowStrategyCandidate[],
+  ): Promise<LiveStrategyPersistenceResult[]> {
+    if (candidates.length === 0) return [];
+    if (candidates.length === 1) {
+      return [await this.persist(candidates[0])];
+    }
+
+    return await this.dataSource.transaction(async (manager) => {
+      await manager.query(INNODB_LOCK_WAIT_TIMEOUT_SQL);
+      const results: LiveStrategyPersistenceResult[] = [];
+      for (let i = 0; i < candidates.length; i += 1) {
+        const candidate = candidates[i];
+        const savepoint = `${SAVEPOINT_PREFIX}${i}`;
+        await manager.query(`SAVEPOINT ${savepoint}`);
+        try {
+          const alertEventId = await this.insertSignalAndAlert(
+            manager,
+            candidate,
+          );
+          await manager.query(`RELEASE SAVEPOINT ${savepoint}`);
+          results.push({
+            outcome: OUTCOME_CREATED,
+            alertEventId,
+            candidate,
+          });
+        } catch (error) {
+          if (isUniqueConstraintViolation(error, ALERT_DEDUPE_CONSTRAINT)) {
+            await manager.query(`ROLLBACK TO SAVEPOINT ${savepoint}`);
+            await manager.query(`RELEASE SAVEPOINT ${savepoint}`);
+            results.push({
+              outcome: OUTCOME_DUPLICATE_SKIPPED,
+              alertEventId: null,
+              candidate,
+            });
+            continue;
+          }
+          throw error;
+        }
+      }
+      return results;
+    });
+  }
+
+  private async insertSignalAndAlert(
+    manager: EntityManager,
+    candidate: ShadowStrategyCandidate,
+  ): Promise<number> {
+    const payload = mapKernelSignalToPersistencePayload(candidate, {
+      securityId: candidate.securityId,
+      source: candidate.source,
+      period: candidate.period,
+      ruleSnapshot: candidate.ruleSnapshot,
+    });
+    const signal = manager.create(StrategySignal, {
+      strategyDefinitionId: payload.definitionId,
+      strategyVersionId: payload.versionId,
+      securityId: payload.securityId,
+      period: payload.period as Period,
+      source: payload.source as MarketDataSource,
+      signalTime: payload.signalTime,
+      pivotTime: payload.pivotTime,
+      signalSource: StrategySignalSource.LIVE,
+      signalKind: payload.signalKind as StrategySignalKind,
+      signalType: payload.signalType,
+      decisionTrace: payload.decisionTrace,
+      contextSnapshot: payload.contextSnapshot,
+      ruleSnapshot: payload.ruleSnapshot,
+    });
+    const savedSignal = await manager.save(StrategySignal, signal);
+
+    const alert = manager.create(StrategyAlertEvent, {
+      strategySignalId: savedSignal.id,
+      status: StrategyAlertStatus.PENDING,
+      dedupeKey: liveStrategyAlertDedupeKey(candidate),
+      deliveryResult: null,
+    });
+    const savedAlert = await manager.save(StrategyAlertEvent, alert);
+    return savedAlert.id;
   }
 
   /**

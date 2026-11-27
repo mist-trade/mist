@@ -81,6 +81,11 @@ export class AlertReplayService {
       tradingDay: formatShanghaiDateString(effectiveTime),
     };
 
+    // Drop aggregate back to PENDING BEFORE enqueueing replay jobs so an early
+    // worker completion cannot be overwritten back to PENDING.
+    await this.alertEvents.update(alertEventId, {
+      status: StrategyAlertStatus.PENDING,
+    });
     for (const delivery of stuck) {
       await this.deliveries.update(delivery.id, {
         status: StrategyAlertDeliveryStatus.PENDING,
@@ -93,10 +98,6 @@ export class AlertReplayService {
         delivery.channel,
       );
     }
-    // Drop aggregate back to PENDING so reconcile re-evaluates on completion.
-    await this.alertEvents.update(alertEventId, {
-      status: StrategyAlertStatus.PENDING,
-    });
     this.logger.log(
       `replay: re-enqueued ${stuck.length} channel(s) for event ${alertEventId}`,
     );

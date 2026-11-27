@@ -496,4 +496,169 @@ describe('AlertChannelDeliveryService (V2 grouped)', () => {
     );
     expect(text).not.toContain('ALREADY_HOLDING');
   });
+
+  it('writes zero virtual fills when adapter.send fails transiently or permanently', async () => {
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [{ status: StrategyAlertDeliveryStatus.FAILED }],
+    );
+    adapter.send.mockResolvedValueOnce({
+      status: 'transient_failure',
+      error: 'network timeout',
+    });
+
+    await expect(service.run(groupJob('wechat', [1]), 0, 5)).rejects.toThrow(
+      /transient delivery failure/,
+    );
+    expect(fillLog.append).not.toHaveBeenCalled();
+
+    deliveries.find.mockImplementation((opts: any) => {
+      if (opts?.where?.channel !== undefined) return [delivery()];
+      return [{ status: StrategyAlertDeliveryStatus.DEAD_LETTERED }];
+    });
+    adapter.send.mockResolvedValueOnce({
+      status: 'permanent_failure',
+      error: 'bad webhook',
+    });
+
+    await service.run(groupJob('wechat', [1]), 0, 5);
+    expect(fillLog.append).not.toHaveBeenCalled();
+  });
+
+  it('serializes concurrent runs for the same securityId so the second run observes the first run virtual fill', async () => {
+    const persistedFills: any[] = [];
+    fillLog.loadBySecurity.mockImplementation(async () => [...persistedFills]);
+    fillLog.append.mockImplementation(async (event) => {
+      persistedFills.push(event);
+    });
+
+    let releaseFirstSend!: () => void;
+    const firstSendGate = new Promise<void>((resolve) => {
+      releaseFirstSend = resolve;
+    });
+    let sendCall = 0;
+    adapter.send.mockImplementation(async () => {
+      sendCall += 1;
+      if (sendCall === 1) {
+        await firstSendGate;
+        return { status: 'sent', providerMessageId: 'm-1' };
+      }
+      return { status: 'sent', providerMessageId: 'm-2' };
+    });
+
+    deliveries.find.mockImplementation((opts: any) => {
+      const ids = opts?.where?.strategyAlertEventId?._value;
+      if (opts?.where?.channel !== undefined) {
+        if (Array.isArray(ids) && ids.includes(1)) {
+          return [delivery({ id: 7, strategyAlertEventId: 1 })];
+        }
+        return [delivery({ id: 8, strategyAlertEventId: 2 })];
+      }
+      return [{ status: StrategyAlertDeliveryStatus.SENT }];
+    });
+    alertEvents.find.mockImplementation(async (opts: any) => {
+      const ids = opts?.where?.id?._value ?? [];
+      if (ids.includes(1)) return [{ id: 1, strategySignalId: 5 }];
+      return [{ id: 2, strategySignalId: 6 }];
+    });
+    signals.find.mockImplementation(async (opts: any) => {
+      const ids = opts?.where?.id?._value ?? [];
+      if (ids.includes(5)) return [makeSignal({ id: 5 })];
+      return [makeSignal({ id: 6 })];
+    });
+    securities.find.mockResolvedValue([
+      { id: 9, code: '000001', name: '平安银行' },
+    ]);
+    strategyDefinitions.find.mockResolvedValue([{ id: 3, name: '全共振战术' }]);
+
+    const run1 = service.run(groupJob('wechat', [1]), 0, 5);
+    await new Promise((resolve) => setImmediate(resolve));
+    const run2 = service.run(groupJob('wechat', [2]), 0, 5);
+    await new Promise((resolve) => setImmediate(resolve));
+
+    // run2 must NOT read fillLog before run1 sends & writes its virtual fill
+    expect(fillLog.loadBySecurity).toHaveBeenCalledTimes(1);
+
+    releaseFirstSend();
+    await Promise.all([run1, run2]);
+
+    expect(fillLog.loadBySecurity).toHaveBeenCalledTimes(2);
+    expect(fillLog.append).toHaveBeenCalledTimes(1);
+    expect(adapter.send).toHaveBeenNthCalledWith(1, {
+      text: expect.stringContaining('▶ 买入'),
+    });
+    expect(adapter.send).toHaveBeenNthCalledWith(2, {
+      text: expect.stringContaining('ALREADY_HOLDING'),
+    });
+  });
+
+  it('preserves real pivotTime and contextSnapshot.pivotPrice on KernelSignal passed into TradingEngine', async () => {
+    const decideSpy = jest.spyOn(TradingEngine.prototype, 'decide');
+    const pivotTime = new Date('2026-08-12T01:00:00.000Z');
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [
+        makeSignal({
+          pivotTime,
+          contextSnapshot: {
+            triggerPrice: 12.5,
+            pivotPrice: 11.9,
+            badgeText: '二买',
+          },
+        }),
+      ],
+      [{ status: StrategyAlertDeliveryStatus.SENT }],
+    );
+    adapter.send.mockResolvedValue({ status: 'sent' });
+
+    await service.run(groupJob('wechat', [1]), 0, 5);
+
+    expect(decideSpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        signals: [
+          expect.objectContaining({
+            signal: expect.objectContaining({
+              pivotTime: '2026-08-12T01:00:00.000Z',
+              pivotPrice: 11.9,
+            }),
+          }),
+        ],
+      }),
+      expect.anything(),
+    );
+    decideSpy.mockRestore();
+  });
+
+  it('passes securityId to buildTradingManual so unrelated positions in accountAfter do not pollute the header', async () => {
+    // Inject a prior fill for securityId=99 (not securityId=9) so positions has an unrelated holding
+    fillLog.loadBySecurity.mockResolvedValue([
+      {
+        idempotencyKey: '999',
+        securityId: 99,
+        securityCode: '600000',
+        side: 'BUY',
+        quantity: 200,
+        priceLi: 10_000n,
+        feesLi: 5_000n,
+        netAmountLi: -2_005_000n,
+        tradingDay: '2026-08-11',
+      },
+    ]);
+    primeGroup(
+      [delivery()],
+      [{ id: 1, strategySignalId: 5 }],
+      [makeSignal()],
+      [{ status: StrategyAlertDeliveryStatus.SENT }],
+    );
+    adapter.send.mockResolvedValue({ status: 'sent' });
+
+    await service.run(groupJob('wechat', [1]), 0, 5);
+
+    const text = adapter.send.mock.calls[0][0].text as string;
+    // securityId=9 holds the new buy from this run, NOT 200 shares from securityId=99
+    expect(text).not.toContain('200股');
+  });
 });

@@ -32,22 +32,24 @@ interface MutableFoldPosition {
   accumulatedBuyFeesLi: Li;
 }
 
+export interface VirtualFillAccumulator {
+  apply(event: VirtualFillEvent): void;
+  snapshot(tradingDay?: string): AccountSnapshot;
+}
+
 /**
- * 依序 fold fill 事件重建账户快照。
- *
- * @param events 按 id 序（追加序）的全部 fill 事件
- * @param seedCapitalLi 种子资金（整数厘）
- * @param currentTradingDay 快照所在交易日（T+1 判定基准）
+ * 创建增量账本累加器（O(1) 单条推进，供管线门面避免 O(G * F) 重复全量 fold）。
  */
-export function foldVirtualFills(
-  events: readonly VirtualFillEvent[],
+export function createVirtualFillAccumulator(
   seedCapitalLi: bigint,
-  currentTradingDay: string,
-): AccountSnapshot {
+  initialTradingDay = '',
+): VirtualFillAccumulator {
   let cashLi: Li = seedCapitalLi;
+  let lastTradingDay = initialTradingDay;
   const positions = new Map<number, MutableFoldPosition>();
 
-  for (const event of events) {
+  const apply = (event: VirtualFillEvent): void => {
+    lastTradingDay = event.tradingDay;
     cashLi += event.netAmountLi;
     const turnoverLi = event.priceLi * BigInt(event.quantity);
 
@@ -83,7 +85,7 @@ export function foldVirtualFills(
       pos.currentPriceLi = event.priceLi;
     } else {
       const pos = positions.get(event.securityId);
-      if (pos === undefined || pos.holdingQuantity <= 0) continue;
+      if (pos === undefined || pos.holdingQuantity <= 0) return;
 
       const fillQty = Math.min(pos.holdingQuantity, event.quantity);
       const costBasisLi = pos.costPriceLi * BigInt(fillQty);
@@ -106,25 +108,52 @@ export function foldVirtualFills(
         pos.entryTime = undefined;
       }
     }
-  }
-
-  const projected = new Map<number, TradingPositionState>();
-  for (const [id, pos] of positions) {
-    if (pos.holdingQuantity <= 0) continue;
-    projected.set(id, {
-      securityId: pos.securityId,
-      securityCode: pos.securityCode,
-      holdingQuantity: pos.holdingQuantity,
-      costPriceLi: pos.costPriceLi,
-      entryTime: pos.entryTime,
-      currentPriceLi: pos.currentPriceLi,
-      realizedPnlLi: pos.realizedPnlLi,
-    });
-  }
-
-  return {
-    cashLi,
-    positions: projected,
-    tradingDay: currentTradingDay,
   };
+
+  const snapshot = (tradingDay?: string): AccountSnapshot => {
+    const projected = new Map<number, TradingPositionState>();
+    for (const [id, pos] of positions) {
+      if (pos.holdingQuantity <= 0) continue;
+      projected.set(id, {
+        securityId: pos.securityId,
+        securityCode: pos.securityCode,
+        holdingQuantity: pos.holdingQuantity,
+        costPriceLi: pos.costPriceLi,
+        entryTime: pos.entryTime,
+        currentPriceLi: pos.currentPriceLi,
+        realizedPnlLi: pos.realizedPnlLi,
+        accumulatedBuyFeesLi: pos.accumulatedBuyFeesLi,
+      });
+    }
+
+    return {
+      cashLi,
+      positions: projected,
+      tradingDay: tradingDay ?? lastTradingDay,
+    };
+  };
+
+  return { apply, snapshot };
+}
+
+/**
+ * 依序 fold fill 事件重建账户快照。
+ *
+ * @param events 按 id 序（追加序）的全部 fill 事件
+ * @param seedCapitalLi 种子资金（整数厘）
+ * @param currentTradingDay 快照所在交易日（T+1 判定基准）
+ */
+export function foldVirtualFills(
+  events: readonly VirtualFillEvent[],
+  seedCapitalLi: bigint,
+  currentTradingDay: string,
+): AccountSnapshot {
+  const accumulator = createVirtualFillAccumulator(
+    seedCapitalLi,
+    currentTradingDay,
+  );
+  for (const event of events) {
+    accumulator.apply(event);
+  }
+  return accumulator.snapshot(currentTradingDay);
 }

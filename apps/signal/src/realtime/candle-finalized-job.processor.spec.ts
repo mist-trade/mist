@@ -1,5 +1,6 @@
 import { LegacyStrategyCompiler } from '@app/strategy';
 import type { StrategyBar } from '@app/market-data';
+import type { ShadowStrategyCandidate } from '@app/signal';
 import { StrategySignalKind } from '@app/shared-data';
 import type { SignalRegistryDefinition } from '../signal-registry.types';
 import { CANDLE_FINALIZED_JOB_NAME } from '@app/contracts';
@@ -779,6 +780,92 @@ describe('CandleFinalizedJobProcessor', () => {
     await expect(
       processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(bar)),
     ).rejects.toThrow('conflicting candle finalization identity');
+  });
+
+  it('uses persistBatch once when multiple candidates fire in a trigger and persistBatch is available', async () => {
+    const minutes = [
+      makeBar('2026-08-04T01:30:00.000Z', 25),
+      makeBar('2026-08-04T01:31:00.000Z', 25),
+      makeBar('2026-08-04T01:32:00.000Z', 25),
+      makeBar('2026-08-04T01:33:00.000Z', 25),
+      makeBar('2026-08-04T01:34:00.000Z', 35),
+    ];
+    const marketData = sequentialMarketData(...minutes);
+    const persistence = {
+      persist: jest.fn(),
+      persistBatch: jest.fn(
+        async (candidates: readonly ShadowStrategyCandidate[]) =>
+          candidates.map((candidate, idx) => ({
+            outcome: 'created' as const,
+            alertEventId: 301 + idx,
+            candidate,
+          })),
+      ),
+      publishGroupedDeliveries: jest.fn(async () => undefined),
+    };
+    const processor = new CandleFinalizedJobProcessor(
+      marketData,
+      () => [
+        {
+          definitionId: 3,
+          versionId: 7,
+          source: 'tdx',
+          period: 1,
+          ruleSnapshot: { field: 'k.close', operator: 'gt', value: 30 },
+          kind: 'decision_flow',
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 30 },
+            'entry',
+          ),
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 4,
+          versionId: 8,
+          source: 'tdx',
+          period: 5,
+          ruleSnapshot: { field: 'k.close', operator: 'gt', value: 30 },
+          kind: 'decision_flow',
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 30 },
+            'entry',
+          ),
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+      () => new Date('2026-08-04T02:00:00.000Z'),
+      undefined,
+      undefined,
+      30_000,
+      'on',
+      persistence,
+    );
+
+    for (const bar of minutes.slice(0, 4)) {
+      await processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(bar));
+    }
+
+    const closing = await processor.process(
+      CANDLE_FINALIZED_JOB_NAME,
+      sealedPayload(minutes[4]),
+    );
+
+    expect(closing.outcome).toBe('completed');
+    expect(closing.candidates.map((c) => c.period)).toEqual([1, 5]);
+    expect(persistence.persist).not.toHaveBeenCalled();
+    expect(persistence.persistBatch).toHaveBeenCalledTimes(1);
+    expect(persistence.persistBatch).toHaveBeenCalledWith(
+      expect.arrayContaining([
+        expect.objectContaining({ period: 1 }),
+        expect.objectContaining({ period: 5 }),
+      ]),
+    );
+    expect(persistence.publishGroupedDeliveries).toHaveBeenCalledWith([
+      expect.objectContaining({ alertEventId: 301 }),
+      expect.objectContaining({ alertEventId: 302 }),
+    ]);
   });
 });
 

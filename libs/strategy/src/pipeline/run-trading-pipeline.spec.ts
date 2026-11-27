@@ -877,4 +877,145 @@ describe('runTradingPipeline（REQ-FACADE-01..05）', () => {
     expect(result.report).toContain('共振(3):');
     expect(result.report).not.toContain('%');
   });
+
+  it('[BUG-MAIN-PIPELINE-01] next_bar_open + allowFractionalShares 低开时封顶 requestedQuantity，ELEVATED_RISK 高开时保持减半预算', async () => {
+    class SingleBuyPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.single-buy-parity';
+      public readonly name = '单买对账测试';
+      public readonly category = 'TECHNICAL' as const;
+      public readonly version = '1.0.0';
+      public readonly description = 'day1 buy only';
+
+      public async evaluate(ctx: { timestamp: Date }): Promise<FactorOpinion> {
+        return ctx.timestamp.toISOString() === '2026-01-04T16:00:00.000Z'
+          ? { action: 'BUY', reason: 'd1 buy' }
+          : { action: 'NEUTRAL', reason: 'hold' };
+      }
+    }
+
+    const mk1d = (
+      utcIso: string,
+      open: number,
+      close: number,
+    ): StrategyBar => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'tdx',
+      period: 1440,
+      timestamp: new Date(utcIso),
+      open,
+      high: Math.max(open, close) + 0.1,
+      low: Math.min(open, close) - 0.1,
+      close,
+      volume: '1000',
+      amount: '10000',
+      type: 'complete',
+    });
+
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(new SingleBuyPlugin());
+    const flow: DecisionFlowNode = {
+      id: 'guard_buy',
+      type: 'GUARD',
+      name: '买门禁',
+      pluginId: 'plugin.test.single-buy-parity',
+      requiredAction: 'BUY',
+      onPass: { id: 'term_buy', type: 'TERMINAL', action: 'BUY' },
+    };
+    const plan: KernelPlan = {
+      definitionId: 1,
+      versionId: 1,
+      flow,
+      ruleSnapshot: Object.freeze({}),
+      period: 1440,
+      requiredBarCount: 1,
+      contextRequirements: {},
+    };
+
+    // 1. allowFractionalShares=true + 次根低开：引擎按收盘 10.00 分配 950 股（10,000 元），
+    //    次根开盘跌至 8.00，不得悄悄放大到 1,187 股，必须封顶在 950 股
+    const lowerOpenRes = await runTradingPipeline({
+      barsByPeriod: new Map([
+        [
+          1440,
+          [
+            mk1d('2026-01-04T16:00:00.000Z', 10.0, 10.0),
+            mk1d('2026-01-05T16:00:00.000Z', 8.0, 8.2),
+          ],
+        ],
+      ]),
+      plans: [plan],
+      registry,
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: new Date('2026-01-04T16:00:00.000Z'),
+      seedCapitalLi: 10_000_000n, // 10,000 元
+      cashAllocationRatio: 0.95,
+      allowFractionalShares: true,
+      executionMode: 'next_bar_open',
+      feeEnabled: false,
+      slippageRatio: 0,
+    });
+    expect(lowerOpenRes.fills).toHaveLength(1);
+    expect(lowerOpenRes.fills[0].quantity).toBe(950);
+
+    // 2. ELEVATED_RISK + 次根高开：信号价 10.00 预算减半（47,500 股），次根高开至 12.34
+    //    必须延续 ELEVATED_RISK 减半口径（38,400 股），绝不能无视 regime 弹回 76,900 股
+    const { MarketRiskRegime } = await import('../trading');
+    const elevatedRes = await runTradingPipeline({
+      barsByPeriod: new Map([
+        [
+          1440,
+          [
+            mk1d('2026-01-04T16:00:00.000Z', 10.0, 10.0),
+            mk1d('2026-01-05T16:00:00.000Z', 12.34, 12.5),
+          ],
+        ],
+      ]),
+      plans: [plan],
+      registry,
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: new Date('2026-01-04T16:00:00.000Z'),
+      seedCapitalLi: 1_000_000_000n,
+      cashAllocationRatio: 0.95,
+      executionMode: 'next_bar_open',
+      feeEnabled: true,
+      slippageRatio: 0,
+      macroRegime: {
+        regime: MarketRiskRegime.ELEVATED_RISK,
+        marketAtrPercentile: 0.9,
+        isLiquidityFrozen: false,
+      },
+    });
+    expect(elevatedRes.fills).toHaveLength(1);
+    expect(elevatedRes.fills[0].quantity).toBe(38_400);
+
+    // 3. next_bar_open + 高开致可用资金刚好无法支付整手含费总额：步降一手成交且不产生 broker INSUFFICIENT_CASH 拒单
+    const stepDownRes = await runTradingPipeline({
+      barsByPeriod: new Map([
+        [
+          1440,
+          [
+            mk1d('2026-01-04T16:00:00.000Z', 9.0, 9.0),
+            mk1d('2026-01-05T16:00:00.000Z', 10.0, 10.2),
+          ],
+        ],
+      ]),
+      plans: [plan],
+      registry,
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: new Date('2026-01-04T16:00:00.000Z'),
+      seedCapitalLi: 10_000_000n, // 10,000 元
+      cashAllocationRatio: 1.0,
+      executionMode: 'next_bar_open',
+      feeEnabled: true,
+      slippageRatio: 0,
+    });
+    expect(stepDownRes.fills).toHaveLength(1);
+    // 10.00 × 1000 + 5.10 规费 > 10,000 → 步降为 900 股（与 recomputeNextBarOpenBuyQuantity 一致）
+    expect(stepDownRes.fills[0].quantity).toBe(900);
+    expect(stepDownRes.groups[0].decision.instructions[0].quantity).toBe(900);
+  });
 });

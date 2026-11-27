@@ -32,34 +32,48 @@ export class CandleFinalizedBullMqWorker extends WorkerHost {
     job: Job<CandleFinalizedTriggerV1, CandleFinalizedJobResult, string>,
   ): Promise<CandleFinalizedJobResult> {
     this.healthState.recordJobStarted();
+    let diagnostics:
+      | ReturnType<CandleFinalizedJobProcessor['diagnostics']>
+      | undefined;
     try {
-      const result = await this.runtimeMutex.run(() =>
-        this.processor.process(job.name, job.data),
-      );
-      const diagnostics = this.processor.diagnostics();
+      const result = await this.runtimeMutex.run(async () => {
+        try {
+          const processed = await this.processor.process(job.name, job.data);
+          diagnostics = this.processor.diagnostics();
+          return processed;
+        } catch (error) {
+          try {
+            diagnostics = this.processor.diagnostics();
+          } catch {
+            // Preserve the original failure if diagnostics snapshot throws.
+          }
+          throw error;
+        }
+      });
+      const snapshot = diagnostics ?? this.processor.diagnostics();
       this.healthState.recordJobSucceeded({
         acceptedAt: new Date().toISOString(),
         outcome: result.outcome,
-        acceptedTriggerTime: diagnostics.acceptedTriggerTime,
-        evaluated: diagnostics.evaluated,
-        windowGroupCount: diagnostics.groupCount,
-        rawBarCount: diagnostics.rawBarCount,
-        derivedBarCount: diagnostics.derivedBarCount,
-        evaluationOutcome: diagnostics.lastOutcome,
-        persistenceOutcome: diagnostics.lastPersistenceOutcome,
+        acceptedTriggerTime: snapshot.acceptedTriggerTime,
+        evaluated: snapshot.evaluated,
+        windowGroupCount: snapshot.groupCount,
+        rawBarCount: snapshot.rawBarCount,
+        derivedBarCount: snapshot.derivedBarCount,
+        evaluationOutcome: snapshot.lastOutcome,
+        persistenceOutcome: snapshot.lastPersistenceOutcome,
       });
       return result;
     } catch (error) {
-      const diagnostics = this.processor.diagnostics();
+      const snapshot = diagnostics ?? this.processor.diagnostics();
       this.healthState.recordJobFailed({
-        failureCode: classifyJobFailure(error, diagnostics),
+        failureCode: classifyJobFailure(error, snapshot),
         failedAt: new Date().toISOString(),
-        acceptedTriggerTime: diagnostics.acceptedTriggerTime,
-        evaluationStarted: diagnostics.evaluationStarted,
-        windowGroupCount: diagnostics.groupCount,
-        rawBarCount: diagnostics.rawBarCount,
-        derivedBarCount: diagnostics.derivedBarCount,
-        persistenceOutcome: diagnostics.lastPersistenceOutcome,
+        acceptedTriggerTime: snapshot.acceptedTriggerTime,
+        evaluationStarted: snapshot.evaluationStarted,
+        windowGroupCount: snapshot.groupCount,
+        rawBarCount: snapshot.rawBarCount,
+        derivedBarCount: snapshot.derivedBarCount,
+        persistenceOutcome: snapshot.lastPersistenceOutcome,
       });
       throw error;
     }

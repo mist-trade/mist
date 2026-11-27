@@ -665,5 +665,232 @@ describe('TradingEngine', () => {
       );
       expect(rejectManual).not.toContain('%');
     });
+
+    it('多标持仓且未传 securityId 时头行回退空仓而不误取首标；传入 securityId 精准定位', () => {
+      const snap = snapshot(
+        new Map<number, TradingPositionState>([
+          [
+            1,
+            {
+              securityId: 1,
+              securityCode: '000001',
+              holdingQuantity: 1000,
+              costPriceLi: yuanToLi(10),
+              currentPriceLi: yuanToLi(10),
+              realizedPnlLi: 0n,
+            },
+          ],
+          [
+            2,
+            {
+              securityId: 2,
+              securityCode: '600519',
+              holdingQuantity: 200,
+              costPriceLi: yuanToLi(1500),
+              currentPriceLi: yuanToLi(1500),
+              realizedPnlLi: 0n,
+            },
+          ],
+        ]),
+      );
+      const decision = {
+        instructions: [],
+        rejections: [],
+        accountAfter: snap,
+      };
+
+      const withoutId = buildTradingManual({
+        securityCode: '600519',
+        securityName: '贵州茅台',
+        effectiveTime: SIGNAL_TIME,
+        decision,
+      });
+      expect(withoutId).toContain(' / 空仓');
+      expect(withoutId).not.toContain('1,000股');
+
+      const withId = buildTradingManual({
+        securityId: 2,
+        securityCode: '600519',
+        securityName: '贵州茅台',
+        effectiveTime: SIGNAL_TIME,
+        decision,
+      });
+      expect(withId).toContain('持仓 200股 @ 1500.00');
+    });
+
+    it('RISK_CUT 拒单按卖出方向渲染，而非误判 signalKind', () => {
+      const riskCutSignal = attributed(
+        'evt-risk-cut',
+        makeSignal({
+          signalKind: 'entry',
+          intent: 'RISK_CUT',
+          signalType: 'SYSTEMIC_RISK',
+          triggerPrice: 12.0,
+        }),
+      );
+      const decision = engine.decide(groupOf([riskCutSignal]), snapshot());
+      const manual = buildTradingManual({
+        securityCode: '000001',
+        securityName: '平安银行',
+        securityId: 1,
+        effectiveTime: SIGNAL_TIME,
+        decision,
+      });
+      expect(manual).toContain('✗ 卖出已拒绝：NO_POSITION');
+    });
+  });
+
+  describe('虚拟账本投影与 foldVirtualFills 口径一致（buy fees 分摊 + realizedPnl 跨回合累计）', () => {
+    it('买入记录 accumulatedBuyFeesLi，部分卖出按比例扣减已分摊买费并保留剩余买费', () => {
+      const partialSellEngine = new TradingEngine({
+        exitRules: [
+          (ctx) =>
+            ctx.position
+              ? {
+                  action: 'INSTRUCT',
+                  side: 'SELL',
+                  quantity: Math.floor(ctx.position.holdingQuantity / 2),
+                  reason: 'PARTIAL_EXIT',
+                }
+              : null,
+        ],
+      });
+
+      const buyDecision = partialSellEngine.decide(
+        groupOf([
+          attributed(
+            'evt-buy-partial',
+            makeSignal({ triggerPrice: 10.0, signalType: 'BUY_A' }),
+          ),
+        ]),
+        snapshot(new Map(), yuanToLi(21_100)), // 21,100 × 0.95 = 20,045 → 2000 股
+      );
+      const boughtPos = buyDecision.accountAfter.positions.get(1)!;
+      expect(boughtPos.holdingQuantity).toBe(2000);
+      // 成交额 20,000 元 = 20,000,000 厘；佣金 5000 厘 + 过户费 200 厘 = 5200 厘
+      expect(boughtPos.accumulatedBuyFeesLi).toBe(5200n);
+
+      // 次日半仓卖出 1000 股 @ 11.00
+      const nextDayHeld: TradingPositionState = {
+        ...boughtPos,
+        entryTime: new Date('2026-01-14T07:00:00Z'),
+      };
+      const sellDecision = partialSellEngine.decide(
+        groupOf([
+          attributed(
+            'evt-sell-partial',
+            makeSignal({
+              signalKind: 'exit',
+              signalType: 'PARTIAL_EXIT',
+              triggerPrice: 11.0,
+            }),
+          ),
+        ]),
+        {
+          cashLi: buyDecision.accountAfter.cashLi,
+          positions: new Map([[1, nextDayHeld]]),
+          tradingDay: TRADING_DAY,
+        },
+      );
+      const remPos = sellDecision.accountAfter.positions.get(1)!;
+      expect(remPos.holdingQuantity).toBe(1000);
+      // 卖出 1000 股 @ 11 = 11,000,000；卖费 = 保底5000 + 过户110 + 印花5500 = 10,610
+      // 成本 10,000,000；分摊买费 5200 * 1000 / 2000 = 2600
+      // realizedPnlLi = (11,000,000 - 10,610) - 10,000,000 - 2,600 = 986,790
+      expect(remPos.realizedPnlLi).toBe(986790n);
+      expect(remPos.accumulatedBuyFeesLi).toBe(2600n);
+    });
+
+    it('先出后进同组及已有 realizedPnl 状态重仓入场均累计 realizedPnlLi', () => {
+      const buyFirst = engine.decide(
+        groupOf([
+          attributed(
+            'evt-b1',
+            makeSignal({ triggerPrice: 10.0, signalType: 'BUY_1' }),
+          ),
+        ]),
+        snapshot(),
+      );
+      const nextDayHeld: TradingPositionState = {
+        ...buyFirst.accountAfter.positions.get(1)!,
+        entryTime: new Date('2026-01-14T07:00:00Z'),
+      };
+      const sellThenBuy = engine.decide(
+        groupOf([
+          attributed(
+            'evt-s1',
+            makeSignal({
+              signalKind: 'exit',
+              signalType: 'SELL_1',
+              triggerPrice: 12.34,
+            }),
+          ),
+          attributed(
+            'evt-b2',
+            makeSignal({
+              signalKind: 'entry',
+              signalType: 'BUY_2',
+              triggerPrice: 12.34,
+            }),
+          ),
+        ]),
+        snapshot(new Map([[1, nextDayHeld]]), buyFirst.accountAfter.cashLi),
+      );
+      const reEntered = sellThenBuy.accountAfter.positions.get(1)!;
+      expect(reEntered.holdingQuantity).toBe(94000);
+      // 与 foldVirtualFills 一致：(1172300000 - 890948) - 950000000 - 247000 = 221,162,052
+      expect(reEntered.realizedPnlLi).toBe(221_162_052n);
+
+      // 若传入的已平仓快照位（holdingQuantity=0）携带累计 realizedPnlLi，再次入场不得硬重置为 0n
+      const carriedClosed: TradingPositionState = {
+        securityId: 1,
+        securityCode: '000001',
+        holdingQuantity: 0,
+        costPriceLi: 0n,
+        currentPriceLi: yuanToLi(12.0),
+        realizedPnlLi: 500_000n,
+      };
+      const reEntryFromClosed = engine.decide(
+        groupOf([attributed('evt-b3', makeSignal({ triggerPrice: 10.0 }))]),
+        snapshot(new Map([[1, carriedClosed]])),
+      );
+      expect(
+        reEntryFromClosed.accountAfter.positions.get(1)?.realizedPnlLi,
+      ).toBe(500_000n);
+    });
+
+    it('隔离 NaN / <=0 坏价格信号，不污染同向有效共振伙伴', () => {
+      const nanEntry = attributed(
+        'evt-nan',
+        makeSignal({ signalKind: 'entry', triggerPrice: Number.NaN }),
+      );
+      const zeroRiskCut = attributed(
+        'evt-zero-risk',
+        makeSignal({
+          signalKind: 'entry',
+          intent: 'RISK_CUT',
+          triggerPrice: 0,
+        }),
+      );
+      const validEntry = attributed(
+        'evt-valid',
+        makeSignal({ signalKind: 'entry', triggerPrice: 10.0 }),
+      );
+
+      const decision = engine.decide(
+        groupOf([nanEntry, zeroRiskCut, validEntry]),
+        snapshot(),
+      );
+      expect(decision.instructions).toHaveLength(1);
+      expect(decision.instructions[0].idempotencyKey).toBe('evt-valid');
+      expect(decision.rejections).toHaveLength(2);
+      expect(decision.rejections.map((r) => r.idempotencyKey)).toEqual([
+        'evt-zero-risk',
+        'evt-nan',
+      ]);
+      expect(
+        decision.rejections.every((r) => r.reason === 'INVALID_PRICE'),
+      ).toBe(true);
+    });
   });
 });

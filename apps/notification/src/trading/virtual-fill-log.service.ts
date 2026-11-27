@@ -52,6 +52,18 @@ export class VirtualFillLogService implements VirtualFillLogPort {
     securityId: number,
   ): Promise<readonly VirtualFillEvent[]> {
     const rows = await this.repo.find({
+      select: {
+        id: true,
+        alertEventId: true,
+        securityId: true,
+        securityCode: true,
+        side: true,
+        quantity: true,
+        price: true,
+        fees: true,
+        netAmount: true,
+        tradingDay: true,
+      },
       where: { securityId },
       order: { id: 'ASC' },
     });
@@ -65,9 +77,7 @@ export class VirtualFillLogService implements VirtualFillLogPort {
       feesLi: BigInt(row.fees),
       netAmountLi: BigInt(row.netAmount),
       tradingDay: row.tradingDay,
-      instruction: row.instruction as
-        | VirtualFillEvent['instruction']
-        | undefined,
+      instruction: undefined,
     }));
   }
 }

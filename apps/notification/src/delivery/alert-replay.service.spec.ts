@@ -135,6 +135,10 @@ describe('AlertReplayService', () => {
     expect(alertEvents.update).toHaveBeenCalledWith(1, {
       status: StrategyAlertStatus.PENDING,
     });
+    const alertUpdateOrder = alertEvents.update.mock.invocationCallOrder[0];
+    const firstEnqueueOrder =
+      queue.enqueueChannelReplay.mock.invocationCallOrder[0];
+    expect(alertUpdateOrder).toBeLessThan(firstEnqueueOrder);
   });
 
   it('is a no-op when the query returns no stuck rows (SENT excluded by query)', async () => {

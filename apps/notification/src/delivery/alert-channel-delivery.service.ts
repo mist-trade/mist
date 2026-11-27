@@ -59,6 +59,7 @@ const RESONANCE_CONTRIBUTOR_SEPARATOR = ' + ';
 @Injectable()
 export class AlertChannelDeliveryService {
   private readonly logger = new Logger(AlertChannelDeliveryService.name);
+  private readonly securityMutexTails = new Map<number, Promise<void>>();
 
   constructor(
     @InjectRepository(StrategyAlertEvent)
@@ -134,95 +135,141 @@ export class AlertChannelDeliveryService {
     const definitionIds = [
       ...new Set(signals.map((signal) => signal.strategyDefinitionId)),
     ];
-    const securities = await this.securities.find({
-      where: { id: In(securityIds) },
-    });
-    const securitiesById = new Map(securities.map((s) => [s.id, s]));
-    const definitions = await this.strategyDefinitions.find({
-      where: { id: In(definitionIds) },
-    });
-    const definitionsById = new Map(definitions.map((d) => [d.id, d]));
+    const lockSecurityIds = [
+      ...new Set([job.group.securityId, ...securityIds]),
+    ].sort((a, b) => a - b);
 
-    const items: {
-      readonly alertEvent: StrategyAlertEvent;
-      readonly signal: StrategySignal | null;
-      readonly security: Security | null;
-      readonly strategyDefinition: StrategyDefinition | null;
-    }[] = [];
-    for (const event of alertEvents) {
-      const signal = signalsById.get(event.strategySignalId) ?? null;
-      items.push({
-        alertEvent: event,
-        signal,
-        security: signal
-          ? (securitiesById.get(signal.securityId) ?? null)
-          : null,
-        strategyDefinition: signal
-          ? (definitionsById.get(signal.strategyDefinitionId) ?? null)
-          : null,
+    await this.withSecurityLocks(lockSecurityIds, async () => {
+      const securities = await this.securities.find({
+        where: { id: In(securityIds) },
       });
-    }
+      const securitiesById = new Map(securities.map((s) => [s.id, s]));
+      const definitions = await this.strategyDefinitions.find({
+        where: { id: In(definitionIds) },
+      });
+      const definitionsById = new Map(definitions.map((d) => [d.id, d]));
 
-    const message = await this.decideAndRender(job.group, items);
-    let result: ChannelSendResult;
-    try {
-      result = await adapter.send({ text: message });
-    } catch (error) {
-      result = {
-        status: 'transient_failure',
-        error: toErrorMessage(error),
-      };
-    }
-    this.counters.recordAttempt(channel);
-
-    if (result.status === 'sent') {
-      this.counters.recordSent(channel);
-      for (const row of work) {
-        await this.deliveries.update(row.id, {
-          status: StrategyAlertDeliveryStatus.SENT,
-          attemptCount: row.attemptCount + 1,
-          providerMessageId: result.providerMessageId ?? null,
-          sentAt: new Date(),
-          lastError: null,
+      const items: {
+        readonly alertEvent: StrategyAlertEvent;
+        readonly signal: StrategySignal | null;
+        readonly security: Security | null;
+        readonly strategyDefinition: StrategyDefinition | null;
+      }[] = [];
+      for (const event of alertEvents) {
+        const signal = signalsById.get(event.strategySignalId) ?? null;
+        items.push({
+          alertEvent: event,
+          signal,
+          security: signal
+            ? (securitiesById.get(signal.securityId) ?? null)
+            : null,
+          strategyDefinition: signal
+            ? (definitionsById.get(signal.strategyDefinitionId) ?? null)
+            : null,
         });
+      }
+
+      const prepared = await this.decideAndRender(job.group, items);
+      let result: ChannelSendResult;
+      try {
+        result = await adapter.send({ text: prepared.message });
+      } catch (error) {
+        result = {
+          status: 'transient_failure',
+          error: toErrorMessage(error),
+        };
+      }
+      this.counters.recordAttempt(channel);
+
+      if (result.status === 'sent') {
+        // 指令即成交（REQ-LEDGER-04）：仅在渠道投递成功后写入虚拟成交回填，杜绝幽灵成交。
+        for (const instruction of prepared.decision.instructions) {
+          await this.appendAssumedFill(
+            instruction,
+            prepared.securityId,
+            prepared.securityCode,
+            prepared.tradingDay,
+          );
+        }
+        this.counters.recordSent(channel);
+        for (const row of work) {
+          await this.deliveries.update(row.id, {
+            status: StrategyAlertDeliveryStatus.SENT,
+            attemptCount: row.attemptCount + 1,
+            providerMessageId: result.providerMessageId ?? null,
+            sentAt: new Date(),
+            lastError: null,
+          });
+          await this.reconcile(row.strategyAlertEventId);
+        }
+        this.logger.log(
+          `delivered group channel=${channel} events=[${alertEventIds.join(',')}] attempt=${attemptsMade + 1}`,
+        );
+        return;
+      }
+
+      const isLastAttempt = attemptsMade + 1 >= maxAttempts;
+      const terminal = result.status === 'permanent_failure' || isLastAttempt;
+      const newStatus = terminal
+        ? StrategyAlertDeliveryStatus.DEAD_LETTERED
+        : StrategyAlertDeliveryStatus.FAILED;
+      this.counters.recordFailure(channel);
+      for (const row of work) {
+        await this.updateDeliveryStatus(
+          row.id,
+          newStatus,
+          row.attemptCount + 1,
+          result.error,
+        );
         await this.reconcile(row.strategyAlertEventId);
       }
-      this.logger.log(
-        `delivered group channel=${channel} events=[${alertEventIds.join(',')}] attempt=${attemptsMade + 1}`,
-      );
-      return;
-    }
 
-    const isLastAttempt = attemptsMade + 1 >= maxAttempts;
-    const terminal = result.status === 'permanent_failure' || isLastAttempt;
-    const newStatus = terminal
-      ? StrategyAlertDeliveryStatus.DEAD_LETTERED
-      : StrategyAlertDeliveryStatus.FAILED;
-    this.counters.recordFailure(channel);
-    for (const row of work) {
-      await this.updateDeliveryStatus(
-        row.id,
-        newStatus,
-        row.attemptCount + 1,
-        result.error,
+      if (result.status === 'transient_failure' && !terminal) {
+        throw new Error(
+          `transient delivery failure channel=${channel} events=[${alertEventIds.join(',')}]: ${result.error ?? 'unknown'}`,
+        );
+      }
+      this.counters.recordDeadLetter(channel);
+      this.logger.warn(
+        `delivery dead-lettered channel=${channel} events=[${alertEventIds.join(',')}]: ${result.error ?? 'exhausted retries'}`,
       );
-      await this.reconcile(row.strategyAlertEventId);
-    }
+    });
+  }
 
-    if (result.status === 'transient_failure' && !terminal) {
-      throw new Error(
-        `transient delivery failure channel=${channel} events=[${alertEventIds.join(',')}]: ${result.error ?? 'unknown'}`,
-      );
-    }
-    this.counters.recordDeadLetter(channel);
-    this.logger.warn(
-      `delivery dead-lettered channel=${channel} events=[${alertEventIds.join(',')}]: ${result.error ?? 'exhausted retries'}`,
-    );
+  private async withSecurityLocks<T>(
+    sortedSecurityIds: readonly number[],
+    operation: () => Promise<T>,
+  ): Promise<T> {
+    const acquireNext = (index: number): Promise<T> => {
+      if (index >= sortedSecurityIds.length) {
+        return operation();
+      }
+      const securityId = sortedSecurityIds[index];
+      const prior =
+        this.securityMutexTails.get(securityId) ?? Promise.resolve();
+      let release!: () => void;
+      const current = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const tail = prior.then(() => current);
+      this.securityMutexTails.set(securityId, tail);
+      return prior.then(async () => {
+        try {
+          return await acquireNext(index + 1);
+        } finally {
+          release();
+          if (this.securityMutexTails.get(securityId) === tail) {
+            this.securityMutexTails.delete(securityId);
+          }
+        }
+      });
+    };
+    return acquireNext(0);
   }
 
   /**
    * 交易层接管（REQ-ADAPT-02）：证据 → 归因信号组 → fold 账本快照 →
-   * engine.decide → 指令假定成交回填（指令即成交，幂等）→ 交易手册渲染。
+   * engine.decide → 交易手册渲染（只读无副作用；虚拟成交回填严格延后至 send 成功）。
    */
   private async decideAndRender(
     group: {
@@ -236,7 +283,13 @@ export class AlertChannelDeliveryService {
       readonly security: Security | null;
       readonly strategyDefinition: StrategyDefinition | null;
     }[],
-  ): Promise<string> {
+  ): Promise<{
+    readonly message: string;
+    readonly decision: ReturnType<TradingEngine['decide']>;
+    readonly securityId: number;
+    readonly securityCode: string;
+    readonly tradingDay: string;
+  }> {
     const effectiveTime = new Date(group.effectiveTime);
     const tradingDay =
       group.tradingDay ?? formatShanghaiDateString(effectiveTime);
@@ -273,22 +326,20 @@ export class AlertChannelDeliveryService {
     );
     const decision = this.engine.decide(signalGroup, snapshot);
 
-    // 指令即成交（REQ-LEDGER-04）：假定成交回填，幂等锚点 = alertEventId
-    for (const instruction of decision.instructions) {
-      await this.appendAssumedFill(
-        instruction,
-        securityId,
-        securityCode,
-        tradingDay,
-      );
-    }
-
-    return buildTradingManual({
+    const message = buildTradingManual({
+      securityId,
       securityCode,
       securityName,
       effectiveTime,
       decision,
     });
+    return {
+      message,
+      decision,
+      securityId,
+      securityCode,
+      tradingDay,
+    };
   }
 
   private toAttributed(
@@ -307,14 +358,24 @@ export class AlertChannelDeliveryService {
       typeof ctxTriggerPrice === 'number' && ctxTriggerPrice > 0
         ? ctxTriggerPrice
         : 0; // 缺失 → 引擎 priceGate 显式 INVALID_PRICE 拒绝（可审计）
+    const ctxPivotPrice = ctx.pivotPrice;
+    const pivotPrice =
+      typeof ctxPivotPrice === 'number' && Number.isFinite(ctxPivotPrice)
+        ? ctxPivotPrice
+        : null;
+    const pivotTime = signal?.pivotTime
+      ? signal.pivotTime instanceof Date
+        ? signal.pivotTime.toISOString()
+        : String(signal.pivotTime)
+      : null;
     const kernelLike: KernelSignal = {
       definitionId: signal?.strategyDefinitionId ?? 0,
       versionId: signal?.strategyVersionId ?? 0,
       signalKind: signal?.signalKind ?? 'entry',
       signalTime: signal?.signalTime ?? effectiveTime,
       triggerPrice,
-      pivotTime: null,
-      pivotPrice: null,
+      pivotTime,
+      pivotPrice,
       signalType: signal?.signalType ?? 'signal',
       decisionTrace: (signal?.decisionTrace ?? {}) as Record<string, unknown>,
       contextSnapshot: signal?.contextSnapshot ?? {},

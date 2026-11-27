@@ -82,6 +82,8 @@ describe('PositionStateMachine（纯记账员）', () => {
     expect(snapshot.holdingQuantity).toBe(2000);
     // 加权成本均价 = (1000*10 + 1000*11) / 2000 = 10.50
     expect(snapshot.costPrice).toBe(10.5);
+    // 加仓买入应刷新 entryTime 至最新成交时刻（T+1 口径保护）
+    expect(snapshot.entryTime).toEqual(t2);
   });
 
   it('protects against whipsaw by not triggering hardcoded stop losses during market dips', () => {

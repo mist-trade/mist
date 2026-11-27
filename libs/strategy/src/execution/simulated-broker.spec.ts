@@ -928,4 +928,45 @@ describe('SimulatedBroker', () => {
     expect(broker.getOrder(first.orderId)?.status).toBe('FILLED');
     expect(broker.getOrder(second.orderId)?.status).toBe('PENDING');
   });
+
+  it('TC-19: fast-return when pendingOrders is empty still updates daily preClose tracking across days', () => {
+    // Day 1: 无挂单，收盘 10.00
+    expect(
+      broker.onBar(
+        createBar('2026-10-14T02:00:00.000Z', 9.8, 10.1, 9.7, 10.0, '600519'),
+      ),
+    ).toEqual([]);
+    // Day 2: 无挂单，收盘 10.50（必须更新 lastBarCloseMap / lastBarDateMap / prevCloseMap）
+    expect(
+      broker.onBar(
+        createBar('2026-10-15T02:00:00.000Z', 10.1, 10.6, 10.0, 10.5, '600519'),
+      ),
+    ).toEqual([]);
+
+    // Day 2 收盘后下单，Day 3 按 Day 2 收盘 10.50 的 +10% 一字涨停（11.55）应被拒单
+    const buyOrder = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T07:00:00.000Z'),
+      intentId: 'tc19-buy',
+    });
+    const fills = broker.onBar(
+      createBar(
+        '2026-10-16T02:00:00.000Z',
+        11.55,
+        11.55,
+        11.55,
+        11.55,
+        '600519',
+      ),
+    );
+    expect(fills).toHaveLength(0);
+    expect(broker.getOrder(buyOrder.orderId)?.status).toBe('REJECTED');
+    expect(broker.getOrder(buyOrder.orderId)?.rejectReason).toBe(
+      'BUY_REJECTED_LIMIT_UP',
+    );
+  });
 });

@@ -5,13 +5,15 @@
  */
 import { formatShanghaiDateTimeString, MINUTES_PER_HOUR } from '@app/timezone';
 import { PERIOD_MINUTES } from '@app/constants';
-import { ORDER_SIDES, SIGNAL_KINDS } from '../strategy.constants';
+import { ORDER_SIDES } from '../strategy.constants';
 import { liToYuan } from './money';
 import type { SignalContributor, TradingDecision } from './domain.types';
+import { resolveIntent } from './rules';
 
 const RESONANCE_SEPARATOR = ' + ';
 const TRACE_JOINER = ' → ';
 const TRACE_SUFFIX_PASS = ' ✓';
+const INTENT_EXIT = 'EXIT';
 
 /**
  * 紧凑 trace 链（2026-11-24 定稿）：每个节点 `短名 ✓`，' → ' 连接。
@@ -66,10 +68,13 @@ function buildHeader(input: TradingManualInput): string {
   const { decision } = input;
   const name = input.securityName ? ` ${input.securityName}` : '';
   const cash = formatYuan(decision.accountAfter.cashLi);
+  const positions = decision.accountAfter.positions;
   const holding =
     typeof input.securityId === 'number'
-      ? decision.accountAfter.positions.get(input.securityId)
-      : [...decision.accountAfter.positions.values()][0];
+      ? positions.get(input.securityId)
+      : positions.size === 1
+        ? [...positions.values()][0]
+        : undefined;
   const holdingSeg = holding
     ? ` / 持仓 ${holding.holdingQuantity.toLocaleString('en-US')}股 @ ${liToYuan(holding.costPriceLi).toFixed(2)}`
     : ' / 空仓';
@@ -129,7 +134,7 @@ function renderInstruction(i: TradingDecision['instructions'][number]): string {
 function renderRejection(r: TradingDecision['rejections'][number]): string {
   const signal = r.signal;
   const direction =
-    signal.signal.signalKind === SIGNAL_KINDS.EXIT ? '卖出' : '买入';
+    resolveIntent(signal.signal) === INTENT_EXIT ? '卖出' : '买入';
 
   if (r.contributors && r.contributors.length > 1) {
     const summary = r.contributors

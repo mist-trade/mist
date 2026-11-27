@@ -16,12 +16,12 @@ export type SimulationSessionStatus =
 export interface SimulationSignal {
   /** 决策触发时刻 (ISO 字符串) = currentBar.timestamp (右侧闭合确立，用于交易撮合与单调推进) */
   readonly signalTime: string;
-  /** 形态几何极值时刻 (ISO 字符串) = cand.pivotTime || cand.time (用于图表锚点与结构归因) */
-  readonly pivotTime: string;
+  /** 形态几何极值时刻 (ISO 字符串) = cand.pivotTime || null (用于图表锚点与结构归因，无 pivot 时为 null) */
+  readonly pivotTime: string | null;
   /** 决策触发时刻收盘市价 (虚拟撮合基准价) */
   readonly triggerPrice: number;
-  /** 形态几何极值点价格 (止损参考基准价) */
-  readonly pivotPrice: number;
+  /** 形态几何极值点价格 (止损参考基准价，无 pivot 时为 null) */
+  readonly pivotPrice: number | null;
   readonly signalType: string;
   readonly badgeText: string;
   readonly isBuy: boolean;

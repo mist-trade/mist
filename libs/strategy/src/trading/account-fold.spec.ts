@@ -1,4 +1,4 @@
-import { foldVirtualFills } from './account-fold';
+import { createVirtualFillAccumulator, foldVirtualFills } from './account-fold';
 import { ORDER_SIDES } from '../strategy.constants';
 import type { VirtualFillEvent } from './fill-log.port';
 
@@ -145,5 +145,69 @@ describe('foldVirtualFills（REQ-LEDGER-01 账本 fold）', () => {
     expect(pos.costPriceLi).toBe(12000n);
     expect(pos.realizedPnlLi).toBe(975000n); // 第一回合：(11,000,000−15,000)−10,000,000−买费10,000 = 975,000 厘
     expect(pos.entryTime?.toISOString()).toContain('2026-01-06T16:00:00'); // 01-07 00:00 +08:00
+  });
+
+  it('createVirtualFillAccumulator 增量 apply 与 foldVirtualFills 逐字段等价且快照隔离', () => {
+    const events: VirtualFillEvent[] = [
+      fill({
+        idempotencyKey: 'evt-1',
+        side: ORDER_SIDES.BUY,
+        quantity: 2000,
+        priceLi: 10000n,
+        feesLi: 20000n,
+        netAmountLi: -(20000000n + 20000n),
+        tradingDay: '2026-01-05',
+      }),
+      fill({
+        idempotencyKey: 'evt-2',
+        side: ORDER_SIDES.SELL,
+        quantity: 500,
+        priceLi: 11000n,
+        feesLi: 8000n,
+        netAmountLi: 5500000n - 8000n,
+        tradingDay: '2026-01-06',
+      }),
+      fill({
+        idempotencyKey: 'evt-3',
+        side: ORDER_SIDES.SELL,
+        quantity: 1500,
+        priceLi: 12000n,
+        feesLi: 15000n,
+        netAmountLi: 18000000n - 15000n,
+        tradingDay: '2026-01-07',
+      }),
+      fill({
+        idempotencyKey: 'evt-4',
+        side: ORDER_SIDES.BUY,
+        quantity: 1000,
+        priceLi: 12500n,
+        feesLi: 12000n,
+        netAmountLi: -(12500000n + 12000n),
+        tradingDay: '2026-01-08',
+      }),
+    ];
+
+    const acc = createVirtualFillAccumulator(SEED, '2026-01-05');
+    expect(acc.snapshot('2026-01-05')).toEqual(
+      foldVirtualFills([], SEED, '2026-01-05'),
+    );
+
+    const historySnapshots = [];
+    for (let i = 0; i < events.length; i++) {
+      const ev = events[i];
+      acc.apply(ev);
+      const incSnap = acc.snapshot(ev.tradingDay);
+      const fullSnap = foldVirtualFills(
+        events.slice(0, i + 1),
+        SEED,
+        ev.tradingDay,
+      );
+      expect(incSnap).toEqual(fullSnap);
+      historySnapshots.push({ incSnap, fullSnap });
+    }
+
+    // 验证既往快照未受后续 apply 污染
+    expect(historySnapshots[0].incSnap).toEqual(historySnapshots[0].fullSnap);
+    expect(historySnapshots[1].incSnap).toEqual(historySnapshots[1].fullSnap);
   });
 });

@@ -1,5 +1,11 @@
 import type { KernelSignal } from '../kernel/kernel.types';
+import { resolveIntent } from '../trading/rules';
 import type { SimulationSignal } from './strategy-simulation.types';
+
+const EXIT_INTENT = 'EXIT';
+const EXTRACTOR_NODE_TYPE = 'EXTRACTOR';
+const DEFAULT_BUY_BADGE = '买点';
+const DEFAULT_SELL_BADGE = '卖点';
 
 /**
  * 内核信号 → 推演会话展示信号（SimulationSignal）。
@@ -11,18 +17,18 @@ export function mapKernelSignalToSimulationSignal(
   signal: KernelSignal,
   options: { readonly securityCode: string; readonly period: number },
 ): SimulationSignal {
-  const isBuy = signal.signalKind === 'entry';
+  const isBuy = resolveIntent(signal) !== EXIT_INTENT;
   const evidenceType = readEvidenceEventType(signal);
   const signalType = evidenceType ?? signal.signalType;
   const badgeText =
     signal.badgeText ??
     (signal.contextSnapshot as any)?.badgeText ??
     (signal.decisionTrace as any)?.badgeText ??
-    (isBuy ? '买点' : '卖点');
+    (isBuy ? DEFAULT_BUY_BADGE : DEFAULT_SELL_BADGE);
   return {
     signalTime: signal.signalTime.toISOString(),
-    pivotTime: signal.pivotTime ?? signal.signalTime.toISOString(),
-    pivotPrice: signal.pivotPrice ?? signal.triggerPrice,
+    pivotTime: signal.pivotTime ?? null,
+    pivotPrice: signal.pivotPrice ?? null,
     triggerPrice: signal.triggerPrice,
     signalType,
     badgeText,
@@ -37,9 +43,20 @@ function readEvidenceEventType(signal: KernelSignal): string | null {
   const trace = signal.decisionTrace?.trace;
   if (!Array.isArray(trace)) return null;
   for (const item of trace as ReadonlyArray<{
+    type?: unknown;
+    role?: unknown;
+    passed?: unknown;
     evidence?: Record<string, unknown>;
   }>) {
-    const evidence = item?.evidence;
+    if (!item || typeof item !== 'object') continue;
+    if (item.passed === false) continue;
+    if (
+      item.type === EXTRACTOR_NODE_TYPE ||
+      item.role === EXTRACTOR_NODE_TYPE
+    ) {
+      continue;
+    }
+    const evidence = item.evidence;
     if (!evidence || typeof evidence !== 'object') continue;
     const rawType =
       evidence.eventType ??

@@ -37,7 +37,11 @@ export {
   toSignalContributor,
 } from './consolidation';
 export type { ConsolidatedDirectionBuckets } from './consolidation';
-export { createAllInWithBuffer } from './sizing';
+export {
+  createAllInWithBuffer,
+  recomputeNextBarOpenBuyQuantity,
+} from './sizing';
+export type { RecomputeNextBarBuyParams } from './sizing';
 export {
   createDefaultEntryRules,
   createDefaultExitRules,
@@ -60,7 +64,8 @@ export type {
   VirtualFillLogPort,
   VirtualFillSide,
 } from './fill-log.port';
-export { foldVirtualFills } from './account-fold';
+export { createVirtualFillAccumulator, foldVirtualFills } from './account-fold';
+export type { VirtualFillAccumulator } from './account-fold';
 export { groupSignals } from './grouping';
 export type {
   GroupableSignal,

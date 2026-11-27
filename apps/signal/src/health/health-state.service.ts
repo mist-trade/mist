@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable, Optional } from '@nestjs/common';
 import {
   resolveRealtimeStrategyMode,
   type RealtimeStrategyMode,
@@ -8,9 +8,17 @@ import { RuntimeObservabilityService } from '../observability/runtime-observabil
 
 @Injectable()
 export class HealthStateService {
-  // Property-based injection avoids the webpack/ts-loader transpileOnly
-  // metadata loss that drops __decorate for this class's constructor params.
-  private readonly runtime = new RuntimeObservabilityService();
+  private readonly runtime: RuntimeObservabilityService;
+
+  constructor(
+    // Explicit @Inject preserves DI metadata even under ts-loader transpileOnly;
+    // @Optional + fallback keeps isolated 0-arg unit test instantiation working.
+    @Optional()
+    @Inject(RuntimeObservabilityService)
+    runtime?: RuntimeObservabilityService,
+  ) {
+    this.runtime = runtime ?? new RuntimeObservabilityService();
+  }
   private readonly realtimeMode: RealtimeStrategyMode =
     resolveRealtimeStrategyMode(process.env.REALTIME_STRATEGY_MODE);
   private registry: SignalHealthVo['registry'] = {

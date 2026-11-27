@@ -1,4 +1,5 @@
 import { HealthStateService } from './health-state.service';
+import { RuntimeObservabilityService } from '../observability/runtime-observability.service';
 
 describe('HealthStateService (signal)', () => {
   const originalMode = process.env.REALTIME_STRATEGY_MODE;
@@ -165,6 +166,20 @@ describe('HealthStateService (signal)', () => {
       definitionCount: 3,
       lastRefreshOutcome: 'failed',
       lastFailureCode: 'REGISTRY_REFRESH_FAILED',
+    });
+  });
+
+  it('uses the injected RuntimeObservabilityService singleton instead of creating an isolated instance', () => {
+    process.env.REALTIME_STRATEGY_MODE = 'shadow';
+    const runtime = new RuntimeObservabilityService();
+    runtime.recordConsumerRemoval(4);
+    runtime.recordTradingDayRollover();
+    const state = new HealthStateService(runtime);
+
+    expect(state.snapshot().runtime).toMatchObject({
+      consumerRemovalCount: 4,
+      tradingDayRolloverCount: 1,
+      lastCleanupOutcome: 'trading_day_rolled_over',
     });
   });
 });

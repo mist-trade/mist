@@ -10,6 +10,19 @@ import type {
 } from '../../libs/strategy/src/factor/factor.types';
 import { ExternalFactorPluginLoader } from '../../libs/strategy/src/factor/external-plugin-loader';
 import { ChanVisualAdapter } from '../../libs/visual-command/src/adapters/chan-visual.adapter';
+import {
+  availabilityKey,
+  applySlippageLi,
+  MarketRiskRegime,
+  ORDER_SIDES,
+  recomputeNextBarOpenBuyQuantity,
+  SimulatedBroker,
+  StrategyEvaluationKernel,
+  TradingEngine,
+  TRADING_LAYER_DEFAULTS,
+  yuanToLi,
+} from '@app/strategy';
+import { formatShanghaiDateString } from '@app/timezone';
 import * as provider from './provider';
 import * as constants from './strategy-dev.constants';
 
@@ -328,5 +341,314 @@ describe('tools/strategy-dev/server.ts (DEV-P0-09 & DEV-PERF-01)', () => {
     expect(out2.body.data).toEqual(out1.body.data);
     // 命中模块级缓存，convert 仅执行 1 次
     expect(convertSpy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('tools/strategy-dev/server.ts Wave 2B parity & API contract', () => {
+  let serverMod: ServerModule;
+
+  beforeAll(async () => {
+    process.env.DEV_SERVER_AUTOSTART = 'false';
+    process.env.SKIP_DEV_PREHEAT = 'true';
+    ExternalFactorPluginLoader.setDisabled(true);
+    serverMod = await import('./server');
+  });
+
+  afterAll(() => {
+    ExternalFactorPluginLoader.resetConfiguration();
+    jest.restoreAllMocks();
+  });
+
+  beforeEach(() => {
+    jest.restoreAllMocks();
+    serverMod.visualCommandsCache?.clear?.();
+    (serverMod as any).backtestSignalsCache?.clear?.();
+  });
+
+  function makeWaveKlines(
+    symbol: string,
+    count = 80,
+    periodMinutes = 1440,
+  ): any[] {
+    const startMs = Date.UTC(2025, 0, 2, 0, 0, 0);
+    return Array.from({ length: count }, (_, idx) => {
+      const wave = Math.sin(idx / 3) * 1.2 + Math.cos(idx / 7) * 0.6;
+      const close = Math.round((10 + wave) * 100) / 100;
+      const open = Math.round((close - 0.1) * 100) / 100;
+      return {
+        id: idx + 1,
+        symbol,
+        time: new Date(startMs + idx * periodMinutes * 60_000),
+        open,
+        high: Math.round((Math.max(open, close) + 0.3) * 100) / 100,
+        low: Math.round((Math.min(open, close) - 0.3) * 100) / 100,
+        close,
+        volume: '10000',
+        amount: String(Math.round(close * 10000)),
+      };
+    });
+  }
+
+  it('preserves navSeries, non-empty ruleSnapshot, and externalContextRequirements on backtestSignalsCache hit', async () => {
+    const sampleKlines = makeWaveKlines('000001', 90);
+    const loadSpy = jest
+      .spyOn(provider, 'loadCanonicalKlines')
+      .mockReturnValue(sampleKlines);
+
+    const payload = {
+      symbol: '000001',
+      period: 1440,
+      startDate: '2025-02-01T00:00:00.000Z',
+      endDate: '2025-06-01T00:00:00.000Z',
+    };
+
+    const pair1 = createMockHttpPair({
+      method: 'POST',
+      url: '/v1/strategy-backtests',
+      body: payload,
+    });
+    await serverMod.handleDevRequest(pair1.req, pair1.res);
+    const out1 = await pair1.done;
+
+    const pair2 = createMockHttpPair({
+      method: 'POST',
+      url: '/v1/strategy-backtests',
+      body: payload,
+    });
+    await serverMod.handleDevRequest(pair2.req, pair2.res);
+    const out2 = await pair2.done;
+
+    expect(out1.statusCode).toBe(200);
+    expect(out2.statusCode).toBe(200);
+    expect(loadSpy).toHaveBeenCalledTimes(1);
+
+    const data1 = out1.body.data;
+    const data2 = out2.body.data;
+
+    expect(Array.isArray(data1.navSeries)).toBe(true);
+    expect(data1.navSeries.length).toBeGreaterThan(0);
+    expect(data2.navSeries).toEqual(data1.navSeries);
+
+    expect(data1.ruleSnapshot).toBeDefined();
+    expect(Object.keys(data1.ruleSnapshot).length).toBeGreaterThan(0);
+    expect(data2.ruleSnapshot).toEqual(data1.ruleSnapshot);
+
+    expect(Array.isArray(data1.externalContextRequirements)).toBe(true);
+    expect(data2.externalContextRequirements).toEqual(
+      data1.externalContextRequirements,
+    );
+    expect(data1.contextRequirements).toBeDefined();
+    expect(data2.contextRequirements).toEqual(data1.contextRequirements);
+  });
+
+  it('derives externalContextRequirements from plugins declaring resolveExternalContextRequirements', async () => {
+    const sampleKlines = makeWaveKlines('000001', 40);
+    jest.spyOn(provider, 'loadCanonicalKlines').mockReturnValue(sampleKlines);
+    const extReq = [{ securityCode: '000300', period: 1440, minBars: 5 }];
+    jest
+      .spyOn(ExternalFactorPluginLoader, 'registerExternalPlugins')
+      .mockImplementation((registry) => {
+        registry.register({
+          id: 'plugin.test.ext-req',
+          name: '外部上下文测试',
+          category: 'TECHNICAL',
+          version: '1.0.0',
+          description: 'test',
+          paramSchema: {},
+          resolveExternalContextRequirements: () => extReq,
+          evaluate: async () => ({ action: 'NEUTRAL', reason: 'ok' }),
+        });
+        return 1;
+      });
+
+    const pair = createMockHttpPair({
+      method: 'POST',
+      url: '/v1/strategy-backtests',
+      body: {
+        symbol: '000001',
+        period: 1440,
+        mode: 'single',
+        pluginId: 'plugin.test.ext-req',
+      },
+    });
+    await serverMod.handleDevRequest(pair.req, pair.res);
+    const out = await pair.done;
+
+    expect(out.statusCode).toBe(200);
+    expect(out.body.data.externalContextRequirements).toEqual(extReq);
+    expect(Object.keys(out.body.data.ruleSnapshot).length).toBeGreaterThan(0);
+  });
+
+  it('uses availabilityKey for effectiveTime, propagates macroRegime, and recomputes Next-Bar high-open BUY qty', async () => {
+    // 构造 30m K 线：第 1 根在 15:00 上海收盘触发信号 (availabilityKey = 15:01)，第 2 根高开 +8%
+    const t0 = new Date('2026-01-05T07:00:00.000Z'); // 15:00+08
+    const t1 = new Date('2026-01-06T02:00:00.000Z'); // 次日 10:00+08
+    const t2 = new Date('2026-01-06T07:00:00.000Z'); // 次日 15:00+08
+    const klines = [
+      {
+        id: 1,
+        symbol: '000001',
+        time: t0,
+        open: 10.0,
+        high: 10.2,
+        low: 9.9,
+        close: 10.0,
+        volume: '10000',
+        amount: '100000',
+      },
+      {
+        id: 2,
+        symbol: '000001',
+        time: t1,
+        open: 10.8,
+        high: 10.9,
+        low: 10.0,
+        close: 10.1,
+        volume: '10000',
+        amount: '101000',
+      },
+      {
+        id: 3,
+        symbol: '000001',
+        time: t2,
+        open: 10.1,
+        high: 10.2,
+        low: 9.8,
+        close: 9.9,
+        volume: '10000',
+        amount: '99000',
+      },
+    ];
+    jest.spyOn(provider, 'loadCanonicalKlines').mockReturnValue(klines);
+
+    const pushSpy = jest.spyOn(StrategyEvaluationKernel.prototype, 'push');
+    pushSpy.mockResolvedValueOnce([
+      {
+        definitionId: -1,
+        versionId: -1,
+        signalKind: 'entry',
+        triggerPeriod: 30,
+        intent: 'ENTRY',
+        signalTime: t0,
+        triggerPrice: 10.0,
+        pivotTime: null,
+        pivotPrice: null,
+        signalType: 'TEST_BUY',
+        badgeText: '买点',
+        decisionTrace: { status: 'SIGNAL_EMITTED', action: 'BUY' },
+        contextSnapshot: { action: 'BUY' },
+        ruleSnapshot: {},
+      },
+    ]);
+    pushSpy.mockResolvedValue([]);
+
+    const decideSpy = jest.spyOn(TradingEngine.prototype, 'decide');
+    const surveilSpy = jest.spyOn(TradingEngine.prototype, 'surveilBar');
+    const submitSpy = jest.spyOn(SimulatedBroker.prototype, 'submitOrder');
+
+    const elevatedRegime = {
+      regime: MarketRiskRegime.ELEVATED_RISK,
+      marketAtrPercentile: 0.9,
+      isLiquidityFrozen: false,
+    };
+
+    await (serverMod.runUnifiedSimulationBacktest as any)({
+      code: '000001',
+      period: 30,
+      startDate: '2026-01-01T00:00:00.000Z',
+      endDate: '2026-01-10T00:00:00.000Z',
+      enableStopLoss: true,
+      macroRegime: elevatedRegime,
+    });
+
+    expect(decideSpy).toHaveBeenCalled();
+    const firstGroup = decideSpy.mock.calls[0][0];
+    const expectedEffective = availabilityKey({ period: 30, timestamp: t0 });
+    expect(firstGroup.effectiveTime.getTime()).toBe(
+      expectedEffective.getTime(),
+    );
+    expect(firstGroup.tradingDay).toBe(
+      formatShanghaiDateString(expectedEffective),
+    );
+    expect(decideSpy.mock.calls[0][2]).toEqual(elevatedRegime);
+
+    expect(surveilSpy).toHaveBeenCalled();
+    expect(surveilSpy.mock.calls[0][2]).toEqual(elevatedRegime);
+
+    const buyOrder = submitSpy.mock.calls.find(
+      ([dto]) => dto.side === ORDER_SIDES.BUY,
+    );
+    expect(buyOrder).toBeDefined();
+    const expectedQty = recomputeNextBarOpenBuyQuantity({
+      cashLi: yuanToLi(1_000_000),
+      fillPriceLi: applySlippageLi(yuanToLi(10.8), ORDER_SIDES.BUY, 0.0005),
+      requestedQuantity: 47_500,
+      cashAllocationRatio: TRADING_LAYER_DEFAULTS.DEFAULT_CASH_ALLOCATION_RATIO,
+      lotSize: TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE,
+      securityCode: '000001',
+      feeEnabled: true,
+      macroRegime: elevatedRegime,
+    });
+    expect(buyOrder![0].quantity).toBe(expectedQty);
+  });
+
+  it('returns real nullable pivotTime/pivotPrice without signalTime fallback or synthetic chanBsp in GET /v1/strategy-backtests/:id/signals', async () => {
+    const t0 = new Date('2026-01-05T07:00:00.000Z');
+    const klines = makeWaveKlines('000001', 5, 30).map((k, idx) => ({
+      ...k,
+      time: new Date(t0.getTime() + idx * 30 * 60_000),
+    }));
+    jest.spyOn(provider, 'loadCanonicalKlines').mockReturnValue(klines);
+
+    const pushSpy = jest.spyOn(StrategyEvaluationKernel.prototype, 'push');
+    pushSpy.mockResolvedValueOnce([
+      {
+        definitionId: -1,
+        versionId: -1,
+        signalKind: 'entry',
+        triggerPeriod: 30,
+        intent: 'ENTRY',
+        signalTime: t0,
+        triggerPrice: 12.34,
+        pivotTime: null,
+        pivotPrice: null,
+        signalType: 'LEGACY_DSL',
+        badgeText: '规则买入',
+        decisionTrace: { status: 'SIGNAL_EMITTED', action: 'BUY' },
+        contextSnapshot: { action: 'BUY' },
+        ruleSnapshot: {},
+      },
+    ]);
+    pushSpy.mockResolvedValue([]);
+
+    const createPair = createMockHttpPair({
+      method: 'POST',
+      url: '/v1/strategy-backtests',
+      body: {
+        symbol: '000001',
+        period: 30,
+        startDate: '2026-01-01T00:00:00.000Z',
+        endDate: '2026-12-31T00:00:00.000Z',
+      },
+    });
+    await serverMod.handleDevRequest(createPair.req, createPair.res);
+    const created = await createPair.done;
+    const runId = created.body.data.runId;
+
+    const getPair = createMockHttpPair({
+      method: 'GET',
+      url: `/v1/strategy-backtests/${runId}/signals`,
+    });
+    await serverMod.handleDevRequest(getPair.req, getPair.res);
+    const out = await getPair.done;
+
+    expect(out.statusCode).toBe(200);
+    const items = out.body.data.items;
+    expect(items).toHaveLength(1);
+    const item = items[0];
+    expect(item.pivotTime).toBeNull();
+    expect(item.contextSnapshot.pivotTime).toBeNull();
+    expect(item.contextSnapshot.pivotPrice).toBeNull();
+    expect(item.contextSnapshot).not.toHaveProperty('chanBsp');
   });
 });

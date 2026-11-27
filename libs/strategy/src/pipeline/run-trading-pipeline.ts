@@ -21,8 +21,9 @@ import {
   buildOfflineSignalIdempotencyKey,
   createAllInWithBuffer,
   createDefaultRiskRules,
+  createVirtualFillAccumulator,
   groupSignals,
-  foldVirtualFills,
+  recomputeNextBarOpenBuyQuantity,
   buildTradingManual,
   renderTraceChainOf,
   TradingEngine,
@@ -30,6 +31,7 @@ import {
   liToYuan,
   yuanToLi,
   type FeeConfigLi,
+  type MacroRegimeSnapshot,
   type RiskRule,
   type SignalGroup,
   type SignalGroupInput,
@@ -77,6 +79,8 @@ export interface PipelineInput {
   readonly allowFractionalShares?: boolean;
   /** 证券名称（用于涨跌停 ST 标识判断，可选） */
   readonly securityName?: string;
+  /** 宏观风险体制快照（透传至引擎裁决与 Next-Bar 仓位重算） */
+  readonly macroRegime?: MacroRegimeSnapshot;
 }
 
 export interface PipelineResult {
@@ -186,6 +190,7 @@ export async function runTradingPipeline(
       seedCapitalLi,
       lotSize,
       feeEnabled,
+      feeConfigLi,
       cashAllocationRatio,
     });
   }
@@ -297,6 +302,7 @@ async function runAssumedClosePipeline(params: {
   }));
 
   const fills: VirtualFillEvent[] = [];
+  const accumulator = createVirtualFillAccumulator(seedCapitalLi);
   const groupResults: GroupResultEntry[] = [];
 
   // 组序：按 effectiveTime 升序（时间轴因果序）
@@ -308,12 +314,8 @@ async function runAssumedClosePipeline(params: {
 
   for (const rawGroup of ordered) {
     const group = buildSignalGroupInput(rawGroup, input);
-    const snapshot = foldVirtualFills(
-      fills,
-      seedCapitalLi,
-      rawGroup.descriptor.tradingDay,
-    );
-    const decision = engine.decide(group, snapshot);
+    const snapshot = accumulator.snapshot(rawGroup.descriptor.tradingDay);
+    const decision = engine.decide(group, snapshot, input.macroRegime);
 
     // 假定成交（指令即成交，厘算术；幂等键与指令一致 → 重放不重复回填）
     for (const instruction of decision.instructions) {
@@ -326,7 +328,7 @@ async function runAssumedClosePipeline(params: {
         feeConfigLi,
       );
       const turnoverLi = priceLi * BigInt(instruction.quantity);
-      fills.push({
+      const fill: VirtualFillEvent = {
         idempotencyKey: instruction.idempotencyKey,
         securityId: input.securityId,
         securityCode: input.securityCode,
@@ -350,7 +352,9 @@ async function runAssumedClosePipeline(params: {
           strategyName: instruction.attribution.strategyName,
           periodLabel: instruction.attribution.periodLabel,
         },
-      });
+      };
+      fills.push(fill);
+      accumulator.apply(fill);
     }
 
     groupResults.push({ group, decision });
@@ -372,6 +376,7 @@ async function runNextBarOpenPipeline(params: {
   readonly seedCapitalLi: bigint;
   readonly lotSize: number;
   readonly feeEnabled: boolean;
+  readonly feeConfigLi?: FeeConfigLi;
   readonly cashAllocationRatio: number;
 }): Promise<PipelineResult> {
   const {
@@ -382,8 +387,10 @@ async function runNextBarOpenPipeline(params: {
     seedCapitalLi,
     lotSize,
     feeEnabled,
+    feeConfigLi,
     cashAllocationRatio,
   } = params;
+  const macroRegime = input.macroRegime;
 
   const execPeriod =
     input.executionPeriod ?? input.plans[0]?.period ?? DEFAULT_EXECUTION_PERIOD;
@@ -417,6 +424,7 @@ async function runNextBarOpenPipeline(params: {
   const signals: KernelSignal[] = [];
   const pendingSignals: KernelSignal[] = [];
   const fills: VirtualFillEvent[] = [];
+  const accumulator = createVirtualFillAccumulator(seedCapitalLi);
   const groupResults: GroupResultEntry[] = [];
   const pendingOrderMeta = new Map<string, PendingOrderMeta>();
 
@@ -468,8 +476,8 @@ async function runNextBarOpenPipeline(params: {
     for (const rawGroup of ordered) {
       const group = buildSignalGroupInput(rawGroup, input);
       const tradingDay = barDayForSnapshot ?? rawGroup.descriptor.tradingDay;
-      const snapshot = foldVirtualFills(fills, seedCapitalLi, tradingDay);
-      const decision = engine.decide(group, snapshot);
+      const snapshot = accumulator.snapshot(tradingDay);
+      const decision = engine.decide(group, snapshot, macroRegime);
 
       if (hasBlockedOrder || !nextOpenBar) {
         groupResults.push({ group, decision });
@@ -493,7 +501,7 @@ async function runNextBarOpenPipeline(params: {
             estSellLi,
             submitQty,
             input.securityCode,
-            feeEnabled ? undefined : ZERO_FEE_CONFIG_LI,
+            feeConfigLi,
           );
           scheduledSellProceedsLi +=
             estSellLi * BigInt(submitQty) - sellFees.totalFeesLi;
@@ -503,28 +511,27 @@ async function runNextBarOpenPipeline(params: {
             ORDER_SIDES.BUY,
             slippageRatio,
           );
-          if (
-            input.allowFractionalShares ||
-            estBuyLi > yuanToLi(instruction.referencePrice)
-          ) {
-            const availableCashLi =
-              yuanToLi(broker.getAccount().availableCash) +
-              scheduledSellProceedsLi;
-            submitQty = computeAffordableQuantity({
-              cashLi: availableCashLi,
-              fillPriceLi: estBuyLi,
-              cashAllocationRatio,
-              lotSize,
-              securityCode: input.securityCode,
-              feeEnabled,
-            });
-            if (submitQty !== instruction.quantity) {
-              updatedInstructions[idx] = {
-                ...instruction,
-                quantity: submitQty,
-              };
-              instructionsAdjusted = true;
-            }
+          const availableCashLi =
+            yuanToLi(broker.getAccount().availableCash) +
+            scheduledSellProceedsLi;
+          submitQty = recomputeNextBarOpenBuyQuantity({
+            cashLi: availableCashLi,
+            fillPriceLi: estBuyLi,
+            requestedQuantity: instruction.quantity,
+            cashAllocationRatio,
+            lotSize,
+            securityCode: input.securityCode,
+            feeEnabled,
+            feeConfig: feeConfigLi,
+            macroRegime,
+            allowFractionalShares: input.allowFractionalShares,
+          });
+          if (submitQty !== instruction.quantity) {
+            updatedInstructions[idx] = {
+              ...instruction,
+              quantity: submitQty,
+            };
+            instructionsAdjusted = true;
           }
         }
 
@@ -590,7 +597,7 @@ async function runNextBarOpenPipeline(params: {
         const priceLi = yuanToLi(filled.fillPrice);
         const feesLi = yuanToLi(filled.fees.totalFees);
         const turnoverLi = priceLi * BigInt(filled.filledQuantity);
-        fills.push({
+        const fill: VirtualFillEvent = {
           idempotencyKey: meta?.idempotencyKey ?? `offline-${filled.orderId}`,
           securityId: input.securityId,
           securityCode: input.securityCode,
@@ -605,7 +612,9 @@ async function runNextBarOpenPipeline(params: {
           tradingDay: barDay,
           fillTime: filled.fillTime,
           instruction: meta?.instruction,
-        });
+        };
+        fills.push(fill);
+        accumulator.apply(fill);
       }
     }
 
@@ -625,42 +634,4 @@ async function runNextBarOpenPipeline(params: {
     fills,
     report: renderPipelineReport(groupResults, input),
   };
-}
-
-function computeAffordableQuantity(params: {
-  readonly cashLi: bigint;
-  readonly fillPriceLi: bigint;
-  readonly cashAllocationRatio: number;
-  readonly lotSize: number;
-  readonly securityCode: string;
-  readonly feeEnabled: boolean;
-}): number {
-  const {
-    cashLi,
-    fillPriceLi,
-    cashAllocationRatio,
-    lotSize,
-    securityCode,
-    feeEnabled,
-  } = params;
-  if (fillPriceLi <= 0n || cashLi <= 0n) return 0;
-  const sizing = createAllInWithBuffer(cashAllocationRatio);
-  let qty = sizing({ cashLi, priceLi: fillPriceLi, lotSize }).quantity;
-  const step = BigInt(lotSize);
-  while (qty >= lotSize) {
-    const turnoverLi = fillPriceLi * BigInt(qty);
-    const feesLi = feeEnabled
-      ? calculateExecutionFeesLi(
-          ORDER_SIDES.BUY,
-          fillPriceLi,
-          qty,
-          securityCode,
-        ).totalFeesLi
-      : 0n;
-    if (turnoverLi + feesLi <= cashLi) {
-      return qty;
-    }
-    qty -= Number(step);
-  }
-  return 0;
 }

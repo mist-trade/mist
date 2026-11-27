@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { Cron } from '@nestjs/schedule';
 import {
   ASIA_SHANGHAI_TIMEZONE,
@@ -11,6 +11,7 @@ import type { SignalRegistrySnapshot } from '../signal-registry.types';
 import { HealthStateService } from '../health/health-state.service';
 import { TimezoneService } from '@app/timezone';
 import { CandleFinalizedJobProcessor } from './candle-finalized-job.processor';
+import { SignalRuntimeMutex } from '../signal-runtime-mutex.service';
 
 /**
  * 盘前策略内核池预热编排（09:20 屏障）：
@@ -27,6 +28,9 @@ export class SignalPreMarketWarmupService {
     private readonly processor: CandleFinalizedJobProcessor,
     private readonly timezoneService: TimezoneService,
     private readonly healthState: HealthStateService,
+    @Optional()
+    @Inject(SignalRuntimeMutex)
+    private readonly runtimeMutex?: SignalRuntimeMutex,
   ) {}
 
   @Cron(CRON_PRE_MARKET_STRATEGY_WARMUP_0920, {
@@ -44,7 +48,11 @@ export class SignalPreMarketWarmupService {
         this.logger.log('pre-market warmup skipped: no active targets');
         return;
       }
-      const report = await this.processor.warmupRealtimeWindows(targets, now);
+      const runWarmup = () =>
+        this.processor.warmupRealtimeWindows(targets, now);
+      const report = this.runtimeMutex
+        ? await this.runtimeMutex.run(runWarmup)
+        : await runWarmup();
       if (report) {
         this.healthState.recordPreMarketWarmup(
           report,

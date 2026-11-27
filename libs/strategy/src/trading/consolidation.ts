@@ -7,7 +7,6 @@
  * - 主锚点选举仅用于确定性 JSON 输出、primary idempotencyKey 与 referencePrice。
  */
 import type { KernelSignal } from '../kernel/kernel.types';
-import { SIGNAL_KINDS } from '../strategy.constants';
 import type { AttributedSignal, SignalContributor } from './domain.types';
 import { yuanToLi } from './money';
 import { resolveIntent } from './rules';
@@ -80,9 +79,7 @@ export function consolidateGroupByDirection(
   const validEntries: AttributedSignal[] = [];
 
   for (const item of signals) {
-    const isExit =
-      resolveIntent(item.signal) === INTENT_EXIT ||
-      item.signal.signalKind === SIGNAL_KINDS.EXIT;
+    const isExit = resolveIntent(item.signal) === INTENT_EXIT;
     const price = item.signal.triggerPrice;
     const priceInvalid = !Number.isFinite(price) || yuanToLi(price) <= 0n;
 
@@ -117,10 +114,20 @@ export function consolidateGroupByDirection(
 export function toSignalContributor(
   attributed: AttributedSignal,
 ): SignalContributor {
+  const { signal } = attributed;
   return {
     idempotencyKey: attributed.idempotencyKey,
-    signalType: attributed.signal.signalType,
+    signalType: signal.signalType,
     attribution: attributed.attribution,
+    ...(signal.pivotPrice !== undefined
+      ? { pivotPrice: signal.pivotPrice }
+      : {}),
+    ...(signal.originPluginId !== undefined
+      ? { originPluginId: signal.originPluginId }
+      : {}),
+    ...(signal.ruleSnapshot !== undefined
+      ? { ruleSnapshot: signal.ruleSnapshot }
+      : {}),
   };
 }
 

@@ -200,7 +200,6 @@ export class SimulatedBroker implements ExecutionBrokerPort {
   }
 
   onBar(bar: StrategyBar): readonly OrderFilledEvent[] {
-    const fills: OrderFilledEvent[] = [];
     const secCode = bar.securityCode ?? '';
     const currentDateStr = formatShanghaiDateString(bar.timestamp);
     const lastDateStr = this.lastBarDateMap.get(secCode);
@@ -214,13 +213,19 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     this.lastBarDateMap.set(secCode, currentDateStr);
 
     const meta = this.securityMetaMap.get(secCode);
-    const securityName = meta?.name;
-
     if (!this.dailyPreCloseMap.has(secCode)) {
       this.dailyPreCloseMap.set(secCode, meta?.preClose ?? bar.open);
     }
-    const prevClose = this.dailyPreCloseMap.get(secCode) ?? bar.open;
+    this.lastBarCloseMap.set(secCode, bar.close);
+    this.prevCloseMap.set(secCode, bar.close);
 
+    if (this.pendingOrders.size === 0) {
+      return [];
+    }
+
+    const fills: OrderFilledEvent[] = [];
+    const securityName = meta?.name;
+    const prevClose = this.dailyPreCloseMap.get(secCode) ?? bar.open;
     const blockedSellSecurities = new Set<string>();
     const isLimitDown = isOneWordLimitDown(bar, prevClose, securityName);
 
@@ -423,8 +428,6 @@ export class SimulatedBroker implements ExecutionBrokerPort {
       }
     }
 
-    this.lastBarCloseMap.set(secCode, bar.close);
-    this.prevCloseMap.set(secCode, bar.close);
     return fills;
   }
 

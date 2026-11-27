@@ -197,6 +197,68 @@ describe('LiveStrategyPersistenceService', () => {
       expect(publishGroup).not.toHaveBeenCalled();
     });
   });
+
+  describe('persistBatch', () => {
+    it('returns empty list without opening a transaction when batch is empty', async () => {
+      const dataSource = { transaction: jest.fn() };
+      const service = new LiveStrategyPersistenceService(dataSource as never);
+
+      await expect(service.persistBatch([])).resolves.toEqual([]);
+      expect(dataSource.transaction).not.toHaveBeenCalled();
+    });
+
+    it('persists multiple candidates in one transaction with one SET SESSION and per-candidate savepoint rollback on duplicate', async () => {
+      const candA = candidate();
+      const candB = { ...candidate(), definitionId: 4 };
+      const candC = { ...candidate(), definitionId: 5 };
+      const dupErr = duplicateError(
+        "Duplicate entry 'x' for key 'strategy_alert_events.uq_strategy_alert_events_dedupe_key'",
+      );
+
+      const manager = {
+        query: jest.fn().mockResolvedValue(undefined),
+        create: jest.fn((_entity, value) => value),
+        save: jest
+          .fn()
+          // candA: Signal + AlertEvent
+          .mockResolvedValueOnce({ id: 71 })
+          .mockResolvedValueOnce({ id: 81 })
+          // candB: Signal succeeds, AlertEvent hits duplicate constraint
+          .mockResolvedValueOnce({ id: 72 })
+          .mockRejectedValueOnce(dupErr)
+          // candC: Signal + AlertEvent
+          .mockResolvedValueOnce({ id: 73 })
+          .mockResolvedValueOnce({ id: 83 }),
+      };
+      const dataSource = {
+        transaction: jest.fn((operation) => operation(manager)),
+      };
+      const service = new LiveStrategyPersistenceService(dataSource as never);
+
+      const results = await service.persistBatch([candA, candB, candC]);
+
+      expect(dataSource.transaction).toHaveBeenCalledTimes(1);
+      expect(
+        manager.query.mock.calls.filter(
+          ([sql]) => sql === 'SET SESSION innodb_lock_wait_timeout = 3',
+        ),
+      ).toHaveLength(1);
+      expect(
+        manager.query.mock.calls.some(([sql]) =>
+          String(sql).startsWith('ROLLBACK TO SAVEPOINT '),
+        ),
+      ).toBe(true);
+      expect(results).toEqual([
+        { outcome: 'created', alertEventId: 81, candidate: candA },
+        {
+          outcome: 'duplicate_skipped',
+          alertEventId: null,
+          candidate: candB,
+        },
+        { outcome: 'created', alertEventId: 83, candidate: candC },
+      ]);
+    });
+  });
 });
 
 function candidate() {

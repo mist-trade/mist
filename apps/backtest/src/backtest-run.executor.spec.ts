@@ -5,11 +5,22 @@ import {
   StrategyRuleSchemaVersion,
 } from '@app/shared-data';
 import {
+  availabilityKey,
   compileStoredDefinitionVersion,
   LegacyStrategyCompiler,
+  MarketRiskRegime,
+  recomputeNextBarOpenBuyQuantity,
+  applySlippageLi,
+  EXECUTION_RULES,
+  ORDER_SIDES,
   shanghaiMidnight,
+  SimulatedBroker,
+  TradingEngine,
+  TRADING_LAYER_DEFAULTS,
+  yuanToLi,
   type DailyNavSnapshot,
 } from '@app/strategy';
+import { formatShanghaiDateString } from '@app/timezone';
 import type { StrategyBar } from '@app/market-data';
 import { computeUnderwaterDuration } from '@app/indicators';
 import { createChanFullOutputFixture } from '../../../libs/chancore/src/chan-full-output.characterization.fixture';
@@ -1212,3 +1223,259 @@ function multiCompleted(fixture: {
 }): Record<string, unknown> {
   return completedUpdateCall(fixture);
 }
+
+describe('BacktestRunExecutor Wave 2B parity', () => {
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
+
+  function parityFixture(
+    options: {
+      period?: number;
+      contextSnapshot?: Record<string, unknown> | null;
+      rule?: Record<string, unknown>;
+    } = {},
+  ) {
+    const fixture = executor();
+    const period = options.period ?? Period.DAY;
+    const run = {
+      ...fixture.current,
+      targetUniverse: ['600000.SH'],
+      period,
+      startDate: new Date('2026-01-01T00:00:00.000Z'),
+      endDate: new Date('2026-01-31T00:00:00.000Z'),
+      kind: 'decision_flow',
+      ...(options.contextSnapshot !== undefined
+        ? { contextSnapshot: options.contextSnapshot }
+        : {}),
+    };
+    fixture.dependencies.runRepository.findOne.mockResolvedValue(run);
+
+    const sellRuleFlow = LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'lt', value: 9.9 },
+      'exit',
+    );
+    const buyRuleFlow = LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'gt', value: 9.95 },
+      'entry',
+    );
+    const rootNode = {
+      ...sellRuleFlow,
+      onFail: buyRuleFlow,
+    };
+
+    fixture.dependencies.versionRepository.findOne.mockResolvedValue({
+      id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
+      rule: options.rule ?? {
+        rootNode,
+        requiredBarCount: 1,
+      },
+      signalKind: 'entry',
+    });
+    fixture.dependencies.securityRepository.find.mockResolvedValue([
+      { id: 9, code: '600000.SH', name: '浦发银行' },
+    ]);
+    fixture.dependencies.marketData.loadReplayWindow.mockResolvedValue({
+      bars: [],
+    });
+    return fixture;
+  }
+
+  function makeBar(
+    iso: string,
+    period: number,
+    open: number,
+    close: number,
+  ): StrategyBar {
+    return {
+      securityId: 9,
+      securityCode: '600000.SH',
+      source: 'tdx',
+      period,
+      timestamp: new Date(iso),
+      open,
+      high: Math.max(open, close) + 0.1,
+      low: Math.min(open, close) - 0.1,
+      close,
+      volume: '100000',
+      amount: String(Math.round(close * 100000)),
+      type: 'complete',
+    };
+  }
+
+  it('derives group.effectiveTime via availabilityKey and tradingDay from effectiveTime', async () => {
+    const fixture = parityFixture({ period: Period.THIRTY_MIN });
+    const decideSpy = jest.spyOn(TradingEngine.prototype, 'decide');
+
+    // 15:00 上海收盘 30m Bar (07:00Z) → availabilityKey 封存为 15:01 上海 (07:01Z)
+    const signalBarTs = '2026-01-05T07:00:00.000Z';
+    const nextBarTs = '2026-01-06T02:00:00.000Z';
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars: [
+        makeBar(signalBarTs, Period.THIRTY_MIN, 10.0, 10.2),
+        makeBar(nextBarTs, Period.THIRTY_MIN, 10.2, 10.0),
+      ],
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    expect(decideSpy).toHaveBeenCalled();
+    const firstGroup = decideSpy.mock.calls[0][0];
+    const expectedEffective = availabilityKey({
+      period: Period.THIRTY_MIN,
+      timestamp: new Date(signalBarTs),
+    });
+    expect(firstGroup.effectiveTime.getTime()).toBe(
+      expectedEffective.getTime(),
+    );
+    expect(firstGroup.tradingDay).toBe(
+      formatShanghaiDateString(expectedEffective),
+    );
+  });
+
+  it('recomputes Next-Bar high-open BUY quantity and propagates macroRegime to decide, surveilBar, and recompute', async () => {
+    const elevatedRegime = {
+      regime: MarketRiskRegime.ELEVATED_RISK,
+      marketAtrPercentile: 0.9,
+      isLiquidityFrozen: false,
+    };
+    const fixture = parityFixture({
+      period: Period.DAY,
+      contextSnapshot: { macroRegime: elevatedRegime },
+    });
+    const decideSpy = jest.spyOn(TradingEngine.prototype, 'decide');
+    const surveilSpy = jest.spyOn(TradingEngine.prototype, 'surveilBar');
+    const submitSpy = jest.spyOn(SimulatedBroker.prototype, 'submitOrder');
+
+    // Bar 1 (01-04 16:00Z = 01-05 00:00+08): close=10.0 -> BUY
+    // Bar 2 (01-05 16:00Z = 01-06 00:00+08): open=10.80 (+8% 高开，不触及涨停), close=10.00 (neutral)
+    // Bar 3 (01-06 16:00Z = 01-07 00:00+08): close=9.5 -> SELL
+    // Bar 4 (01-07 16:00Z = 01-08 00:00+08): open=9.6, close=10.0 -> fill SELL
+    const bars: StrategyBar[] = [
+      makeBar('2026-01-04T16:00:00.000Z', Period.DAY, 10.0, 10.0),
+      makeBar('2026-01-05T16:00:00.000Z', Period.DAY, 10.8, 10.0),
+      makeBar('2026-01-06T16:00:00.000Z', Period.DAY, 10.0, 9.5),
+      makeBar('2026-01-07T16:00:00.000Z', Period.DAY, 9.6, 10.0),
+    ];
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars,
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    expect(decideSpy).toHaveBeenCalled();
+    expect(decideSpy.mock.calls[0][2]).toEqual(elevatedRegime);
+
+    expect(surveilSpy).toHaveBeenCalled();
+    expect(surveilSpy.mock.calls[0][2]).toEqual(elevatedRegime);
+
+    const buyOrderCall = submitSpy.mock.calls.find(
+      ([dto]) => dto.side === ORDER_SIDES.BUY,
+    );
+    expect(buyOrderCall).toBeDefined();
+    const expectedBuyQty = recomputeNextBarOpenBuyQuantity({
+      cashLi: yuanToLi(1_000_000),
+      fillPriceLi: applySlippageLi(
+        yuanToLi(10.8),
+        ORDER_SIDES.BUY,
+        EXECUTION_RULES.DEFAULT_SLIPPAGE_RATIO,
+      ),
+      requestedQuantity: 47_500,
+      cashAllocationRatio: TRADING_LAYER_DEFAULTS.DEFAULT_CASH_ALLOCATION_RATIO,
+      lotSize: TRADING_LAYER_DEFAULTS.DEFAULT_LOT_SIZE,
+      securityCode: '600000.SH',
+      feeEnabled: true,
+      macroRegime: elevatedRegime,
+    });
+    expect(buyOrderCall![0].quantity).toBe(expectedBuyQty);
+    expect(expectedBuyQty).toBeLessThan(47_500);
+  });
+
+  it('skips doomed BUY order submission when Next-Bar high-open leaves less than 1 lot affordable', async () => {
+    const fixture = parityFixture({ period: Period.DAY });
+    const submitSpy = jest.spyOn(SimulatedBroker.prototype, 'submitOrder');
+
+    // Bar 1 close=5000 (5000*100 = 500,000 <= 1,000,000 -> decide emits 100股 BUY)
+    // Bar 2 open=10500 (10500*100 > 1,000,000 -> recompute 返回 0 < 100 股 -> 不得下必败单)
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars: [
+        makeBar('2026-01-04T16:00:00.000Z', Period.DAY, 5000, 5000),
+        makeBar('2026-01-05T16:00:00.000Z', Period.DAY, 10500, 10500),
+      ],
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    const buyOrderCalls = submitSpy.mock.calls.filter(
+      ([dto]) => dto.side === ORDER_SIDES.BUY,
+    );
+    expect(buyOrderCalls).toHaveLength(0);
+  });
+
+  it('preserves pivotPrice, badgeText, displayTag, styleMeta, and triggerPeriod in BacktestSignalResult contextSnapshot', async () => {
+    const fixture = parityFixture({
+      period: Period.THIRTY_MIN,
+      rule: {
+        id: 'term_rich_meta',
+        type: 'TERMINAL',
+        action: 'BUY',
+        signalTag: 'RICH_META',
+        reason: '完整展示元数据透传',
+        requiredBarCount: 1,
+      },
+    });
+    const styleMeta = { color: '#10b981', position: 'below' as const };
+    jest
+      .spyOn(
+        (await import('@app/strategy')).StrategyEvaluationKernel.prototype,
+        'push',
+      )
+      .mockResolvedValueOnce([
+        {
+          definitionId: 3,
+          versionId: 7,
+          signalKind: 'entry',
+          triggerPeriod: 30,
+          intent: 'ENTRY',
+          originPluginId: 'plugin.test.meta',
+          signalTime: new Date('2026-01-05T02:00:00.000Z'),
+          triggerPrice: 10.2,
+          pivotTime: '2026-01-05T01:30:00.000Z',
+          pivotPrice: 9.85,
+          signalType: 'first_buy',
+          badgeText: '1买',
+          displayTag: 'CHAN_FIRST_BUY',
+          styleMeta,
+          decisionTrace: { status: 'SIGNAL_EMITTED', action: 'BUY' },
+          contextSnapshot: { action: 'BUY' },
+          ruleSnapshot: {},
+        },
+      ]);
+
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars: [
+        makeBar('2026-01-05T02:00:00.000Z', Period.THIRTY_MIN, 10.0, 10.2),
+      ],
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    expect(fixture.dependencies.resultRepository.create).toHaveBeenCalledWith(
+      expect.objectContaining({
+        pivotTime: new Date('2026-01-05T01:30:00.000Z'),
+        contextSnapshot: expect.objectContaining({
+          pivotPrice: 9.85,
+          badgeText: '1买',
+          displayTag: 'CHAN_FIRST_BUY',
+          styleMeta,
+          triggerPeriod: 30,
+        }),
+      }),
+    );
+  });
+});

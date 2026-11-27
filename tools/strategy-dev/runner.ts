@@ -217,7 +217,9 @@ async function runStrategyDev(): Promise<void> {
     console.table(
       signals.map((s) => ({
         决策触发时刻: s.signalTime.replace('T', ' ').substring(0, 19),
-        形态极值时刻: s.pivotTime.replace('T', ' ').substring(0, 19),
+        形态极值时刻: (s.pivotTime ?? s.signalTime)
+          .replace('T', ' ')
+          .substring(0, 19),
         信号类型: s.badgeText || s.signalType,
         方向: s.isBuy ? '▲ 买入' : '▼ 卖出',
         撮合基准价: s.triggerPrice.toFixed(2),
