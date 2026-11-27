@@ -8,8 +8,17 @@ import {
   A_SHARE_DATA_MIN_BOUNDARY,
   InvalidHistoricalDataBoundaryException,
 } from '../strategy.errors';
-import type { KernelSignal, PrewarmStatus } from './kernel.types';
+import type {
+  ExternalContextRequirement,
+  KernelSignal,
+  PrewarmStatus,
+} from './kernel.types';
 import type { StrategyEvaluationKernel } from './strategy-evaluation-kernel';
+
+const DAILY_PERIOD = 1440;
+const SURVEILLANCE_PREWARM_BARS = 48;
+const STREAM_RANK_EXTERNAL = 0;
+const STREAM_RANK_MAIN = 1;
 
 export interface HistoricalReplayCriteria {
   readonly securityId: number;
@@ -19,6 +28,10 @@ export interface HistoricalReplayCriteria {
   readonly evaluationPeriod: number;
   /** context 周期 → 预热根数（编译产物；不含求值周期） */
   readonly contextPeriods: Readonly<Record<number, number>>;
+  /** 轻量监控周期集合（如 [5]）：预热按需补齐，公开区间随主/context 周期按可用时刻归并推流 */
+  readonly surveillancePeriods?: readonly number[];
+  /** 跨标的上下文依赖（需已绑定 numeric securityId；优先同可用时刻先于主标的推入内核） */
+  readonly externalContextRequirements?: readonly ExternalContextRequirement[];
   /**
    * 预热段查询上界（loadReplayWindow endAt）与回放页起点（readReplayPage startAt）。
    * 分钟级周期为当日开盘，日线周期为 run.startDate——日线另有可用时刻边界（见 drive）。
@@ -50,10 +63,19 @@ export interface HistoricalReplaySummary {
 }
 
 interface PeriodStream {
+  readonly securityId: number;
+  readonly securityCode?: string;
   readonly period: number;
+  readonly isExternal: 0 | 1;
   buffer: StrategyBar[];
   afterTimestamp?: Date;
   exhausted: boolean;
+}
+
+interface TaggedPrewarmStream {
+  readonly period: number;
+  readonly isExternal: 0 | 1;
+  readonly bars: readonly StrategyBar[];
 }
 
 /**
@@ -103,6 +125,8 @@ export class HistoricalBarSource {
       selection,
       evaluationPeriod,
       contextPeriods,
+      surveillancePeriods,
+      externalContextRequirements,
       preWarmEndAt,
       requiredBars,
     } = this.criteria;
@@ -113,9 +137,29 @@ export class HistoricalBarSource {
         ([rawPeriod, bars]) => [Number(rawPeriod), bars] as const,
       ),
     ]);
+    const surveillanceSet = new Set<number>();
+    for (const rawPeriod of surveillancePeriods ?? []) {
+      const period = Number(rawPeriod);
+      if (
+        Number.isSafeInteger(period) &&
+        period > 0 &&
+        !periodDemands.has(period)
+      ) {
+        surveillanceSet.add(period);
+      }
+    }
+    const externalDemand = new Map<string, ExternalContextRequirement>();
+    for (const req of externalContextRequirements ?? []) {
+      if (typeof req.securityId !== 'number') continue;
+      const key = `${req.securityId}|${req.period}`;
+      const existing = externalDemand.get(key);
+      if (!existing || req.minBars > existing.minBars) {
+        externalDemand.set(key, req);
+      }
+    }
 
-    // ① 预热段：每周期独立取整段（canonical），日线的可用时刻边界见 periodBoundary
-    const prewarmStreams = new Map<number, StrategyBar[]>();
+    // ① 预热段：主/context + surveillance + 外部标的分别取历史窗，按 (availabilityKey, isExternal, period) 归并推入
+    const prewarmTaggedStreams: TaggedPrewarmStream[] = [];
     for (const [period, demand] of periodDemands) {
       const response = await this.port.loadReplayWindow({
         securityId,
@@ -125,21 +169,86 @@ export class HistoricalBarSource {
         endAt: this.preWarmBoundary(period, preWarmEndAt),
         requiredBars: demand,
       });
-      prewarmStreams.set(period, [...response.bars]);
+      prewarmTaggedStreams.push({
+        period,
+        isExternal: STREAM_RANK_MAIN,
+        bars: [...response.bars],
+      });
     }
-    for (const bar of HistoricalBarSource.mergeByAvailability(prewarmStreams)) {
+    for (const survPeriod of [...surveillanceSet].sort((a, b) => a - b)) {
+      const response = await this.port.loadReplayWindow({
+        securityId,
+        ...(securityCode ? { securityCode } : {}),
+        selection,
+        period: survPeriod,
+        endAt: this.preWarmBoundary(survPeriod, preWarmEndAt),
+        requiredBars: SURVEILLANCE_PREWARM_BARS,
+      });
+      if (response?.bars?.length) {
+        prewarmTaggedStreams.push({
+          period: survPeriod,
+          isExternal: STREAM_RANK_MAIN,
+          bars: [...response.bars],
+        });
+      }
+    }
+    for (const req of externalDemand.values()) {
+      const response = await this.port.loadReplayWindow({
+        securityId: req.securityId!,
+        ...(req.securityCode ? { securityCode: req.securityCode } : {}),
+        selection,
+        period: req.period,
+        endAt: this.preWarmBoundary(req.period, preWarmEndAt),
+        requiredBars: req.minBars,
+      });
+      if (response?.bars?.length) {
+        prewarmTaggedStreams.push({
+          period: req.period,
+          isExternal: STREAM_RANK_EXTERNAL,
+          bars: [...response.bars],
+        });
+      }
+    }
+    for (const bar of HistoricalBarSource.mergeTaggedByAvailability(
+      prewarmTaggedStreams,
+    )) {
       await kernel.push(bar);
       await onPushed?.(bar);
-      if (bar.period === evaluationPeriod) {
+      if (bar.securityId === securityId && bar.period === evaluationPeriod) {
         await onBar?.(bar);
       }
     }
 
     // ② 公开区间：逐周期分页 + k 路归并推进，公开相信号经 onSignal 落盘
-    const streams = new Map<number, PeriodStream>();
+    const streams = new Map<string, PeriodStream>();
     for (const period of periodDemands.keys()) {
-      streams.set(period, {
+      streams.set(`main:${period}`, {
+        securityId,
+        ...(securityCode ? { securityCode } : {}),
         period,
+        isExternal: STREAM_RANK_MAIN,
+        buffer: [],
+        afterTimestamp: undefined,
+        exhausted: false,
+      });
+    }
+    for (const survPeriod of surveillanceSet) {
+      streams.set(`surv:${survPeriod}`, {
+        securityId,
+        ...(securityCode ? { securityCode } : {}),
+        period: survPeriod,
+        isExternal: STREAM_RANK_MAIN,
+        buffer: [],
+        afterTimestamp: undefined,
+        exhausted: false,
+      });
+    }
+    for (const [extKey, req] of externalDemand) {
+      streams.set(`ext:${extKey}`, {
+        securityId: req.securityId!,
+        ...(req.securityCode ? { securityCode: req.securityCode } : {}),
+        period: req.period,
+        isExternal: STREAM_RANK_EXTERNAL,
         buffer: [],
         afterTimestamp: undefined,
         exhausted: false,
@@ -152,10 +261,12 @@ export class HistoricalBarSource {
       if (!next) break;
       const signals = await kernel.push(next);
       await onPushed?.(next);
-      if (next.period === evaluationPeriod) {
+      if (next.securityId === securityId && next.period === evaluationPeriod) {
         barCount += 1;
         publicBarCount += 1;
         await onBar?.(next);
+      }
+      if (signals.length > 0) {
         for (const signal of signals) {
           await onSignal?.(signal, next);
         }
@@ -187,16 +298,16 @@ export class HistoricalBarSource {
    * 上海零点，使日线下界对齐"可用时刻 <= publicFrom"。
    */
   private preWarmBoundary(period: number, preWarmEndAt: Date): Date {
-    if (period !== 1440) return preWarmEndAt;
+    if (period !== DAILY_PERIOD) return preWarmEndAt;
     return shanghaiMidnight(preWarmEndAt);
   }
 
   /**
-   * k 路归并选择器：各周期页缓冲里选 (availabilityKey, period) 最小者。
+   * k 路归并选择器：各流页缓冲里选 (availabilityKey, isExternal, period) 最小者。
    * 缓冲耗尽时异步翻页，页耗尽标记 exhausted。
    */
   private async pickNext(
-    streams: Map<number, PeriodStream>,
+    streams: Map<string, PeriodStream>,
   ): Promise<StrategyBar | null> {
     let best: { stream: PeriodStream; key: number } | null = null;
     for (const stream of streams.values()) {
@@ -209,7 +320,10 @@ export class HistoricalBarSource {
       if (
         best === null ||
         key < best.key ||
-        (key === best.key && stream.period < best.stream.period)
+        (key === best.key && stream.isExternal < best.stream.isExternal) ||
+        (key === best.key &&
+          stream.isExternal === best.stream.isExternal &&
+          stream.period < best.stream.period)
       ) {
         best = { stream, key };
       }
@@ -219,11 +333,10 @@ export class HistoricalBarSource {
   }
 
   private async refill(stream: PeriodStream): Promise<void> {
-    const { securityId, securityCode, selection, preWarmEndAt, endAt } =
-      this.criteria;
+    const { selection, preWarmEndAt, endAt } = this.criteria;
     const page = await this.port.readReplayPage({
-      securityId,
-      ...(securityCode ? { securityCode } : {}),
+      securityId: stream.securityId,
+      ...(stream.securityCode ? { securityCode: stream.securityCode } : {}),
       selection,
       period: stream.period,
       startAt: this.preWarmBoundary(stream.period, preWarmEndAt),
@@ -242,6 +355,43 @@ export class HistoricalBarSource {
       return;
     }
     stream.afterTimestamp = page.nextAfterTimestamp;
+  }
+
+  /** 预热段多流（含外部标的前置与主标的监控）归并 */
+  public static mergeTaggedByAvailability(
+    streams: readonly TaggedPrewarmStream[],
+  ): readonly StrategyBar[] {
+    const queues = streams.map((stream) => ({
+      period: stream.period,
+      isExternal: stream.isExternal,
+      bars: [...stream.bars],
+    }));
+    const merged: StrategyBar[] = [];
+    for (;;) {
+      let bestIdx = -1;
+      let bestKey = 0;
+      for (let idx = 0; idx < queues.length; idx += 1) {
+        const q = queues[idx]!;
+        const head = q.bars[0];
+        if (!head) continue;
+        const key = availabilityKey(head).getTime();
+        const best = bestIdx >= 0 ? queues[bestIdx]! : null;
+        if (
+          best === null ||
+          key < bestKey ||
+          (key === bestKey && q.isExternal < best.isExternal) ||
+          (key === bestKey &&
+            q.isExternal === best.isExternal &&
+            q.period < best.period)
+        ) {
+          bestIdx = idx;
+          bestKey = key;
+        }
+      }
+      if (bestIdx < 0) break;
+      merged.push(queues[bestIdx]!.bars.shift()!);
+    }
+    return merged;
   }
 
   /** 预热段多周期归并（纯函数）：供 drive 内部与单测使用。 */

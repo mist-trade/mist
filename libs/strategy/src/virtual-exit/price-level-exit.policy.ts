@@ -1,4 +1,5 @@
 import type { StrategyBar } from '@app/market-data';
+import { formatShanghaiDateString } from '@app/timezone';
 import { SIGNAL_KINDS } from '../strategy.constants';
 import type { KernelSignal, SignalChannelRef } from '../kernel/kernel.types';
 import {
@@ -10,6 +11,21 @@ import {
   type VirtualExitRule,
   type VirtualExitRuleBinding,
 } from './virtual-exit.port';
+
+export type VirtualExitExecutionMode = 'assumed_close' | 'next_bar_open';
+
+export interface PriceLevelExitPolicyOptions {
+  /** 成交口径：assumed_close（默认，发令当根收盘）| next_bar_open（次根开盘） */
+  readonly executionMode?: VirtualExitExecutionMode;
+  /** 是否严格按自然日 T+1 冻结建仓当日卖出（next_bar_open 默认 true） */
+  readonly enforceT1?: boolean;
+  /** 监控周期提示（透传给外部策略；公共价格规则按主周期计数） */
+  readonly surveillancePeriods?: readonly number[];
+}
+
+const DAILY_PERIOD = 1440;
+const EXECUTION_MODE_ASSUMED_CLOSE: VirtualExitExecutionMode = 'assumed_close';
+const EXECUTION_MODE_NEXT_BAR_OPEN: VirtualExitExecutionMode = 'next_bar_open';
 
 /**
  * 价格/时间型虚拟出场规则种类（本求值器可解释的子集）。
@@ -26,6 +42,8 @@ interface VirtualLot {
   /** 成本基准 = 入场信号 triggerPrice（确认 Bar 收盘价） */
   readonly entryPrice: number;
   readonly entryTime: Date;
+  /** 上海交易日历下的建仓成交日（assumed_close 为信号日；next_bar_open 为首根撮合 Bar 交易日） */
+  fillDay?: string;
   /** 持有期内确认 Bar 计数（含入场当根之后推进的 bar） */
   barsHeld: number;
   /** 持有期内最高 close（trailing 峰值基准） */
@@ -61,6 +79,14 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
     }
   >();
   private readonly lots = new Map<string, VirtualLot>();
+  private readonly executionMode: VirtualExitExecutionMode;
+  private readonly enforceT1: boolean;
+
+  constructor(options?: PriceLevelExitPolicyOptions) {
+    this.executionMode = options?.executionMode ?? EXECUTION_MODE_ASSUMED_CLOSE;
+    this.enforceT1 =
+      options?.enforceT1 ?? this.executionMode === EXECUTION_MODE_NEXT_BAR_OPEN;
+  }
 
   public configure(specs: readonly VirtualExitChannelSpec[]): void {
     this.specs.clear();
@@ -95,6 +121,9 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
         this.lots.set(key, {
           entryPrice: signal.triggerPrice,
           entryTime: signal.signalTime,
+          ...(this.executionMode === EXECUTION_MODE_ASSUMED_CLOSE
+            ? { fillDay: formatShanghaiDateString(signal.signalTime) }
+            : {}),
           barsHeld: 0,
           peakPrice: signal.triggerPrice,
         });
@@ -113,10 +142,31 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
     bar: StrategyBar,
     period: number,
   ): readonly VirtualExitProposal[] {
+    if (this.specs.size === 0 || this.lots.size === 0) {
+      return [];
+    }
     const barTs = bar.timestamp.getTime();
     if (!Number.isFinite(barTs)) {
       return [];
     }
+    const barDay = formatShanghaiDateString(bar.timestamp);
+
+    if (this.executionMode === EXECUTION_MODE_NEXT_BAR_OPEN) {
+      for (const [key, lot] of this.lots) {
+        if (lot.fillDay !== undefined) continue;
+        const spec = this.specs.get(key);
+        const sigTs = lot.entryTime.getTime();
+        const sigDay = formatShanghaiDateString(lot.entryTime);
+        const unlockedAsFillBar =
+          spec?.channel.period === DAILY_PERIOD
+            ? barDay > sigDay
+            : Number.isFinite(sigTs) && barTs > sigTs;
+        if (unlockedAsFillBar) {
+          lot.fillDay = barDay;
+        }
+      }
+    }
+
     const proposals: VirtualExitProposal[] = [];
     for (const [key, spec] of this.specs) {
       if (spec.channel.period !== period) continue;
@@ -127,6 +177,10 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
       if (!Number.isFinite(entryTs) || barTs <= entryTs) continue;
       lot.barsHeld += 1;
       this.updateLotWatermark(lot, bar.close);
+      if (this.enforceT1 && (!lot.fillDay || barDay <= lot.fillDay)) {
+        // A 股 T+1 冻结期：禁止触发出场，且绝不可提前清位导致孤儿仓位
+        continue;
+      }
       const proposal = this.evaluateBindings(spec, lot, bar);
       if (proposal) {
         // 触发即平批：出场信号回流 onSignal 前先本地清位，防重复

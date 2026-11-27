@@ -1478,4 +1478,64 @@ describe('BacktestRunExecutor Wave 2B parity', () => {
       }),
     );
   });
+
+  it('passes executionMode next_bar_open, enforceT1, and surveillancePeriods to virtualExitPolicy and settles Next-5m-Bar fills', async () => {
+    const strategyMod = await import('@app/strategy');
+    const policySpy = jest.spyOn(
+      strategyMod.ExternalFactorPluginLoader,
+      'createVirtualExitPolicy',
+    );
+    const sellRuleFlow = LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'lt', value: 9.0 },
+      'exit',
+    );
+    const buyRuleFlow = LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'gt', value: 10.0 },
+      'entry',
+    );
+    const fixture = parityFixture({
+      period: Period.DAY,
+      rule: {
+        rootNode: { ...sellRuleFlow, onFail: buyRuleFlow },
+        requiredBarCount: 1,
+        surveillancePeriods: [5, 1440],
+      },
+    });
+    const d1 = makeBar('2026-01-05T07:00:00.000Z', Period.DAY, 10.0, 10.3);
+    const d2Morning5m = makeBar(
+      '2026-01-06T01:35:00.000Z',
+      Period.FIVE_MIN,
+      10.6,
+      10.7,
+    );
+    const d2Close = makeBar('2026-01-06T07:00:00.000Z', Period.DAY, 10.6, 10.8);
+    fixture.dependencies.marketData.readReplayPage.mockImplementation(
+      async (query: { period: number; afterTimestamp?: Date }) => {
+        if (query.afterTimestamp) {
+          return { bars: [], nextAfterTimestamp: undefined };
+        }
+        if (query.period === Period.FIVE_MIN) {
+          return { bars: [d2Morning5m], nextAfterTimestamp: undefined };
+        }
+        return { bars: [d1, d2Close], nextAfterTimestamp: undefined };
+      },
+    );
+
+    await fixture.instance.execute(fixture.current.id);
+
+    expect(policySpy).toHaveBeenCalledWith(
+      expect.objectContaining({
+        executionMode: 'next_bar_open',
+        enforceT1: true,
+        surveillancePeriods: [5],
+      }),
+    );
+    expect(
+      fixture.dependencies.marketData.loadReplayWindow,
+    ).toHaveBeenCalledWith(
+      expect.objectContaining({
+        period: Period.FIVE_MIN,
+      }),
+    );
+  });
 });

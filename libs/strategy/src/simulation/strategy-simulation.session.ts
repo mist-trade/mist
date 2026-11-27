@@ -23,6 +23,7 @@ export const SIMULATION_LOCAL_FIXTURE_IDENTITY = Object.freeze({
   definitionId: -1,
   versionId: -1,
 });
+const DEFAULT_SIMULATION_VIRTUAL_EXIT_MODE = 'assumed_close';
 
 /**
  * 本地推演会话：交互式步进/回看/跳转的帧缓存壳。
@@ -48,7 +49,10 @@ export class StrategySimulationSession {
   private readonly publicBars: readonly StrategyBar[];
   private readonly externalPreWarmBars: readonly StrategyBar[];
   private readonly externalPublicBars: readonly StrategyBar[];
+  private readonly surveillancePreWarmBars: readonly StrategyBar[];
+  private readonly surveillancePublicBars: readonly StrategyBar[];
   private externalPublicCursor = 0;
+  private surveillancePublicCursor = 0;
   private readonly frames: (CompactSimulationFrame | undefined)[] = [];
   private readonly accumulatedSignals: SimulationSignal[] = [];
   private pushedPublicCount = 0;
@@ -104,12 +108,38 @@ export class StrategySimulationSession {
         (bar) => availabilityKey(bar).getTime() >= firstPublicAvail,
       ),
     );
+    const surveillanceAll = (config.surveillanceBars ?? []).filter(
+      (bar) => !endAt || bar.timestamp.getTime() <= endAt.getTime(),
+    );
+    const surveillanceSorted = [...surveillanceAll].sort(
+      (left, right) =>
+        availabilityKey(left).getTime() - availabilityKey(right).getTime() ||
+        left.period - right.period,
+    );
+    this.surveillancePreWarmBars = Object.freeze(
+      surveillanceSorted.filter(
+        (bar) => availabilityKey(bar).getTime() < firstPublicAvail,
+      ),
+    );
+    this.surveillancePublicBars = Object.freeze(
+      surveillanceSorted.filter(
+        (bar) => availabilityKey(bar).getTime() >= firstPublicAvail,
+      ),
+    );
+    const surveillancePeriods = (config.surveillancePeriods ?? []).filter(
+      (p) => Number.isSafeInteger(p) && p > 0 && p < config.period,
+    );
     this.kernel = new StrategyEvaluationKernel({
       securityId: config.securityId ?? 1,
       securityCode: config.securityCode,
       publicFrom,
       virtualExitPolicy:
-        ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
+        ExternalFactorPluginLoader.createVirtualExitPolicy({
+          executionMode:
+            config.executionMode ?? DEFAULT_SIMULATION_VIRTUAL_EXIT_MODE,
+          enforceT1: config.enforceT1 ?? true,
+          ...(surveillancePeriods.length > 0 ? { surveillancePeriods } : {}),
+        }) ?? undefined,
       plans: [
         {
           definitionId:
@@ -123,6 +153,7 @@ export class StrategySimulationSession {
           requiredBarCount: config.windowBudget ?? 600,
           contextRequirements: config.contextRequirements ?? {},
           externalContextRequirements: config.externalContextRequirements ?? [],
+          surveillancePeriods,
         },
       ],
       registry: config.registry,
@@ -258,6 +289,8 @@ export class StrategySimulationSession {
 
     const bar = this.publicBars[next];
     const fresh = next >= this.pushedPublicCount;
+    const preEmittedSignals: import('../kernel/kernel.types').KernelSignal[] =
+      [];
     if (fresh) {
       // 公开段外部 bar 按 availabilityKey 因果归并（封堵日线 00:00 泄漏至日内步骤）
       const barAvail = availabilityKey(bar).getTime();
@@ -269,8 +302,26 @@ export class StrategySimulationSession {
         await this.kernel.push(this.externalPublicBars[e++]);
       }
       this.externalPublicCursor = e;
+
+      let s = this.surveillancePublicCursor;
+      while (
+        s < this.surveillancePublicBars.length &&
+        availabilityKey(this.surveillancePublicBars[s]).getTime() <= barAvail
+      ) {
+        const survSignals = await this.kernel.push(
+          this.surveillancePublicBars[s++],
+        );
+        if (survSignals.length > 0) {
+          preEmittedSignals.push(...survSignals);
+        }
+      }
+      this.surveillancePublicCursor = s;
     }
-    const kernelSignals = fresh ? await this.kernel.push(bar) : [];
+    const barSignals = fresh ? await this.kernel.push(bar) : [];
+    const kernelSignals =
+      preEmittedSignals.length > 0
+        ? [...preEmittedSignals, ...barSignals]
+        : barSignals;
     this.pushedPublicCount = Math.max(this.pushedPublicCount, next + 1);
 
     const latestSignals = kernelSignals.map((signal) =>
@@ -382,8 +433,9 @@ export class StrategySimulationSession {
   private async seedPreWarm(): Promise<void> {
     if (this.preWarmSeeded) return;
     this.preWarmSeeded = true;
-    // 预热段按 availabilityKey 因果归并：外部 bar 在其可用边界前先于标的 bar 推入
+    // 预热段按 availabilityKey 因果归并：外部 bar 与监控 bar 均先于同边界标的 bar 推入
     let e = 0;
+    let s = 0;
     for (const bar of this.preWarmBars) {
       const barAvail = availabilityKey(bar).getTime();
       while (
@@ -392,10 +444,19 @@ export class StrategySimulationSession {
       ) {
         await this.kernel.push(this.externalPreWarmBars[e++]);
       }
+      while (
+        s < this.surveillancePreWarmBars.length &&
+        availabilityKey(this.surveillancePreWarmBars[s]).getTime() <= barAvail
+      ) {
+        await this.kernel.push(this.surveillancePreWarmBars[s++]);
+      }
       await this.kernel.push(bar);
     }
     while (e < this.externalPreWarmBars.length) {
       await this.kernel.push(this.externalPreWarmBars[e++]);
+    }
+    while (s < this.surveillancePreWarmBars.length) {
+      await this.kernel.push(this.surveillancePreWarmBars[s++]);
     }
   }
 

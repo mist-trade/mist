@@ -53,6 +53,7 @@ import {
   type AccountSnapshot,
   type CompiledStoredDefinition,
   type DailyNavSnapshot,
+  type ExternalContextRequirement,
   type KernelSignal,
   type MacroRegimeSnapshot,
   type PositionClosedRecord,
@@ -80,6 +81,7 @@ import { BacktestSuiteExecutor } from './suite/backtest-suite.executor';
 
 const BACKTEST_CALCULATION_BATCH_SIZE = 100;
 const BACKTEST_RESULT_BATCH_SIZE = 100;
+const BACKTEST_VIRTUAL_EXIT_MODE = 'next_bar_open';
 
 class ReplayBudget {
   consumed = 0;
@@ -234,13 +236,15 @@ export class BacktestRunExecutor {
 
     // 编译边界统一收口：run.kind 仅作 DB 快照语义，回放一律透明编译为
     // decision_flow 统一计划（kernel 相位由 publicFrom 时间轴判定）。
-    const compiled: CompiledStoredDefinition = compileStoredDefinitionVersion({
-      kind: run.kind,
-      rule: version.rule as Record<string, unknown>,
-      signalKind: version.signalKind,
-    });
+    const compiledRaw: CompiledStoredDefinition =
+      compileStoredDefinitionVersion({
+        kind: run.kind,
+        rule: version.rule as Record<string, unknown>,
+        signalKind: version.signalKind,
+        evaluationPeriod: run.period,
+      });
     this.logger.log(
-      `backtest plan compiled runId=${run.id} sourceKind=${compiled.sourceKind} requiredBarCount=${compiled.requiredBarCount}`,
+      `backtest plan compiled runId=${run.id} sourceKind=${compiledRaw.sourceKind} requiredBarCount=${compiledRaw.requiredBarCount}`,
     );
 
     const timeoutMs =
@@ -267,6 +271,7 @@ export class BacktestRunExecutor {
     const byCode = new Map(
       securities.map((security) => [security.code, security]),
     );
+    const compiled = await this.attachExternalSecurityIds(compiledRaw, byCode);
     const issues: BacktestTargetIssue[] = [];
     const executable: Array<{ code: string; security: Security }> = [];
     const seenSecurityIds = new Set<number>();
@@ -426,12 +431,19 @@ export class BacktestRunExecutor {
     navHistory: readonly DailyNavSnapshot[];
   }> {
     const preWarmEndAt = replayStartFor(run);
+    const surveillancePeriods = compiled.surveillancePeriods.filter(
+      (period) => period < run.period,
+    );
     const kernel = new StrategyEvaluationKernel({
       securityId,
       securityCode,
       publicFrom: run.startDate,
       virtualExitPolicy:
-        ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
+        ExternalFactorPluginLoader.createVirtualExitPolicy({
+          executionMode: BACKTEST_VIRTUAL_EXIT_MODE,
+          enforceT1: true,
+          ...(surveillancePeriods.length > 0 ? { surveillancePeriods } : {}),
+        }) ?? undefined,
       plans: [
         {
           definitionId: run.strategyDefinitionId,
@@ -441,6 +453,8 @@ export class BacktestRunExecutor {
           period: run.period,
           requiredBarCount: compiled.requiredBarCount,
           contextRequirements: compiled.contextRequirements,
+          externalContextRequirements: compiled.externalContextRequirements,
+          surveillancePeriods,
         },
       ],
     });
@@ -457,6 +471,8 @@ export class BacktestRunExecutor {
       selection,
       evaluationPeriod: run.period,
       contextPeriods: compiled.contextRequirements,
+      surveillancePeriods,
+      externalContextRequirements: compiled.externalContextRequirements,
       preWarmEndAt,
       publicFrom: run.startDate,
       endAt: new Date(run.endDate.getTime()),
@@ -660,6 +676,19 @@ export class BacktestRunExecutor {
     };
 
     let lastSeenBar: StrategyBar | null = null;
+    const executionPeriod =
+      surveillancePeriods.length > 0
+        ? Math.min(...surveillancePeriods)
+        : run.period;
+    const sawExecutionBarDays = new Set<string>();
+    const executeOnBar = (bar: StrategyBar): void => {
+      flushPendingGroup(bar);
+      const fills = broker.onBar(bar);
+      for (const fill of fills) {
+        positionMachine.onOrderFilled(fill);
+        capitalLedger.applyFill(fill);
+      }
+    };
 
     const outcome = await source.drive(
       kernel,
@@ -694,7 +723,7 @@ export class BacktestRunExecutor {
         matchedCodes.add(securityCode);
         onSignal();
 
-        // 信号入组缓冲，下一根 Bar 开始时统一经交易层引擎裁决（先出后进）
+        // 信号入组缓冲，下一根执行周期 Bar 开始时统一经交易层引擎裁决（先出后进）
         pendingSignals.push({ signal });
         if (results.length >= BACKTEST_RESULT_BATCH_SIZE)
           await this.flushResults(results);
@@ -702,15 +731,14 @@ export class BacktestRunExecutor {
       async (bar) => {
         budget.consume();
         lastSeenBar = bar;
+        const barDay = formatShanghaiDateString(bar.timestamp);
 
-        // 1) 上一 Bar 信号组统一裁决 → 指令入待撮合队列（本 Bar Next-Bar 撮合）
-        flushPendingGroup(bar);
-
-        // 2) 撮合 + 记账（SimulatedBroker 撮合语义零改动）
-        const fills = broker.onBar(bar);
-        for (const fill of fills) {
-          positionMachine.onOrderFilled(fill);
-          capitalLedger.applyFill(fill);
+        // 1) 若当日已由细粒度执行周期（如 5m）驱动撮合则不重复执行；否则回退至主周期执行
+        if (
+          executionPeriod === run.period ||
+          !sawExecutionBarDays.has(barDay)
+        ) {
+          executeOnBar(bar);
         }
 
         positionMachine.onBar(bar);
@@ -749,16 +777,26 @@ export class BacktestRunExecutor {
         }
 
         if (isSessionCloseBar(bar.timestamp, run.period)) {
-          const dateStr = formatShanghaiDateString(bar.timestamp);
           capitalLedger.onDayClose(bar, positionMachine.getSnapshot());
-          broker.settleDayClose(dateStr);
+          broker.settleDayClose(barDay);
         }
 
         await budget.checkpoint();
       },
-      async () => {
-        // 预算计全部推送 bar（含 context 周期与预热段）——多周期合并流按预期加速消耗
+      async (pushedBar) => {
+        // 预算计全部推送 bar（含 context / surveillance / 外部与预热段）
         budget.consume();
+        if (
+          executionPeriod !== run.period &&
+          pushedBar.securityId === securityId &&
+          pushedBar.period === executionPeriod &&
+          pushedBar.timestamp.getTime() >= run.startDate.getTime()
+        ) {
+          sawExecutionBarDays.add(
+            formatShanghaiDateString(pushedBar.timestamp),
+          );
+          executeOnBar(pushedBar);
+        }
       },
     );
     await budget.checkpoint(true);
@@ -779,6 +817,44 @@ export class BacktestRunExecutor {
       prewarmActual: outcome.prewarmActual,
       trades: positionMachine.getClosedTrades(),
       navHistory: capitalLedger.getNavHistory(),
+    };
+  }
+
+  private async attachExternalSecurityIds(
+    compiled: CompiledStoredDefinition,
+    knownByCode: ReadonlyMap<string, Security>,
+  ): Promise<CompiledStoredDefinition> {
+    if (compiled.externalContextRequirements.length === 0) {
+      return compiled;
+    }
+    const missingCodes = [
+      ...new Set(
+        compiled.externalContextRequirements
+          .filter((req) => req.securityId === undefined)
+          .map((req) => normalizeCode(req.securityCode))
+          .filter((code) => code.length > 0 && !knownByCode.has(code)),
+      ),
+    ];
+    const extraByCode = new Map<string, Security>();
+    if (missingCodes.length > 0) {
+      const extraRows = await this.securityRepository.find({
+        where: { code: In(missingCodes) },
+      });
+      for (const row of extraRows) {
+        extraByCode.set(row.code, row);
+      }
+    }
+    const externalContextRequirements: ExternalContextRequirement[] =
+      compiled.externalContextRequirements.map((req) => {
+        if (req.securityId !== undefined) return req;
+        const normalized = normalizeCode(req.securityCode);
+        const found =
+          knownByCode.get(normalized) ?? extraByCode.get(normalized);
+        return found ? { ...req, securityId: found.id } : req;
+      });
+    return {
+      ...compiled,
+      externalContextRequirements,
     };
   }
 

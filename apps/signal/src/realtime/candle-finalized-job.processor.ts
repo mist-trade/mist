@@ -450,12 +450,17 @@ function collectDerivedPeriods(
   evaluation: RealtimeStrategyEvaluationService,
   trigger: ReturnType<typeof toStrategyTrigger>,
 ): Set<number> {
-  // 派生周期集合 = 求值周期 ∪ context 周期（含 1440）
+  // 派生周期集合 = 求值周期 ∪ context 周期 ∪ surveillance 监控周期
   const derivedPeriods = new Set<number>();
   for (const plan of executionPlans) {
     derivedPeriods.add(plan.period);
     for (const rawPeriod of Object.keys(plan.contextRequirements ?? {})) {
       derivedPeriods.add(Number(rawPeriod));
+    }
+    for (const survPeriod of plan.surveillancePeriods ?? []) {
+      if (Number.isSafeInteger(survPeriod) && survPeriod > 0) {
+        derivedPeriods.add(survPeriod);
+      }
     }
   }
   // 空计划的外部标的（自身无策略）：仍按声明依赖派生周期（如 880003 的 1440），

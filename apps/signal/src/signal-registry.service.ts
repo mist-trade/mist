@@ -109,7 +109,17 @@ export class SignalRegistryService implements OnApplicationBootstrap {
     const compiled = definitions.map((definition) =>
       this.safeCompile(definition, securityIds),
     );
-    this.publish(new Map(compiled.map((item) => [item.definitionId, item])));
+    const externalSecurityIds = await this.resolveExternalSecurityIds(
+      collectExternalCodes(compiled),
+    );
+    this.publish(
+      new Map(
+        compiled.map((item) => [
+          item.definitionId,
+          attachExternalSecurityIds(item, externalSecurityIds),
+        ]),
+      ),
+    );
   }
 
   capture(): SignalRegistrySnapshot {
@@ -143,16 +153,22 @@ export class SignalRegistryService implements OnApplicationBootstrap {
               period === 60 ||
               period === 1440,
           )
-          .map((period) =>
-            Object.freeze({
+          .map((period) => {
+            const periodPlan =
+              definition.plansByPeriod?.[period] ?? definition.executionPlan;
+            const filteredSurveillance = (
+              periodPlan.surveillancePeriods ?? []
+            ).filter((survPeriod) => survPeriod < period);
+            return Object.freeze({
               definitionId: definition.definitionId,
               versionId: definition.versionId,
               source,
               period,
-              ...definition.executionPlan,
+              ...periodPlan,
+              surveillancePeriods: filteredSurveillance,
               ruleSnapshot: definition.ruleSnapshot,
-            } as RealtimeStrategyExecutionPlan),
-          ),
+            } as RealtimeStrategyExecutionPlan);
+          }),
       )
       .sort(
         (left, right) =>
@@ -173,13 +189,21 @@ export class SignalRegistryService implements OnApplicationBootstrap {
             where: { id: strategyDefinitionId },
             relations: { currentVersion: true },
           });
-          const compiled =
+          const rawCompiled =
             definition?.status === StrategyStatus.ENABLED
               ? this.safeCompile(
                   definition,
                   await this.resolveSecurityIds(definition.targetUniverse),
                 )
               : null;
+          const externalSecurityIds = rawCompiled
+            ? await this.resolveExternalSecurityIds(
+                collectExternalCodes([rawCompiled]),
+              )
+            : new Map<string, number>();
+          const compiled = rawCompiled
+            ? attachExternalSecurityIds(rawCompiled, externalSecurityIds)
+            : null;
           let action: SignalRegistryRefreshV1['action'] = 'removed';
           await this.runtimeMutex.run(() => {
             const next = new Map(this.current.definitions);
@@ -246,6 +270,20 @@ export class SignalRegistryService implements OnApplicationBootstrap {
     }
     return resolved;
   }
+
+  private async resolveExternalSecurityIds(
+    codes: readonly string[],
+  ): Promise<ReadonlyMap<string, number>> {
+    const unique = [
+      ...new Set(codes.map((code) => normalizeSecurityCode(code))),
+    ].sort();
+    if (unique.length === 0) return new Map();
+    const rows = await this.securities.find({
+      where: { code: In(unique) },
+      order: { code: 'ASC' },
+    });
+    return new Map(rows.map((row) => [row.code, row.id]));
+  }
 }
 
 function toImmutableMap<K, V>(
@@ -298,11 +336,25 @@ function compileRegistryDefinition(
       `Strategy version ${version.id} has unsupported rule schema`,
     );
   }
+  const supportedPeriods = definition.periods.filter(
+    (period) =>
+      period === 1 ||
+      period === 5 ||
+      period === 15 ||
+      period === 30 ||
+      period === 60 ||
+      period === 1440,
+  );
   // 编译边界统一收口：三种来源 kind 全部透明编译为 decision_flow 求值计划。
+  const baseEvalPeriod =
+    supportedPeriods.length === 1 ? supportedPeriods[0] : undefined;
   const compiled = compileStoredDefinitionVersion({
     kind: definition.kind,
     rule: version.rule as Record<string, unknown>,
     signalKind: version.signalKind,
+    ...(baseEvalPeriod !== undefined
+      ? { evaluationPeriod: baseEvalPeriod }
+      : {}),
   });
   const executionPlan: SignalRegistryExecutionPlan = {
     kind: 'decision_flow',
@@ -310,8 +362,33 @@ function compileRegistryDefinition(
     signalKind: version.signalKind,
     requiredBarCount: compiled.requiredBarCount,
     contextRequirements: compiled.contextRequirements,
+    externalContextRequirements: compiled.externalContextRequirements,
+    surveillancePeriods: compiled.surveillancePeriods,
     sourceKind: compiled.sourceKind,
   };
+  let plansByPeriod: Record<number, SignalRegistryExecutionPlan> | undefined;
+  if (supportedPeriods.length > 1) {
+    plansByPeriod = {};
+    for (const period of supportedPeriods) {
+      const perPeriodCompiled = compileStoredDefinitionVersion({
+        kind: definition.kind,
+        rule: version.rule as Record<string, unknown>,
+        signalKind: version.signalKind,
+        evaluationPeriod: period,
+      });
+      plansByPeriod[period] = Object.freeze({
+        kind: 'decision_flow',
+        flow: perPeriodCompiled.flow,
+        signalKind: version.signalKind,
+        requiredBarCount: perPeriodCompiled.requiredBarCount,
+        contextRequirements: perPeriodCompiled.contextRequirements,
+        externalContextRequirements:
+          perPeriodCompiled.externalContextRequirements,
+        surveillancePeriods: perPeriodCompiled.surveillancePeriods,
+        sourceKind: perPeriodCompiled.sourceKind,
+      });
+    }
+  }
   return Object.freeze({
     definitionId: definition.id,
     versionId: version.id,
@@ -325,7 +402,81 @@ function compileRegistryDefinition(
     periods: Object.freeze([...definition.periods]),
     sources: Object.freeze([...definition.sources]),
     executionPlan,
+    ...(plansByPeriod ? { plansByPeriod: Object.freeze(plansByPeriod) } : {}),
     ruleSnapshot: compiled.ruleSnapshot,
+  });
+}
+
+function collectExternalCodes(
+  definitions: readonly SignalRegistryDefinition[],
+): readonly string[] {
+  const codes = new Set<string>();
+  const addPlanCodes = (plan: SignalRegistryExecutionPlan): void => {
+    for (const req of plan.externalContextRequirements ?? []) {
+      if (req.securityId === undefined && req.securityCode) {
+        codes.add(req.securityCode);
+      }
+    }
+  };
+  for (const def of definitions) {
+    addPlanCodes(def.executionPlan);
+    if (def.plansByPeriod) {
+      for (const plan of Object.values(def.plansByPeriod)) {
+        addPlanCodes(plan);
+      }
+    }
+  }
+  return [...codes];
+}
+
+function enrichPlanExternalSecurityIds(
+  plan: SignalRegistryExecutionPlan,
+  externalSecurityIds: ReadonlyMap<string, number>,
+): SignalRegistryExecutionPlan {
+  const reqs = plan.externalContextRequirements;
+  if (!reqs || reqs.length === 0) return plan;
+  return Object.freeze({
+    ...plan,
+    externalContextRequirements: Object.freeze(
+      reqs.map((req) => {
+        if (req.securityId !== undefined) return req;
+        const resolvedId = externalSecurityIds.get(
+          normalizeSecurityCode(req.securityCode),
+        );
+        return resolvedId !== undefined
+          ? { ...req, securityId: resolvedId }
+          : req;
+      }),
+    ),
+  });
+}
+
+function attachExternalSecurityIds(
+  definition: SignalRegistryDefinition,
+  externalSecurityIds: ReadonlyMap<string, number>,
+): SignalRegistryDefinition {
+  if (externalSecurityIds.size === 0) return definition;
+  const nextExecutionPlan = enrichPlanExternalSecurityIds(
+    definition.executionPlan,
+    externalSecurityIds,
+  );
+  let nextPlansByPeriod:
+    | Readonly<Record<number, SignalRegistryExecutionPlan>>
+    | undefined;
+  if (definition.plansByPeriod) {
+    const updated: Record<number, SignalRegistryExecutionPlan> = {};
+    for (const [period, plan] of Object.entries(definition.plansByPeriod)) {
+      updated[Number(period)] = enrichPlanExternalSecurityIds(
+        plan,
+        externalSecurityIds,
+      );
+    }
+    nextPlansByPeriod = Object.freeze(updated);
+  }
+  return Object.freeze({
+    ...definition,
+    executionPlan: nextExecutionPlan,
+    ...(nextPlansByPeriod ? { plansByPeriod: nextPlansByPeriod } : {}),
   });
 }
 

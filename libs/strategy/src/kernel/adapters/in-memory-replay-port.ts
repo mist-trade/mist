@@ -29,6 +29,11 @@ export interface InMemoryReplayPortOptions {
   readonly securityCode?: string;
   /** period → 升序 StrategyBar 序列（构造方负责过滤与映射，port 只做窗口/分页） */
   readonly series: ReadonlyMap<number, readonly StrategyBar[]>;
+  /** 外部标的（按 securityId → period → 升序 StrategyBar 序列） */
+  readonly externalSeries?: ReadonlyMap<
+    number,
+    ReadonlyMap<number, readonly StrategyBar[]>
+  >;
   readonly pageSize?: number;
 }
 
@@ -51,11 +56,18 @@ function periodName(period: number): string {
  * 驱动（三链路同构的唯一排序基础）。
  */
 export class InMemoryReplayPort implements StrategyReplayMarketDataPort {
+  private readonly mainSecurityId: number;
   private readonly series: ReadonlyMap<number, readonly StrategyBar[]>;
+  private readonly externalSeries?: ReadonlyMap<
+    number,
+    ReadonlyMap<number, readonly StrategyBar[]>
+  >;
   private readonly pageSize: number;
 
   constructor(options: InMemoryReplayPortOptions) {
+    this.mainSecurityId = options.securityId;
     this.series = options.series;
+    this.externalSeries = options.externalSeries;
     this.pageSize = options.pageSize ?? DEFAULT_REPLAY_PAGE_SIZE;
 
     const missing: number[] = [];
@@ -73,6 +85,22 @@ export class InMemoryReplayPort implements StrategyReplayMarketDataPort {
         }
       }
     }
+    if (this.externalSeries) {
+      for (const [extId, byPeriod] of this.externalSeries) {
+        for (const [period, bars] of byPeriod) {
+          for (let i = 1; i < bars.length; i++) {
+            if (
+              bars[i].timestamp.getTime() <= bars[i - 1].timestamp.getTime()
+            ) {
+              throw new ReplaySeriesMissingError(
+                [],
+                `in-memory external replay series for security ${extId} period ${period} is not strictly ascending at index ${i}`,
+              );
+            }
+          }
+        }
+      }
+    }
     if (missing.length > 0) {
       const names = missing.map(periodName).join(',');
       throw new ReplaySeriesMissingError(
@@ -83,10 +111,20 @@ export class InMemoryReplayPort implements StrategyReplayMarketDataPort {
     }
   }
 
+  private resolveBars(
+    securityId: number,
+    period: number,
+  ): readonly StrategyBar[] {
+    if (securityId !== this.mainSecurityId) {
+      return this.externalSeries?.get(securityId)?.get(period) ?? [];
+    }
+    return this.series.get(period) ?? [];
+  }
+
   public async loadReplayWindow(
     criteria: StrategyReplayWindowCriteria,
   ): Promise<StrategyReplayWindow> {
-    const bars = this.series.get(criteria.period) ?? [];
+    const bars = this.resolveBars(criteria.securityId, criteria.period);
     const endMs = criteria.endAt.getTime();
     let windowEnd = bars.length;
     while (windowEnd > 0 && bars[windowEnd - 1].timestamp.getTime() >= endMs) {
@@ -99,7 +137,7 @@ export class InMemoryReplayPort implements StrategyReplayMarketDataPort {
   public async readReplayPage(
     criteria: StrategyReplayPageCriteria,
   ): Promise<StrategyReplayPage> {
-    const bars = this.series.get(criteria.period) ?? [];
+    const bars = this.resolveBars(criteria.securityId, criteria.period);
     const afterMs = criteria.afterTimestamp?.getTime() ?? null;
     const startMs = criteria.startAt.getTime();
     const endMs = criteria.endAt.getTime();

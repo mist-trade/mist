@@ -21,9 +21,14 @@ import {
   type SimulationSignal,
 } from '../../libs/strategy/src/simulation';
 import {
+  HistoricalBarSource,
+  InMemoryReplayPort,
   StrategyEvaluationKernel,
   type KernelSignal,
 } from '../../libs/strategy/src/kernel';
+import { compileStoredDefinitionVersion } from '../../libs/strategy/src/decision-flow/stored-definition-compiler';
+import { InMemoryFactorPluginRegistry } from '../../libs/strategy/src/factor/factor-plugin-registry';
+import { ensureStandardPluginsRegistered } from '../../libs/strategy/src/factor/standard-plugins';
 import { mapKernelSignalToSimulationSignal } from '../../libs/strategy/src/simulation/kernel-signal-mapper';
 import { ExternalFactorPluginLoader } from '../../libs/strategy/src/factor/external-plugin-loader';
 import {
@@ -162,42 +167,151 @@ async function runStrategyDev(): Promise<void> {
   );
 
   // 2. 编译策略树与初始化统一求值内核 (StrategyEvaluationKernel)
-  const flow = createTacticsDecisionFlow();
+  const registry = new InMemoryFactorPluginRegistry();
+  ensureStandardPluginsRegistered(registry);
+  const rawFlow = createTacticsDecisionFlow();
+  const compiled = compileStoredDefinitionVersion(
+    {
+      kind: 'decision_flow',
+      rule: { rootNode: rawFlow, requiredBarCount: 60 },
+      evaluationPeriod: periodNum,
+    },
+    registry,
+  );
+  const surveillancePeriods = compiled.surveillancePeriods.filter(
+    (p) => p < periodNum,
+  );
   const bars = klines.map((k) => toStrategyBar(k, periodNum));
+  const seriesMap = new Map<number, StrategyBar[]>([[periodNum, bars]]);
+  const activeSurveillance: number[] = [];
+  for (const survPeriod of surveillancePeriods) {
+    try {
+      const survKlines = loadCanonicalKlines({
+        code: securityCode,
+        period: survPeriod,
+        exact: true,
+      });
+      if (survKlines.length > 0) {
+        seriesMap.set(
+          survPeriod,
+          survKlines.map((k) => toStrategyBar(k, survPeriod)),
+        );
+        activeSurveillance.push(survPeriod);
+      }
+    } catch {
+      // 无次级监控行情数据时跳过
+    }
+  }
+  const externalSeriesMap = new Map<number, Map<number, StrategyBar[]>>();
+  const resolvedExternalReqs = compiled.externalContextRequirements.map(
+    (req, idx) => {
+      const extSecurityId = req.securityId ?? -(idx + 1);
+      try {
+        const extKlines = loadCanonicalKlines({
+          code: req.securityCode,
+          period: req.period,
+          exact: true,
+        });
+        if (extKlines.length > 0) {
+          const extBars = extKlines.map((k) =>
+            toStrategyBar(k, req.period, extSecurityId),
+          );
+          let byPeriod = externalSeriesMap.get(extSecurityId);
+          if (!byPeriod) {
+            byPeriod = new Map<number, StrategyBar[]>();
+            externalSeriesMap.set(extSecurityId, byPeriod);
+          }
+          byPeriod.set(req.period, extBars);
+        }
+      } catch {
+        // 无外部行情数据时交由内核 fail-closed 护栏处理
+      }
+      return { ...req, securityId: extSecurityId };
+    },
+  );
+  for (const reqPeriodStr of Object.keys(compiled.contextRequirements)) {
+    const ctxPeriod = Number(reqPeriodStr);
+    if (!seriesMap.has(ctxPeriod)) {
+      try {
+        const ctxKlines = loadCanonicalKlines({
+          code: securityCode,
+          period: ctxPeriod,
+          exact: true,
+        });
+        if (ctxKlines.length > 0) {
+          seriesMap.set(
+            ctxPeriod,
+            ctxKlines.map((k) => toStrategyBar(k, ctxPeriod)),
+          );
+        }
+      } catch {
+        // 缺少 context 数据时继续保留主周期
+      }
+    }
+  }
 
+  const RUNNER_VIRTUAL_EXIT_MODE = 'assumed_close';
+  const RUNNER_SECURITY_ID = 1;
   const kernel = new StrategyEvaluationKernel({
-    securityId: 1,
+    securityId: RUNNER_SECURITY_ID,
     securityCode,
     publicFrom: new Date(-8640000000000000), // 全时序流式推演，无静默截断
+    registry,
     virtualExitPolicy:
-      ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
+      ExternalFactorPluginLoader.createVirtualExitPolicy({
+        executionMode: RUNNER_VIRTUAL_EXIT_MODE,
+        enforceT1: true,
+        ...(activeSurveillance.length > 0
+          ? { surveillancePeriods: activeSurveillance }
+          : {}),
+      }) ?? undefined,
     plans: [
       {
         definitionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,
         versionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId,
-        flow,
-        ruleSnapshot: Object.freeze({}),
+        flow: compiled.flow,
+        ruleSnapshot: compiled.ruleSnapshot,
         period: periodNum,
-        requiredBarCount: 60,
-        contextRequirements: {},
+        requiredBarCount: compiled.requiredBarCount,
+        contextRequirements: compiled.contextRequirements,
+        externalContextRequirements: resolvedExternalReqs,
+        surveillancePeriods: activeSurveillance,
       },
     ],
   });
 
   // 3. 逐 Bar 推流驱动内核求值 (生产同构管线，无未来函数泄漏)
+  const port = new InMemoryReplayPort({
+    securityId: RUNNER_SECURITY_ID,
+    securityCode,
+    series: seriesMap,
+    ...(externalSeriesMap.size > 0
+      ? { externalSeries: externalSeriesMap }
+      : {}),
+  });
+  const endAt = bars.length > 0 ? bars[bars.length - 1]!.timestamp : new Date();
+  const source = new HistoricalBarSource(port, {
+    securityId: RUNNER_SECURITY_ID,
+    selection: { kind: 'canonical' },
+    evaluationPeriod: periodNum,
+    contextPeriods: compiled.contextRequirements,
+    surveillancePeriods: activeSurveillance,
+    externalContextRequirements: resolvedExternalReqs,
+    preWarmEndAt: new Date(-8640000000000000),
+    publicFrom: new Date(-8640000000000000),
+    endAt,
+    requiredBars: compiled.requiredBarCount,
+  });
   const signals: SimulationSignal[] = [];
   const t0 = Date.now();
-  for (const bar of bars) {
-    const rawSignals: readonly KernelSignal[] = await kernel.push(bar);
-    for (const raw of rawSignals) {
-      signals.push(
-        mapKernelSignalToSimulationSignal(raw, {
-          securityCode,
-          period: periodNum,
-        }),
-      );
-    }
-  }
+  await source.drive(kernel, (raw: KernelSignal) => {
+    signals.push(
+      mapKernelSignalToSimulationSignal(raw, {
+        securityCode,
+        period: raw.triggerPeriod ?? periodNum,
+      }),
+    );
+  });
   const evalDuration = Date.now() - t0;
 
   console.log(

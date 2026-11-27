@@ -479,6 +479,49 @@ describe('tools/strategy-dev/server.ts Wave 2B parity & API contract', () => {
     expect(Object.keys(out.body.data.ruleSnapshot).length).toBeGreaterThan(0);
   });
 
+  it('wires executionMode=next_bar_open and surveillancePeriods in runUnifiedSimulationBacktest', async () => {
+    const klines = makeWaveKlines('000001', 10);
+    jest.spyOn(provider, 'loadCanonicalKlines').mockReturnValue(klines);
+    const spy = jest.spyOn(
+      ExternalFactorPluginLoader,
+      'createVirtualExitPolicy',
+    );
+    jest
+      .spyOn(ExternalFactorPluginLoader, 'registerExternalPlugins')
+      .mockImplementation((registry) => {
+        registry.register({
+          id: 'plugin.test.surv-dev',
+          name: '监控插件',
+          category: 'TECHNICAL',
+          version: '1.0.0',
+          description: 'test',
+          paramSchema: {},
+          resolveSurveillancePeriods: () => [5],
+          evaluate: async () => ({ action: 'NEUTRAL', reason: 'ok' }),
+        });
+        return 1;
+      });
+
+    try {
+      const res = await (serverMod.runUnifiedSimulationBacktest as any)({
+        code: '000001',
+        period: 1440,
+        mode: 'single',
+        pluginId: 'plugin.test.surv-dev',
+      });
+      expect(res.surveillancePeriods).toEqual([5]);
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          executionMode: 'next_bar_open',
+          enforceT1: true,
+          surveillancePeriods: [5],
+        }),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
   it('uses availabilityKey for effectiveTime, propagates macroRegime, and recomputes Next-Bar high-open BUY qty', async () => {
     // 构造 30m K 线：第 1 根在 15:00 上海收盘触发信号 (availabilityKey = 15:01)，第 2 根高开 +8%
     const t0 = new Date('2026-01-05T07:00:00.000Z'); // 15:00+08

@@ -273,5 +273,116 @@ describe('ExternalFactorPluginLoader', () => {
         expect(typeof p.evaluate).toBe('function');
       });
     });
+
+    it('createVirtualExitPolicy forwards execution options and prioritizes loaded external policy ahead of PriceLevelExitPolicy fallback', () => {
+      tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mist-plugin-vexit-'));
+      const testFile = path.join(tempDir, 'index.js');
+      fs.writeFileSync(
+        testFile,
+        `
+        let capturedOptions = null;
+        let activeChannel = null;
+        exports.plugins = [];
+        exports.createVirtualExitPolicy = function(exitPluginsOrOpts, maybeOpts) {
+          capturedOptions =
+            Array.isArray(exitPluginsOrOpts) || exitPluginsOrOpts === undefined
+              ? maybeOpts
+              : exitPluginsOrOpts;
+          return {
+            configure(specs) {
+              activeChannel = specs[0]?.channel ?? null;
+            },
+            onSignal(sig) {
+              if (sig.signalKind === 'entry') activeChannel = sig.channel ?? activeChannel;
+            },
+            onBar(bar, period) {
+              if (!activeChannel || activeChannel.period !== period) return [];
+              const channel = activeChannel;
+              activeChannel = null;
+              return [{
+                channel,
+                ownerPluginId: 'plugin.ext.struct',
+                ruleId: 'ext-struct',
+                exitKind: 'STRUCTURAL_BREAKDOWN',
+                reason: 'ext priority first',
+                badgeText: '外部优先出场',
+                evidence: { capturedOptions }
+              }];
+            },
+            onExternalExit() {
+              activeChannel = null;
+            }
+          };
+        };
+      `,
+        'utf8',
+      );
+
+      ExternalFactorPluginLoader.setCustomPaths([tempDir]);
+      const policy = ExternalFactorPluginLoader.createVirtualExitPolicy({
+        executionMode: 'next_bar_open',
+        surveillancePeriods: [5],
+      });
+      const channel = { definitionId: 21, versionId: 1, period: 1440 };
+      policy.configure([
+        {
+          channel,
+          bindings: [
+            {
+              ownerPluginId: 'p',
+              rule: { kind: 'breakeven', activationGain: 0.01 },
+            },
+            {
+              ownerPluginId: 'p',
+              rule: { kind: 'time_expired', maxHoldingBars: 1 },
+            },
+          ],
+        },
+      ]);
+      policy.onSignal({
+        definitionId: 21,
+        versionId: 1,
+        signalKind: 'entry',
+        channel,
+        signalTime: new Date('2026-01-05T00:00:00+08:00'),
+        triggerPrice: 10,
+        pivotTime: null,
+        pivotPrice: null,
+        signalType: 'ENTRY',
+        decisionTrace: {},
+        contextSnapshot: {},
+        ruleSnapshot: {},
+      });
+
+      const d1 = {
+        securityId: 1,
+        securityCode: '000001',
+        source: 'tdx' as const,
+        period: 1440,
+        timestamp: new Date('2026-01-06T00:00:00+08:00'),
+        open: 10,
+        high: 10,
+        low: 9,
+        close: 9.5,
+        volume: '100',
+        amount: '950',
+        type: 'complete' as const,
+      };
+      const d2 = {
+        ...d1,
+        timestamp: new Date('2026-01-07T00:00:00+08:00'),
+        close: 9.0,
+      };
+      const d1Proposals = policy.onBar(d1, 1440);
+      expect(d1Proposals).toHaveLength(1);
+      expect(d1Proposals[0]?.exitKind).toBe('STRUCTURAL_BREAKDOWN');
+      expect(d1Proposals[0]?.evidence?.capturedOptions).toEqual({
+        executionMode: 'next_bar_open',
+        intradaySurveillancePeriods: [5],
+      });
+
+      // Fallback PriceLevelExitPolicy must have received onExternalExit and stay silent on D2
+      expect(policy.onBar(d2, 1440)).toHaveLength(0);
+    });
   });
 });

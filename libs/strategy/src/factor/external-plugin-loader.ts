@@ -2,9 +2,19 @@ import * as fs from 'node:fs';
 import * as path from 'node:path';
 import type { FactorPlugin } from './factor.types';
 import type { FactorPluginRegistry } from './factor-plugin-registry';
-import { PriceLevelExitPolicy } from '../virtual-exit/price-level-exit.policy';
+import {
+  PriceLevelExitPolicy,
+  type PriceLevelExitPolicyOptions,
+} from '../virtual-exit/price-level-exit.policy';
 import { CompositeVirtualExitPolicy } from '../virtual-exit/composite-virtual-exit.policy';
 import type { VirtualExitPolicyPort } from '../virtual-exit/virtual-exit.port';
+
+export interface ExternalVirtualExitPolicyOptions
+  extends PriceLevelExitPolicyOptions {
+  readonly maxActiveLots?: number;
+  readonly defaultLotWeight?: number;
+  readonly enableDailyPromotion?: boolean;
+}
 
 const CANDIDATE_INDEX_FILES: readonly string[] = Object.freeze([
   'index.ts',
@@ -120,29 +130,33 @@ export class ExternalFactorPluginLoader {
   /**
    * 创建虚拟出场策略实例（每个内核实例一份，持有自己的通道虚拟持仓）。
    *
-   * 公共域 `PriceLevelExitPolicy`（价格型规则：stop/breakeven/trailing/
-   * time_expired，含 2026-11-25 拍板后的硬止损信号侧求值）**常驻**；
-   * 探测到私仓实现时以 Composite 组合（结构型规则由私仓求值）。
+   * 探测到私仓实现时以私仓作为 Composite 主路（统一覆盖结构型与通用价格规则，
+   * 避免通用价格求值器抢占优先级并保证 executionMode / T+1 同口径），公共域
+   * `PriceLevelExitPolicy` 作为兜底并通过 onExternalExit 双向同步；
+   * 开源环境未加载私仓时由公共域 `PriceLevelExitPolicy` 独立承接。
    */
-  public static createVirtualExitPolicy(): VirtualExitPolicyPort {
-    const primary = new PriceLevelExitPolicy();
+  public static createVirtualExitPolicy(
+    options?: ExternalVirtualExitPolicyOptions,
+  ): VirtualExitPolicyPort {
+    const priceLevel = new PriceLevelExitPolicy(options);
     if (this.disabled) {
-      return primary;
+      return priceLevel;
     }
     for (const candPath of this.getCandidatePaths()) {
       const entryFiles = this.resolveEntryFiles(candPath);
       for (const entryFile of entryFiles) {
-        const policy = this.tryCreatePolicy(entryFile);
+        const policy = this.tryCreatePolicy(entryFile, options);
         if (policy) {
-          return new CompositeVirtualExitPolicy(primary, policy);
+          return new CompositeVirtualExitPolicy(policy, priceLevel);
         }
       }
     }
-    return primary;
+    return priceLevel;
   }
 
   private static tryCreatePolicy(
     filePath: string,
+    options?: ExternalVirtualExitPolicyOptions,
   ): VirtualExitPolicyPort | null {
     try {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -155,7 +169,13 @@ export class ExternalFactorPluginLoader {
       if (typeof factory !== 'function') {
         return null;
       }
-      const policy = factory();
+      const privateOptions = buildPrivatePolicyOptions(options);
+      const policy =
+        privateOptions === undefined
+          ? factory()
+          : factory.length === 1
+            ? factory(privateOptions)
+            : factory(undefined, privateOptions);
       if (
         !policy ||
         typeof policy.configure !== 'function' ||
@@ -391,4 +411,27 @@ export class ExternalFactorPluginLoader {
       }
     }
   }
+}
+
+function buildPrivatePolicyOptions(
+  options?: ExternalVirtualExitPolicyOptions,
+): Readonly<Record<string, unknown>> | undefined {
+  if (!options) return undefined;
+  const out: Record<string, unknown> = {};
+  if (options.executionMode !== undefined) {
+    out.executionMode = options.executionMode;
+  }
+  if (options.surveillancePeriods !== undefined) {
+    out.intradaySurveillancePeriods = options.surveillancePeriods;
+  }
+  if (options.maxActiveLots !== undefined) {
+    out.maxActiveLots = options.maxActiveLots;
+  }
+  if (options.defaultLotWeight !== undefined) {
+    out.defaultLotWeight = options.defaultLotWeight;
+  }
+  if (options.enableDailyPromotion !== undefined) {
+    out.enableDailyPromotion = options.enableDailyPromotion;
+  }
+  return Object.keys(out).length > 0 ? out : undefined;
 }

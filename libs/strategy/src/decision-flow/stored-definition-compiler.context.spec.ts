@@ -524,4 +524,53 @@ describe('stored definition compiler — fail-closed retired fields & node types
     });
     expect(compiled.contextRequirements).toEqual({ 5: 30, 30: 15 });
   });
+
+  it('derives and validates surveillancePeriods from plugins and rule envelopes', () => {
+    const survPlugin: FactorPlugin = {
+      id: 'plugin.test.surv',
+      name: 'surv plugin',
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'declares 5m surveillance for daily plans',
+      resolveSurveillancePeriods: (_params, opts) =>
+        opts?.evaluationPeriod === undefined || opts.evaluationPeriod > 5
+          ? [5]
+          : [],
+      evaluate: async () => ({ action: 'NEUTRAL', reason: 'noop' }),
+    };
+    factorPluginRegistry.register(survPlugin);
+
+    const compiledDaily = compileStoredDefinitionVersion({
+      kind: 'decision_flow',
+      evaluationPeriod: 1440,
+      rule: {
+        surveillancePeriods: [15],
+        rootNode: guardNode('plugin.test.surv'),
+        requiredBarCount: 10,
+      } as unknown as Record<string, unknown>,
+    });
+    expect(compiledDaily.surveillancePeriods).toEqual([5, 15]);
+
+    const compiled5m = compileStoredDefinitionVersion({
+      kind: 'decision_flow',
+      evaluationPeriod: 5,
+      rule: {
+        surveillancePeriods: [5, 15],
+        rootNode: guardNode('plugin.test.surv'),
+        requiredBarCount: 10,
+      } as unknown as Record<string, unknown>,
+    });
+    expect(compiled5m.surveillancePeriods).toEqual([]);
+
+    const badErr = captureCompileError(() =>
+      compileStoredDefinitionVersion({
+        kind: 'decision_flow',
+        rule: {
+          surveillancePeriods: [0],
+          rootNode: guardNode('plugin.test.surv'),
+        } as unknown as Record<string, unknown>,
+      }),
+    );
+    expect(badErr.code).toBe('DECISION_FLOW_RULE_INVALID');
+  });
 });

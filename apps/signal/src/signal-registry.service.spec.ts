@@ -187,6 +187,142 @@ describe('SignalRegistryService', () => {
     expect(registry.capture().definitions.get(1)).toBeDefined();
     expect(registry.executionPlansFor(9, 'tdx')).toHaveLength(1);
   });
+
+  it('filters surveillancePeriods strictly below evaluationPeriod across multi-period plans', async () => {
+    process.env.REALTIME_STRATEGY_MODE = 'off';
+    const strategyMod = await import('@app/strategy');
+    const base = definition(1, 11);
+    const leaf = strategyMod.LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'gt', value: 1 },
+      'entry',
+    );
+    const multiPeriodDef: StrategyDefinition = {
+      ...base,
+      kind: StrategyKind.DECISION_FLOW,
+      periods: [Period.FIVE_MIN, Period.THIRTY_MIN, Period.DAY],
+      currentVersion: {
+        ...base.currentVersion!,
+        rule: {
+          rootNode: leaf,
+          requiredBarCount: 1,
+          surveillancePeriods: [5, 30, 1440],
+        },
+      },
+    };
+    const repository = {
+      find: jest.fn().mockResolvedValue([multiPeriodDef]),
+      findOne: jest.fn(),
+    } as unknown as Repository<StrategyDefinition>;
+    const registry = new SignalRegistryService(
+      repository,
+      securityRepository(),
+      new HealthStateService(),
+      new SignalRuntimeMutex(),
+    );
+
+    await registry.onApplicationBootstrap();
+
+    const plans = registry.executionPlansFor(9, 'tdx');
+    expect(plans).toHaveLength(3);
+    expect(plans.find((p) => p.period === 5)?.surveillancePeriods).toEqual([]);
+    expect(plans.find((p) => p.period === 30)?.surveillancePeriods).toEqual([
+      5,
+    ]);
+    expect(plans.find((p) => p.period === 1440)?.surveillancePeriods).toEqual([
+      5, 30,
+    ]);
+  });
+
+  it('resolves externalContextRequirements securityIds best-effort from security repository', async () => {
+    process.env.REALTIME_STRATEGY_MODE = 'off';
+    const strategyMod = await import('@app/strategy');
+    strategyMod.ensureStandardPluginsRegistered();
+    strategyMod.factorPluginRegistry.register({
+      id: 'plugin.test.external_ctx_registry',
+      name: 'External Ctx Test Plugin',
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'Test plugin for external context resolution',
+      resolveExternalContextRequirements: () => [
+        { securityCode: '880003', period: 1440, minBars: 5 },
+        { securityCode: '000300.SH', period: 1440, minBars: 3 },
+      ],
+      resolveSurveillancePeriods: (_params, options) =>
+        options?.evaluationPeriod === undefined || options.evaluationPeriod > 5
+          ? [5]
+          : [],
+      evaluate: async () => ({ action: 'NEUTRAL', reason: 'noop' }),
+    });
+
+    try {
+      const base = definition(1, 11);
+      const leaf = strategyMod.LegacyStrategyCompiler.compileRuleToDecisionFlow(
+        { field: 'k.close', operator: 'gt', value: 1 },
+        'entry',
+      );
+      const defWithExt: StrategyDefinition = {
+        ...base,
+        kind: StrategyKind.DECISION_FLOW,
+        periods: [Period.DAY],
+        currentVersion: {
+          ...base.currentVersion!,
+          rule: {
+            rootNode: {
+              id: 'guard-ext',
+              type: 'GUARD',
+              name: 'ext-guard',
+              pluginId: 'plugin.test.external_ctx_registry',
+              requiredAction: 'NEUTRAL',
+              onPass: leaf,
+            },
+            requiredBarCount: 1,
+          },
+        },
+      };
+      const repository = {
+        find: jest.fn().mockResolvedValue([defWithExt]),
+        findOne: jest.fn(),
+      } as unknown as Repository<StrategyDefinition>;
+      const securities = {
+        find: jest
+          .fn()
+          .mockResolvedValue([
+            { id: 9, code: '000001' } as Security,
+            { id: 77, code: '880003' } as Security,
+            { id: 88, code: '000300' } as Security,
+          ]),
+      } as unknown as Repository<Security>;
+      const registry = new SignalRegistryService(
+        repository,
+        securities,
+        new HealthStateService(),
+        new SignalRuntimeMutex(),
+      );
+
+      await registry.onApplicationBootstrap();
+
+      const plans = registry.executionPlansFor(9, 'tdx');
+      expect(plans).toHaveLength(1);
+      expect(plans[0].surveillancePeriods).toEqual([5]);
+      expect(plans[0].externalContextRequirements).toEqual([
+        expect.objectContaining({
+          securityCode: '000300.SH',
+          securityId: 88,
+          period: 1440,
+          minBars: 3,
+        }),
+        expect.objectContaining({
+          securityCode: '880003',
+          securityId: 77,
+          period: 1440,
+          minBars: 5,
+        }),
+      ]);
+    } finally {
+      strategyMod.factorPluginRegistry.clear();
+      strategyMod.ensureStandardPluginsRegistered();
+    }
+  });
 });
 
 function securityRepository(): Repository<Security> {

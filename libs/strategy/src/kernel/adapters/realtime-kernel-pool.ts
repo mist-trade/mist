@@ -13,6 +13,9 @@ import { StrategyEvaluationKernel } from '../strategy-evaluation-kernel';
 import { HistoricalBarSource } from '../historical-bar-source';
 import { validateBarSeriesWithPolars } from '@app/indicators';
 
+const REALTIME_VIRTUAL_EXIT_MODE = 'assumed_close';
+const DEFAULT_SURVEILLANCE_HYDRATION_BARS = 48;
+
 export type RealtimeLastOutcome =
   | 'evaluated_matched'
   | 'evaluated_not_matched'
@@ -35,6 +38,8 @@ export type RealtimeStrategyExecutionPlan = {
   readonly contextRequirements: Readonly<Record<number, number>>;
   /** 跨标的上下文依赖（编译产物；内核为其维护独立外部窗口） */
   readonly externalContextRequirements?: readonly ExternalContextRequirement[];
+  /** 轻量监控周期集合（如 [5]，直通虚拟出场策略而不触发主决策流） */
+  readonly surveillancePeriods?: readonly number[];
 };
 
 export type RealtimeWindowGroupIdentity = {
@@ -266,6 +271,7 @@ export class RealtimeKernelPool {
     }
     // 声明周期集合 = ∪ plans 的求值周期 ∪ contextRequirements keys
     const periods = new Set<number>();
+    const surveillanceSet = new Set<number>();
     for (const plan of plans) {
       assertCapacity(plan.requiredBarCount);
       periods.add(plan.period);
@@ -277,6 +283,13 @@ export class RealtimeKernelPool {
         assertCapacity(rawBars);
         periods.add(period);
       }
+      for (const rawSurv of plan.surveillancePeriods ?? []) {
+        assertCapacity(rawSurv);
+        surveillanceSet.add(rawSurv);
+      }
+    }
+    for (const period of periods) {
+      surveillanceSet.delete(period);
     }
 
     // 跨标的依赖：收集计划声明（同 code|period 取 minBars 最大值）
@@ -338,6 +351,35 @@ export class RealtimeKernelPool {
       }
     }
 
+    // 轻量监控周期预热：best-effort 补全近期 K 线，避免缺乏次级历史时阻断盘前主链路
+    const groupSurveillancePeriods = [...surveillanceSet].sort(
+      (left, right) => left - right,
+    );
+    for (const survPeriod of groupSurveillancePeriods) {
+      try {
+        const hydrated = await this.marketData.loadRealtimeWindow({
+          securityId: bar.securityId,
+          source: requireRealtimeSource(bar.source),
+          securityCode: bar.securityCode,
+          period: survPeriod,
+          anchorAt: bar.timestamp,
+          anchorAvailabilityMs: availabilityKey(bar).getTime(),
+          requiredBars: DEFAULT_SURVEILLANCE_HYDRATION_BARS,
+        });
+        const ordered = dedupeHydration(
+          (hydrated?.bars ?? []).filter(
+            (candidate) => candidate.period === survPeriod,
+          ),
+          bar,
+        );
+        if (ordered.length > 0) {
+          hydratedByPeriod.set(survPeriod, [...ordered]);
+        }
+      } catch {
+        // 监控周期缺少前置历史时不阻断主/context 周期预热
+      }
+    }
+
     // 外部标的预热：声明的跨标的历史先推入（外部 bar 只落窗不求值，同日宏观在前）
     const externalPreBars: StrategyBar[] = [];
     for (const req of externalDemand.values()) {
@@ -365,7 +407,13 @@ export class RealtimeKernelPool {
       publicFrom: bar.timestamp,
       registry: this.registry,
       virtualExitPolicy:
-        ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
+        ExternalFactorPluginLoader.createVirtualExitPolicy({
+          executionMode: REALTIME_VIRTUAL_EXIT_MODE,
+          enforceT1: true,
+          ...(groupSurveillancePeriods.length > 0
+            ? { surveillancePeriods: groupSurveillancePeriods }
+            : {}),
+        }) ?? undefined,
       plans: plans.map((plan) => ({
         definitionId: plan.definitionId,
         versionId: plan.versionId,
@@ -376,6 +424,9 @@ export class RealtimeKernelPool {
         requiredBarCount: plan.requiredBarCount,
         contextRequirements: plan.contextRequirements ?? {},
         externalContextRequirements: plan.externalContextRequirements ?? [],
+        surveillancePeriods: (plan.surveillancePeriods ?? []).filter(
+          (p) => p < plan.period,
+        ),
       })),
     });
     const group: KernelGroup = {
@@ -526,7 +577,10 @@ function planSignatureOf(
             .map((req) => `${req.securityCode}@${req.period}x${req.minBars}`)
             .join('+')}`
         : '';
-      return `${plan.definitionId}:${plan.versionId}${ext}`;
+      const surv = plan.surveillancePeriods?.length
+        ? `:s${[...plan.surveillancePeriods].sort((a, b) => a - b).join('+')}`
+        : '';
+      return `${plan.definitionId}:${plan.versionId}:${plan.period}${ext}${surv}`;
     })
     .sort()
     .join(',');

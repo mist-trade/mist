@@ -84,7 +84,11 @@ import {
   PRIVATE_DATA_DIR,
   REVERSE_PERIOD_MAP,
 } from './provider';
-import { loadLegacyPresetFlow, loadLegacyPresetMetas } from './preset-loader';
+import {
+  loadLegacyPresetConfig,
+  loadLegacyPresetFlow,
+  loadLegacyPresetMetas,
+} from './preset-loader';
 import { KPriceProjector } from '../../libs/market-data/src/k-price-projector';
 import type {
   StrategyBar,
@@ -116,6 +120,7 @@ const DEV_DEFAULT_INITIAL_CASH = 1_000_000;
 const DEV_DEFAULT_REQUIRED_BAR_COUNT = 300;
 const DEV_DEFAULT_PRE_CLOSE = 1000;
 const DEV_DECISION_FLOW_KIND = 'decision_flow' as const;
+const DEV_VIRTUAL_EXIT_MODE = 'next_bar_open' as const;
 
 // 严格门禁：tools/strategy-dev/server.ts 属于本地开发网关，严禁在生产环境启动
 if (process.env.NODE_ENV === 'production') {
@@ -568,6 +573,7 @@ interface CachedBacktestResult {
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
   readonly contextRequirements: Readonly<Record<number, number>>;
   readonly externalContextRequirements: readonly ExternalContextRequirement[];
+  readonly surveillancePeriods: readonly number[];
   readonly definitionVersionLabel?: string;
 }
 
@@ -965,6 +971,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   let ruleSnapshot: Readonly<Record<string, unknown>>;
   let contextRequirements: Readonly<Record<number, number>>;
   let externalContextRequirements: readonly ExternalContextRequirement[];
+  let compiledSurveillancePeriods: readonly number[];
   let definitionVersionLabel: string | null = null;
   if (storedDefinition) {
     const compiled = compileStoredDefinitionVersion(
@@ -981,6 +988,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     ruleSnapshot = compiled.ruleSnapshot;
     contextRequirements = compiled.contextRequirements;
     externalContextRequirements = compiled.externalContextRequirements;
+    compiledSurveillancePeriods = compiled.surveillancePeriods;
     definitionVersionLabel = storedDefinition.versionLabel;
   } else if (
     typeof options.strategyDefinitionId === 'number' &&
@@ -998,12 +1006,25 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       options.pluginId,
       options.strategyDefinitionId,
     );
+    const presetConfig =
+      options.mode === 'single'
+        ? null
+        : loadLegacyPresetConfig(
+            resolveLegacyDefinitionId(
+              options.mode,
+              options.strategyDefinitionId,
+            ),
+          );
     const compiled = compileStoredDefinitionVersion(
       {
         kind: DEV_DECISION_FLOW_KIND,
         rule: {
           rootNode: customFlow,
-          requiredBarCount: DEV_DEFAULT_REQUIRED_BAR_COUNT,
+          requiredBarCount:
+            presetConfig?.requiredBarCount ?? DEV_DEFAULT_REQUIRED_BAR_COUNT,
+          ...(presetConfig?.surveillancePeriods
+            ? { surveillancePeriods: presetConfig.surveillancePeriods }
+            : {}),
         },
         evaluationPeriod: options.period,
       },
@@ -1014,9 +1035,13 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     ruleSnapshot = compiled.ruleSnapshot;
     contextRequirements = compiled.contextRequirements;
     externalContextRequirements = compiled.externalContextRequirements;
+    compiledSurveillancePeriods = compiled.surveillancePeriods;
   }
+  const surveillancePeriods = compiledSurveillancePeriods.filter(
+    (period) => period < options.period,
+  );
 
-  // 3. 缓存键（含 context 指纹、宏观体制与定义版本）
+  // 3. 缓存键（含 context/surveillance 指纹、宏观体制与定义版本）
   const cacheKey = getBacktestCacheKey({
     ...options,
     initialCash,
@@ -1024,6 +1049,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     contextFingerprint: JSON.stringify({
       contextRequirements,
       externalContextRequirements,
+      surveillancePeriods,
     }),
     ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
   });
@@ -1053,21 +1079,27 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     };
   }
 
-  // 4. 多周期数据装载：周期集合 = 求值 ∪ context，逐周期映射 + A 股边界过滤
+  // 4. 多周期数据装载：周期集合 = 求值 ∪ context ∪ surveillance，逐周期映射 + A 股边界过滤
   const MIN_A_SHARE_DATE = new Date('1996-12-16T00:00:00.000Z');
+  const coreDemandedSet = new Set<number>([
+    options.period,
+    ...Object.keys(contextRequirements).map(Number),
+  ]);
   const demandedPeriods = Array.from(
-    new Set<number>([
-      options.period,
-      ...Object.keys(contextRequirements).map(Number),
-    ]),
+    new Set<number>([...coreDemandedSet, ...surveillancePeriods]),
   );
   const seriesMap = new Map<number, StrategyBar[]>();
+  const activeSurveillancePeriods: number[] = [];
   for (const period of demandedPeriods) {
     let klines: ChanK[];
     try {
       // exact：多周期 context 严禁静默回退到同 symbol 其他周期数据集
       klines = loadCanonicalKlines({ code: options.code, period, exact: true });
     } catch (err: any) {
+      if (!coreDemandedSet.has(period)) {
+        // 次级监控周期本地尚未同步时降级跳过，不阻断主周期回测
+        continue;
+      }
       const periodName = REVERSE_PERIOD_MAP[period] ?? `${period}m`;
       throw new DevBacktestRequestError(
         422,
@@ -1088,7 +1120,60 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         ),
       )
       .filter((b) => b.timestamp.getTime() >= MIN_A_SHARE_DATE.getTime());
+    if (!coreDemandedSet.has(period)) {
+      if (periodBars.length > 0) {
+        seriesMap.set(period, periodBars);
+        activeSurveillancePeriods.push(period);
+      }
+      continue;
+    }
     seriesMap.set(period, periodBars);
+  }
+  activeSurveillancePeriods.sort((a, b) => a - b);
+
+  // 4.1 跨标的外部上下文数据装载（复用负合成 securityId 路由，不污染主标的滑窗）
+  const externalSecurityIds = resolveExternalSecurityIds(
+    externalContextRequirements,
+  );
+  const resolvedExternalRequirements = externalContextRequirements.map(
+    (req) => ({
+      ...req,
+      securityId:
+        externalSecurityIds.get(req.securityCode) ?? req.securityId ?? -1,
+    }),
+  );
+  const externalSeriesMap = new Map<number, Map<number, StrategyBar[]>>();
+  for (const req of resolvedExternalRequirements) {
+    let klines: ChanK[] = [];
+    try {
+      klines = loadCanonicalKlines({
+        code: req.securityCode,
+        period: req.period,
+        exact: true,
+      });
+    } catch {
+      klines = [];
+    }
+    if (klines.length === 0) continue;
+    const extBars = klines
+      .map((k) =>
+        toStrategyBar(
+          k,
+          req.period,
+          req.securityId!,
+          (k as { source?: StrategyMarketSource }).source ??
+            DEFAULT_DEV_MARKET_SOURCE,
+          req.securityCode,
+        ),
+      )
+      .filter((b) => b.timestamp.getTime() >= MIN_A_SHARE_DATE.getTime());
+    if (extBars.length === 0) continue;
+    let byPeriod = externalSeriesMap.get(req.securityId!);
+    if (!byPeriod) {
+      byPeriod = new Map<number, StrategyBar[]>();
+      externalSeriesMap.set(req.securityId!, byPeriod);
+    }
+    byPeriod.set(req.period, extBars);
   }
 
   // 5. 内存 replay port（缺数据/乱序 fail-closed）
@@ -1096,6 +1181,9 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     securityId: DEFAULT_DEV_SECURITY_ID,
     securityCode: options.code,
     series: seriesMap,
+    ...(externalSeriesMap.size > 0
+      ? { externalSeries: externalSeriesMap }
+      : {}),
   });
 
   // 6. 公开相边界（startDate 缺省 = A 股现代样本边界，等价全公开）
@@ -1119,7 +1207,13 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     publicFrom,
     registry,
     virtualExitPolicy:
-      ExternalFactorPluginLoader.createVirtualExitPolicy() ?? undefined,
+      ExternalFactorPluginLoader.createVirtualExitPolicy({
+        executionMode: DEV_VIRTUAL_EXIT_MODE,
+        enforceT1: true,
+        ...(activeSurveillancePeriods.length > 0
+          ? { surveillancePeriods: activeSurveillancePeriods }
+          : {}),
+      }) ?? undefined,
     plans: [
       {
         definitionId: SIMULATION_LOCAL_FIXTURE_IDENTITY.definitionId,
@@ -1129,17 +1223,21 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         period: options.period,
         requiredBarCount,
         contextRequirements,
+        externalContextRequirements: resolvedExternalRequirements,
+        surveillancePeriods: activeSurveillancePeriods,
       },
     ],
   });
 
-  // 7. 多序列合并推流（HistoricalBarSource：k 路归并，onBar/onSignal 仅求值周期）
+  // 7. 多序列合并推流（HistoricalBarSource：k 路归并，onBar/onSignal 仅求值周期与监控信号）
   const replaySource = new HistoricalBarSource(port, {
     securityId: DEFAULT_DEV_SECURITY_ID,
     securityCode: options.code,
     selection: { kind: 'canonical' },
     evaluationPeriod: options.period,
     contextPeriods: contextRequirements,
+    surveillancePeriods: activeSurveillancePeriods,
+    externalContextRequirements: resolvedExternalRequirements,
     preWarmEndAt: publicFrom,
     publicFrom,
     endAt,
@@ -1347,21 +1445,34 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   let lastEvalBar: StrategyBar | null = null;
   let evalBarCount = 0;
   let pushCount = 0;
+  const executionPeriod =
+    activeSurveillancePeriods.length > 0
+      ? Math.min(...activeSurveillancePeriods)
+      : options.period;
+  const sawExecutionBarDays = new Set<string>();
+  const executeOnBar = (execBar: StrategyBar): void => {
+    flushPendingGroup(execBar, execBar);
+    const fills = broker.onBar(execBar);
+    for (const fill of fills) {
+      position.onOrderFilled(fill);
+      capitalLedger.applyFill(fill);
+    }
+  };
 
   const replaySummary = await replaySource.drive(
     kernel,
-    // onSignal（仅求值周期）：原始信号收集（API 兼容）+ 入组缓冲
+    // onSignal（求值周期与监控信号）：原始信号收集 + 入组缓冲
     async (kSig: KernelSignal) => {
       const simSig = mapKernelSignalToSimulationSignal(kSig, {
         securityCode: options.code,
-        period: options.period,
+        period: kSig.triggerPeriod ?? options.period,
       });
       collectedSignals.push(simSig);
 
-      // 交易层统一裁决：信号入组缓冲，下一根 Bar 开始统一 engine.decide
+      // 交易层统一裁决：信号入组缓冲，下一根执行周期 Bar 开始统一 engine.decide
       pendingSignals.push({ signal: kSig });
     },
-    // onBar（仅求值周期）：跨日日结 / Next-Bar 撮合 / 持仓盯市 / 风控裁决
+    // onBar（仅求值周期）：跨日日结 / Fallback 撮合 / 持仓盯市 / 风控裁决
     async (bar: StrategyBar) => {
       evalBarCount += 1;
       const currentDateStr = formatShanghaiDateString(bar.timestamp);
@@ -1373,14 +1484,11 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       }
       lastDateStr = currentDateStr;
 
-      // 1) 上一 Bar 信号组统一裁决 → 指令入待撮合队列（本 Bar Next-Bar 撮合）
-      flushPendingGroup(bar, bar);
-
-      // 2) 撮合 + 记账（SimulatedBroker 撮合语义零改动）
-      const fills = broker.onBar(bar);
-      for (const fill of fills) {
-        position.onOrderFilled(fill);
-        capitalLedger.applyFill(fill);
+      if (
+        executionPeriod === options.period ||
+        !sawExecutionBarDays.has(currentDateStr)
+      ) {
+        executeOnBar(bar);
       }
       position.onBar(bar);
 
@@ -1422,8 +1530,21 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
         );
       }
     },
-    // onPushed：异步让渡事件循环，确保单线程 Node.js 维持 HTTP 响应流畅
-    async () => {
+    // onPushed：细粒度执行周期 Bar 撮合 + 异步让渡事件循环
+    async (pushedBar: StrategyBar) => {
+      if (
+        executionPeriod !== options.period &&
+        pushedBar.securityId === DEFAULT_DEV_SECURITY_ID &&
+        pushedBar.period === executionPeriod &&
+        pushedBar.timestamp.getTime() >= publicFrom.getTime()
+      ) {
+        const pushDay = formatShanghaiDateString(pushedBar.timestamp);
+        if (lastDateStr !== null && pushDay !== lastDateStr) {
+          broker.settleDayClose(lastDateStr);
+        }
+        sawExecutionBarDays.add(pushDay);
+        executeOnBar(pushedBar);
+      }
       pushCount += 1;
       if (pushCount % 50 === 0) {
         await new Promise<void>((r) => setImmediate(r));
@@ -1518,6 +1639,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
       ruleSnapshot,
       contextRequirements,
       externalContextRequirements,
+      surveillancePeriods: activeSurveillancePeriods,
       ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
     });
   }
@@ -1534,6 +1656,7 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
     ruleSnapshot,
     contextRequirements,
     externalContextRequirements,
+    surveillancePeriods: activeSurveillancePeriods,
     ...(definitionVersionLabel ? { definitionVersionLabel } : {}),
   };
 }
@@ -1753,21 +1876,59 @@ async function handleDevRequest(
       const versionId =
         body.versionId ?? SIMULATION_LOCAL_FIXTURE_IDENTITY.versionId;
 
+      let contextRequirements: Readonly<Record<number, number>> | undefined;
       let externalContextRequirements:
         | readonly ExternalContextRequirement[]
         | undefined;
+      let compiledSurveillancePeriods: readonly number[] | undefined;
       if (!flow && body.rule) {
         const compiled = compileStoredDefinitionVersion({
           kind: body.kind ?? 'decision_flow',
           rule: body.rule,
           signalKind: body.signalKind,
+          evaluationPeriod: period,
         });
         flow = compiled.flow;
         ruleSnapshot = compiled.ruleSnapshot;
         windowBudget = compiled.requiredBarCount;
+        contextRequirements = compiled.contextRequirements;
         externalContextRequirements = compiled.externalContextRequirements;
+        compiledSurveillancePeriods = compiled.surveillancePeriods;
       }
-      flow ||= createCustomDecisionFlow();
+      if (!flow) {
+        const presetCfg =
+          typeof body.strategyDefinitionId === 'number'
+            ? loadLegacyPresetConfig(body.strategyDefinitionId)
+            : null;
+        flow = createCustomDecisionFlow(
+          body.mode,
+          body.pluginId,
+          body.strategyDefinitionId,
+        );
+        const compiled = compileStoredDefinitionVersion({
+          kind: DEV_DECISION_FLOW_KIND,
+          rule: {
+            rootNode: flow,
+            requiredBarCount:
+              windowBudget ??
+              presetCfg?.requiredBarCount ??
+              DEV_DEFAULT_REQUIRED_BAR_COUNT,
+            ...(presetCfg?.surveillancePeriods
+              ? { surveillancePeriods: presetCfg.surveillancePeriods }
+              : {}),
+          },
+          evaluationPeriod: period,
+        });
+        flow = compiled.flow;
+        ruleSnapshot ||= compiled.ruleSnapshot;
+        windowBudget ??= compiled.requiredBarCount;
+        contextRequirements = compiled.contextRequirements;
+        externalContextRequirements = compiled.externalContextRequirements;
+        compiledSurveillancePeriods = compiled.surveillancePeriods;
+      }
+      const surveillancePeriods = (compiledSurveillancePeriods ?? []).filter(
+        (p) => p < period,
+      );
 
       // 跨标的依赖：为声明的外部标的加载本地日线（同 period），赋予负合成 securityId 按因果序归并推入
       const externalBars = buildExternalSimulationBars(
@@ -1784,6 +1945,36 @@ async function handleDevRequest(
         },
       );
 
+      // 轻量监控周期（如 5m）加载：按因果序直通 virtualExitPolicy，不进入主窗
+      const surveillanceBars: StrategyBar[] = [];
+      const loadedSurveillancePeriods: number[] = [];
+      for (const survPeriod of surveillancePeriods) {
+        try {
+          const survKlines = loadCanonicalKlines({
+            code,
+            period: survPeriod,
+            exact: true,
+          });
+          if (survKlines.length > 0) {
+            loadedSurveillancePeriods.push(survPeriod);
+            for (const k of survKlines) {
+              surveillanceBars.push(
+                toStrategyBar(
+                  k,
+                  survPeriod,
+                  DEFAULT_DEV_SECURITY_ID,
+                  (k as { source?: StrategyMarketSource }).source ??
+                    DEFAULT_DEV_MARKET_SOURCE,
+                  code,
+                ),
+              );
+            }
+          }
+        } catch {
+          // 本地缺少监控周期数据时跳过，不阻断步进推演
+        }
+      }
+
       const session = new StrategySimulationSession(bars, {
         securityCode: code,
         period,
@@ -1795,8 +1986,11 @@ async function handleDevRequest(
         ruleSnapshot,
         windowBudget,
         flow,
+        contextRequirements,
         externalContextRequirements,
         externalBars,
+        surveillancePeriods: loadedSurveillancePeriods,
+        surveillanceBars,
       });
 
       // 初始化首帧 (cursor 0)，确保会话就绪且首帧在客户端连接前已同步可用

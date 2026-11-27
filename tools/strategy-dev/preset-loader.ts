@@ -22,6 +22,14 @@ export interface LegacyPresetMeta {
   readonly periods: number[];
   readonly targetUniverse?: string[];
   readonly version: string;
+  readonly requiredBarCount?: number;
+  readonly surveillancePeriods?: readonly number[];
+}
+
+export interface LegacyPresetConfig {
+  readonly flow: DecisionFlowNode;
+  readonly requiredBarCount?: number;
+  readonly surveillancePeriods?: readonly number[];
 }
 
 interface PresetFileShape {
@@ -35,6 +43,8 @@ interface PresetFileShape {
   readonly supportedPeriods?: unknown;
   readonly targetUniverse?: unknown;
   readonly version?: unknown;
+  readonly requiredBarCount?: unknown;
+  readonly surveillancePeriods?: unknown;
 }
 
 let presetIndex: Map<number, DecisionFlowNode> | null = null;
@@ -87,6 +97,18 @@ function buildIndex(): {
       }
       if (!flows.has(legacyId)) {
         flows.set(legacyId, raw.decisionFlow);
+        const requiredBarCount =
+          typeof raw.requiredBarCount === 'number' &&
+          Number.isSafeInteger(raw.requiredBarCount) &&
+          raw.requiredBarCount > 0
+            ? raw.requiredBarCount
+            : undefined;
+        const surveillancePeriods = Array.isArray(raw.surveillancePeriods)
+          ? raw.surveillancePeriods.filter(
+              (p): p is number =>
+                typeof p === 'number' && Number.isSafeInteger(p) && p > 0,
+            )
+          : undefined;
         metas.set(legacyId, {
           id: legacyId,
           name:
@@ -106,6 +128,10 @@ function buildIndex(): {
               )
             : ['000001'],
           version: typeof raw.version === 'string' ? raw.version : '1.0.0',
+          ...(requiredBarCount !== undefined ? { requiredBarCount } : {}),
+          ...(surveillancePeriods && surveillancePeriods.length > 0
+            ? { surveillancePeriods }
+            : {}),
         });
       }
     }
@@ -127,6 +153,25 @@ export function loadLegacyPresetFlow(
 ): DecisionFlowNode | null {
   ensureIndexBuilt();
   return presetIndex!.get(definitionId) ?? null;
+}
+
+/** 按内置预设编号解析决策流及预算/监控周期元数据；未命中返回 null。 */
+export function loadLegacyPresetConfig(
+  definitionId: number,
+): LegacyPresetConfig | null {
+  ensureIndexBuilt();
+  const flow = presetIndex!.get(definitionId);
+  if (!flow) return null;
+  const meta = presetMetaIndex!.get(definitionId);
+  return {
+    flow,
+    ...(meta?.requiredBarCount !== undefined
+      ? { requiredBarCount: meta.requiredBarCount }
+      : {}),
+    ...(meta?.surveillancePeriods !== undefined
+      ? { surveillancePeriods: meta.surveillancePeriods }
+      : {}),
+  };
 }
 
 /** 获取所有可用的预设策略元信息列表（按 ID 升序排列） */

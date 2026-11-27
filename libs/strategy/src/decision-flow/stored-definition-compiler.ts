@@ -34,6 +34,8 @@ export interface CompiledStoredDefinition {
   readonly contextRequirements: Readonly<Record<number, number>>;
   /** 跨标的上下文依赖（由插件元数据推导，可能为空数组） */
   readonly externalContextRequirements: readonly ExternalContextRequirement[];
+  /** 轻量监控周期集合（如 [5]，由规则或插件元数据汇总，可能为空数组） */
+  readonly surveillancePeriods: readonly number[];
   readonly sourceKind: StoredDefinitionSourceKind;
   /** 快照：rule_dsl 为归一化规则，其余为原 rule */
   readonly ruleSnapshot: Readonly<Record<string, unknown>>;
@@ -89,6 +91,7 @@ export function compileStoredDefinitionVersion(
       const payload = input.rule as {
         rootNode?: DecisionFlowNode;
         requiredBarCount?: unknown;
+        surveillancePeriods?: unknown;
       };
       const rawFlow = payload?.rootNode ?? payload;
       const flow = validateDecisionFlowTree(rawFlow);
@@ -106,6 +109,12 @@ export function compileStoredDefinitionVersion(
         externalContextRequirements: deriveExternalContextRequirements(
           flow,
           registry,
+        ),
+        surveillancePeriods: deriveSurveillancePeriods(
+          flow,
+          registry,
+          input.evaluationPeriod,
+          payload?.surveillancePeriods,
         ),
         sourceKind: 'decision_flow',
         ruleSnapshot: input.rule,
@@ -132,6 +141,11 @@ export function compileStoredDefinitionVersion(
           externalContextRequirements: deriveExternalContextRequirements(
             flow,
             registry,
+          ),
+          surveillancePeriods: deriveSurveillancePeriods(
+            flow,
+            registry,
+            input.evaluationPeriod,
           ),
           sourceKind: 'rule_dsl',
           ruleSnapshot: compilation.normalizedRule as Readonly<
@@ -161,6 +175,11 @@ export function compileStoredDefinitionVersion(
         externalContextRequirements: deriveExternalContextRequirements(
           flow,
           registry,
+        ),
+        surveillancePeriods: deriveSurveillancePeriods(
+          flow,
+          registry,
+          input.evaluationPeriod,
         ),
         sourceKind: 'chan_bsp',
         ruleSnapshot: input.rule,
@@ -559,4 +578,73 @@ export function deriveExternalContextRequirements(
       left.securityCode.localeCompare(right.securityCode) ||
       left.period - right.period,
   );
+}
+
+/**
+ * 汇总决策流所需的轻量监控周期（rule.surveillancePeriods ∪ 插件 resolveSurveillancePeriods）。
+ * 仅保留严格小于 evaluationPeriod（当指定时）的正整数周期，升序去重。
+ */
+export function deriveSurveillancePeriods(
+  flow: DecisionFlowNode,
+  registry: FactorPluginRegistry = factorPluginRegistry,
+  evaluationPeriod?: number,
+  explicitSurveillancePeriods?: unknown,
+): readonly number[] {
+  const merged = new Set<number>();
+
+  if (explicitSurveillancePeriods !== undefined) {
+    if (!Array.isArray(explicitSurveillancePeriods)) {
+      throw new StoredDefinitionCompileError(
+        ERROR_CODE_FLOW_INVALID,
+        'decision flow surveillancePeriods must be an array of positive integers',
+      );
+    }
+    for (const raw of explicitSurveillancePeriods) {
+      const period = typeof raw === 'number' ? raw : Number(raw);
+      if (!Number.isSafeInteger(period) || period <= 0) {
+        throw new StoredDefinitionCompileError(
+          ERROR_CODE_FLOW_INVALID,
+          `decision flow contains invalid surveillance period: ${String(raw)}`,
+        );
+      }
+      if (evaluationPeriod === undefined || period < evaluationPeriod) {
+        merged.add(period);
+      }
+    }
+  }
+
+  const references = collectPluginReferences(flow);
+  if (references.size > 0) {
+    if (registry === factorPluginRegistry) {
+      ensureStandardPluginsRegistered();
+    }
+    for (const [pluginId, params] of references) {
+      const plugin = registry.get(pluginId);
+      if (!plugin) {
+        throw new StoredDefinitionCompileError(
+          ERROR_CODE_FLOW_INVALID,
+          `decision flow references unknown factor plugin: ${pluginId}`,
+        );
+      }
+      const resolved =
+        evaluationPeriod !== undefined
+          ? plugin.resolveSurveillancePeriods?.(params, { evaluationPeriod })
+          : plugin.resolveSurveillancePeriods?.(params);
+      if (!resolved) continue;
+      for (const rawPeriod of resolved) {
+        const period = Number(rawPeriod);
+        if (!Number.isSafeInteger(period) || period <= 0) {
+          throw new StoredDefinitionCompileError(
+            ERROR_CODE_FLOW_INVALID,
+            `factor plugin ${pluginId} declared an invalid surveillance period: ${String(rawPeriod)}`,
+          );
+        }
+        if (evaluationPeriod === undefined || period < evaluationPeriod) {
+          merged.add(period);
+        }
+      }
+    }
+  }
+
+  return [...merged].sort((left, right) => left - right);
 }

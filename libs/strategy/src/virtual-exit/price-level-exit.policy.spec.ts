@@ -305,4 +305,87 @@ describe('PriceLevelExitPolicy（价格型虚拟出场求值器）', () => {
 
     expect(policy.onBar(bar(9.0), 30)).toHaveLength(0);
   });
+
+  it('Probe A & B：next_bar_open 严守 D1 开盘成交与自然日 T+1，冻结期不误平也不误删持仓', () => {
+    const dailyChannel = { definitionId: 11, versionId: 1, period: 1440 };
+    const dailyBar = (dayIso: string, close: number): StrategyBar => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'tdx',
+      period: 1440,
+      timestamp: new Date(dayIso),
+      open: close,
+      high: close,
+      low: close,
+      close,
+      volume: '1000',
+      amount: '10000',
+      type: 'complete',
+    });
+    const pNext = new PriceLevelExitPolicy({ executionMode: 'next_bar_open' });
+    pNext.configure([
+      {
+        channel: dailyChannel,
+        bindings: [
+          {
+            ownerPluginId: 'p',
+            rule: { kind: 'time_expired', maxHoldingBars: 1 },
+          },
+        ],
+      },
+    ]);
+    pNext.onSignal({
+      definitionId: 11,
+      versionId: 1,
+      signalKind: 'entry',
+      channel: dailyChannel,
+      signalTime: new Date('2026-01-05T00:00:00+08:00'),
+      triggerPrice: 10.0,
+      pivotTime: null,
+      pivotPrice: null,
+      signalType: 'FIRST_BUY',
+      decisionTrace: {},
+      contextSnapshot: {},
+      ruleSnapshot: {},
+    });
+
+    // D1 (2026-01-06) 为 Next-Bar Open 建仓日：barsHeld 推进但 T+1 冻结，绝不得误发 time_expired(1) 且保留持仓
+    expect(
+      pNext.onBar(dailyBar('2026-01-06T00:00:00+08:00', 10.1), 1440),
+    ).toHaveLength(0);
+    // D2 (2026-01-07) 解锁后正常触发超时出场
+    const d2Exits = pNext.onBar(
+      dailyBar('2026-01-07T00:00:00+08:00', 10.2),
+      1440,
+    );
+    expect(d2Exits).toHaveLength(1);
+    expect(d2Exits[0]?.exitKind).toBe('time_expired');
+
+    // Probe B：assumed_close + enforceT1 时同日盘中跌破止损线不发射、不删批，次日再跌正常止损
+    const pIntraday = new PriceLevelExitPolicy({
+      executionMode: 'assumed_close',
+      enforceT1: true,
+    });
+    pIntraday.configure([
+      {
+        channel: CHANNEL,
+        bindings: [
+          { ownerPluginId: 'p', rule: { kind: 'stop', lossRatio: -0.02 } },
+        ],
+      },
+    ]);
+    pIntraday.onSignal({
+      ...entrySignal(10.0),
+      signalTime: new Date('2026-01-05T10:00:00+08:00'),
+    });
+    expect(
+      pIntraday.onBar(bar(9.5, new Date('2026-01-05T14:00:00+08:00')), 30),
+    ).toHaveLength(0);
+    const unlocked = pIntraday.onBar(
+      bar(9.4, new Date('2026-01-06T10:00:00+08:00')),
+      30,
+    );
+    expect(unlocked).toHaveLength(1);
+    expect(unlocked[0]?.exitKind).toBe('stop');
+  });
 });

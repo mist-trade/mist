@@ -67,6 +67,50 @@ describe('CandleFinalizedJobProcessor', () => {
     expect(marketData.loadRealtimeWindow).toHaveBeenCalledTimes(1);
   });
 
+  it('derives surveillancePeriods bars when closed 1m triggers surveillance boundary without firing main flow', async () => {
+    const bar5mClose = makeBar('2026-08-04T01:34:00.000Z', 9.5); // 09:35 5m close boundary
+    const marketData = {
+      loadRealtimeWindow: jest.fn().mockResolvedValue({ bars: [] }),
+      resolveRealtimeObservation: jest
+        .fn()
+        .mockResolvedValue({ outcome: 'sealed', bar: bar5mClose }),
+    };
+    const processor = new CandleFinalizedJobProcessor(
+      marketData,
+      () => [
+        {
+          definitionId: 6,
+          versionId: 1,
+          source: 'tdx',
+          period: 1440,
+          ruleSnapshot: { field: 'k.close', operator: 'gt', value: 100 },
+          kind: 'decision_flow',
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 100 },
+            'entry',
+          ),
+          requiredBarCount: 1,
+          contextRequirements: {},
+          surveillancePeriods: [5],
+        },
+      ],
+      () => new Date('2026-08-04T01:36:00.000Z'),
+    );
+
+    const result = await processor.process(
+      CANDLE_FINALIZED_JOB_NAME,
+      sealedPayload(bar5mClose),
+    );
+    expect(result.outcome).toBe('completed');
+    // 确认 loadRealtimeWindow 为主周期(1440)及监控周期(5m)均完成了水合调度
+    expect(marketData.loadRealtimeWindow).toHaveBeenCalledWith(
+      expect.objectContaining({ period: 1440 }),
+    );
+    expect(marketData.loadRealtimeWindow).toHaveBeenCalledWith(
+      expect.objectContaining({ period: 5 }),
+    );
+  });
+
   it('does not read a 1m bar for discarded and can close an incomplete period', async () => {
     const first = makeBar('2026-08-04T06:40:00.000Z', 28);
     const marketData = {

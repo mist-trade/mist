@@ -122,6 +122,15 @@ export interface FactorPluginMetadata {
   }[];
 
   /**
+   * 声明次级别盘中防守监控周期（可选）：如日线策略挂载 5m 破线穿透。
+   * 编译边界汇总进 plan.surveillancePeriods 并透传至四路运行时。
+   */
+  resolveSurveillancePeriods?(
+    params?: Record<string, unknown>,
+    options?: ContextRequirementResolveOptions,
+  ): readonly number[];
+
+  /**
    * 声明通道级虚拟出场规则（可选，信号侧）。
    * 规则由聚合层的 VirtualExitGovernor 依据通道虚拟持仓求值，
    * 插件本身保持无状态——只声明"什么条件算出场"，不持有持仓。

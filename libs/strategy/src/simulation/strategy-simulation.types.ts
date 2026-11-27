@@ -6,6 +6,7 @@ import type {
 import type { DecisionFlowNode } from '../decision-flow/decision-flow.types';
 import type { FactorPluginRegistry } from '../factor/factor-plugin-registry';
 import type { ExternalContextRequirement } from '../kernel/kernel.types';
+import type { VirtualExitExecutionMode } from '../virtual-exit/price-level-exit.policy';
 
 export type SimulationSessionStatus =
   | 'idle'
@@ -63,6 +64,14 @@ export interface SimulationSessionConfig {
   readonly externalContextRequirements?: readonly ExternalContextRequirement[];
   /** 外部标的 bar 流（如 880003 日线）：会话按因果序归并推入内核外部窗口 */
   readonly externalBars?: readonly StrategyBar[];
+  /** 轻量监控周期集合（如 [5]） */
+  readonly surveillancePeriods?: readonly number[];
+  /** 轻量监控周期 bar 流（如 5m）：按可用时刻因果归并直通 virtualExitPolicy */
+  readonly surveillanceBars?: readonly StrategyBar[];
+  /** 虚拟出场成交口径（默认 assumed_close，与信号推演同口径） */
+  readonly executionMode?: VirtualExitExecutionMode;
+  /** 是否严格按自然日 T+1 冻结建仓当日卖出（默认 true） */
+  readonly enforceT1?: boolean;
   readonly registry?: FactorPluginRegistry;
 }
 

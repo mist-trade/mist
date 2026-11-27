@@ -322,4 +322,68 @@ describe('RealtimeKernelPool — 跨标的依赖（外部窗口预热与扇出�
     await pool.push(trigger2 as never, plans);
     expect(plugin.lastMacroClose).toBe(24);
   });
+
+  it('forwards surveillancePeriods and executes 5m virtual exit without disturbing main period warmup', async () => {
+    const START = Date.UTC(2026, 7, 2, 7, 0); // 15:00 CST daily (Aug 2 & Aug 3, both < Aug 4 ANCHOR)
+    const dailyHistory = barsFor(7, 1440, [10, 10.2], START);
+    const fiveMinHistory = barsFor(
+      7,
+      5,
+      [10.1, 10.2],
+      Date.UTC(2026, 7, 3, 2, 0),
+    );
+    const port = localPort(
+      [...dailyHistory, ...fiveMinHistory].map((b) => [b]),
+    );
+    const plugin = new AlwaysBuyPlugin();
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(plugin);
+
+    const { ExternalFactorPluginLoader } = await import(
+      '../../factor/external-plugin-loader'
+    );
+    const spy = jest.spyOn(
+      ExternalFactorPluginLoader,
+      'createVirtualExitPolicy',
+    );
+    const pool = new RealtimeKernelPool(port as never, registry);
+    const plans: RealtimeStrategyExecutionPlan[] = [
+      plan({
+        period: 1440,
+        requiredBarCount: 2,
+        surveillancePeriods: [5],
+        flow: {
+          id: 'guard_buy',
+          type: 'GUARD',
+          name: 'buy',
+          pluginId: plugin.id,
+          requiredAction: 'BUY',
+          onPass: {
+            id: 'term_buy',
+            type: 'TERMINAL',
+            action: 'BUY',
+            signalTag: 'BUY_DAILY',
+            reason: 'ok',
+          },
+        },
+      }),
+    ];
+
+    try {
+      const report = await pool.warmup(
+        [{ securityId: 7, source: 'qmt', plans }],
+        ANCHOR,
+      );
+      expect(report.succeeded).toBe(1);
+      expect(spy).toHaveBeenCalledWith(
+        expect.objectContaining({
+          executionMode: 'assumed_close',
+          enforceT1: true,
+          surveillancePeriods: [5],
+        }),
+      );
+    } finally {
+      spy.mockRestore();
+    }
+  });
 });
