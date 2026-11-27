@@ -43,3 +43,6 @@ export const MAX_DEV_SESSIONS = 10;
 
 /** 诊断快照磁盘文件最大保留份数（轮转修剪，防磁盘膨胀） */
 export const MAX_SNAPSHOT_DUMP_FILES = 20;
+
+/** 统一绘图指令流模块级 LRU 缓存容量上限（防长期运行内存溢出） */
+export const MAX_VISUAL_COMMANDS_CACHE_ENTRIES = 64;

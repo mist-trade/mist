@@ -337,13 +337,15 @@ export class BacktestRunExecutor {
         allNavHistories.push(outcome.navHistory);
       }
     }
-    await this.flushResults(results);
-    await this.flushTrades(trades);
-
     const sortedDates = collectSortedDates(allNavHistories);
     const { navSeries: combinedNavSeries, navPoints } =
       combineDailyNavHistories(allNavHistories, DEFAULT_BROKER_INITIAL_CASH);
-    const summary = computePerformanceSummary(combinedNavSeries, trades);
+    // 必须在 flushTrades 通过 splice 清空 trades 数组前计算绩效汇总，传入只读快照
+    const closedTradesSnapshot: readonly BacktestTradeResult[] = [...trades];
+    const summary = computePerformanceSummary(
+      combinedNavSeries,
+      closedTradesSnapshot,
+    );
     // sharpe_ratio 统一等权组合（协方差口径）估计量：单标的 N=1 与原单序列
     // 夏普逐位一致（equity 环比 + 丢首行同构构造），多标的按日期轴对齐等权
     // 平均（缺失日 0 = 持现金）。
@@ -351,6 +353,9 @@ export class BacktestRunExecutor {
       alignEquityReturns(allNavHistories, sortedDates),
     );
     const maxUnderwaterDuration = computeUnderwaterDuration(combinedNavSeries);
+
+    await this.flushResults(results);
+    await this.flushTrades(trades);
 
     const prewarmMinActual =
       prewarmActuals.length > 0 ? Math.min(...prewarmActuals) : null;

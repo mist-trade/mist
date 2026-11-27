@@ -564,6 +564,222 @@ describe('CandleFinalizedJobProcessor', () => {
     expect(result.candidates).toHaveLength(1);
     expect(marketData.resolveRealtimeObservation).toHaveBeenCalledTimes(1);
   });
+
+  it('batches persisted results across all emitted timeframes sharing effectiveTime into one publishGroupedDeliveries call', async () => {
+    const minutes = [
+      makeBar('2026-08-04T01:30:00.000Z', 25),
+      makeBar('2026-08-04T01:31:00.000Z', 25),
+      makeBar('2026-08-04T01:32:00.000Z', 25),
+      makeBar('2026-08-04T01:33:00.000Z', 25),
+      makeBar('2026-08-04T01:34:00.000Z', 35),
+    ];
+    const marketData = sequentialMarketData(...minutes);
+    const persistence = {
+      persist: jest
+        .fn()
+        .mockImplementationOnce(async (candidate) => ({
+          outcome: 'created' as const,
+          alertEventId: 101,
+          candidate,
+        }))
+        .mockImplementationOnce(async (candidate) => ({
+          outcome: 'created' as const,
+          alertEventId: 102,
+          candidate,
+        })),
+      publishGroupedDeliveries: jest.fn(async () => undefined),
+    };
+    const processor = new CandleFinalizedJobProcessor(
+      marketData,
+      () => [
+        {
+          definitionId: 3,
+          versionId: 7,
+          source: 'tdx',
+          period: 1,
+          ruleSnapshot: { field: 'k.close', operator: 'gt', value: 30 },
+          kind: 'decision_flow',
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 30 },
+            'entry',
+          ),
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 4,
+          versionId: 8,
+          source: 'tdx',
+          period: 5,
+          ruleSnapshot: { field: 'k.close', operator: 'gt', value: 30 },
+          kind: 'decision_flow',
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 30 },
+            'entry',
+          ),
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+      () => new Date('2026-08-04T02:00:00.000Z'),
+      undefined,
+      undefined,
+      30_000,
+      'on',
+      persistence,
+    );
+
+    for (const bar of minutes.slice(0, 4)) {
+      const res = await processor.process(
+        CANDLE_FINALIZED_JOB_NAME,
+        sealedPayload(bar),
+      );
+      expect(res.candidates).toEqual([]);
+    }
+
+    const closing = await processor.process(
+      CANDLE_FINALIZED_JOB_NAME,
+      sealedPayload(minutes[4]),
+    );
+
+    expect(closing.outcome).toBe('completed');
+    expect(closing.candidates.map((c) => c.period)).toEqual([1, 5]);
+    expect(persistence.persist).toHaveBeenCalledTimes(2);
+    expect(persistence.publishGroupedDeliveries).toHaveBeenCalledTimes(1);
+    expect(persistence.publishGroupedDeliveries).toHaveBeenCalledWith([
+      expect.objectContaining({ alertEventId: 101 }),
+      expect.objectContaining({ alertEventId: 102 }),
+    ]);
+  });
+
+  it('retries cleanly after transient persistence failure without losing closed multi-period bars or cursor', async () => {
+    const minutes = [
+      makeBar('2026-08-04T01:30:00.000Z', 25),
+      makeBar('2026-08-04T01:31:00.000Z', 25),
+      makeBar('2026-08-04T01:32:00.000Z', 25),
+      makeBar('2026-08-04T01:33:00.000Z', 25),
+      makeBar('2026-08-04T01:34:00.000Z', 35),
+    ];
+    // Closing bar resolved twice (attempt 1 fails on persist, attempt 2 retries) + attempt 3 idempotent check
+    const marketData = sequentialMarketData(...minutes, minutes[4], minutes[4]);
+    const dbLockTimeout = new Error('Lock wait timeout exceeded');
+    const persistence = {
+      persist: jest
+        .fn()
+        // Attempt 1: 1m commits, 5m fails with DB lock timeout
+        .mockImplementationOnce(async (candidate) => ({
+          outcome: 'created' as const,
+          alertEventId: 201,
+          candidate,
+        }))
+        .mockRejectedValueOnce(dbLockTimeout)
+        // Attempt 2: 5m completes on retry
+        .mockImplementationOnce(async (candidate) => ({
+          outcome: 'created' as const,
+          alertEventId: 202,
+          candidate,
+        })),
+      publishGroupedDeliveries: jest.fn(async () => undefined),
+    };
+    const processor = new CandleFinalizedJobProcessor(
+      marketData,
+      () => [
+        {
+          definitionId: 3,
+          versionId: 7,
+          source: 'tdx',
+          period: 1,
+          ruleSnapshot: { field: 'k.close', operator: 'gt', value: 30 },
+          kind: 'decision_flow',
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 30 },
+            'entry',
+          ),
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 4,
+          versionId: 8,
+          source: 'tdx',
+          period: 5,
+          ruleSnapshot: { field: 'k.close', operator: 'gt', value: 30 },
+          kind: 'decision_flow',
+          flow: LegacyStrategyCompiler.compileRuleToDecisionFlow(
+            { field: 'k.close', operator: 'gt', value: 30 },
+            'entry',
+          ),
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+      () => new Date('2026-08-04T02:00:00.000Z'),
+      undefined,
+      undefined,
+      30_000,
+      'on',
+      persistence,
+    );
+
+    for (const bar of minutes.slice(0, 4)) {
+      await processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(bar));
+    }
+
+    // Attempt 1 fails transiently during persistence
+    await expect(
+      processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(minutes[4])),
+    ).rejects.toBe(dbLockTimeout);
+    expect(persistence.publishGroupedDeliveries).not.toHaveBeenCalled();
+
+    // Attempt 2 retries the exact same trigger: must emit BOTH 1m and 5m without loss
+    const retried = await processor.process(
+      CANDLE_FINALIZED_JOB_NAME,
+      sealedPayload(minutes[4]),
+    );
+    expect(retried.outcome).toBe('completed');
+    expect(retried.candidates.map((c) => c.period)).toEqual([1, 5]);
+    expect(persistence.publishGroupedDeliveries).toHaveBeenCalledTimes(1);
+    expect(persistence.publishGroupedDeliveries).toHaveBeenCalledWith([
+      expect.objectContaining({ alertEventId: 201 }),
+      expect.objectContaining({ alertEventId: 202 }),
+    ]);
+
+    // Attempt 3 after successful commit is idempotently ignored
+    await expect(
+      processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(minutes[4])),
+    ).resolves.toEqual({ outcome: 'completed', candidates: [] });
+  });
+
+  it('rejects conflicting candle finalization identity on uncommitted retry', async () => {
+    const bar = makeBar('2026-08-04T06:44:00.000Z', 28);
+    const conflictingBar = { ...bar, high: 99 };
+    const marketData = {
+      loadRealtimeWindow: jest.fn().mockResolvedValue({ bars: [] }),
+      resolveRealtimeObservation: jest
+        .fn()
+        .mockResolvedValueOnce({ outcome: 'sealed', bar })
+        .mockResolvedValueOnce({ outcome: 'sealed', bar: conflictingBar }),
+    };
+    const failure = new Error('db unavailable');
+    const persistence = {
+      persist: jest.fn().mockRejectedValueOnce(failure),
+      publishGroupedDeliveries: jest.fn(async () => undefined),
+    };
+    const processor = modeProcessor(
+      marketData,
+      'on',
+      persistence,
+      () => new Date('2026-08-04T07:00:00.000Z'),
+    );
+
+    await expect(
+      processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(bar)),
+    ).rejects.toBe(failure);
+
+    await expect(
+      processor.process(CANDLE_FINALIZED_JOB_NAME, sealedPayload(bar)),
+    ).rejects.toThrow('conflicting candle finalization identity');
+  });
 });
 
 function makeBar(timestamp: string, close: number): StrategyBar {

@@ -11,6 +11,7 @@ import {
   STRATEGY_ALERT_DELIVERY_QUEUE_NAME,
   alertDeliveryChannelJobId,
   alertDeliveryFanoutJobId,
+  alertDeliverySweepFanoutJobId,
   decodeAlertDeliveryChannelJobV2,
   decodeAlertDeliveryFanoutJobV2,
   type AlertDeliveryChannelJobV2,
@@ -62,6 +63,22 @@ export class AlertDeliveryQueueService implements OnModuleDestroy {
     await this.queue.add(STRATEGY_ALERT_DELIVERY_FANOUT_JOB, accepted, {
       ...STRATEGY_ALERT_DELIVERY_FANOUT_JOB_OPTIONS,
       jobId: alertDeliveryFanoutJobId(accepted),
+    });
+  }
+
+  /** Enqueue deliver.fanout for one sweep recovery batch (sweep-scoped jobId). */
+  async enqueueSweepFanout(
+    group: AlertDeliveryGroupDescriptor,
+    alertEventIds: readonly number[],
+  ): Promise<void> {
+    const accepted = decodeAlertDeliveryFanoutJobV2({
+      contractVersion: 2,
+      group,
+      alertEventIds,
+    });
+    await this.queue.add(STRATEGY_ALERT_DELIVERY_FANOUT_JOB, accepted, {
+      ...STRATEGY_ALERT_DELIVERY_FANOUT_JOB_OPTIONS,
+      jobId: alertDeliverySweepFanoutJobId(accepted),
     });
   }
 

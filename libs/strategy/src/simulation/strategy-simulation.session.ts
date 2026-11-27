@@ -1,4 +1,5 @@
 import type { StrategyBar } from '@app/market-data';
+import { availabilityKey } from '../kernel/availability';
 import { StrategyEvaluationKernel } from '../kernel/strategy-evaluation-kernel';
 import { ExternalFactorPluginLoader } from '../factor/external-plugin-loader';
 import { mapKernelSignalToSimulationSignal } from './kernel-signal-mapper';
@@ -75,14 +76,22 @@ export class StrategySimulationSession {
     const externalAll = (config.externalBars ?? []).filter(
       (bar) => !endAt || bar.timestamp.getTime() <= endAt.getTime(),
     );
+    const firstPublicAvail =
+      this.publicBars.length > 0
+        ? availabilityKey(this.publicBars[0]).getTime()
+        : publicFrom.getTime();
+    const externalSorted = [...externalAll].sort(
+      (left, right) =>
+        availabilityKey(left).getTime() - availabilityKey(right).getTime(),
+    );
     this.externalPreWarmBars = Object.freeze(
-      externalAll.filter(
-        (bar) => bar.timestamp.getTime() < publicFrom.getTime(),
+      externalSorted.filter(
+        (bar) => availabilityKey(bar).getTime() < firstPublicAvail,
       ),
     );
     this.externalPublicBars = Object.freeze(
-      externalAll.filter(
-        (bar) => bar.timestamp.getTime() >= publicFrom.getTime(),
+      externalSorted.filter(
+        (bar) => availabilityKey(bar).getTime() >= firstPublicAvail,
       ),
     );
     this.kernel = new StrategyEvaluationKernel({
@@ -224,12 +233,12 @@ export class StrategySimulationSession {
     const bar = this.publicBars[next];
     const fresh = next >= this.pushedPublicCount;
     if (fresh) {
-      // 公开段同日宏观 bar 先于标的 bar 推入（外部 bar 只落窗不求值）
+      // 公开段外部 bar 按 availabilityKey 因果归并（封堵日线 00:00 泄漏至日内步骤）
+      const barAvail = availabilityKey(bar).getTime();
       let e = this.externalPublicCursor;
       while (
         e < this.externalPublicBars.length &&
-        this.externalPublicBars[e].timestamp.getTime() <=
-          bar.timestamp.getTime()
+        availabilityKey(this.externalPublicBars[e]).getTime() <= barAvail
       ) {
         await this.kernel.push(this.externalPublicBars[e++]);
       }
@@ -347,13 +356,13 @@ export class StrategySimulationSession {
   private async seedPreWarm(): Promise<void> {
     if (this.preWarmSeeded) return;
     this.preWarmSeeded = true;
-    // 预热段按时间归并：同日宏观 bar 先于标的 bar（因果序）
+    // 预热段按 availabilityKey 因果归并：外部 bar 在其可用边界前先于标的 bar 推入
     let e = 0;
     for (const bar of this.preWarmBars) {
+      const barAvail = availabilityKey(bar).getTime();
       while (
         e < this.externalPreWarmBars.length &&
-        this.externalPreWarmBars[e].timestamp.getTime() <=
-          bar.timestamp.getTime()
+        availabilityKey(this.externalPreWarmBars[e]).getTime() <= barAvail
       ) {
         await this.kernel.push(this.externalPreWarmBars[e++]);
       }

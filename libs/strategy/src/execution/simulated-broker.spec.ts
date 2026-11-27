@@ -638,4 +638,294 @@ describe('SimulatedBroker', () => {
     expect(sellFills[0].side).toBe('SELL');
     expect(broker.getOpenOrders()).toHaveLength(0);
   });
+
+  it('TC-14: STOP order applies custom slippageRatio for gap-down and intraday trigger', () => {
+    const customBroker = new SimulatedBroker({
+      initialCash: 1_000_000,
+      slippageRatio: 0.01,
+    });
+    customBroker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-14T09:30:00.000Z'),
+      intentId: 'buy-1',
+    });
+    customBroker.onBar(
+      createBar('2026-10-14T09:31:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+    customBroker.settleDayClose('2026-10-14');
+
+    customBroker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'STOP',
+      quantity: 500,
+      stopPrice: 9.5,
+      signalTime: new Date('2026-10-15T09:30:00.000Z'),
+      intentId: 'stop-gap',
+    });
+    const gapFills = customBroker.onBar(
+      createBar('2026-10-15T09:31:00.000Z', 9.3, 9.4, 9.2, 9.35, '600519'),
+    );
+    expect(gapFills).toHaveLength(1);
+    // 9.30 * (1 - 0.01) = 9.207
+    expect(gapFills[0].fillPrice).toBe(9.207);
+
+    customBroker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'STOP',
+      quantity: 500,
+      stopPrice: 9.2,
+      signalTime: new Date('2026-10-15T09:31:00.000Z'),
+      intentId: 'stop-intraday',
+    });
+    const intradayFills = customBroker.onBar(
+      createBar('2026-10-15T09:32:00.000Z', 9.3, 9.35, 9.15, 9.25, '600519'),
+    );
+    expect(intradayFills).toHaveLength(1);
+    // 9.20 * (1 - 0.01) = 9.108
+    expect(intradayFills[0].fillPrice).toBe(9.108);
+  });
+
+  it('TC-15: non-SELL STOP order is not executed through sell-stop path', () => {
+    const buyStop = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'STOP',
+      quantity: 1000,
+      stopPrice: 9.5,
+      signalTime: new Date('2026-10-15T09:30:00.000Z'),
+      intentId: 'buy-stop-invalid',
+    });
+
+    const fills = broker.onBar(
+      createBar('2026-10-15T09:31:00.000Z', 9.3, 9.4, 9.2, 9.35, '600519'),
+    );
+    expect(fills).toHaveLength(0);
+    expect(broker.getAccount().positions.size).toBe(0);
+    expect(broker.getOrder(buyStop.orderId)?.status).not.toBe('FILLED');
+  });
+
+  it('TC-16: one-word limit-down blocks triggered STOP SELL and cancels paired BUY on same bar', () => {
+    broker.registerSecurity('600519', { name: '贵州茅台', preClose: 10.0 });
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-14T01:30:00.000Z'),
+      intentId: 'd1-buy-stop',
+    });
+    broker.onBar(
+      createBar('2026-10-14T02:00:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+    broker.settleDayClose('2026-10-14');
+    const cashAfterBuy = broker.getAccount().availableCash;
+
+    const stopOrder = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'STOP',
+      quantity: 1000,
+      stopPrice: 9.5,
+      signalTime: new Date('2026-10-15T01:30:00.000Z'),
+      intentId: 'd2-stop-sell',
+    });
+    const pairedBuy = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T01:30:00.000Z'),
+      intentId: 'd2-paired-buy',
+    });
+
+    const limitDownBar = createBar(
+      '2026-10-15T02:00:00.000Z',
+      9.0,
+      9.0,
+      9.0,
+      9.0,
+      '600519',
+    );
+    const fills = broker.onBar(limitDownBar);
+    expect(fills).toHaveLength(0);
+    expect(broker.getAccount().availableCash).toBe(cashAfterBuy);
+    expect(broker.getAccount().positions.get('600519')?.totalQuantity).toBe(
+      1000,
+    );
+
+    expect(broker.getOrder(stopOrder.orderId)?.status).toBe('BLOCKED');
+    expect(broker.getOrder(stopOrder.orderId)?.rejectReason).toBe(
+      'SELL_BLOCKED_LIMIT_DOWN',
+    );
+    expect(broker.getOrder(pairedBuy.orderId)?.status).toBe('CANCELLED');
+    expect(broker.getOrder(pairedBuy.orderId)?.rejectReason).toBe(
+      'PAIRED_SELL_BLOCKED_LIMIT_DOWN',
+    );
+
+    // 流动性打开后止损单继续成交
+    broker.settleDayClose('2026-10-15');
+    const openBar = createBar(
+      '2026-10-16T02:00:00.000Z',
+      8.8,
+      9.0,
+      8.7,
+      8.9,
+      '600519',
+    );
+    const nextFills = broker.onBar(openBar);
+    expect(nextFills).toHaveLength(1);
+    expect(nextFills[0].orderId).toBe(stopOrder.orderId);
+    expect(broker.getOpenOrders()).toHaveLength(0);
+  });
+
+  it('TC-17: unfillable triggered STOP SELL transitions to REJECTED and is deleted from pendingOrders', () => {
+    broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-14T09:30:00.000Z'),
+      intentId: 'buy-1',
+    });
+    broker.onBar(
+      createBar('2026-10-14T09:31:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+    broker.settleDayClose('2026-10-14');
+
+    // 提交两笔各 1000 股的 STOP SELL（提交时 available=1000 均通过预检）
+    const stop1 = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'STOP',
+      quantity: 1000,
+      stopPrice: 9.5,
+      signalTime: new Date('2026-10-15T09:30:00.000Z'),
+      intentId: 'stop-1',
+    });
+    const stop2 = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'STOP',
+      quantity: 1000,
+      stopPrice: 9.5,
+      signalTime: new Date('2026-10-15T09:30:00.000Z'),
+      intentId: 'stop-2',
+    });
+
+    const fills = broker.onBar(
+      createBar('2026-10-15T09:31:00.000Z', 9.2, 9.3, 9.1, 9.25, '600519'),
+    );
+    expect(fills).toHaveLength(1);
+    expect(fills[0].orderId).toBe(stop1.orderId);
+    expect(broker.getOrder(stop2.orderId)?.status).toBe('REJECTED');
+    expect(broker.getOrder(stop2.orderId)?.rejectReason).toBe(
+      'INSUFFICIENT_SHARES',
+    );
+    expect(broker.getOpenOrders()).toHaveLength(0);
+
+    // T+1 冻结场景：持有 1000 股可卖 + 当日新买 1000 股冻结；两笔 STOP SELL 触发，第二笔因仅剩 T+1 冻结份额被 REJECTED(T1_LOCKED_SHARES)
+    const t1Broker = new SimulatedBroker(1_000_000);
+    t1Broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-14T09:30:00.000Z'),
+      intentId: 'd0-buy',
+    });
+    t1Broker.onBar(
+      createBar('2026-10-14T09:31:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+    t1Broker.settleDayClose('2026-10-14');
+
+    // Day 1 早盘新买 1000 股成交 -> 1000 可卖 + 1000 冻结
+    t1Broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-15T09:30:00.000Z'),
+      intentId: 'd1-buy',
+    });
+    t1Broker.onBar(
+      createBar('2026-10-15T09:31:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+
+    const t1Stop1 = t1Broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'STOP',
+      quantity: 1000,
+      stopPrice: 9.5,
+      signalTime: new Date('2026-10-15T09:31:00.000Z'),
+      intentId: 't1-stop-1',
+    });
+    const t1Stop2 = t1Broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'SELL',
+      orderType: 'STOP',
+      quantity: 1000,
+      stopPrice: 9.5,
+      signalTime: new Date('2026-10-15T09:31:00.000Z'),
+      intentId: 't1-stop-2',
+    });
+    const t1Fills = t1Broker.onBar(
+      createBar('2026-10-15T09:32:00.000Z', 9.2, 9.3, 9.1, 9.25, '600519'),
+    );
+    expect(t1Fills).toHaveLength(1);
+    expect(t1Fills[0].orderId).toBe(t1Stop1.orderId);
+    expect(t1Broker.getOrder(t1Stop2.orderId)?.status).toBe('REJECTED');
+    expect(t1Broker.getOrder(t1Stop2.orderId)?.rejectReason).toBe(
+      'T1_LOCKED_SHARES',
+    );
+    expect(t1Broker.getOpenOrders()).toHaveLength(0);
+  });
+
+  it('TC-18: deriveOrderId checks orderLog so duplicate intentId never overwrites finished order history', () => {
+    const first = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-14T09:30:00.000Z'),
+      intentId: 'dup-intent',
+    });
+    broker.onBar(
+      createBar('2026-10-14T09:31:00.000Z', 10.0, 10.0, 10.0, 10.0, '600519'),
+    );
+    expect(broker.getOrder(first.orderId)?.status).toBe('FILLED');
+
+    const second = broker.submitOrder({
+      securityId: 1,
+      securityCode: '600519',
+      side: 'BUY',
+      orderType: 'MARKET',
+      quantity: 1000,
+      signalTime: new Date('2026-10-14T09:32:00.000Z'),
+      intentId: 'dup-intent',
+    });
+    expect(second.orderId).toBe(`${first.orderId}-2`);
+    expect(broker.getOrder(first.orderId)?.status).toBe('FILLED');
+    expect(broker.getOrder(second.orderId)?.status).toBe('PENDING');
+  });
 });

@@ -83,6 +83,14 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
     if (!channel) return;
     const key = channelKey(channel);
     if (signal.signalKind === SIGNAL_KINDS.ENTRY) {
+      if (
+        !Number.isFinite(signal.triggerPrice) ||
+        signal.triggerPrice <= 0 ||
+        !(signal.signalTime instanceof Date) ||
+        !Number.isFinite(signal.signalTime.getTime())
+      ) {
+        return;
+      }
       if (!this.lots.has(key)) {
         this.lots.set(key, {
           entryPrice: signal.triggerPrice,
@@ -97,19 +105,28 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
     this.lots.delete(key);
   }
 
+  public onExternalExit(proposal: VirtualExitProposal): void {
+    this.lots.delete(channelKey(proposal.channel));
+  }
+
   public onBar(
     bar: StrategyBar,
     period: number,
   ): readonly VirtualExitProposal[] {
+    const barTs = bar.timestamp.getTime();
+    if (!Number.isFinite(barTs)) {
+      return [];
+    }
     const proposals: VirtualExitProposal[] = [];
     for (const [key, spec] of this.specs) {
       if (spec.channel.period !== period) continue;
       const lot = this.lots.get(key);
       if (!lot) continue;
+      const entryTs = lot.entryTime.getTime();
       // 严禁在建仓信号同一根 Bar 上立即计持仓天数或触发出场
-      if (bar.timestamp.getTime() <= lot.entryTime.getTime()) continue;
+      if (!Number.isFinite(entryTs) || barTs <= entryTs) continue;
       lot.barsHeld += 1;
-      if (bar.close > lot.peakPrice) lot.peakPrice = bar.close;
+      this.updateLotWatermark(lot, bar.close);
       const proposal = this.evaluateBindings(spec, lot, bar);
       if (proposal) {
         // 触发即平批：出场信号回流 onSignal 前先本地清位，防重复
@@ -118,6 +135,15 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
       }
     }
     return proposals;
+  }
+
+  private updateLotWatermark(lot: VirtualLot, closePrice: number): void {
+    if (!Number.isFinite(closePrice) || closePrice <= 0) {
+      return;
+    }
+    if (!Number.isFinite(lot.peakPrice) || closePrice > lot.peakPrice) {
+      lot.peakPrice = closePrice;
+    }
   }
 
   private evaluateBindings(
@@ -148,11 +174,26 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
     lot: VirtualLot,
     bar: StrategyBar,
   ): VirtualExitProposal | null {
+    if (
+      !Number.isFinite(lot.entryPrice) ||
+      lot.entryPrice <= 0 ||
+      !Number.isFinite(lot.peakPrice) ||
+      lot.peakPrice <= 0 ||
+      !Number.isFinite(bar.close) ||
+      bar.close <= 0
+    ) {
+      return null;
+    }
     const gainRatio = (bar.close - lot.entryPrice) / lot.entryPrice;
+    if (!Number.isFinite(gainRatio)) {
+      return null;
+    }
     switch (rule.kind) {
       case PRICE_LEVEL_RULE_KINDS.STOP: {
+        if (!Number.isFinite(rule.lossRatio)) return null;
         // 均价止损：收盘跌破 entryPrice × (1 + lossRatio)，lossRatio 为负数
-        if (bar.close >= lot.entryPrice * (1 + rule.lossRatio)) return null;
+        const stopPrice = lot.entryPrice * (1 + rule.lossRatio);
+        if (!Number.isFinite(stopPrice) || bar.close >= stopPrice) return null;
         return this.proposal(
           channel,
           ownerPluginId,
@@ -167,9 +208,12 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
         );
       }
       case PRICE_LEVEL_RULE_KINDS.BREAKEVEN: {
+        if (!Number.isFinite(rule.activationGain)) return null;
         // 浮盈回吐保护：峰值浮盈曾达 activationGain，随后收盘跌破成本
         const peakGain = (lot.peakPrice - lot.entryPrice) / lot.entryPrice;
-        if (peakGain < rule.activationGain) return null;
+        if (!Number.isFinite(peakGain) || peakGain < rule.activationGain) {
+          return null;
+        }
         if (bar.close >= lot.entryPrice) return null;
         return this.proposal(
           channel,
@@ -185,10 +229,23 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
         );
       }
       case PRICE_LEVEL_RULE_KINDS.TRAILING: {
+        if (
+          !Number.isFinite(rule.activationGain) ||
+          !Number.isFinite(rule.drawdownRatio) ||
+          rule.drawdownRatio < 0 ||
+          rule.drawdownRatio >= 1
+        ) {
+          return null;
+        }
         // 均价移动止盈：峰值浮盈达 activationGain 后，收盘自峰值回撤 drawdownRatio
         const peakGain = (lot.peakPrice - lot.entryPrice) / lot.entryPrice;
-        if (peakGain < rule.activationGain) return null;
-        if (bar.close >= lot.peakPrice * (1 - rule.drawdownRatio)) return null;
+        if (!Number.isFinite(peakGain) || peakGain < rule.activationGain) {
+          return null;
+        }
+        const trailingFloor = lot.peakPrice * (1 - rule.drawdownRatio);
+        if (!Number.isFinite(trailingFloor) || bar.close >= trailingFloor) {
+          return null;
+        }
         return this.proposal(
           channel,
           ownerPluginId,
@@ -203,6 +260,9 @@ export class PriceLevelExitPolicy implements VirtualExitPolicyPort {
         );
       }
       case PRICE_LEVEL_RULE_KINDS.TIME_EXPIRED: {
+        if (!Number.isFinite(rule.maxHoldingBars) || rule.maxHoldingBars <= 0) {
+          return null;
+        }
         // 持仓超时：持有确认 Bar 数达上限
         if (lot.barsHeld < rule.maxHoldingBars) return null;
         return this.proposal(

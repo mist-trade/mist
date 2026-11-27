@@ -103,4 +103,8 @@ export interface VirtualExitPolicyPort {
   onSignal(signal: KernelSignal): void;
   /** 推进指定周期的全部通道，返回触发的出场提案 */
   onBar(bar: StrategyBar, period: number): readonly VirtualExitProposal[];
+  /** 预热相 Bar 透传（可选，供外部结构型策略同步热身状态） */
+  onPrewarmBar?(bar: StrategyBar, period: number): void;
+  /** 同级或外部策略已平仓某通道时通知本策略清理对应虚拟持仓 */
+  onExternalExit?(proposal: VirtualExitProposal): void;
 }

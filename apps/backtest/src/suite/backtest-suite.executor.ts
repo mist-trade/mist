@@ -11,6 +11,7 @@ import {
   BacktestRun,
   BacktestRunStatus,
   BacktestTradeResult,
+  type BacktestTargetIssue,
 } from '@app/shared-data';
 import {
   DEFAULT_BROKER_INITIAL_CASH,
@@ -28,6 +29,8 @@ import type { ClosedTradeInput } from '@app/indicators';
 import { BacktestRunExecutor } from '../backtest-run.executor';
 
 export type ChildRunExecutorFn = (runId: number) => Promise<void>;
+
+const MIN_CAPITAL_TARGET_COUNT = 1;
 
 @Injectable()
 export class BacktestSuiteExecutor {
@@ -100,11 +103,17 @@ export class BacktestSuiteExecutor {
       };
 
       const orchestrator = new WalkForwardOrchestrator();
+      const normalizedUniverse = normalizeTargetUniverse(
+        masterRun.targetUniverse,
+      );
+      const suiteInitialCapital = resolvePortfolioInitialCash(
+        normalizedUniverse.length,
+      );
 
       const report = await orchestrator.execute({
         suiteId: masterRun.suiteId ?? `wfa-${masterRun.id}`,
         sliceOptions,
-        initialCapital: DEFAULT_BROKER_INITIAL_CASH,
+        initialCapital: suiteInitialCapital,
         runner: async (fold) => {
           this.logger.log(
             `WFA Fold ${fold.foldIndex}: Train [${fold.trainStartDate} ~ ${fold.trainEndDate}], Test [${fold.testStartDate} ~ ${fold.testEndDate}]`,
@@ -250,10 +259,16 @@ export class BacktestSuiteExecutor {
       }
 
       const orchestrator = new StressTestingSuiteOrchestrator();
+      const explicitUniverse = normalizeTargetUniverse(
+        masterRun.targetUniverse,
+      );
+      const suiteInitialCash = resolvePortfolioInitialCash(
+        explicitUniverse.length,
+      );
 
       const report = await orchestrator.execute({
         scenarios,
-        initialCash: DEFAULT_BROKER_INITIAL_CASH,
+        initialCash: suiteInitialCash,
         failFast: false,
         runner: async (scenario) => {
           this.logger.log(
@@ -261,10 +276,9 @@ export class BacktestSuiteExecutor {
           );
 
           const targetUniverse =
-            scenario.recommendedUniverse &&
-            scenario.recommendedUniverse.length > 0
-              ? [...scenario.recommendedUniverse]
-              : masterRun.targetUniverse;
+            explicitUniverse.length > 0
+              ? [...explicitUniverse]
+              : normalizeTargetUniverse(scenario.recommendedUniverse);
 
           const childRun = await this.runRepository.save(
             this.runRepository.create({
@@ -299,10 +313,17 @@ export class BacktestSuiteExecutor {
             (p) => p.totalEquity,
           );
 
+          const effectiveTargetCount = resolveEffectiveTargetCount(
+            completedChild?.targetUniverse ?? targetUniverse,
+            completedChild?.targetIssues,
+          );
+          const scenarioInitialCash =
+            resolvePortfolioInitialCash(effectiveTargetCount);
+
           return {
             navSeries,
             trades: trades.map(mapDbTradeToIndicatorInput),
-            initialCash: DEFAULT_BROKER_INITIAL_CASH,
+            initialCash: scenarioInitialCash,
             rawResult: completedChild,
           };
         },
@@ -362,6 +383,45 @@ export class BacktestSuiteExecutor {
     }
     await this.runExecutor.execute(childRunId);
   }
+}
+
+function normalizeTargetUniverse(
+  universe: readonly string[] | null | undefined,
+): string[] {
+  if (!Array.isArray(universe)) return [];
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  for (const raw of universe) {
+    if (typeof raw !== 'string') continue;
+    const code = raw.trim();
+    if (code.length === 0 || seen.has(code)) continue;
+    seen.add(code);
+    normalized.push(code);
+  }
+  return normalized;
+}
+
+function resolveEffectiveTargetCount(
+  targetUniverse: readonly string[] | null | undefined,
+  targetIssues?: readonly BacktestTargetIssue[] | null,
+): number {
+  const normalized = normalizeTargetUniverse(targetUniverse);
+  if (!Array.isArray(targetIssues) || targetIssues.length === 0) {
+    return normalized.length;
+  }
+  const failedCodes = new Set(
+    targetIssues
+      .map((issue) =>
+        typeof issue.securityCode === 'string' ? issue.securityCode.trim() : '',
+      )
+      .filter((code) => code.length > 0),
+  );
+  return normalized.filter((code) => !failedCodes.has(code)).length;
+}
+
+function resolvePortfolioInitialCash(effectiveTargetCount: number): number {
+  const scale = Math.max(MIN_CAPITAL_TARGET_COUNT, effectiveTargetCount);
+  return scale * DEFAULT_BROKER_INITIAL_CASH;
 }
 
 function mapDbTradeToIndicatorInput(

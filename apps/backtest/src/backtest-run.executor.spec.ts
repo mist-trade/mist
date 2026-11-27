@@ -740,6 +740,99 @@ describe('BacktestRunExecutor 统一内核回放', () => {
     );
   });
 
+  it('computes tradeCount, winRate, and profitLossRatio before flushTrades drains the trades buffer', async () => {
+    const fixture = executor();
+    const run = {
+      ...fixture.current,
+      targetUniverse: ['600000.SH'],
+      period: Period.DAY,
+      startDate: new Date('2026-01-01T00:00:00.000Z'),
+      endDate: new Date('2026-01-31T00:00:00.000Z'),
+      kind: 'decision_flow',
+    };
+    fixture.dependencies.runRepository.findOne.mockResolvedValue(run);
+
+    const sellRuleFlow = LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'lt', value: 9.9 },
+      'exit',
+    );
+    const buyRuleFlow = LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'gt', value: 10.1 },
+      'entry',
+    );
+    const rootNode = {
+      ...sellRuleFlow,
+      onFail: buyRuleFlow,
+    };
+
+    fixture.dependencies.versionRepository.findOne.mockResolvedValue({
+      id: 7,
+      ruleSchemaVersion: StrategyRuleSchemaVersion.V1,
+      rule: {
+        rootNode,
+        requiredBarCount: 1,
+      },
+      signalKind: 'entry',
+    });
+    fixture.dependencies.securityRepository.find.mockResolvedValue([
+      { id: 9, code: '600000.SH', name: '浦发银行' },
+    ]);
+    fixture.dependencies.marketData.loadReplayWindow.mockResolvedValue({
+      bars: [],
+    });
+
+    const dailyBar = (
+      iso: string,
+      open: number,
+      close: number,
+    ): StrategyBar => ({
+      securityId: 9,
+      securityCode: '600000.SH',
+      source: 'tdx',
+      period: Period.DAY,
+      timestamp: new Date(iso),
+      open,
+      high: Math.max(open, close) + 0.1,
+      low: Math.min(open, close) - 0.1,
+      close,
+      volume: '100000',
+      amount: String(Math.round(close * 100000)),
+      type: 'complete',
+    });
+
+    // 2 笔完整闭环交易：第 1 笔盈利（10.2 买 -> 10.5 卖），第 2 笔亏损（10.2 买 -> 9.6 卖）
+    const bars: StrategyBar[] = [
+      dailyBar('2026-01-02T15:00:00.000Z', 10.0, 10.2), // BUY
+      dailyBar('2026-01-05T15:00:00.000Z', 10.2, 10.4), // fill BUY #1
+      dailyBar('2026-01-06T15:00:00.000Z', 10.4, 9.8), // SELL
+      dailyBar('2026-01-07T15:00:00.000Z', 10.5, 10.0), // fill SELL #1 (win), close=10.0 neutral
+      dailyBar('2026-01-08T15:00:00.000Z', 10.0, 10.2), // BUY
+      dailyBar('2026-01-09T15:00:00.000Z', 10.2, 10.0), // fill BUY #2
+      dailyBar('2026-01-12T15:00:00.000Z', 10.0, 9.7), // SELL
+      dailyBar('2026-01-13T15:00:00.000Z', 9.6, 10.0), // fill SELL #2 (loss), close=10.0 neutral
+    ];
+
+    fixture.dependencies.marketData.readReplayPage.mockResolvedValueOnce({
+      bars,
+      nextAfterTimestamp: undefined,
+    });
+
+    await fixture.instance.execute(fixture.current.id);
+
+    expect(fixture.dependencies.tradeRepository.insert).toHaveBeenCalledTimes(
+      1,
+    );
+    const insertedTrades =
+      fixture.dependencies.tradeRepository.insert.mock.calls[0][0];
+    expect(insertedTrades).toHaveLength(2);
+
+    const completedUpdate = completedUpdateCall(fixture);
+    expect(completedUpdate.status).toBe(BacktestRunStatus.COMPLETED);
+    expect(completedUpdate.tradeCount).toBe(2);
+    expect(completedUpdate.winRate).toBe(0.5);
+    expect(completedUpdate.profitLossRatio).toBeGreaterThan(0);
+  });
+
   it('delegates master suite runs to BacktestSuiteExecutor when scenarioId is WFA or STRESS_SUITE', async () => {
     const fixture = executor();
     fixture.dependencies.suiteExecutor.isMasterSuiteRun.mockReturnValue(true);

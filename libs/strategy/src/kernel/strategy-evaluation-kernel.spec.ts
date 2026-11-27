@@ -1002,4 +1002,242 @@ describe('StrategyEvaluationKernel（多周期窗口）', () => {
     expect(signals[0]?.pivotPrice).toBe(10.5);
     expect(signals[0]?.pivotTime).toBe('2026-01-02T00:00:00.000Z');
   });
+
+  it('预热条转发给 virtualExitPolicy.onPrewarmBar（含主/context 周期与 surveillancePeriods）', async () => {
+    const onPrewarmBar = jest.fn();
+    const policy: VirtualExitPolicyPort = {
+      configure: jest.fn(),
+      onSignal: jest.fn(),
+      onBar: jest.fn().mockReturnValue([]),
+      onPrewarmBar,
+    };
+
+    const registry = makeAlwaysMatchedRegistry();
+    const publicFrom = new Date('2026-01-05T02:00:00.000Z');
+    const kernel = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom,
+      registry,
+      virtualExitPolicy: policy,
+      surveillancePeriods: [5],
+      plans: [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow: createAlwaysMatchedFlow(),
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: { 15: 1 },
+        },
+      ],
+    });
+
+    const pre30 = makeStrategyBar(new Date('2026-01-05T01:30:00.000Z'), 10, 30);
+    const pre15 = makeStrategyBar(new Date('2026-01-05T01:45:00.000Z'), 10, 15);
+    const pre5 = makeStrategyBar(new Date('2026-01-05T01:55:00.000Z'), 10, 5);
+    const pub30 = makeStrategyBar(publicFrom, 10.2, 30);
+
+    await kernel.push(pre30);
+    await kernel.push(pre15);
+    await kernel.push(pre5);
+    await kernel.push(pub30);
+
+    expect(onPrewarmBar).toHaveBeenCalledTimes(3);
+    expect(onPrewarmBar).toHaveBeenNthCalledWith(1, pre30, 30);
+    expect(onPrewarmBar).toHaveBeenNthCalledWith(2, pre15, 15);
+    expect(onPrewarmBar).toHaveBeenNthCalledWith(3, pre5, 5);
+  });
+
+  it('跨计划去重 contextPrefetchSpecs 且 MissingContextSeriesError 按 plan 隔离而不崩溃兄弟计划', async () => {
+    const sharedCtxEval = jest.fn().mockResolvedValue({
+      action: 'BUY',
+      reason: 'shared ctx ok',
+    });
+    const brokenCtxEval = jest.fn().mockImplementation(async () => {
+      throw new MissingContextSeriesError(5);
+    });
+
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register({
+      id: 'plugin.ctx.shared',
+      name: 'Shared Context',
+      category: 'REGIME',
+      version: '1.0.0',
+      description: 'shared',
+      role: 'context',
+      evaluate: sharedCtxEval,
+    });
+    registry.register({
+      id: 'plugin.ctx.broken',
+      name: 'Broken Context',
+      category: 'REGIME',
+      version: '1.0.0',
+      description: 'broken',
+      role: 'context',
+      evaluate: brokenCtxEval,
+    });
+
+    const sharedFlow: DecisionFlowNode = {
+      id: 'guard_shared',
+      type: 'GUARD',
+      name: 'shared',
+      pluginId: 'plugin.ctx.shared',
+      requiredAction: 'BUY',
+      onPass: {
+        id: 'term_shared',
+        type: 'TERMINAL',
+        action: 'BUY',
+        signalTag: 'SHARED_OK',
+      },
+    };
+    const brokenFlow: DecisionFlowNode = {
+      id: 'guard_broken',
+      type: 'GUARD',
+      name: 'broken',
+      pluginId: 'plugin.ctx.broken',
+      requiredAction: 'BUY',
+      onPass: {
+        id: 'term_broken',
+        type: 'TERMINAL',
+        action: 'BUY',
+        signalTag: 'BROKEN_OK',
+      },
+    };
+
+    const bar = makeStrategyBar(new Date('2026-01-05T02:00:00.000Z'), 10, 30);
+    const kernel = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bar.timestamp,
+      registry,
+      plans: [
+        {
+          definitionId: 101,
+          versionId: 1,
+          flow: sharedFlow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 102,
+          versionId: 1,
+          flow: sharedFlow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 103,
+          versionId: 1,
+          flow: brokenFlow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+    });
+
+    const signals = await kernel.push(bar);
+    // Plan 101 与 102 共用同一个 context cacheKey，每 Bar 仅预取一次；Plan 103 fail-closed 跳过
+    expect(sharedCtxEval).toHaveBeenCalledTimes(1);
+    expect(brokenCtxEval).toHaveBeenCalledTimes(1);
+    expect(signals.map((s) => s.definitionId)).toEqual([101, 102]);
+    expect(kernel.diagnostics().planSkips).toBe(1);
+  });
+
+  it('同 Bar 多计划之间隔离 context.attributes（EXTRACTOR 写入不泄漏给兄弟计划）', async () => {
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register({
+      id: 'plugin.ext.writer',
+      name: 'Writer',
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'writes attribute',
+      evaluate: async () => ({
+        action: 'NEUTRAL',
+        reason: 'write',
+        evidence: { flag: 'POISONED' },
+      }),
+    });
+    registry.register(new AlwaysBuyPlugin());
+
+    const writerPlanFlow: DecisionFlowNode = {
+      id: 'ext_1',
+      type: 'EXTRACTOR',
+      name: '提取污染属性',
+      pluginId: 'plugin.ext.writer',
+      exportAttributeKey: 'shared.leak',
+      next: {
+        id: 'guard_w',
+        type: 'GUARD',
+        name: '买',
+        pluginId: 'plugin.test.always-buy',
+        requiredAction: 'BUY',
+        onPass: { id: 'term_w', type: 'TERMINAL', action: 'BUY' },
+      },
+    };
+    const readerPlanFlow: DecisionFlowNode = {
+      id: 'branch_r',
+      type: 'BRANCH',
+      name: '检测污染',
+      condition: {
+        attributeKey: 'shared.leak.flag',
+        operator: 'eq',
+        value: 'POISONED',
+      },
+      branches: {
+        true: {
+          id: 'term_leaked',
+          type: 'TERMINAL',
+          action: 'BUY',
+          signalTag: 'LEAKED',
+        },
+        false: {
+          id: 'term_clean',
+          type: 'TERMINAL',
+          action: 'BUY',
+          signalTag: 'CLEAN',
+        },
+      },
+    };
+
+    const bar = makeStrategyBar(new Date('2026-01-05T02:00:00.000Z'), 10, 30);
+    const kernel = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bar.timestamp,
+      registry,
+      plans: [
+        {
+          definitionId: 201,
+          versionId: 1,
+          flow: writerPlanFlow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 202,
+          versionId: 1,
+          flow: readerPlanFlow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+    });
+
+    const signals = await kernel.push(bar);
+    expect(signals).toHaveLength(2);
+    expect(signals[1]?.definitionId).toBe(202);
+    expect(signals[1]?.signalType).toBe('CLEAN');
+  });
 });

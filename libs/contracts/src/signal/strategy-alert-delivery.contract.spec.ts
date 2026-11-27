@@ -1,6 +1,7 @@
 import {
   alertDeliveryChannelJobId,
   alertDeliveryFanoutJobId,
+  alertDeliverySweepFanoutJobId,
   decodeAlertDeliveryChannelJobV2,
   decodeAlertDeliveryFanoutJobV2,
 } from './strategy-alert-delivery.contract';
@@ -174,6 +175,36 @@ describe('strategy-alert-delivery contract', () => {
       expect(qq).not.toBe(wechat);
       expect(qq).toBe('deliver-channel-v2-9-1795485600000-qq');
       expect(wechat).toBe('deliver-channel-v2-9-1795485600000-wechat');
+    });
+
+    it('sweep fanout jobId avoids primary fanout collision, is order-insensitive for identical ids, and distinguishes different id sets', () => {
+      const primary = alertDeliveryFanoutJobId({
+        contractVersion: 2,
+        group: { ...GROUP },
+        alertEventIds: [5, 6],
+      });
+      const sweepAsc = alertDeliverySweepFanoutJobId({
+        contractVersion: 2,
+        group: { ...GROUP },
+        alertEventIds: [5, 6],
+      });
+      const sweepDesc = alertDeliverySweepFanoutJobId({
+        contractVersion: 2,
+        group: { ...GROUP },
+        alertEventIds: [6, 5],
+      });
+      const sweepSubset = alertDeliverySweepFanoutJobId({
+        contractVersion: 2,
+        group: { ...GROUP },
+        alertEventIds: [5],
+      });
+
+      expect(sweepAsc).not.toBe(primary);
+      expect(sweepAsc).toMatch(
+        /^deliver-fanout-sweep-v2-9-1795485600000-[a-f0-9]+$/,
+      );
+      expect(sweepAsc).toBe(sweepDesc);
+      expect(sweepAsc).not.toBe(sweepSubset);
     });
   });
 });

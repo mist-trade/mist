@@ -98,6 +98,7 @@ import {
   SESSION_INACTIVE_TTL_MS,
   MAX_DEV_SESSIONS,
   MAX_SNAPSHOT_DUMP_FILES,
+  MAX_VISUAL_COMMANDS_CACHE_ENTRIES,
 } from './strategy-dev.constants';
 
 const PORT = Number(process.env.PORT) || DEFAULT_DEV_PORT;
@@ -255,11 +256,11 @@ function toStrategyBar(
   period: number,
   securityId = DEFAULT_DEV_SECURITY_ID,
   source: StrategyMarketSource = DEFAULT_DEV_MARKET_SOURCE,
-  securityCode = DEFAULT_DEV_SECURITY_CODE,
+  securityCode?: string,
 ): StrategyBar {
   return Object.freeze({
     securityId,
-    securityCode: rawK.symbol || securityCode,
+    securityCode: securityCode || rawK.symbol || DEFAULT_DEV_SECURITY_CODE,
     source,
     period,
     timestamp: new Date(rawK.time || rawK.timestamp),
@@ -546,6 +547,122 @@ const sessionStreamClients = new Map<string, Set<http.ServerResponse>>();
 // 回测信号内存缓存池 (cacheKey -> signals, runId -> signals)
 const backtestSignalsCache = new Map<string, readonly SimulationSignal[]>();
 const backtestRunSignalsMap = new Map<number, readonly SimulationSignal[]>();
+
+/** 有界 LRU 内存缓存（防模块级缓存无界增长） */
+class BoundedLruCache<K, V> {
+  private readonly cache = new Map<K, V>();
+
+  constructor(
+    private readonly maxEntries: number = MAX_VISUAL_COMMANDS_CACHE_ENTRIES,
+  ) {}
+
+  public get(key: K): V | undefined {
+    if (!this.cache.has(key)) return undefined;
+    const value = this.cache.get(key) as V;
+    this.cache.delete(key);
+    this.cache.set(key, value);
+    return value;
+  }
+
+  public set(key: K, value: V): void {
+    if (this.maxEntries <= 0) return;
+    if (this.cache.has(key)) {
+      this.cache.delete(key);
+    } else if (this.cache.size >= this.maxEntries) {
+      const oldestKey = this.cache.keys().next().value;
+      if (oldestKey !== undefined) {
+        this.cache.delete(oldestKey);
+      }
+    }
+    this.cache.set(key, value);
+  }
+
+  public get size(): number {
+    return this.cache.size;
+  }
+
+  public clear(): void {
+    this.cache.clear();
+  }
+}
+
+// 统一绘图指令流模块级有界缓存 (防大时序重复同步阻塞计算)
+const visualCommandsCache = new BoundedLruCache<string, unknown>(
+  MAX_VISUAL_COMMANDS_CACHE_ENTRIES,
+);
+
+/**
+ * 为外部上下文标的分配严格 < 0 且与主标的 DEFAULT_DEV_SECURITY_ID (1) 互斥的合成 securityId，
+ * 确保 StrategyEvaluationKernel 将其严格路由至外部上下文窗口而不污染主标的滑窗。
+ */
+function resolveExternalSecurityIds(
+  requirements: readonly ExternalContextRequirement[],
+): ReadonlyMap<string, number> {
+  const byCode = new Map<string, number>();
+  const reservedByKernel = new Map<number, string>();
+  for (const req of requirements) {
+    const key = req.securityId ?? -1;
+    if (!reservedByKernel.has(key)) {
+      reservedByKernel.set(key, req.securityCode);
+    }
+  }
+
+  const usedIds = new Set<number>();
+  let nextSynthetic = -1;
+  for (const req of requirements) {
+    if (byCode.has(req.securityCode)) continue;
+    let assigned: number;
+    if (
+      typeof req.securityId === 'number' &&
+      Number.isSafeInteger(req.securityId) &&
+      req.securityId < 0 &&
+      !usedIds.has(req.securityId)
+    ) {
+      assigned = req.securityId;
+    } else {
+      while (
+        usedIds.has(nextSynthetic) ||
+        (reservedByKernel.has(nextSynthetic) &&
+          reservedByKernel.get(nextSynthetic) !== req.securityCode)
+      ) {
+        nextSynthetic -= 1;
+      }
+      assigned = nextSynthetic;
+      nextSynthetic -= 1;
+    }
+    usedIds.add(assigned);
+    byCode.set(req.securityCode, assigned);
+  }
+  return byCode;
+}
+
+/**
+ * 构造本地仿真外部上下文 K 线序列：显式向 toStrategyBar 注入负合成 securityId、
+ * DEFAULT_DEV_MARKET_SOURCE 与 req.securityCode，杜绝默认 securityId=1 混入主标的滑窗。
+ */
+function buildExternalSimulationBars(
+  requirements: readonly ExternalContextRequirement[],
+  loadKlines: (req: ExternalContextRequirement) => readonly any[],
+): StrategyBar[] {
+  const securityIdByCode = resolveExternalSecurityIds(requirements);
+  const externalBars: StrategyBar[] = [];
+  for (const req of requirements) {
+    const syntheticSecurityId = securityIdByCode.get(req.securityCode) ?? -1;
+    const klines = loadKlines(req);
+    for (const k of klines) {
+      externalBars.push(
+        toStrategyBar(
+          k,
+          req.period,
+          syntheticSecurityId,
+          DEFAULT_DEV_MARKET_SOURCE,
+          req.securityCode,
+        ),
+      );
+    }
+  }
+  return externalBars;
+}
 
 function getBacktestCacheKey(options: {
   code: string;
@@ -1216,7 +1333,10 @@ async function runUnifiedSimulationBacktest(options: RunBacktestOptions) {
   };
 }
 
-const server = http.createServer(async (req, res) => {
+async function handleDevRequest(
+  req: http.IncomingMessage,
+  res: http.ServerResponse,
+): Promise<void> {
   const parsedUrl = url.parse(req.url || '', true);
   const pathname = parsedUrl.pathname || '';
 
@@ -1325,9 +1445,6 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // 统一绘图指令流内存缓存 (防大时序重复同步阻塞计算)
-  const visualCommandsCache = new Map<string, any>();
-
   // 3. 统一绘图指令流: GET /v1/visual/commands (纯几何，严格遵守架构红线)
   if (pathname.endsWith('/v1/visual/commands') && req.method === 'GET') {
     const code = resolveSecurityCode(
@@ -1340,7 +1457,7 @@ const server = http.createServer(async (req, res) => {
       parsedUrl.query.filterFenxingContainment === 'true' ||
       parsedUrl.query.filterFenxingContainment === '1';
 
-    const cacheKey = `${code}:${period}:${filterFenxingContainment}:${parsedUrl.query.includeBsp || ''}:${parsedUrl.query.startDate || ''}:${parsedUrl.query.endDate || ''}`;
+    const cacheKey = `${code}:${period}:${source}:${filterFenxingContainment}:${parsedUrl.query.includeBsp || ''}:${parsedUrl.query.startDate || ''}:${parsedUrl.query.endDate || ''}`;
     const cached = visualCommandsCache.get(cacheKey);
     if (cached) {
       sendJson(res, cached);
@@ -1413,7 +1530,16 @@ const server = http.createServer(async (req, res) => {
       const filterFenxingContainment = Boolean(body.filterFenxingContainment);
 
       const fullKlines = loadCanonicalKlines({ code, period });
-      const bars = fullKlines.map((k) => toStrategyBar(k, period));
+      const bars = fullKlines.map((k) =>
+        toStrategyBar(
+          k,
+          period,
+          DEFAULT_DEV_SECURITY_ID,
+          (k as { source?: StrategyMarketSource }).source ??
+            DEFAULT_DEV_MARKET_SOURCE,
+          code,
+        ),
+      );
       let flow = body.flow;
       let ruleSnapshot = body.ruleSnapshot;
       let windowBudget = body.windowBudget;
@@ -1438,29 +1564,20 @@ const server = http.createServer(async (req, res) => {
       }
       flow ||= createCustomDecisionFlow();
 
-      // 跨标的依赖：为声明的外部标的加载本地日线（同 period），按因果序归并推入
-      const externalBars = (externalContextRequirements ?? [])
-        .flatMap((req) => {
+      // 跨标的依赖：为声明的外部标的加载本地日线（同 period），赋予负合成 securityId 按因果序归并推入
+      const externalBars = buildExternalSimulationBars(
+        externalContextRequirements ?? [],
+        (req) => {
           try {
             return loadCanonicalKlines({
               code: req.securityCode,
               period: req.period,
-            }).map((k) => toStrategyBar(k, req.period));
+            });
           } catch {
             return [];
           }
-        })
-        .map((bar) =>
-          bar.securityId === undefined
-            ? {
-                ...bar,
-                securityId:
-                  externalContextRequirements?.find(
-                    (req) => req.securityCode === bar.securityCode,
-                  )?.securityId ?? -1,
-              }
-            : bar,
-        );
+        },
+      );
 
       const session = new StrategySimulationSession(bars, {
         securityCode: code,
@@ -1533,14 +1650,15 @@ const server = http.createServer(async (req, res) => {
         },
       });
 
-      // 超时无活动自动清理
-      setTimeout(() => {
+      // 超时无活动自动清理（unref 避免阻塞测试/进程优雅退出）
+      const inactivityTimer = setTimeout(() => {
         if (activeSessions.has(session.sessionId)) {
           activeSessions.get(session.sessionId)?.destroy();
           activeSessions.delete(session.sessionId);
           sessionStreamClients.delete(session.sessionId);
         }
       }, SESSION_INACTIVE_TTL_MS);
+      inactivityTimer.unref?.();
 
       sendJson(res, session.getSummary(), DEV_HTTP_STATUS.CREATED);
     } catch (err: any) {
@@ -2199,7 +2317,9 @@ const server = http.createServer(async (req, res) => {
 
   // 默认 404
   sendJson(res, { error: 'Not Found', path: pathname }, 404);
-});
+}
+
+const server = http.createServer(handleDevRequest);
 
 // 会话级单测经 DEV_SERVER_AUTOSTART=false 复用本模块导出，不启动 HTTP 监听
 if (process.env.DEV_SERVER_AUTOSTART !== 'false') {
@@ -2256,4 +2376,11 @@ if (process.env.DEV_SERVER_AUTOSTART !== 'false') {
   });
 }
 
-export { runUnifiedSimulationBacktest };
+export {
+  runUnifiedSimulationBacktest,
+  BoundedLruCache,
+  visualCommandsCache,
+  resolveExternalSecurityIds,
+  buildExternalSimulationBars,
+  handleDevRequest,
+};

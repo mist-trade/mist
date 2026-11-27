@@ -66,6 +66,7 @@ export class StrategyEvaluationKernel {
   private readonly evaluator: DecisionFlowEvaluator;
   private readonly registry: FactorPluginRegistry;
   private readonly contextPrefetchSpecs: readonly ContextPrefetchSpec[];
+  private readonly prefetchPeriodsByCacheKey = new Map<string, Set<number>>();
   private readonly windows = new Map<number, StrategySeriesImputer>();
 
   private readonly externalWindows = new Map<string, ExternalWindowState>();
@@ -183,9 +184,21 @@ export class StrategyEvaluationKernel {
     const registry = config.registry ?? new InMemoryFactorPluginRegistry();
     this.registry = registry;
     this.evaluator = new DecisionFlowEvaluator({ registry });
-    this.contextPrefetchSpecs = this.plans.flatMap((plan) =>
-      collectContextPrefetchSpecs(plan.flow, registry),
-    );
+    const dedupedPrefetch = new Map<string, ContextPrefetchSpec>();
+    for (const plan of this.plans) {
+      for (const spec of collectContextPrefetchSpecs(plan.flow, registry)) {
+        if (!dedupedPrefetch.has(spec.cacheKey)) {
+          dedupedPrefetch.set(spec.cacheKey, spec);
+        }
+        let periods = this.prefetchPeriodsByCacheKey.get(spec.cacheKey);
+        if (!periods) {
+          periods = new Set<number>();
+          this.prefetchPeriodsByCacheKey.set(spec.cacheKey, periods);
+        }
+        periods.add(plan.period);
+      }
+    }
+    this.contextPrefetchSpecs = [...dedupedPrefetch.values()];
 
     // 通道级虚拟出场：收集各插件声明的规则，一次性交给外部策略实现。
     this.virtualExitPolicy = config.virtualExitPolicy;
@@ -242,6 +255,7 @@ export class StrategyEvaluationKernel {
         (this.preWarmActual.get(bar.period) ?? 0) + 1,
       );
       this.cursors.set(bar.period, bar.timestamp.getTime());
+      this.virtualExitPolicy?.onPrewarmBar?.(bar, bar.period);
       return [];
     }
 
@@ -299,6 +313,7 @@ export class StrategyEvaluationKernel {
     }
     this.surveillanceCursors.set(bar.period, ts);
     if (ts < this.publicFrom.getTime()) {
+      this.virtualExitPolicy?.onPrewarmBar?.(bar, bar.period);
       return [];
     }
     this.publicBarCount += 1;
@@ -525,31 +540,69 @@ export class StrategyEvaluationKernel {
    *  role:'context' 插件 (pluginId, params) 组合每 Bar 预求值一次，opinion 写入
    *  黑板；GUARD/EXTRACTOR 节点按相同键读缓存，不再逐 flow 重复求值。
    *  context 插件严禁作为终端信号发射源（状态可见性走 decisionTrace.trace）。 */
-  private async prefetchContextOpinions(context: FactorContext): Promise<void> {
+  private async prefetchContextOpinions(
+    baseContext: FactorContext,
+    missingContextErrors: Map<string, Error>,
+  ): Promise<void> {
     for (const spec of this.contextPrefetchSpecs) {
+      if (
+        !this.prefetchPeriodsByCacheKey
+          .get(spec.cacheKey)
+          ?.has(baseContext.period)
+      ) {
+        continue;
+      }
       const plugin = this.registry.get(spec.pluginId);
       if (!plugin) continue;
-      const opinion = await plugin.evaluate(context, spec.params);
-      context.attributes.set(spec.cacheKey, opinion);
+      const callContext: FactorContext = {
+        ...baseContext,
+        attributes: new Map(baseContext.attributes),
+      };
+      try {
+        const opinion = await plugin.evaluate(callContext, spec.params);
+        baseContext.attributes.set(spec.cacheKey, opinion);
+      } catch (error) {
+        if (isMissingContextSeriesError(error)) {
+          missingContextErrors.set(spec.cacheKey, error);
+          continue;
+        }
+        throw error;
+      }
     }
   }
 
   /** 预热相静默求值：仅推进该周期 plan 的插件游标，信号全部丢弃。 */
   private async evaluateSilent(period: number, timestamp: Date): Promise<void> {
-    const context = this.buildContext(timestamp, period);
-    await this.prefetchContextOpinions(context);
+    const baseContext = this.buildContext(timestamp, period);
+    const missingContextErrors = new Map<string, Error>();
+    await this.prefetchContextOpinions(baseContext, missingContextErrors);
     for (const plan of this.plans) {
       if (plan.period !== period) continue;
       if (!this.contextReady(plan)) continue;
-      await this.evaluator.evaluate(plan.flow, context);
+      const planContext: FactorContext = {
+        ...baseContext,
+        attributes: new Map(baseContext.attributes),
+      };
+      try {
+        await this.evaluator.evaluate(plan.flow, planContext, {
+          planScope: planScopeOf(plan),
+          missingContextErrors,
+        });
+      } catch (error) {
+        if (isMissingContextSeriesError(error)) {
+          continue;
+        }
+        throw error;
+      }
     }
   }
 
   private async evaluatePublic(
     bar: StrategyBar,
   ): Promise<readonly KernelSignal[]> {
-    const context = this.buildContext(bar.timestamp, bar.period);
-    await this.prefetchContextOpinions(context);
+    const baseContext = this.buildContext(bar.timestamp, bar.period);
+    const missingContextErrors = new Map<string, Error>();
+    await this.prefetchContextOpinions(baseContext, missingContextErrors);
     const signals: KernelSignal[] = [];
     for (const plan of this.plans) {
       if (plan.period !== bar.period) continue;
@@ -557,9 +610,16 @@ export class StrategyEvaluationKernel {
         this.planSkips += 1;
         continue;
       }
+      const planContext: FactorContext = {
+        ...baseContext,
+        attributes: new Map(baseContext.attributes),
+      };
       let decision: DecisionResult;
       try {
-        decision = await this.evaluator.evaluate(plan.flow, context);
+        decision = await this.evaluator.evaluate(plan.flow, planContext, {
+          planScope: planScopeOf(plan),
+          missingContextErrors,
+        });
       } catch (error) {
         if (isMissingContextSeriesError(error)) {
           // 插件读了未声明的 context 周期：显式跳过该 plan（fail-closed），
@@ -680,6 +740,10 @@ interface ExternalWindowState {
 
 function externalWindowKey(securityCode: string, period: number): string {
   return `${securityCode}\u0000${period}`;
+}
+
+function planScopeOf(plan: KernelPlan): string {
+  return `${plan.definitionId}:${plan.versionId}:${plan.period}`;
 }
 
 function assertPositiveInteger(value: unknown, label: string): void {

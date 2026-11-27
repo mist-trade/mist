@@ -107,10 +107,14 @@ export class RealtimePeriodBuilder {
     if (periods.has(1440)) {
       const dayKey = `${trigger.securityId}\u0000${trigger.source}\u00001440\u0000day`;
       const tradingDayMs = shanghaiMidnightOf(trigger.timestamp).getTime();
-      const daySlot = this.dailyPending.get(dayKey) ?? {
-        tradingDayMs,
-        buckets: new Map<number, StrategyBar>(),
-      };
+      const existingDaySlot = this.dailyPending.get(dayKey);
+      const daySlot =
+        existingDaySlot && existingDaySlot.tradingDayMs === tradingDayMs
+          ? existingDaySlot
+          : {
+              tradingDayMs,
+              buckets: new Map<number, StrategyBar>(),
+            };
       if (sealedBar) {
         daySlot.buckets.set(trigger.timestamp.getTime(), sealedBar);
       }
@@ -147,7 +151,7 @@ export class RealtimePeriodBuilder {
       groups.map((group) => groupKey(group.securityId, group.source)),
     );
     for (const key of [...this.pending.keys(), ...this.dailyPending.keys()]) {
-      const identity = key.split('\u0000').slice(0, 3).join('\u0000');
+      const identity = key.split('\u0000').slice(0, 2).join('\u0000');
       if (!retained.has(identity)) {
         this.pending.delete(key);
         this.dailyPending.delete(key);

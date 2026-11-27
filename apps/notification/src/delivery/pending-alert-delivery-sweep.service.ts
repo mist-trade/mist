@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Interval } from '@nestjs/schedule';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, LessThanOrEqual, Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import {
   StrategyAlertDelivery,
   StrategyAlertEvent,
@@ -25,6 +25,14 @@ export const PENDING_SWEEP_INTERVAL_MS = 60_000;
 export const PENDING_SWEEP_STALENESS_MS = 5 * 60_000;
 /** Per-pass cap: stranded events are rare; bound the sweep's work per pass. */
 export const PENDING_SWEEP_MAX_PER_PASS = 100;
+
+const ALERT_EVENT_ALIAS = 'e';
+const ALERT_DELIVERY_ALIAS = 'd';
+const DELIVERY_JOIN_CONDITION = 'd.strategyAlertEventId = e.id';
+const FILTER_PENDING_STATUS = 'e.status = :status';
+const FILTER_STALE_CREATED_AT = 'e.createdAt <= :cutoff';
+const FILTER_MISSING_DELIVERY = 'd.id IS NULL';
+const ORDER_BY_EVENT_ID = 'e.id';
 
 /**
  * Outbox-style recovery relay (remediate-alert-delivery-integrity M2): the
@@ -51,8 +59,6 @@ export class PendingAlertDeliverySweepService {
   constructor(
     @InjectRepository(StrategyAlertEvent)
     private readonly alertEvents: Repository<StrategyAlertEvent>,
-    @InjectRepository(StrategyAlertDelivery)
-    private readonly deliveries: Repository<StrategyAlertDelivery>,
     @InjectRepository(StrategySignal)
     private readonly signals: Repository<StrategySignal>,
     private readonly queue: AlertDeliveryQueueService,
@@ -125,7 +131,7 @@ export class PendingAlertDeliverySweepService {
     }
 
     for (const { descriptor, ids } of groups.values()) {
-      await this.queue.enqueueFanout(descriptor, ids);
+      await this.queue.enqueueSweepFanout(descriptor, ids);
       this.logger.log(
         `sweep re-enqueued group fanout securityId=${descriptor.securityId} ` +
           `effectiveTime=${descriptor.effectiveTime} events=[${ids.join(',')}]`,
@@ -135,25 +141,19 @@ export class PendingAlertDeliverySweepService {
   }
 
   private async findStranded(): Promise<StrategyAlertEvent[]> {
-    const stranded = await this.alertEvents.find({
-      where: {
-        status: StrategyAlertStatus.PENDING,
-        createdAt: LessThanOrEqual(
-          new Date(Date.now() - PENDING_SWEEP_STALENESS_MS),
-        ),
-      },
-      take: PENDING_SWEEP_MAX_PER_PASS,
-    });
-    if (stranded.length === 0) return [];
-    // Events with any delivery row (in-flight, retrying, or replay-reset
-    // PENDING with FAILED rows) are owned by the normal pipeline; only events
-    // the fanout never touched are stranded.
-    const ids = stranded.map((event) => event.id);
-    const withRows = await this.deliveries.find({
-      where: { strategyAlertEventId: In(ids) },
-      select: ['strategyAlertEventId'],
-    });
-    const rowed = new Set(withRows.map((row) => row.strategyAlertEventId));
-    return stranded.filter((event) => !rowed.has(event.id));
+    const cutoff = new Date(Date.now() - PENDING_SWEEP_STALENESS_MS);
+    return await this.alertEvents
+      .createQueryBuilder(ALERT_EVENT_ALIAS)
+      .leftJoin(
+        StrategyAlertDelivery,
+        ALERT_DELIVERY_ALIAS,
+        DELIVERY_JOIN_CONDITION,
+      )
+      .where(FILTER_PENDING_STATUS, { status: StrategyAlertStatus.PENDING })
+      .andWhere(FILTER_STALE_CREATED_AT, { cutoff })
+      .andWhere(FILTER_MISSING_DELIVERY)
+      .orderBy(ORDER_BY_EVENT_ID, 'ASC')
+      .limit(PENDING_SWEEP_MAX_PER_PASS)
+      .getMany();
   }
 }

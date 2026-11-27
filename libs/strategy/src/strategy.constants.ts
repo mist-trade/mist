@@ -98,3 +98,7 @@ export const TRADING_LAYER_DEFAULTS = Object.freeze({
   DEFAULT_LOT_SIZE: 100,
   DEFAULT_SEED_CAPITAL: 1_000_000,
 } as const);
+
+export const FACTOR_EVALUATION_SCOPE_SYMBOL = Symbol(
+  'mist.strategy.factorEvaluationScope',
+);

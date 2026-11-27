@@ -98,12 +98,18 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     const base =
       dto.intentId ??
       `${dto.securityCode}-${dto.side}-${dto.signalTime.getTime()}-${dto.quantity}`;
-    if (!this.pendingOrders.has(`ord-${base}`)) {
-      return `ord-${base}`;
+    const candidate = `ord-${base}`;
+    if (!this.pendingOrders.has(candidate) && !this.orderLog.has(candidate)) {
+      return candidate;
     }
-    // 同复合键的极端重复提交：确定性序号消歧
+    // 同复合键的极端重复提交：确定性序号消歧（同时避开已结束历史订单日志）
     let n = 2;
-    while (this.pendingOrders.has(`ord-${base}-${n}`)) n += 1;
+    while (
+      this.pendingOrders.has(`ord-${base}-${n}`) ||
+      this.orderLog.has(`ord-${base}-${n}`)
+    ) {
+      n += 1;
+    }
     return `ord-${base}-${n}`;
   }
 
@@ -215,39 +221,81 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     }
     const prevClose = this.dailyPreCloseMap.get(secCode) ?? bar.open;
 
-    // 阶段 1：盘中触价止损单优先处理 (STOP 订单)
-    for (const [orderId, order] of this.pendingOrders.entries()) {
-      if (
+    const blockedSellSecurities = new Set<string>();
+    const isLimitDown = isOneWordLimitDown(bar, prevClose, securityName);
+
+    // 阶段 1：盘中触价止损单优先处理 (STOP 订单，仅限 SELL 语义，对齐 sellEntries)
+    const stopEntries = Array.from(this.pendingOrders.entries()).filter(
+      ([, order]) =>
         order.securityCode === secCode &&
         order.orderType === ORDER_TYPES.STOP &&
+        order.side === ORDER_SIDES.SELL &&
+        (order.status === ORDER_STATUSES.PENDING ||
+          order.status === ORDER_STATUSES.BLOCKED) &&
         order.stopPrice !== undefined &&
-        bar.timestamp.getTime() > order.signalTime.getTime()
-      ) {
-        if (bar.open <= order.stopPrice) {
-          // 跳空低开跌破止损价：以开盘价扣滑点成交
-          const fillPrice = applySlippage(bar.open, ORDER_SIDES.SELL);
-          const fill = this.executeFill(order, fillPrice, bar.timestamp);
-          if (fill) {
-            fills.push(fill);
-            this.orderLog.set(orderId, {
-              ...order,
-              status: ORDER_STATUSES.FILLED,
-            });
-            this.pendingOrders.delete(orderId);
-          }
-        } else if (bar.low <= order.stopPrice) {
-          // 盘中下探刺破止损价：以止损价扣滑点成交
-          const fillPrice = applySlippage(order.stopPrice, ORDER_SIDES.SELL);
-          const fill = this.executeFill(order, fillPrice, bar.timestamp);
-          if (fill) {
-            fills.push(fill);
-            this.orderLog.set(orderId, {
-              ...order,
-              status: ORDER_STATUSES.FILLED,
-            });
-            this.pendingOrders.delete(orderId);
-          }
+        bar.timestamp.getTime() > order.signalTime.getTime(),
+    );
+
+    for (const [orderId, order] of stopEntries) {
+      const stopPrice = order.stopPrice!;
+      const triggerBasePrice =
+        bar.open <= stopPrice
+          ? bar.open
+          : bar.low <= stopPrice
+            ? stopPrice
+            : null;
+      if (triggerBasePrice === null) {
+        if (order.status === ORDER_STATUSES.BLOCKED && !isLimitDown) {
+          const pendingOrder: Order = {
+            ...order,
+            status: ORDER_STATUSES.PENDING,
+            rejectReason: undefined,
+          };
+          this.pendingOrders.set(orderId, pendingOrder);
+          this.orderLog.set(orderId, pendingOrder);
         }
+        continue;
+      }
+
+      if (isLimitDown) {
+        const blockedOrder: Order = {
+          ...order,
+          status: ORDER_STATUSES.BLOCKED,
+          rejectReason: ORDER_REJECT_REASONS.SELL_BLOCKED_LIMIT_DOWN,
+        };
+        this.pendingOrders.set(orderId, blockedOrder);
+        this.orderLog.set(orderId, blockedOrder);
+        blockedSellSecurities.add(secCode);
+        continue;
+      }
+
+      const fillPrice = applySlippage(
+        triggerBasePrice,
+        ORDER_SIDES.SELL,
+        this.slippageRatio,
+      );
+      const fill = this.executeFill(order, fillPrice, bar.timestamp);
+      if (fill) {
+        fills.push(fill);
+        this.orderLog.set(orderId, {
+          ...order,
+          status: ORDER_STATUSES.FILLED,
+        });
+        this.pendingOrders.delete(orderId);
+      } else {
+        const pos = this.positionMap.get(order.securityCode);
+        const frozen = pos?.frozenQuantity ?? 0;
+        const available = pos?.availableQuantity ?? 0;
+        const isT1Locked = frozen > 0 && available + frozen >= order.quantity;
+        const rejectedOrder: Order = {
+          ...order,
+          status: ORDER_STATUSES.REJECTED,
+          rejectReason: isT1Locked
+            ? ORDER_REJECT_REASONS.T1_LOCKED_SHARES
+            : ORDER_REJECT_REASONS.INSUFFICIENT_SHARES,
+        };
+        this.orderLog.set(orderId, rejectedOrder);
+        this.pendingOrders.delete(orderId);
       }
     }
 
@@ -270,7 +318,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
     );
 
     for (const [orderId, order] of sellEntries) {
-      if (isOneWordLimitDown(bar, prevClose, securityName)) {
+      if (isLimitDown) {
         // 一字跌停无法卖出，挂起顺延至下一周期
         const blockedOrder: Order = {
           ...order,
@@ -279,6 +327,7 @@ export class SimulatedBroker implements ExecutionBrokerPort {
         };
         this.pendingOrders.set(orderId, blockedOrder);
         this.orderLog.set(orderId, blockedOrder);
+        blockedSellSecurities.add(secCode);
         continue;
       }
 
@@ -307,12 +356,14 @@ export class SimulatedBroker implements ExecutionBrokerPort {
       }
     }
 
-    const hasBlockedSell = Array.from(this.pendingOrders.values()).some(
-      (order) =>
-        order.securityCode === secCode &&
-        order.side === ORDER_SIDES.SELL &&
-        order.status === ORDER_STATUSES.BLOCKED,
-    );
+    const hasBlockedSell =
+      blockedSellSecurities.has(secCode) ||
+      Array.from(this.pendingOrders.values()).some(
+        (order) =>
+          order.securityCode === secCode &&
+          order.side === ORDER_SIDES.SELL &&
+          order.status === ORDER_STATUSES.BLOCKED,
+      );
 
     for (const [orderId, order] of buyEntries) {
       if (hasBlockedSell) {

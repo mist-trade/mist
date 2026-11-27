@@ -370,4 +370,106 @@ describe('StrategySimulationSession — 跨标的 bar 因果归并（任务3）'
       expect(plugin.lastMacroClose).toBe(expected);
     }
   });
+
+  it('日内周期(30m)按 availabilityKey 归并日线(1440)外部数据：15:01 前绝不泄漏当日日线', async () => {
+    const registry = new InMemoryFactorPluginRegistry();
+    const seenByEvalTime = new Map<string, string>();
+    registry.register({
+      id: 'plugin.test.intraday-macro-reader',
+      name: '日内宏观读取器',
+      category: 'TECHNICAL',
+      version: '1.0.0',
+      description: 'test',
+      evaluate: async (ctx) => {
+        const series = ctx.attributes.get('series.880003.1440') as
+          | readonly { rawBar: StrategyBar }[]
+          | undefined;
+        const last = series?.[series.length - 1]?.rawBar;
+        if (last) {
+          seenByEvalTime.set(
+            ctx.timestamp.toISOString(),
+            last.timestamp.toISOString(),
+          );
+        }
+        return { action: 'BUY', reason: 'ok' };
+      },
+    });
+
+    // 上海时间：
+    // - 2026-01-05 日线 (00:00 上海 = 2026-01-04T16:00:00Z)，avail = 2026-01-05T07:01:00Z
+    // - 2026-01-06 日线 (00:00 上海 = 2026-01-05T16:00:00Z)，avail = 2026-01-06T07:01:00Z
+    const jan5Daily: StrategyBar = {
+      securityId: 12,
+      securityCode: '880003',
+      source: 'qmt',
+      period: 1440,
+      timestamp: new Date('2026-01-04T16:00:00.000Z'),
+      open: 100,
+      high: 101,
+      low: 99,
+      close: 100,
+      volume: '1',
+      amount: '1',
+      type: 'complete',
+    };
+    const jan6Daily: StrategyBar = {
+      ...jan5Daily,
+      timestamp: new Date('2026-01-05T16:00:00.000Z'),
+      close: 200,
+    };
+
+    // 目标 30m 序列：
+    // - prewarm: 2026-01-05 15:00 上海 (07:00Z, avail = 07:01Z)
+    // - public 0: 2026-01-06 10:30 上海 (02:30Z, avail = 02:30Z < jan6Daily avail 07:01Z)
+    // - public 1: 2026-01-06 14:30 上海 (06:30Z, avail = 06:30Z < jan6Daily avail 07:01Z)
+    // - public 2: 2026-01-06 15:00 上海 (07:00Z, avail = 07:01Z === jan6Daily avail 07:01Z)
+    const targetBars: StrategyBar[] = [
+      makeStrategyBar(new Date('2026-01-05T07:00:00.000Z'), 10, 30),
+      makeStrategyBar(new Date('2026-01-06T02:30:00.000Z'), 11, 30),
+      makeStrategyBar(new Date('2026-01-06T06:30:00.000Z'), 12, 30),
+      makeStrategyBar(new Date('2026-01-06T07:00:00.000Z'), 13, 30),
+    ];
+
+    const session = new StrategySimulationSession(targetBars, {
+      securityId: 1,
+      securityCode: '000001',
+      period: 30,
+      startDate: new Date('2026-01-06T01:30:00.000Z'), // 09:30 上海（早于 jan6Daily 15:01 可用时刻，但晚于 jan6Daily 00:00 裸时间戳）
+      windowBudget: 1,
+      flow: {
+        id: 'guard',
+        type: 'GUARD',
+        name: 'gate',
+        pluginId: 'plugin.test.intraday-macro-reader',
+        requiredAction: 'BUY',
+        onPass: {
+          id: 'term',
+          type: 'TERMINAL',
+          action: 'BUY',
+          signalTag: 'INTRADAY_EXT',
+          reason: 'pass',
+        },
+      },
+      externalContextRequirements: [
+        { securityCode: '880003', securityId: 12, period: 1440, minBars: 1 },
+      ],
+      externalBars: [jan5Daily, jan6Daily],
+      registry,
+    });
+
+    await session.stepNext(); // 10:30：仅可见 2026-01-05 日线
+    expect(seenByEvalTime.get(targetBars[1].timestamp.toISOString())).toBe(
+      jan5Daily.timestamp.toISOString(),
+    );
+
+    await session.stepNext(); // 14:30：仍不可见 2026-01-06 日线
+    expect(seenByEvalTime.get(targetBars[2].timestamp.toISOString())).toBe(
+      jan5Daily.timestamp.toISOString(),
+    );
+
+    await session.stepNext(); // 15:00 (avail = 15:01)：正式可见 2026-01-06 日线
+    expect(seenByEvalTime.get(targetBars[3].timestamp.toISOString())).toBe(
+      jan6Daily.timestamp.toISOString(),
+    );
+  });
 });

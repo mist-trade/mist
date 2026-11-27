@@ -55,9 +55,22 @@ interface FinalizationCursor {
   readonly bar: StrategyBar | null;
 }
 
+interface PendingFinalizationCommit {
+  readonly timestampMs: number;
+  readonly outcome: 'sealed' | 'discarded';
+  readonly bar: StrategyBar | null;
+  readonly emitted: readonly StrategyBar[];
+  readonly evaluatedByBar: Map<number, readonly ShadowStrategyCandidate[]>;
+  readonly persistedByCandidate: Map<string, LiveStrategyPersistenceResult>;
+}
+
 export class CandleFinalizedJobProcessor {
   private readonly logger = new Logger(CandleFinalizedJobProcessor.name);
   private readonly cursors = new Map<string, FinalizationCursor>();
+  private readonly pendingCommits = new Map<
+    string,
+    PendingFinalizationCommit
+  >();
   private activeTradingDay: string | null = null;
   private lastPersistenceOutcome:
     | LiveStrategyPersistenceOutcome
@@ -122,6 +135,7 @@ export class CandleFinalizedJobProcessor {
       }
       this.activeTradingDay = tradingDay;
       this.cursors.clear();
+      this.pendingCommits.clear();
       this.periodBuilder.reset();
       // 跨日守卫：当日已预热的组必须保留（首根封存 Bar 零历史 I/O）；
       // 仅在没有为该交易日预热的组时才清空评估态。
@@ -137,7 +151,11 @@ export class CandleFinalizedJobProcessor {
     const cursorKey = `${trigger.securityId}\u0000${trigger.source}`;
     const triggerMs = trigger.timestamp.getTime();
     const prior = this.cursors.get(cursorKey);
-    if (prior && triggerMs < prior.timestampMs) {
+    const pendingPrior = this.pendingCommits.get(cursorKey);
+    if (
+      (prior && triggerMs < prior.timestampMs) ||
+      (pendingPrior && triggerMs < pendingPrior.timestampMs)
+    ) {
       return completed('out_of_order_trigger_discarded');
     }
 
@@ -148,12 +166,7 @@ export class CandleFinalizedJobProcessor {
           )
         : null;
     if (prior && triggerMs === prior.timestampMs) {
-      if (
-        prior.outcome === trigger.outcome &&
-        (sealedBar === null
-          ? prior.bar === null
-          : prior.bar !== null && sameBar(prior.bar, sealedBar))
-      ) {
+      if (sameFinalizationIdentity(prior, trigger.outcome, sealedBar)) {
         return Object.freeze({
           outcome: 'completed',
           candidates: Object.freeze([]),
@@ -161,80 +174,105 @@ export class CandleFinalizedJobProcessor {
       }
       throw new Error('conflicting candle finalization identity');
     }
-    // 派生周期集合 = 求值周期 ∪ context 周期（含 1440）
-    const derivedPeriods = new Set<number>();
-    for (const plan of executionPlans) {
-      derivedPeriods.add(plan.period);
-      for (const rawPeriod of Object.keys(plan.contextRequirements ?? {})) {
-        derivedPeriods.add(Number(rawPeriod));
+
+    let pendingCommit: PendingFinalizationCommit;
+    if (pendingPrior && triggerMs === pendingPrior.timestampMs) {
+      if (!sameFinalizationIdentity(pendingPrior, trigger.outcome, sealedBar)) {
+        throw new Error('conflicting candle finalization identity');
+      }
+      pendingCommit = pendingPrior;
+    } else {
+      const derivedPeriods = collectDerivedPeriods(
+        executionPlans,
+        this.evaluation,
+        trigger,
+      );
+      const emitted = this.periodBuilder.accept(
+        trigger,
+        sealedBar,
+        derivedPeriods,
+      );
+      pendingCommit = {
+        timestampMs: triggerMs,
+        outcome: trigger.outcome,
+        bar: sealedBar,
+        emitted,
+        evaluatedByBar: new Map(),
+        persistedByCandidate: new Map(),
+      };
+      this.pendingCommits.set(cursorKey, pendingCommit);
+    }
+    this.lastJobAcceptedTriggerTime = trigger.timestamp.toISOString();
+
+    const candidates: ShadowStrategyCandidate[] = [];
+    const allResults: LiveStrategyPersistenceResult[] = [];
+    for (
+      let barIndex = 0;
+      barIndex < pendingCommit.emitted.length;
+      barIndex += 1
+    ) {
+      const bar = pendingCommit.emitted[barIndex];
+      this.lastJobEvaluationStarted = true;
+      let evaluated = pendingCommit.evaluatedByBar.get(barIndex);
+      if (!evaluated) {
+        evaluated = await this.runStage(deadlineAt, 'analysis_evaluation', () =>
+          this.evaluation.evaluate(bar, executionPlans),
+        );
+        pendingCommit.evaluatedByBar.set(barIndex, evaluated);
+      }
+      this.lastJobEvaluated = true;
+
+      for (let candIndex = 0; candIndex < evaluated.length; candIndex += 1) {
+        const candidate = evaluated[candIndex];
+        if (this.mode === 'on') {
+          if (!this.persistence) {
+            throw new Error('on-mode live strategy persistence is unavailable');
+          }
+          const candKey = `${barIndex}:${candIndex}`;
+          const cached = pendingCommit.persistedByCandidate.get(candKey);
+          if (cached) {
+            this.lastPersistenceOutcome = cached.outcome;
+            allResults.push(cached);
+          } else {
+            try {
+              const result = await this.runStage(
+                deadlineAt,
+                'persistence',
+                async (): Promise<LiveStrategyPersistenceResult> => {
+                  const persisted = await this.persistence!.persist(candidate);
+                  pendingCommit.persistedByCandidate.set(candKey, persisted);
+                  return persisted;
+                },
+              );
+              this.lastPersistenceOutcome = result.outcome;
+              allResults.push(result);
+            } catch (error) {
+              this.lastPersistenceOutcome = 'failed';
+              throw error;
+            }
+          }
+        }
+        candidates.push(candidate);
       }
     }
-    // 空计划的外部标的（自身无策略）：仍按声明依赖派生周期（如 880003 的 1440），
-    // 否则其日线永远派生不出来，跨组扇出也就没有 bar 可投
-    if (executionPlans.length === 0) {
-      for (const period of this.evaluation.externalPeriodsFor(
-        trigger.securityId,
-        trigger.source,
-      )) {
-        derivedPeriods.add(period);
-      }
-    }
-    const emitted = this.periodBuilder.accept(
-      trigger,
-      sealedBar,
-      derivedPeriods,
-    );
+
+    this.pendingCommits.delete(cursorKey);
     this.cursors.set(cursorKey, {
       timestampMs: triggerMs,
       outcome: trigger.outcome,
       bar: sealedBar,
     });
-    this.lastJobAcceptedTriggerTime = trigger.timestamp.toISOString();
 
-    const candidates: ShadowStrategyCandidate[] = [];
-    for (const bar of emitted) {
-      this.lastJobEvaluationStarted = true;
-      const evaluated = await this.runStage(
-        deadlineAt,
-        'analysis_evaluation',
-        () => this.evaluation.evaluate(bar, executionPlans),
-      );
-      this.lastJobEvaluated = true;
-
-      const results: LiveStrategyPersistenceResult[] = [];
-      for (const candidate of evaluated) {
-        if (this.mode === 'on') {
-          if (!this.persistence) {
-            throw new Error('on-mode live strategy persistence is unavailable');
-          }
-          try {
-            const result = await this.runStage(
-              deadlineAt,
-              'persistence',
-              async (): Promise<LiveStrategyPersistenceResult> => {
-                return await this.persistence!.persist(candidate);
-              },
-            );
-            this.lastPersistenceOutcome = result.outcome;
-            results.push(result);
-          } catch (error) {
-            this.lastPersistenceOutcome = 'failed';
-            throw error;
-          }
-        }
-        candidates.push(candidate);
-      }
-      // Batch-grouped best-effort handoff (V2): one deliver.fanout per
-      // (securityId, effectiveTime) group; failures leave events PENDING for
-      // the sweep. Must not fail the committed batch.
-      if (results.length > 0 && this.persistence) {
-        try {
-          await this.persistence.publishGroupedDeliveries(results);
-        } catch (error) {
-          this.logger?.warn?.(
-            `grouped delivery handoff failed (events stay PENDING): ${String(error)}`,
-          );
-        }
+    // Batch-grouped best-effort handoff (V2): one deliver.fanout per
+    // (securityId, effectiveTime) group across all emitted timeframes;
+    // failures leave events PENDING for the sweep. Must not fail the committed batch.
+    if (allResults.length > 0 && this.persistence) {
+      try {
+        await this.persistence.publishGroupedDeliveries(allResults);
+      } catch (error) {
+        this.logger?.warn?.(
+          `grouped delivery handoff failed (events stay PENDING): ${String(error)}`,
+        );
       }
     }
     return Object.freeze({
@@ -355,7 +393,49 @@ export class CandleFinalizedJobProcessor {
     for (const key of this.cursors.keys()) {
       if (!retainedSeries.has(key)) this.cursors.delete(key);
     }
+    for (const key of this.pendingCommits.keys()) {
+      if (!retainedSeries.has(key)) this.pendingCommits.delete(key);
+    }
   }
+}
+
+function collectDerivedPeriods(
+  executionPlans: readonly RealtimeStrategyExecutionPlan[],
+  evaluation: RealtimeStrategyEvaluationService,
+  trigger: ReturnType<typeof toStrategyTrigger>,
+): Set<number> {
+  // 派生周期集合 = 求值周期 ∪ context 周期（含 1440）
+  const derivedPeriods = new Set<number>();
+  for (const plan of executionPlans) {
+    derivedPeriods.add(plan.period);
+    for (const rawPeriod of Object.keys(plan.contextRequirements ?? {})) {
+      derivedPeriods.add(Number(rawPeriod));
+    }
+  }
+  // 空计划的外部标的（自身无策略）：仍按声明依赖派生周期（如 880003 的 1440），
+  // 否则其日线永远派生不出来，跨组扇出也就没有 bar 可投
+  if (executionPlans.length === 0) {
+    for (const period of evaluation.externalPeriodsFor(
+      trigger.securityId,
+      trigger.source,
+    )) {
+      derivedPeriods.add(period);
+    }
+  }
+  return derivedPeriods;
+}
+
+function sameFinalizationIdentity(
+  cursor: Pick<FinalizationCursor, 'outcome' | 'bar'>,
+  outcome: 'sealed' | 'discarded',
+  sealedBar: StrategyBar | null,
+): boolean {
+  return (
+    cursor.outcome === outcome &&
+    (sealedBar === null
+      ? cursor.bar === null
+      : cursor.bar !== null && sameBar(cursor.bar, sealedBar))
+  );
 }
 
 function sameBar(left: StrategyBar, right: StrategyBar): boolean {

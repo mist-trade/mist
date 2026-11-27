@@ -34,6 +34,7 @@ import {
   DEFAULT_REQUIRED_BARS_DUAN,
   DEFAULT_REQUIRED_BARS_BI,
   CANDIDATE_BSP_TYPES,
+  FACTOR_EVALUATION_SCOPE_SYMBOL,
 } from '../../strategy.constants';
 
 export type ChanBspUnitLevel = 'bi' | 'duan';
@@ -213,8 +214,10 @@ export class ChanBspFactorPlugin implements FactorPlugin {
 
     // 处理去重游标（单调极值时间游标守护，严禁回溯发射早于已发射极值时间的事件）
     let candidateEvents = matchedEvents;
-    if (params.deduplicate) {
-      const scopeKey = `${context.securityId}:${context.period}:${units}`;
+    const scopeKey = params.deduplicate
+      ? this.buildCursorScopeKey(context, params)
+      : null;
+    if (scopeKey !== null) {
       let record = this.cursorMap.get(scopeKey);
       if (!record) {
         record = {
@@ -289,8 +292,7 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     }
 
     // 确认放行后，将本轮候选事件更新至单调游标
-    if (params.deduplicate) {
-      const scopeKey = `${context.securityId}:${context.period}:${units}`;
+    if (scopeKey !== null) {
       const record = this.cursorMap.get(scopeKey);
       if (record) {
         const maxTime = Math.max(
@@ -372,6 +374,26 @@ export class ChanBspFactorPlugin implements FactorPlugin {
           : undefined,
       },
     };
+  }
+
+  private buildCursorScopeKey(
+    context: FactorContext,
+    params: ChanBspPluginParams,
+  ): string {
+    const units = params.units ?? CHAN_BSP_UNITS.BI;
+    const direction = params.direction ?? CHAN_BSP_DIRECTIONS.BUY;
+    const pointsObj = (params.points ?? {}) as Record<string, unknown>;
+    const pointsKey = Object.keys(pointsObj)
+      .sort()
+      .map((key) => `${key}=${pointsObj[key] !== false ? '1' : '0'}`)
+      .join(',');
+    const evalScope = (
+      context as FactorContext & {
+        readonly [FACTOR_EVALUATION_SCOPE_SYMBOL]?: string;
+      }
+    )[FACTOR_EVALUATION_SCOPE_SYMBOL];
+    const baseKey = `${context.securityId}:${context.period}:${units}:${direction}:${pointsKey}`;
+    return evalScope ? `${evalScope}|${baseKey}` : baseKey;
   }
 
   private resolveParams(params?: Record<string, unknown>): ChanBspPluginParams {

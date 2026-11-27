@@ -406,4 +406,175 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
       geometry2.mergedKs[geometry2.latestMergedIndex].mergedCount,
     ).toBeGreaterThan(1);
   });
+
+  it('同树多分支与多计划下的 ChanBspFactorPlugin 游标作用域相互隔离（不跨分支/跨计划吞噬信号）', async () => {
+    const { DecisionFlowEvaluator } = await import(
+      '../../decision-flow/decision-flow-evaluator'
+    );
+    const { InMemoryFactorPluginRegistry } = await import(
+      '../factor-plugin-registry'
+    );
+    const { StrategyEvaluationKernel } = await import(
+      '../../kernel/strategy-evaluation-kernel'
+    );
+
+    const timePivot = new Date('2025-09-15T10:00:00.000Z');
+    const sharedPlugin = new ChanBspFactorPlugin();
+    jest.spyOn(sharedPlugin as any, 'detectEvents').mockReturnValue([
+      {
+        type: 'second_buy' as const,
+        units: 'bi' as const,
+        time: timePivot,
+        price: 10.5,
+        zhongshuIndex: 1,
+        zg: 11,
+        zd: 10,
+        unitIndex: 10,
+      },
+      {
+        type: 'third_buy' as const,
+        units: 'bi' as const,
+        time: new Date(timePivot.getTime() - 30 * 60_000),
+        price: 10.2,
+        zhongshuIndex: 1,
+        zg: 11,
+        zd: 10,
+        unitIndex: 9,
+      },
+    ]);
+
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(sharedPlugin);
+    const evaluator = new DecisionFlowEvaluator({ registry });
+
+    // 同树分支 A (second_buy) onFail 或串行评估到分支 B (third_buy，极值时间更早)
+    const context = {
+      securityId: 1,
+      securityCode: '000001',
+      timestamp: timePivot,
+      period: 30,
+      attributes: new Map([
+        [
+          contextSeriesKey('000001', 30),
+          Array.from({ length: 60 }, (_, i) =>
+            makeMockProjectedBar(
+              new Date(timePivot.getTime() + i * 60_000),
+              30,
+            ),
+          ),
+        ],
+      ]),
+    };
+
+    const flowBranchTest = {
+      id: 'guard_second_only',
+      type: 'GUARD' as const,
+      name: '仅2买',
+      pluginId: 'plugin.chan.bsp',
+      params: {
+        units: 'bi',
+        direction: 'buy',
+        points: { first: false, second: true, third: false },
+      },
+      requiredAction: 'SELL' as const, // 故意让其走 onFail 到另一节点
+      onPass: {
+        id: 'term_unreachable',
+        type: 'TERMINAL' as const,
+        action: 'SELL' as const,
+      },
+      onFail: {
+        id: 'guard_third_only',
+        type: 'GUARD' as const,
+        name: '仅3买',
+        pluginId: 'plugin.chan.bsp',
+        params: {
+          units: 'bi',
+          direction: 'buy',
+          points: { first: false, second: false, third: true },
+        },
+        requiredAction: 'BUY' as const,
+        onPass: {
+          id: 'term_third',
+          type: 'TERMINAL' as const,
+          action: 'INHERIT' as const,
+          signalTag: 'THIRD_OK',
+        },
+      },
+    };
+
+    const branchRes = await evaluator.evaluate(flowBranchTest, context);
+    expect(branchRes.status).toBe('SIGNAL_EMITTED');
+    expect(branchRes.signalTag).toBe('THIRD_OK');
+    // 作用域透传不得污染黑板与 trace/evidence
+    expect(context.attributes.has('__scope')).toBe(false);
+    expect(branchRes.evidence).not.toHaveProperty('planScope');
+
+    // 多计划：相同插件参数但不同 definitionId 的两个 plan，plan1 发射后 plan2 不被吞噬
+    sharedPlugin.resetCursors();
+    const bars = Array.from({ length: 55 }, (_, i) => ({
+      securityId: 1,
+      securityCode: '000001',
+      source: 'qmt' as const,
+      period: 30,
+      timestamp: new Date(timePivot.getTime() + i * 30 * 60_000),
+      open: 10,
+      high: 11,
+      low: 9,
+      close: 10.5,
+      volume: '1000',
+      amount: '10000',
+      type: 'complete' as const,
+    }));
+    const simpleBuyFlow = {
+      id: 'guard_buy',
+      type: 'GUARD' as const,
+      name: 'chan买',
+      pluginId: 'plugin.chan.bsp',
+      params: {
+        units: 'bi',
+        direction: 'buy',
+        points: { first: false, second: true, third: false },
+      },
+      requiredAction: 'BUY' as const,
+      onPass: {
+        id: 'term_buy',
+        type: 'TERMINAL' as const,
+        action: 'BUY' as const,
+        signalTag: 'CHAN_BUY',
+      },
+    };
+    const kernel = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bars[0].timestamp,
+      registry,
+      plans: [
+        {
+          definitionId: 1,
+          versionId: 1,
+          flow: simpleBuyFlow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 50,
+          contextRequirements: {},
+        },
+        {
+          definitionId: 2,
+          versionId: 1,
+          flow: simpleBuyFlow,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 50,
+          contextRequirements: {},
+        },
+      ],
+    });
+    const emitted: number[] = [];
+    for (const bar of bars) {
+      for (const sig of await kernel.push(bar)) {
+        emitted.push(sig.definitionId);
+      }
+    }
+    expect(emitted).toEqual([1, 2]);
+  });
 });

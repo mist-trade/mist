@@ -18,7 +18,11 @@
  * domain libs by the transport boundary guard). Channel values mirror the
  * NotificationChannel enum but are defined here as a local literal union.
  */
+import { createHash } from 'node:crypto';
 import { isRecord } from '@app/utils';
+
+const SWEEP_FANOUT_DIGEST_ALGORITHM = 'sha256';
+const SWEEP_FANOUT_DIGEST_HEX_LENGTH = 16;
 
 export type AlertDeliveryChannel = 'qq' | 'wechat' | 'feishu';
 
@@ -221,6 +225,28 @@ export function alertDeliveryFanoutJobId(
   return `deliver-fanout-v2-${accepted.group.securityId}-${Date.parse(
     accepted.group.effectiveTime,
   )}`;
+}
+
+/**
+ * Sweep recovery fanout jobId: scoped by (securityId, effectiveTime) AND a
+ * deterministic digest of sorted alertEventIds so it never collides with
+ * completed primary fanout jobs while still collapsing identical unrecovered
+ * batches across consecutive sweep intervals.
+ */
+export function alertDeliverySweepFanoutJobId(
+  job: AlertDeliveryFanoutJobV2,
+): string {
+  const accepted = decodeAlertDeliveryFanoutJobV2(job);
+  const sortedIds = [...accepted.alertEventIds].sort(
+    (left, right) => left - right,
+  );
+  const fingerprint = createHash(SWEEP_FANOUT_DIGEST_ALGORITHM)
+    .update(sortedIds.join(','))
+    .digest('hex')
+    .slice(0, SWEEP_FANOUT_DIGEST_HEX_LENGTH);
+  return `deliver-fanout-sweep-v2-${accepted.group.securityId}-${Date.parse(
+    accepted.group.effectiveTime,
+  )}-${fingerprint}`;
 }
 
 export function alertDeliveryChannelJobId(

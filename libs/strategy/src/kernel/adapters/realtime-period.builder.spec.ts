@@ -187,15 +187,53 @@ describe('RealtimePeriodBuilder（右标语义）', () => {
     expect(emitted).toEqual([]);
   });
 
-  it('retains groups and evicts unmanaged groups', () => {
+  it('retains active (securityId, source) intraday and daily buckets on retainGroups and evicts unmanaged groups', () => {
     const builder = new RealtimePeriodBuilder();
-    const barA = barAt(0, { securityId: 1 });
-    const barB = barAt(0, { securityId: 2 });
-    builder.accept(triggerOf(barA), barA);
-    builder.accept(triggerOf(barB), barB);
+    const periods = new Set([1, 5, 1440]);
+    for (let minute = 0; minute < 3; minute += 1) {
+      const barA = barAt(minute, { securityId: 1, volume: '1' });
+      const barB = barAt(minute, { securityId: 2, volume: '1' });
+      builder.accept(triggerOf(barA), barA, periods);
+      builder.accept(triggerOf(barB), barB, periods);
+    }
 
-    builder.retainGroups([{ securityId: 1, source: 'tdx', period: 1 }]);
-    // Reset should clear remaining
+    builder.retainGroups([{ securityId: 1, source: 'tdx', period: 5 }]);
+
+    let derivedA5m: StrategyBar | undefined;
+    let derivedB5m: StrategyBar | undefined;
+    for (let minute = 3; minute < 5; minute += 1) {
+      const barA = barAt(minute, { securityId: 1, volume: '1' });
+      const barB = barAt(minute, { securityId: 2, volume: '1' });
+      derivedA5m =
+        builder
+          .accept(triggerOf(barA), barA, periods)
+          .find((b) => b.period === 5) ?? derivedA5m;
+      derivedB5m =
+        builder
+          .accept(triggerOf(barB), barB, periods)
+          .find((b) => b.period === 5) ?? derivedB5m;
+    }
+
+    expect(derivedA5m).toBeDefined();
+    expect(derivedA5m?.type).toBe('complete');
+    expect(derivedA5m?.volume).toBe('5');
+
+    expect(derivedB5m).toBeDefined();
+    expect(derivedB5m?.type).toBe('incomplete');
+    expect(derivedB5m?.volume).toBe('2');
+
+    // Also verify dailyPending was retained for securityId=1 and evicted for securityId=2
+    const termA = afternoonBarAt(120, { securityId: 1, volume: '1' });
+    const termB = afternoonBarAt(120, { securityId: 2, volume: '1' });
+    const dailyA = builder
+      .accept(triggerOf(termA), termA, periods)
+      .find((b) => b.period === 1440);
+    const dailyB = builder
+      .accept(triggerOf(termB), termB, periods)
+      .find((b) => b.period === 1440);
+    expect(dailyA?.volume).toBe('6'); // minutes 0..4 + afternoon terminal
+    expect(dailyB?.volume).toBe('3'); // minutes 3..4 + afternoon terminal
+
     builder.reset();
   });
 });
@@ -348,5 +386,40 @@ describe('RealtimePeriodBuilder（1440 日线派生）', () => {
     };
     const emitted = builder.accept(discardedTrigger, null, new Set([1, 1440]));
     expect(emitted.filter((bar) => bar.period === 1440)).toEqual([]);
+  });
+
+  it('resets stale prior-day dailyPending bucket when a new trading day arrives without prior 15:00 close', () => {
+    const builder = new RealtimePeriodBuilder();
+    const periods = new Set([1, 1440]);
+    // Day 1 (2026-08-04): feed 5 morning bars with volume='10' and NO 15:00 close trigger
+    for (let minute = 0; minute < 5; minute += 1) {
+      const day1Bar = barAt(minute, { volume: '10' });
+      builder.accept(triggerOf(day1Bar), day1Bar, periods);
+    }
+
+    // Day 2 (2026-08-05): full 242 bars with volume='1', without calling reset()
+    const dayOffsetMs = 24 * 60 * 60_000;
+    const day2MidnightMs = TRADING_DAY_MIDNIGHT_MS + dayOffsetMs;
+    const day2Emitted: StrategyBar[] = [];
+    for (let minute = 0; minute <= 120; minute += 1) {
+      const bar = barAt(minute, {
+        timestamp: new Date(SESSION_START_MS + dayOffsetMs + minute * 60_000),
+        volume: '1',
+      });
+      day2Emitted.push(...builder.accept(triggerOf(bar), bar, periods));
+    }
+    for (let minute = 0; minute <= 120; minute += 1) {
+      const bar = afternoonBarAt(minute, {
+        timestamp: new Date(AFTERNOON_START_MS + dayOffsetMs + minute * 60_000),
+        volume: '1',
+      });
+      day2Emitted.push(...builder.accept(triggerOf(bar), bar, periods));
+    }
+
+    const day2Dailies = day2Emitted.filter((bar) => bar.period === 1440);
+    expect(day2Dailies).toHaveLength(1);
+    expect(day2Dailies[0].timestamp).toEqual(new Date(day2MidnightMs));
+    expect(day2Dailies[0].type).toBe('complete');
+    expect(day2Dailies[0].volume).toBe('242');
   });
 });

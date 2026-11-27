@@ -230,4 +230,79 @@ describe('PriceLevelExitPolicy（价格型虚拟出场求值器）', () => {
     expect(proposals).toHaveLength(1);
     expect(proposals[0]?.exitKind).toBe('stop');
   });
+
+  it('缺少或出现 NaN 规则字段/价格时不触发误平仓，且 updateLotWatermark 防御非有限值', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      {
+        ownerPluginId: 'p',
+        rule: {
+          kind: 'trailing',
+          activationGain: 0.1,
+          drawdownRatio: undefined as unknown as number,
+        },
+      },
+      {
+        ownerPluginId: 'p',
+        rule: {
+          kind: 'stop',
+          lossRatio: Number.NaN,
+        },
+      },
+      {
+        ownerPluginId: 'p',
+        rule: {
+          kind: 'breakeven',
+          activationGain: Number.NaN,
+        },
+      },
+      {
+        ownerPluginId: 'p',
+        rule: {
+          kind: 'time_expired',
+          maxHoldingBars: Number.NaN,
+        },
+      },
+    ]);
+    policy.onSignal(entrySignal(10));
+
+    // 盈利 bar 与 NaN close bar 均不得误触发，且峰值不被 NaN 污染
+    expect(policy.onBar(bar(12.5), 30)).toHaveLength(0);
+    expect(policy.onBar(bar(Number.NaN), 30)).toHaveLength(0);
+    expect(policy.onBar(bar(0), 30)).toHaveLength(0);
+    expect(policy.onBar(bar(11.0), 30)).toHaveLength(0);
+
+    // 有效 trailing 规则在遭遇 NaN bar 后，仍能沿用有效 peakPrice 正常求值
+    const p2 = new PriceLevelExitPolicy();
+    configure(p2, [
+      {
+        ownerPluginId: 'p',
+        rule: { kind: 'trailing', activationGain: 0.1, drawdownRatio: 0.05 },
+      },
+    ]);
+    p2.onSignal(entrySignal(10));
+    expect(p2.onBar(bar(12.0), 30)).toHaveLength(0); // peak = 12
+    expect(p2.onBar(bar(Number.NaN), 30)).toHaveLength(0); // 不得破坏 peak 或误退出
+    const triggered = p2.onBar(bar(11.3), 30); // 11.3 < 12 * 0.95 = 11.4
+    expect(triggered).toHaveLength(1);
+    expect(triggered[0]?.exitKind).toBe('trailing');
+  });
+
+  it('onExternalExit 清理对应通道虚拟持仓跟踪', () => {
+    const policy = new PriceLevelExitPolicy();
+    configure(policy, [
+      { ownerPluginId: 'p', rule: { kind: 'stop', lossRatio: -0.05 } },
+    ]);
+    policy.onSignal(entrySignal(10));
+    policy.onExternalExit({
+      channel: CHANNEL,
+      ownerPluginId: 'external.plugin',
+      ruleId: 'ext-1',
+      exitKind: 'STRUCTURAL_EXIT',
+      reason: '外部结构出场',
+      badgeText: '结构出场',
+    });
+
+    expect(policy.onBar(bar(9.0), 30)).toHaveLength(0);
+  });
 });

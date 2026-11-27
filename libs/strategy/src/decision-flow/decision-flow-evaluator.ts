@@ -14,10 +14,18 @@ import type {
   DecisionFlowNode,
   DecisionResult,
 } from './decision-flow.types';
-import { DECISION_ACTIONS } from '../strategy.constants';
+import {
+  DECISION_ACTIONS,
+  FACTOR_EVALUATION_SCOPE_SYMBOL,
+} from '../strategy.constants';
 
 export interface DecisionFlowEvaluatorOptions {
   readonly registry?: FactorPluginRegistry;
+}
+
+export interface DecisionFlowEvaluationOptions {
+  readonly planScope?: string;
+  readonly missingContextErrors?: ReadonlyMap<string, Error>;
 }
 
 const NODE_TYPE_GUARD = 'GUARD';
@@ -46,10 +54,18 @@ export class DecisionFlowEvaluator {
   public async evaluate(
     rootNode: DecisionFlowNode,
     context: FactorContext,
+    options?: DecisionFlowEvaluationOptions,
   ): Promise<DecisionResult> {
     const trace: DecisionExecutionTraceItem[] = [];
 
-    return this.evaluateNode(rootNode, context, trace);
+    return this.evaluateNode(
+      rootNode,
+      context,
+      trace,
+      undefined,
+      undefined,
+      options,
+    );
   }
 
   private async evaluateNode(
@@ -65,6 +81,7 @@ export class DecisionFlowEvaluator {
         position?: 'above' | 'below';
       }>;
     },
+    options?: DecisionFlowEvaluationOptions,
   ): Promise<DecisionResult> {
     switch (node.type) {
       case NODE_TYPE_GUARD: {
@@ -72,6 +89,8 @@ export class DecisionFlowEvaluator {
           node.pluginId,
           context,
           node.params,
+          node.id,
+          options,
         );
 
         const actionMatches =
@@ -127,6 +146,7 @@ export class DecisionFlowEvaluator {
             trace,
             nextInheritedAction,
             nextInheritedMeta,
+            options,
           );
         } else if (node.onFail) {
           return this.evaluateNode(
@@ -135,6 +155,7 @@ export class DecisionFlowEvaluator {
             trace,
             inheritedAction,
             inheritedMeta,
+            options,
           );
         }
 
@@ -163,6 +184,7 @@ export class DecisionFlowEvaluator {
           trace,
           inheritedAction,
           inheritedMeta,
+          options,
         );
       }
 
@@ -171,6 +193,8 @@ export class DecisionFlowEvaluator {
           node.pluginId,
           context,
           node.params,
+          node.id,
+          options,
         );
 
         if (opinion.evidence) {
@@ -203,6 +227,7 @@ export class DecisionFlowEvaluator {
           trace,
           inheritedAction,
           nextInheritedMeta,
+          options,
         );
       }
 
@@ -287,15 +312,31 @@ export class DecisionFlowEvaluator {
   private async resolveOpinion(
     pluginId: string,
     context: FactorContext,
-    params?: Record<string, unknown>,
+    params: Record<string, unknown> | undefined,
+    nodeId: string,
+    options?: DecisionFlowEvaluationOptions,
   ): Promise<FactorOpinion> {
     const cacheKey = contextOpinionKey(pluginId, params);
+    const missingError = options?.missingContextErrors?.get(cacheKey);
+    if (missingError) {
+      throw missingError;
+    }
     const cached = context.attributes.get(cacheKey);
     if (cached) {
       return cached as FactorOpinion;
     }
     const plugin = this.getPlugin(pluginId);
-    const opinion = await plugin.evaluate(context, params);
+    const scope = options?.planScope
+      ? `${options.planScope}:${nodeId}`
+      : nodeId;
+    const scopedContext: FactorContext = { ...context };
+    Object.defineProperty(scopedContext, FACTOR_EVALUATION_SCOPE_SYMBOL, {
+      value: scope,
+      enumerable: false,
+      configurable: false,
+      writable: false,
+    });
+    const opinion = await plugin.evaluate(scopedContext, params);
     // 仅 role:'context' 插件写回缓存（同 Bar 内参数相同的后续节点直接命中，
     // 如双 regime 门禁共用 {mode:'dual_speed'} 组合时只求值一次）；
     // 'signal' 插件保持逐次调用语义不变（有状态游标插件依赖每次调用推进）。
