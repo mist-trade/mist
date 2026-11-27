@@ -1,3 +1,4 @@
+import { ChanCore } from '@app/chancore';
 import { contextSeriesKey } from '../../kernel/availability';
 import { ChanBspFactorPlugin } from './chan-bsp.plugin';
 
@@ -576,5 +577,64 @@ describe('ChanBspFactorPlugin 增量与分型扳机测试', () => {
       }
     }
     expect(emitted).toEqual([1, 2]);
+  });
+
+  it('单遍结构分析：bi 与 duan 模式下每次 evaluate 仅调用 1 次 ChanCore.createBi 并注入 chan.geometry/chan.channels', async () => {
+    const startTime = new Date('2025-09-15T09:30:00.000Z').getTime();
+    // 构造带明显折返波段的 120 根无包含关系 K 线，确保生成有效笔、段与中枢
+    const bars = Array.from({ length: 120 }, (_, i) => {
+      const wave = Math.sin(i / 4) * 3 + (i % 2 === 0 ? 0.6 : -0.6);
+      const base = 100 + wave + i * 0.05;
+      const bar = makeMockProjectedBar(new Date(startTime + i * 60_000), 30);
+      const ohlc = {
+        open: base - 0.1,
+        high: base + 0.4,
+        low: base - 0.4,
+        close: base + 0.1,
+      };
+      bar.ohlc.effective = ohlc;
+      bar.ohlc.raw = ohlc;
+      return bar;
+    });
+
+    for (const units of ['bi', 'duan'] as const) {
+      const createBiSpy = jest.spyOn(ChanCore, 'createBi');
+      const createDuanSpy = jest.spyOn(ChanCore, 'createDuan');
+      const createDuanChannelsSpy = jest.spyOn(ChanCore, 'createDuanChannels');
+      const createBiChannelsSpy = jest.spyOn(ChanCore, 'createBiChannels');
+      const attributes = new Map<string, unknown>([
+        [contextSeriesKey('000001', 30), bars],
+      ]);
+
+      try {
+        await plugin.evaluate(
+          {
+            securityId: 1,
+            securityCode: '000001',
+            timestamp: new Date(startTime + 119 * 60_000),
+            period: 30,
+            attributes,
+          } as any,
+          { units, requiredBarCount: 50, deduplicate: false },
+        );
+
+        expect(createBiSpy).toHaveBeenCalledTimes(1);
+        if (units === 'duan') {
+          expect(createDuanSpy).toHaveBeenCalledTimes(1);
+          expect(createDuanChannelsSpy).toHaveBeenCalledTimes(1);
+          expect(createBiChannelsSpy).not.toHaveBeenCalled();
+        } else {
+          expect(createBiChannelsSpy).toHaveBeenCalledTimes(1);
+          expect(createDuanSpy).not.toHaveBeenCalled();
+        }
+        expect(attributes.get('chan.geometry')).toBeDefined();
+        expect(attributes.get('chan.channels')).toBeDefined();
+      } finally {
+        createBiSpy.mockRestore();
+        createDuanSpy.mockRestore();
+        createDuanChannelsSpy.mockRestore();
+        createBiChannelsSpy.mockRestore();
+      }
+    }
   });
 });

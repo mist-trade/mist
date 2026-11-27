@@ -27,10 +27,7 @@ export function deriveRightLabeledPeriodBars(
   const anchorAvailabilityMs =
     options?.anchorAvailabilityMs ?? Number.POSITIVE_INFINITY;
   if (period === 1440) {
-    return [deriveDaily(oneMinuteBars)].filter(
-      (bar): bar is StrategyBar =>
-        bar !== null && availabilityKey(bar).getTime() < anchorAvailabilityMs,
-    );
+    return deriveDailyBars(oneMinuteBars, anchorAvailabilityMs);
   }
 
   const slots = new Map<number, Map<number, StrategyBar>>();
@@ -71,24 +68,38 @@ export function deriveRightLabeledPeriodBars(
   );
 }
 
-/** 日线聚合：无 15:00 终端桶（当日未闭合/全 discarded）时不产出。 */
-function deriveDaily(
+/** 跨日日线聚合：按上海交易日归桶分别调用 reduceDaily，过滤不可用根并按时间升序返回。 */
+function deriveDailyBars(
   oneMinuteBars: readonly StrategyBar[],
-): StrategyBar | null {
-  if (oneMinuteBars.length === 0) return null;
-  const buckets = new Map<number, StrategyBar>();
-  for (const bar of oneMinuteBars) buckets.set(bar.timestamp.getTime(), bar);
-  const ordered = [...buckets.values()].sort(
+  anchorAvailabilityMs: number,
+): StrategyBar[] {
+  if (oneMinuteBars.length === 0) return [];
+  const dayBuckets = new Map<number, Map<number, StrategyBar>>();
+  for (const bar of oneMinuteBars) {
+    const tradingDayMs = shanghaiMidnightOf(bar.timestamp).getTime();
+    const bucket =
+      dayBuckets.get(tradingDayMs) ?? new Map<number, StrategyBar>();
+    bucket.set(bar.timestamp.getTime(), bar);
+    dayBuckets.set(tradingDayMs, bucket);
+  }
+
+  const derived: StrategyBar[] = [];
+  for (const [tradingDayMs, bucket] of dayBuckets) {
+    if (bucket.size === 0) continue;
+    const first = bucket.values().next().value!;
+    const bar = reduceDaily(
+      first.securityId,
+      first.source,
+      tradingDayMs,
+      bucket,
+      first.securityCode,
+    );
+    if (!bar) continue;
+    if (availabilityKey(bar).getTime() < anchorAvailabilityMs) {
+      derived.push(bar);
+    }
+  }
+  return derived.sort(
     (left, right) => left.timestamp.getTime() - right.timestamp.getTime(),
-  );
-  const first = ordered[0];
-  const last = ordered.at(-1)!;
-  const tradingDayMs = shanghaiMidnightOf(last.timestamp).getTime();
-  return reduceDaily(
-    first.securityId,
-    first.source,
-    tradingDayMs,
-    buckets,
-    first.securityCode,
   );
 }

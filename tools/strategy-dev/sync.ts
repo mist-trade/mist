@@ -185,6 +185,54 @@ function mapQualityRow(
   };
 }
 
+export interface SyncChunkSegment {
+  readonly source: string;
+  readonly from: Date | null;
+  readonly before: Date | null;
+}
+
+export interface SyncYearChunk {
+  readonly source: string;
+  readonly from: Date;
+  readonly before: Date;
+}
+
+/**
+ * 将 canonical 分段按北京自然年（CHUNK_START_YEAR 起步，步长 CHUNK_YEARS）切片，
+ * 覆盖边界末年（y <= segEndYear）并以 from >= before 跳过空区间。
+ */
+export function buildSyncYearChunks(
+  segments: readonly SyncChunkSegment[],
+  now: Date = new Date(),
+): SyncYearChunk[] {
+  const currentBeijingYear = new Date(
+    now.getTime() + BEIJING_OFFSET_MS,
+  ).getUTCFullYear();
+  const chunks: SyncYearChunk[] = [];
+  for (const segment of segments) {
+    const segStartYear = segment.from
+      ? new Date(segment.from.getTime() + BEIJING_OFFSET_MS).getUTCFullYear()
+      : CHUNK_START_YEAR;
+    const segEndYear = segment.before
+      ? new Date(segment.before.getTime() + BEIJING_OFFSET_MS).getUTCFullYear()
+      : currentBeijingYear;
+    const startYear = Math.max(CHUNK_START_YEAR, segStartYear);
+    for (let y = startYear; y <= segEndYear; y += CHUNK_YEARS) {
+      const yearStart = new Date(Date.UTC(y, 0, 1) - BEIJING_OFFSET_MS);
+      const yearEnd = new Date(
+        Date.UTC(y + CHUNK_YEARS, 0, 1) - BEIJING_OFFSET_MS,
+      );
+      const from =
+        segment.from && segment.from > yearStart ? segment.from : yearStart;
+      const before =
+        segment.before && segment.before < yearEnd ? segment.before : yearEnd;
+      if (from >= before) continue;
+      chunks.push({ source: segment.source, from, before });
+    }
+  }
+  return chunks;
+}
+
 async function syncSinglePeriod(
   options: SyncCliOptions,
   periodName: string,
@@ -206,29 +254,7 @@ async function syncSinglePeriod(
   );
 
   // 分片拉取：canonical 分段 ∩ 年份桶，消除单次 maxBuffer 溢出
-  const thisYear = new Date().getUTCFullYear() + 1;
-  const chunks: { source: string; from: Date; before: Date }[] = [];
-  for (const segment of segments) {
-    const segStartYear = segment.from
-      ? new Date(segment.from.getTime() + BEIJING_OFFSET_MS).getUTCFullYear()
-      : CHUNK_START_YEAR;
-    const segEndYear = segment.before
-      ? new Date(segment.before.getTime() + BEIJING_OFFSET_MS).getUTCFullYear()
-      : thisYear;
-    const startYear = Math.max(CHUNK_START_YEAR, segStartYear);
-    for (let y = startYear; y < segEndYear; y += CHUNK_YEARS) {
-      const yearStart = new Date(Date.UTC(y, 0, 1) - BEIJING_OFFSET_MS);
-      const yearEnd = new Date(
-        Date.UTC(y + CHUNK_YEARS, 0, 1) - BEIJING_OFFSET_MS,
-      );
-      const from =
-        segment.from && segment.from > yearStart ? segment.from : yearStart;
-      const before =
-        segment.before && segment.before < yearEnd ? segment.before : yearEnd;
-      if (from >= before) continue;
-      chunks.push({ source: segment.source, from, before });
-    }
-  }
+  const chunks = buildSyncYearChunks(segments);
 
   const seenTime = new Set<string>();
   const collected: QualityRawRow[] = [];
@@ -436,7 +462,9 @@ async function main() {
   );
 }
 
-main().catch((err) => {
-  console.error('[Sync] 致命错误:', err);
-  process.exit(1);
-});
+if (require.main === module) {
+  main().catch((err) => {
+    console.error('[Sync] 致命错误:', err);
+    process.exit(1);
+  });
+}

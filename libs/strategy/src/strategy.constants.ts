@@ -99,6 +99,6 @@ export const TRADING_LAYER_DEFAULTS = Object.freeze({
   DEFAULT_SEED_CAPITAL: 1_000_000,
 } as const);
 
-export const FACTOR_EVALUATION_SCOPE_SYMBOL = Symbol(
+export const FACTOR_EVALUATION_SCOPE_SYMBOL = Symbol.for(
   'mist.strategy.factorEvaluationScope',
 );

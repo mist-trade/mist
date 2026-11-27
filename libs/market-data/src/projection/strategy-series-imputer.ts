@@ -324,8 +324,7 @@ function projectQuantityAppend(
   raw: string | null,
   lastAnchor: string | null,
 ): ProjectedStrategyQuantity {
-  if (raw !== null) {
-    Decimal8.parseCanonical(raw);
+  if (isQuantityAnchor(raw)) {
     return Object.freeze({ raw, effective: raw, resolution: 'observed' });
   }
   if (lastAnchor !== null) {

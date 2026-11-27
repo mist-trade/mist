@@ -18,6 +18,10 @@ import {
   DECISION_ACTIONS,
   FACTOR_EVALUATION_SCOPE_SYMBOL,
 } from '../strategy.constants';
+import {
+  findBadgeTextFromTrace,
+  selectPassingGuardTraceItems,
+} from './decision-pivot-evidence';
 
 export interface DecisionFlowEvaluatorOptions {
   readonly registry?: FactorPluginRegistry;
@@ -38,6 +42,8 @@ const ACTION_BOTH = 'BOTH';
 const ACTION_ANY = 'ANY';
 const STATUS_ABORTED = 'ABORTED';
 const STATUS_SIGNAL_EMITTED = 'SIGNAL_EMITTED';
+const PLUGIN_ROLE_CONTEXT = 'context';
+type ResolvedPluginRole = 'signal' | 'context';
 
 /**
  * 树状决策流通用求值器 (DecisionFlowEvaluator)
@@ -85,7 +91,7 @@ export class DecisionFlowEvaluator {
   ): Promise<DecisionResult> {
     switch (node.type) {
       case NODE_TYPE_GUARD: {
-        const opinion = await this.resolveOpinion(
+        const { opinion, pluginRole } = await this.resolveOpinion(
           node.pluginId,
           context,
           node.params,
@@ -107,6 +113,7 @@ export class DecisionFlowEvaluator {
           !inheritedAction ||
           node.requiredAction === ACTION_BOTH ||
           node.requiredAction === ACTION_ANY ||
+          node.requiredAction === DECISION_ACTIONS.NEUTRAL ||
           node.requiredAction === inheritedAction;
 
         const passed = actionMatches && directionConsistent;
@@ -115,6 +122,7 @@ export class DecisionFlowEvaluator {
           nodeId: node.id,
           type: NODE_TYPE_GUARD,
           pluginId: node.pluginId,
+          ...(pluginRole ? { pluginRole } : {}),
           name: node.name,
           action: opinion.action,
           passed,
@@ -133,11 +141,18 @@ export class DecisionFlowEvaluator {
             ? opinion.action
             : inheritedAction;
 
-        const nextInheritedMeta = {
-          badgeText: opinion.badgeText ?? inheritedMeta?.badgeText,
-          displayTag: opinion.displayTag ?? inheritedMeta?.displayTag,
-          styleMeta: opinion.styleMeta ?? inheritedMeta?.styleMeta,
-        };
+        const isDirectionalSignalGuard =
+          pluginRole !== PLUGIN_ROLE_CONTEXT &&
+          (opinion.action === DECISION_ACTIONS.BUY ||
+            opinion.action === DECISION_ACTIONS.SELL);
+
+        const nextInheritedMeta = isDirectionalSignalGuard
+          ? {
+              badgeText: opinion.badgeText ?? inheritedMeta?.badgeText,
+              displayTag: opinion.displayTag ?? inheritedMeta?.displayTag,
+              styleMeta: opinion.styleMeta ?? inheritedMeta?.styleMeta,
+            }
+          : inheritedMeta;
 
         if (passed) {
           return this.evaluateNode(
@@ -189,7 +204,7 @@ export class DecisionFlowEvaluator {
       }
 
       case NODE_TYPE_EXTRACTOR: {
-        const opinion = await this.resolveOpinion(
+        const { opinion, pluginRole } = await this.resolveOpinion(
           node.pluginId,
           context,
           node.params,
@@ -207,6 +222,7 @@ export class DecisionFlowEvaluator {
           nodeId: node.id,
           type: NODE_TYPE_EXTRACTOR,
           pluginId: node.pluginId,
+          ...(pluginRole ? { pluginRole } : {}),
           name: node.name,
           exportedKey: node.exportAttributeKey,
           evidence: opinion.evidence,
@@ -215,18 +231,12 @@ export class DecisionFlowEvaluator {
           styleMeta: opinion.styleMeta,
         });
 
-        const nextInheritedMeta = {
-          badgeText: opinion.badgeText ?? inheritedMeta?.badgeText,
-          displayTag: opinion.displayTag ?? inheritedMeta?.displayTag,
-          styleMeta: opinion.styleMeta ?? inheritedMeta?.styleMeta,
-        };
-
         return this.evaluateNode(
           node.next,
           context,
           trace,
           inheritedAction,
-          nextInheritedMeta,
+          inheritedMeta,
           options,
         );
       }
@@ -255,7 +265,7 @@ export class DecisionFlowEvaluator {
         }
 
         const badgeText =
-          inheritedMeta?.badgeText ?? this.findBadgeTextFromTrace(trace);
+          inheritedMeta?.badgeText ?? findBadgeTextFromTrace(trace);
         const displayTag = inheritedMeta?.displayTag;
         const styleMeta = inheritedMeta?.styleMeta;
         const evidence = this.findEvidenceFromTrace(trace);
@@ -280,26 +290,11 @@ export class DecisionFlowEvaluator {
   private findEvidenceFromTrace(
     trace: readonly DecisionExecutionTraceItem[],
   ): Readonly<Record<string, unknown>> | undefined {
-    for (let i = trace.length - 1; i >= 0; i--) {
-      if (trace[i].passed === false) continue;
-      const ev = trace[i].evidence as Record<string, unknown> | undefined;
+    const items = selectPassingGuardTraceItems(trace);
+    for (let i = items.length - 1; i >= 0; i--) {
+      const ev = items[i].evidence as Record<string, unknown> | undefined;
       if (ev && typeof ev === 'object' && Object.keys(ev).length > 0) {
         return ev;
-      }
-    }
-    return undefined;
-  }
-
-  private findBadgeTextFromTrace(
-    trace: readonly DecisionExecutionTraceItem[],
-  ): string | undefined {
-    for (let i = trace.length - 1; i >= 0; i--) {
-      const item = trace[i];
-      if (item.passed === false) continue;
-      if (item.badgeText) return item.badgeText;
-      const ev = item.evidence as Record<string, unknown> | undefined;
-      if (ev?.badgeText && typeof ev.badgeText === 'string') {
-        return ev.badgeText;
       }
     }
     return undefined;
@@ -315,7 +310,10 @@ export class DecisionFlowEvaluator {
     params: Record<string, unknown> | undefined,
     nodeId: string,
     options?: DecisionFlowEvaluationOptions,
-  ): Promise<FactorOpinion> {
+  ): Promise<{
+    readonly opinion: FactorOpinion;
+    readonly pluginRole?: ResolvedPluginRole;
+  }> {
     const cacheKey = contextOpinionKey(pluginId, params);
     const missingError = options?.missingContextErrors?.get(cacheKey);
     if (missingError) {
@@ -323,7 +321,9 @@ export class DecisionFlowEvaluator {
     }
     const cached = context.attributes.get(cacheKey);
     if (cached) {
-      return cached as FactorOpinion;
+      const pluginRole =
+        this.registry.get(pluginId)?.role ?? PLUGIN_ROLE_CONTEXT;
+      return { opinion: cached as FactorOpinion, pluginRole };
     }
     const plugin = this.getPlugin(pluginId);
     const scope = options?.planScope
@@ -340,10 +340,10 @@ export class DecisionFlowEvaluator {
     // 仅 role:'context' 插件写回缓存（同 Bar 内参数相同的后续节点直接命中，
     // 如双 regime 门禁共用 {mode:'dual_speed'} 组合时只求值一次）；
     // 'signal' 插件保持逐次调用语义不变（有状态游标插件依赖每次调用推进）。
-    if (plugin.role === 'context') {
+    if (plugin.role === PLUGIN_ROLE_CONTEXT) {
       context.attributes.set(cacheKey, opinion);
     }
-    return opinion;
+    return { opinion, pluginRole: plugin.role };
   }
 
   private getPlugin(pluginId: string): FactorPlugin {

@@ -1240,4 +1240,265 @@ describe('StrategyEvaluationKernel（多周期窗口）', () => {
     expect(signals[1]?.definitionId).toBe(202);
     expect(signals[1]?.signalType).toBe('CLEAN');
   });
+
+  it('role:context 与 EXTRACTOR 无论位于主信号前后，均不得抢占 originPluginId/badgeText/pivotTime/pivotPrice', async () => {
+    const buildTestRegistry = () => {
+      const reg = new InMemoryFactorPluginRegistry();
+      reg.register({
+        id: 'plugin.test.ext',
+        name: 'Ext',
+        category: 'CHAN',
+        version: '1.0.0',
+        description: 'ext',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '提取器',
+          badgeText: '提取徽标',
+          evidence: {
+            eventType: 'EXT_EVT',
+            pivotTime: '2025-01-01T00:00:00.000Z',
+            pivotPrice: 999,
+          },
+        }),
+      });
+      reg.register({
+        id: 'plugin.test.ctx-filter',
+        name: 'Context Filter',
+        category: 'REGIME',
+        version: '1.0.0',
+        description: 'ctx',
+        role: 'context',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '上下文环境',
+          badgeText: '环境过滤',
+          displayTag: 'CTX_TAG',
+          styleMeta: { color: '#999999', position: 'above' },
+          evidence: {
+            eventType: 'CTX_EVT',
+            pivotTime: '2025-01-02T00:00:00.000Z',
+            pivotPrice: 888,
+          },
+        }),
+      });
+      reg.register({
+        id: 'plugin.test.main-signal',
+        name: 'Main Signal',
+        category: 'CHAN',
+        version: '1.0.0',
+        description: 'main',
+        role: 'signal',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '主买点',
+          badgeText: '2买',
+          displayTag: 'CHAN_2B',
+          styleMeta: { color: '#FF0000', position: 'below' },
+          evidence: {
+            eventType: 'second_buy',
+            pivotTime: '2025-01-03T00:00:00.000Z',
+            pivotPrice: 11.2,
+          },
+        }),
+      });
+      reg.register({
+        id: 'plugin.test.bare-signal',
+        name: 'Bare Signal',
+        category: 'TECHNICAL',
+        version: '1.0.0',
+        description: 'bare',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '裸买点',
+        }),
+      });
+      return reg;
+    };
+
+    const bar = makeStrategyBar(new Date('2026-01-05T02:00:00.000Z'), 12, 30);
+
+    // 1) context/extractor 在主信号之后：必须保留 main-signal 归属与徽标/极值
+    const flowAfter: DecisionFlowNode = {
+      id: 'g_main',
+      type: 'GUARD',
+      name: '主信号',
+      pluginId: 'plugin.test.main-signal',
+      requiredAction: 'BUY',
+      onPass: {
+        id: 'g_ctx_after',
+        type: 'GUARD',
+        name: '后置环境',
+        pluginId: 'plugin.test.ctx-filter',
+        requiredAction: 'BUY',
+        onPass: {
+          id: 'ext_after',
+          type: 'EXTRACTOR',
+          name: '后置提取',
+          pluginId: 'plugin.test.ext',
+          exportAttributeKey: 'chan.extra',
+          next: { id: 'term_after', type: 'TERMINAL', action: 'INHERIT' },
+        },
+      },
+    };
+    const kernelAfter = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bar.timestamp,
+      registry: buildTestRegistry(),
+      plans: [
+        {
+          definitionId: 301,
+          versionId: 1,
+          flow: flowAfter,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+    });
+    const sigAfter = (await kernelAfter.push(bar))[0];
+    expect(sigAfter?.originPluginId).toBe('plugin.test.main-signal');
+    expect(sigAfter?.badgeText).toBe('2买');
+    expect(sigAfter?.displayTag).toBe('CHAN_2B');
+    expect(sigAfter?.styleMeta).toEqual({
+      color: '#FF0000',
+      position: 'below',
+    });
+    expect(sigAfter?.pivotTime).toBe('2025-01-03T00:00:00.000Z');
+    expect(sigAfter?.pivotPrice).toBe(11.2);
+
+    // 2) context/extractor 在裸信号前后：裸信号无 badge/pivot 时也不被 context/extractor 抢占
+    const flowBareBefore: DecisionFlowNode = {
+      id: 'ext_before',
+      type: 'EXTRACTOR',
+      name: '前置提取',
+      pluginId: 'plugin.test.ext',
+      exportAttributeKey: 'chan.central',
+      next: {
+        id: 'g_ctx_before',
+        type: 'GUARD',
+        name: '前置环境',
+        pluginId: 'plugin.test.ctx-filter',
+        requiredAction: 'BUY',
+        onPass: {
+          id: 'g_bare',
+          type: 'GUARD',
+          name: '裸信号',
+          pluginId: 'plugin.test.bare-signal',
+          requiredAction: 'BUY',
+          onPass: { id: 'term_bare', type: 'TERMINAL', action: 'INHERIT' },
+        },
+      },
+    };
+    const kernelBare = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom: bar.timestamp,
+      registry: buildTestRegistry(),
+      plans: [
+        {
+          definitionId: 302,
+          versionId: 1,
+          flow: flowBareBefore,
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 1,
+          contextRequirements: {},
+        },
+      ],
+    });
+    const sigBare = (await kernelBare.push(bar))[0];
+    expect(sigBare?.originPluginId).toBe('plugin.test.bare-signal');
+    expect(sigBare?.badgeText).toBeUndefined();
+    expect(sigBare?.displayTag).toBeUndefined();
+    expect(sigBare?.styleMeta).toBeUndefined();
+    expect(sigBare?.pivotTime).toBeNull();
+    expect(sigBare?.pivotPrice).toBeNull();
+  });
+
+  it('partial 预热时（actual > 0 且 < budget）仍执行 evaluateSilent 推进子插件游标，防止首根公开 Bar 倾泻历史形态', async () => {
+    const bars = makeMockBars(20);
+    const historicalPivotTime = bars[12].timestamp;
+    const publicFrom = bars[15].timestamp; // prewarmActual = 15 < budget = 16 -> partial
+
+    class StatefulSubBudgetPlugin implements FactorPlugin {
+      public readonly id = 'plugin.test.sub-budget-cursor';
+      public readonly name = 'Sub-budget Stateful Plugin';
+      public readonly category = 'CHAN' as const;
+      public readonly version = '1.0.0';
+      public readonly description = 'Advances monotonic cursor at 10 bars';
+      public silentAdvanced = false;
+      private lastEmittedMs = -1;
+
+      public async evaluate(
+        ctx: import('../factor/factor.types').FactorContext,
+      ): Promise<FactorOpinion> {
+        const series = ctx.attributes.get(
+          contextSeriesKey(ctx.securityCode, ctx.period),
+        ) as readonly unknown[] | undefined;
+        const len = series?.length ?? 0;
+        if (len < 10) {
+          return { action: 'NEUTRAL', reason: 'insufficient' };
+        }
+        const pivotMs = historicalPivotTime.getTime();
+        if (this.lastEmittedMs >= pivotMs) {
+          return { action: 'NEUTRAL', reason: 'cursor already advanced' };
+        }
+        this.lastEmittedMs = pivotMs;
+        if (ctx.timestamp.getTime() < publicFrom.getTime()) {
+          this.silentAdvanced = true;
+        }
+        return {
+          action: 'BUY',
+          reason: 'historical pattern',
+          badgeText: '1买',
+          evidence: {
+            eventType: 'first_buy',
+            pivotTime: historicalPivotTime.toISOString(),
+            pivotPrice: 10,
+          },
+        };
+      }
+    }
+
+    const plugin = new StatefulSubBudgetPlugin();
+    const registry = new InMemoryFactorPluginRegistry();
+    registry.register(plugin);
+
+    const kernel = new StrategyEvaluationKernel({
+      securityId: 1,
+      securityCode: '000001',
+      publicFrom,
+      registry,
+      plans: [
+        {
+          definitionId: 401,
+          versionId: 1,
+          flow: {
+            id: 'guard_sub',
+            type: 'GUARD',
+            name: '子门限',
+            pluginId: plugin.id,
+            requiredAction: 'BUY',
+            onPass: { id: 'term_sub', type: 'TERMINAL', action: 'INHERIT' },
+          },
+          ruleSnapshot: Object.freeze({}),
+          period: 30,
+          requiredBarCount: 16,
+          contextRequirements: {},
+        },
+      ],
+    });
+
+    for (let i = 0; i < 15; i += 1) {
+      expect(await kernel.push(bars[i])).toEqual([]);
+    }
+    const firstPublicSignals = await kernel.push(bars[15]);
+    expect(plugin.silentAdvanced).toBe(true);
+    expect(firstPublicSignals).toEqual([]);
+    expect(kernel.diagnostics().prewarmStatus).toBe('partial');
+    expect(kernel.diagnostics().prewarmActual).toBe(15);
+    expect(kernel.diagnostics().prewarmExpected).toBe(16);
+  });
 });

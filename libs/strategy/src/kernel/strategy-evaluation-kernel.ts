@@ -1,14 +1,13 @@
 import type { ProjectedStrategyBar, StrategyBar } from '@app/market-data';
 import { StrategySeriesImputer } from '@app/market-data';
 import { DECISION_ACTIONS } from '../strategy.constants';
-import type {
-  DecisionResult,
-  DecisionExecutionTraceItem,
-} from '../decision-flow/decision-flow.types';
+import type { DecisionResult } from '../decision-flow/decision-flow.types';
 import { DecisionFlowEvaluator } from '../decision-flow/decision-flow-evaluator';
 import {
   extractPivotEvidence,
   extractPivotEvidenceFromReason,
+  findBadgeTextFromTrace,
+  selectPassingGuardTraceItems,
 } from '../decision-flow/decision-pivot-evidence';
 import type { FactorContext } from '../factor/factor.types';
 import type { FactorPluginRegistry } from '../factor/factor-plugin-registry';
@@ -259,8 +258,9 @@ export class StrategyEvaluationKernel {
       return [];
     }
 
-    // 该周期首个公开 Bar：预热相结束，若预热窗口已满额则先做一次静默预热求值，
-    // 把插件单调游标推进至预热结束时刻（杜绝历史形态点在公开相首根被倾泻发射）。
+    // 该周期首个公开 Bar：预热相结束，只要预热相收到过 Bar（actual > 0），
+    // 即先做一次静默预热求值，把自身门限已满足的子插件单调游标推进至预热结束时刻
+    // （即使整体处于 partial 预热状态，也能杜绝历史形态点在公开相首根被倾泻发射）。
     if (!this.preWarmEvaluated.has(bar.period)) {
       this.preWarmEvaluated.add(bar.period);
       const actual = this.preWarmActual.get(bar.period) ?? 0;
@@ -269,11 +269,7 @@ export class StrategyEvaluationKernel {
         bar.period,
         actual === 0 ? 'empty' : actual >= budget ? 'full' : 'partial',
       );
-      if (
-        actual > 0 &&
-        window.read().length >= budget &&
-        this.cursors.get(bar.period) !== undefined
-      ) {
+      if (actual > 0 && this.cursors.get(bar.period) !== undefined) {
         await this.evaluateSilent(
           bar.period,
           new Date(this.cursors.get(bar.period)!),
@@ -650,7 +646,7 @@ export class StrategyEvaluationKernel {
       extractPivotEvidence(decision) ??
       extractPivotEvidenceFromReason(decision);
     const badgeText =
-      decision.badgeText ?? this.findBadgeTextFromTrace(decision.trace);
+      decision.badgeText ?? findBadgeTextFromTrace(decision.trace);
     const channel: SignalChannelRef = {
       definitionId: plan.definitionId,
       versionId: plan.versionId,
@@ -693,34 +689,16 @@ export class StrategyEvaluationKernel {
     };
   }
 
-  private findBadgeTextFromTrace(
-    trace?: readonly DecisionExecutionTraceItem[],
-  ): string | undefined {
-    if (!Array.isArray(trace)) return undefined;
-    for (let i = trace.length - 1; i >= 0; i--) {
-      const item = trace[i];
-      if (!item || item.passed === false) continue;
-      if (item.badgeText && typeof item.badgeText === 'string') {
-        return item.badgeText;
-      }
-      const ev = item.evidence as Record<string, unknown> | undefined;
-      if (ev?.badgeText && typeof ev.badgeText === 'string') {
-        return ev.badgeText;
-      }
-    }
-    return undefined;
-  }
-
   /**
-   * 归属插件：取轨迹中最后一个已通过且与最终 action 一致的插件节点。
+   * 归属插件：跳过失败节点、EXTRACTOR 与非必要 context 节点，
+   * 取轨迹中最后一个已通过且与最终 action 一致的插件节点（仅当零非 context 节点时兜底 context）。
    * 仅用于归因观测；通道归属始终按 (definitionId, period)，与插件无关。
    */
   private findOriginPluginId(decision: DecisionResult): string | undefined {
-    const trace = decision.trace;
-    if (!Array.isArray(trace)) return undefined;
-    for (let i = trace.length - 1; i >= 0; i--) {
-      const item = trace[i];
-      if (!item?.pluginId || item.passed === false) continue;
+    const items = selectPassingGuardTraceItems(decision.trace);
+    for (let i = items.length - 1; i >= 0; i--) {
+      const item = items[i];
+      if (!item.pluginId) continue;
       if (item.action === undefined || item.action === decision.action) {
         return item.pluginId;
       }

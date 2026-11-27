@@ -168,16 +168,15 @@ export class ChanBspFactorPlugin implements FactorPlugin {
         ? DEFAULT_REQUIRED_BARS_DUAN
         : DEFAULT_REQUIRED_BARS_BI);
 
-    if ((readContextSeries(context, context.period) ?? []).length < minBars) {
+    const series = readContextSeries(context, context.period) ?? [];
+    if (series.length < minBars) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
-        reason: `K线不足${minBars}根(当前${(readContextSeries(context, context.period) ?? []).length}根)，无法确立缠论结构`,
+        reason: `K线不足${minBars}根(当前${series.length}根)，无法确立缠论结构`,
       };
     }
 
-    const klines = toChanKSeries(
-      readContextSeries(context, context.period) ?? [],
-    );
+    const klines = toChanKSeries(series);
     if (klines.length === 0) {
       return {
         action: DECISION_ACTIONS.NEUTRAL,
@@ -186,8 +185,10 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     }
 
     const units = params.units ?? CHAN_BSP_UNITS.BI;
-    const geometry = this.extractGeometry(klines, units);
-    const allEvents = this.detectEvents(klines, units);
+    const { geometry, events: allEvents } = this.analyzeChanStructure(
+      klines,
+      units,
+    );
 
     // 将客观几何形态全量注入黑板上下文，供后续决策流节点（例如私有战术插件）全量读取
     if (
@@ -415,32 +416,68 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     };
   }
 
-  private extractGeometry(
+  /**
+   * 单遍缠论结构分析：统一执行一次成笔/分段/中枢构建与零回抽判定，
+   * 同时产出几何载荷（geometry）与候选买卖点事件（events）。
+   */
+  private analyzeChanStructure(
     klines: readonly ChanK[],
     units: ChanBspUnitLevel,
-  ): ChanGeometryPayload {
+  ): {
+    readonly geometry: ChanGeometryPayload;
+    readonly events: readonly ChanBspDetectedEvent[];
+  } {
+    const { validBis, bspUnits, zhongshus } = this.computeStructurePrimitives(
+      klines,
+      units,
+    );
+    const geometry = this.buildGeometryPayload(klines, validBis, zhongshus);
+    const events = this.detectEvents(klines, units, { bspUnits, zhongshus });
+    return { geometry, events };
+  }
+
+  private computeStructurePrimitives(
+    klines: readonly ChanK[],
+    units: ChanBspUnitLevel,
+  ): {
+    readonly validBis: readonly ChanBi[];
+    readonly bspUnits: readonly ChanBspUnit[];
+    readonly zhongshus: readonly ChanDivergenceZhongshu[];
+  } {
     const bis = ChanCore.createBi(klines);
     const phaseB = bis.phaseB;
 
-    let zhongshus: readonly ChanDivergenceZhongshu[] = [];
-    let validBis: readonly ChanBi[] = [];
-
     if (units === CHAN_BSP_UNITS.DUAN) {
       const duans = ChanCore.createDuan(phaseB);
+      const validDuans = duans.filter(
+        (d) => d.type === DuanType.Complete && d.status === DuanStatus.Valid,
+      );
       const duanChannels = ChanCore.createDuanChannels(duans);
-      zhongshus = duanChannels.phaseB.map((ch) => {
+      const bspUnits = validDuans.map(ChanCore.toBspUnit);
+      const zhongshus = duanChannels.phaseB.map((ch) => {
         const zs = ChanCore.toZhongshu(ch);
         const difRetracedToZero = checkZhongshuZeroRetracement(klines, zs);
         return ChanCore.toZhongshu(ch, difRetracedToZero);
       });
-    } else {
-      validBis = phaseB.filter(
-        (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
-      );
-      const channels = ChanCore.createBiChannels(klines);
-      zhongshus = channels.phaseB.map(ChanCore.toZhongshu);
+      return { validBis: [], bspUnits, zhongshus };
     }
 
+    const validBis = phaseB.filter(
+      (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
+    );
+    const channels = ChanCore.createBiChannels(klines);
+    return {
+      validBis,
+      bspUnits: validBis.map(ChanCore.toBspUnit),
+      zhongshus: channels.phaseB.map(ChanCore.toZhongshu),
+    };
+  }
+
+  private buildGeometryPayload(
+    klines: readonly ChanK[],
+    validBis: readonly ChanBi[],
+    zhongshus: readonly ChanDivergenceZhongshu[],
+  ): ChanGeometryPayload {
     const channelsGeometry: ChanZhongshuGeometry[] = zhongshus.map(
       (zs, idx) => ({
         index: idx,
@@ -510,33 +547,13 @@ export class ChanBspFactorPlugin implements FactorPlugin {
   private detectEvents(
     klines: readonly ChanK[],
     units: ChanBspUnitLevel,
+    precomputed?: {
+      readonly bspUnits: readonly ChanBspUnit[];
+      readonly zhongshus: readonly ChanDivergenceZhongshu[];
+    },
   ): readonly ChanBspDetectedEvent[] {
-    const bis = ChanCore.createBi(klines);
-    const phaseB = bis.phaseB;
-
-    let bspUnits: readonly ChanBspUnit[];
-    let zhongshus: readonly ChanDivergenceZhongshu[];
-
-    if (units === CHAN_BSP_UNITS.DUAN) {
-      const duans = ChanCore.createDuan(phaseB);
-      const validDuans = duans.filter(
-        (d) => d.type === DuanType.Complete && d.status === DuanStatus.Valid,
-      );
-      const duanChannels = ChanCore.createDuanChannels(duans);
-      bspUnits = validDuans.map(ChanCore.toBspUnit);
-      zhongshus = duanChannels.phaseB.map((ch) => {
-        const zs = ChanCore.toZhongshu(ch);
-        const difRetracedToZero = checkZhongshuZeroRetracement(klines, zs);
-        return ChanCore.toZhongshu(ch, difRetracedToZero);
-      });
-    } else {
-      const validBis = phaseB.filter(
-        (b) => b.type === BiType.Complete && b.status === BiStatus.Valid,
-      );
-      const channels = ChanCore.createBiChannels(klines);
-      bspUnits = validBis.map(ChanCore.toBspUnit);
-      zhongshus = channels.phaseB.map(ChanCore.toZhongshu);
-    }
+    const { bspUnits, zhongshus } =
+      precomputed ?? this.computeStructurePrimitives(klines, units);
 
     const forces = computeChanUnitForces(klines, bspUnits);
     const rawPoints = ChanCore.detectBuySellPoints({

@@ -9,6 +9,7 @@ import type { DecisionFlowNode } from './decision-flow.types';
 import { DecisionExecutionTraceBuilder } from './decision-trace-builder';
 import { LegacyStrategyCompiler } from './legacy-strategy-compiler';
 import { LegacyRuleDslPlugin } from '../factor/plugins/legacy-rule-dsl.plugin';
+import { FACTOR_EVALUATION_SCOPE_SYMBOL } from '../strategy.constants';
 
 function makeMockBar(
   time: Date,
@@ -706,6 +707,305 @@ describe('Phase 2: Decision Flow Engine', () => {
       });
       const chain = renderTraceChainOf({ trace: result.trace });
       expect(chain).toBe('门禁B ✓');
+    });
+  });
+
+  describe('Wave 2A: Scope Symbol 与 Context/Extractor 元数据隔离', () => {
+    it('FACTOR_EVALUATION_SCOPE_SYMBOL 使用 Symbol.for 全局注册，跨模块可通过 Symbol.for 读取作用域', async () => {
+      const globalKey = Symbol.for('mist.strategy.factorEvaluationScope');
+      expect(FACTOR_EVALUATION_SCOPE_SYMBOL).toBe(globalKey);
+
+      let observedScope: unknown;
+      registry.register({
+        id: 'plugin.test.scope-reader',
+        name: 'Scope Reader',
+        category: 'TECHNICAL',
+        version: '1.0.0',
+        description: 'reads scope via Symbol.for',
+        evaluate: async (ctx) => {
+          observedScope = (ctx as unknown as Record<symbol, unknown>)[
+            Symbol.for('mist.strategy.factorEvaluationScope')
+          ];
+          return { action: 'BUY', reason: 'ok' };
+        },
+      });
+
+      const flow: DecisionFlowNode = {
+        id: 'guard_scope',
+        type: 'GUARD',
+        name: '作用域门禁',
+        pluginId: 'plugin.test.scope-reader',
+        requiredAction: 'BUY',
+        onPass: { id: 'term_ok', type: 'TERMINAL', action: 'BUY' },
+      };
+
+      await evaluator.evaluate(
+        flow,
+        {
+          securityId: 1,
+          securityCode: '000001',
+          timestamp: new Date('2026-01-05T02:00:00.000Z'),
+          period: 30,
+          attributes: new Map(),
+        },
+        { planScope: '10:1:30' },
+      );
+
+      expect(observedScope).toBe('10:1:30:guard_scope');
+    });
+
+    it('上游/下游 EXTRACTOR 与 role:context / NEUTRAL GUARD 不得污染主信号 badgeText/displayTag/styleMeta/evidence/pivot', async () => {
+      registry.register({
+        id: 'plugin.test.extractor',
+        name: 'Extractor',
+        category: 'CHAN',
+        version: '1.0.0',
+        description: 'extractor',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '提取器特征',
+          badgeText: '提取器徽标',
+          displayTag: 'EXTRACTOR_TAG',
+          styleMeta: { color: '#111111', position: 'above' },
+          evidence: {
+            eventType: 'EXTRACTOR_EVT',
+            pivotTime: '2026-01-01T00:00:00.000Z',
+            pivotPrice: 999,
+            zd: 10,
+          },
+        }),
+      });
+      registry.register({
+        id: 'plugin.test.ctx',
+        name: 'Context Regime',
+        category: 'REGIME',
+        version: '1.0.0',
+        description: 'context',
+        role: 'context',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '大盘强',
+          badgeText: '环境牛市',
+          displayTag: 'CTX_BULL',
+          styleMeta: { color: '#999999', position: 'above' },
+          evidence: {
+            eventType: 'CTX_EVT',
+            pivotTime: '2026-01-02T00:00:00.000Z',
+            pivotPrice: 888,
+          },
+        }),
+      });
+      registry.register({
+        id: 'plugin.test.neutral',
+        name: 'Neutral Guard',
+        category: 'TECHNICAL',
+        version: '1.0.0',
+        description: 'neutral',
+        evaluate: async () => ({
+          action: 'NEUTRAL',
+          reason: '中性确认',
+          badgeText: '中性徽标',
+          displayTag: 'NEUTRAL_TAG',
+          styleMeta: { color: '#777777', position: 'above' },
+        }),
+      });
+      registry.register({
+        id: 'plugin.test.signal-entry',
+        name: 'Signal Entry',
+        category: 'CHAN',
+        version: '1.0.0',
+        description: 'signal',
+        role: 'signal',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '主信号买点',
+          badgeText: '1买',
+          displayTag: 'CHAN_1B',
+          styleMeta: { color: '#FF0000', position: 'below' },
+          evidence: {
+            eventType: 'first_buy',
+            pivotTime: '2026-01-03T00:00:00.000Z',
+            pivotPrice: 12.34,
+          },
+        }),
+      });
+      registry.register({
+        id: 'plugin.test.signal-bare',
+        name: 'Bare Signal',
+        category: 'TECHNICAL',
+        version: '1.0.0',
+        description: 'bare signal without badge or pivot',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '裸突破信号',
+        }),
+      });
+
+      const ctxBase = (): FactorContext => ({
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date('2026-01-05T02:00:00.000Z'),
+        period: 30,
+        attributes: new Map(),
+      });
+
+      // 1) 上游 EXTRACTOR + 上游 context + 下游 context + NEUTRAL guard 均不可覆盖主信号
+      const flowWithRichSignal: DecisionFlowNode = {
+        id: 'ext_up',
+        type: 'EXTRACTOR',
+        name: '上游提取',
+        pluginId: 'plugin.test.extractor',
+        exportAttributeKey: 'chan.central',
+        next: {
+          id: 'guard_ctx_up',
+          type: 'GUARD',
+          name: '上游环境',
+          pluginId: 'plugin.test.ctx',
+          requiredAction: 'BUY',
+          onPass: {
+            id: 'guard_neutral',
+            type: 'GUARD',
+            name: '中性过滤',
+            pluginId: 'plugin.test.neutral',
+            requiredAction: 'NEUTRAL',
+            onPass: {
+              id: 'guard_sig',
+              type: 'GUARD',
+              name: '主买点',
+              pluginId: 'plugin.test.signal-entry',
+              requiredAction: 'BUY',
+              onPass: {
+                id: 'guard_ctx_down',
+                type: 'GUARD',
+                name: '下游环境',
+                pluginId: 'plugin.test.ctx',
+                requiredAction: 'BUY',
+                onPass: {
+                  id: 'ext_down',
+                  type: 'EXTRACTOR',
+                  name: '下游提取',
+                  pluginId: 'plugin.test.extractor',
+                  exportAttributeKey: 'chan.extra',
+                  next: {
+                    id: 'term_in',
+                    type: 'TERMINAL',
+                    action: 'INHERIT',
+                    signalTag: 'RICH_ENTRY',
+                  },
+                },
+              },
+            },
+          },
+        },
+      };
+
+      const ctx1 = ctxBase();
+      const res1 = await evaluator.evaluate(flowWithRichSignal, ctx1);
+      expect(res1.status).toBe('SIGNAL_EMITTED');
+      expect(res1.action).toBe('BUY');
+      expect(res1.badgeText).toBe('1买');
+      expect(res1.displayTag).toBe('CHAN_1B');
+      expect(res1.styleMeta).toEqual({ color: '#FF0000', position: 'below' });
+      expect(res1.evidence).toMatchObject({ eventType: 'first_buy' });
+      expect(extractPivotEvidence(res1)).toEqual({
+        pivotTime: '2026-01-03T00:00:00.000Z',
+        pivotPrice: 12.34,
+      });
+      expect(ctx1.attributes.get('chan.central')).toMatchObject({ zd: 10 });
+      expect(
+        res1.trace.find((t) => t.nodeId === 'guard_ctx_up')?.pluginRole,
+      ).toBe('context');
+      expect(res1.trace.find((t) => t.nodeId === 'guard_sig')?.pluginRole).toBe(
+        'signal',
+      );
+
+      // 2) 当信号节点本身无 badgeText/displayTag/styleMeta/pivot 时，context/extractor 也不得补位劫持
+      const flowWithBareSignal: DecisionFlowNode = {
+        id: 'ext_up_2',
+        type: 'EXTRACTOR',
+        name: '提取',
+        pluginId: 'plugin.test.extractor',
+        exportAttributeKey: 'chan.central',
+        next: {
+          id: 'guard_ctx_2',
+          type: 'GUARD',
+          name: '环境',
+          pluginId: 'plugin.test.ctx',
+          requiredAction: 'BUY',
+          onPass: {
+            id: 'guard_bare',
+            type: 'GUARD',
+            name: '裸信号',
+            pluginId: 'plugin.test.signal-bare',
+            requiredAction: 'BUY',
+            onPass: {
+              id: 'term_bare',
+              type: 'TERMINAL',
+              action: 'INHERIT',
+              signalTag: 'BARE_ENTRY',
+            },
+          },
+        },
+      };
+
+      const res2 = await evaluator.evaluate(flowWithBareSignal, ctxBase());
+      expect(res2.status).toBe('SIGNAL_EMITTED');
+      expect(res2.badgeText).toBeUndefined();
+      expect(res2.displayTag).toBeUndefined();
+      expect(res2.styleMeta).toBeUndefined();
+      expect(res2.evidence).toBeUndefined();
+      expect(extractPivotEvidence(res2)).toBeNull();
+    });
+
+    it('纯单 context 插件决策流保持向后兼容（无 signal 节点时兜底返回 context 元数据）', async () => {
+      registry.register({
+        id: 'plugin.test.only-context',
+        name: 'Only Context',
+        category: 'REGIME',
+        version: '1.0.0',
+        description: 'single context plugin',
+        role: 'context',
+        evaluate: async () => ({
+          action: 'BUY',
+          reason: '仅context通过',
+          badgeText: '环境买',
+          evidence: {
+            eventType: 'CTX_ONLY',
+            pivotTime: '2026-01-04T00:00:00.000Z',
+            pivotPrice: 20.5,
+          },
+        }),
+      });
+
+      const flow: DecisionFlowNode = {
+        id: 'guard_only_ctx',
+        type: 'GUARD',
+        name: '单环境门禁',
+        pluginId: 'plugin.test.only-context',
+        requiredAction: 'BUY',
+        onPass: {
+          id: 'term_ctx',
+          type: 'TERMINAL',
+          action: 'INHERIT',
+          signalTag: 'CTX_ONLY',
+        },
+      };
+
+      const result = await evaluator.evaluate(flow, {
+        securityId: 1,
+        securityCode: '000001',
+        timestamp: new Date('2026-01-05T02:00:00.000Z'),
+        period: 30,
+        attributes: new Map(),
+      });
+
+      expect(result.status).toBe('SIGNAL_EMITTED');
+      expect(result.badgeText).toBe('环境买');
+      expect(result.evidence).toMatchObject({ eventType: 'CTX_ONLY' });
+      expect(extractPivotEvidence(result)).toEqual({
+        pivotTime: '2026-01-04T00:00:00.000Z',
+        pivotPrice: 20.5,
+      });
     });
   });
 });

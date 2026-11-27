@@ -89,6 +89,8 @@ export interface DecisionExecutionTraceItem {
   readonly type: 'GUARD' | 'BRANCH' | 'EXTRACTOR' | 'TERMINAL';
   /** 产出该节点意见的插件 id（BRANCH/TERMINAL 等非插件节点为空） */
   readonly pluginId?: string;
+  /** 产出该节点意见的插件角色（'context' 为上下文提供者，未指定视作 'signal'） */
+  readonly pluginRole?: 'signal' | 'context';
   readonly name?: string;
   readonly action?: FactorAction | 'ABORT';
   readonly signalTag?: string;
