@@ -21,9 +21,9 @@ export function mapKernelSignalToSimulationSignal(
   const evidenceType = readEvidenceEventType(signal);
   const signalType = evidenceType ?? signal.signalType;
   const badgeText =
-    signal.badgeText ??
-    (signal.contextSnapshot as any)?.badgeText ??
-    (signal.decisionTrace as any)?.badgeText ??
+    readOptionalString(signal.badgeText) ??
+    readOptionalString(signal.contextSnapshot?.badgeText) ??
+    readOptionalString(signal.decisionTrace?.badgeText) ??
     (isBuy ? DEFAULT_BUY_BADGE : DEFAULT_SELL_BADGE);
   return {
     signalTime: signal.signalTime.toISOString(),
@@ -37,6 +37,10 @@ export function mapKernelSignalToSimulationSignal(
     securityCode: options.securityCode,
     period: options.period,
   };
+}
+
+function readOptionalString(value: unknown): string | null {
+  return typeof value === 'string' && value.length > 0 ? value : null;
 }
 
 function readEvidenceEventType(signal: KernelSignal): string | null {
