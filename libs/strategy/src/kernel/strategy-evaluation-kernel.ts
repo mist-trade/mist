@@ -5,7 +5,6 @@ import type { DecisionResult } from '../decision-flow/decision-flow.types';
 import { DecisionFlowEvaluator } from '../decision-flow/decision-flow-evaluator';
 import {
   extractPivotEvidence,
-  extractPivotEvidenceFromReason,
   findBadgeTextFromTrace,
   selectPassingGuardTraceItems,
 } from '../decision-flow/decision-pivot-evidence';
@@ -642,9 +641,7 @@ export class StrategyEvaluationKernel {
     const lastProjected: ProjectedStrategyBar | undefined =
       projected[projected.length - 1];
     const triggerPrice = lastProjected?.ohlc.effective?.close ?? bar.close;
-    const pivot =
-      extractPivotEvidence(decision) ??
-      extractPivotEvidenceFromReason(decision);
+    const pivot = extractPivotEvidence(decision);
     const badgeText =
       decision.badgeText ?? findBadgeTextFromTrace(decision.trace);
     const channel: SignalChannelRef = {

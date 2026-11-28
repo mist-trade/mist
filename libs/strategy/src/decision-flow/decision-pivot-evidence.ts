@@ -80,16 +80,6 @@ export function extractPivotEvidence(
   return null;
 }
 
-/**
- * 历史兜底函数：已移除所有中文文本匹配，严格以结构化 evidence 为准。
- */
-export function extractPivotEvidenceFromReason(
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  _result: DecisionResult,
-): DecisionPivotEvidence | null {
-  return null;
-}
-
 function normalizePivotEvidence(
   raw: RawPivotEvidence,
 ): DecisionPivotEvidence | null {
