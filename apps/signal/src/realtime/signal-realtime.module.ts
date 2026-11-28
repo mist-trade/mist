@@ -21,6 +21,8 @@ import { resolveRealtimeStrategyMode } from '@app/config';
 import { TimezoneModule } from '@app/timezone';
 import { SignalPreMarketWarmupService } from './signal-pre-market-warmup.service';
 import { RuntimeObservabilityService } from '../observability/runtime-observability.service';
+import { RealtimeKernelPool } from '@app/strategy';
+import { RealtimeStrategyEvaluationService } from '@app/signal';
 
 @Module({
   imports: [
@@ -47,6 +49,18 @@ import { RuntimeObservabilityService } from '../observability/runtime-observabil
     SignalStrategyMarketDataAdapter,
     LiveStrategyPersistenceService,
     {
+      provide: RealtimeKernelPool,
+      inject: [SignalStrategyMarketDataAdapter],
+      useFactory: (marketData: SignalStrategyMarketDataAdapter) =>
+        new RealtimeKernelPool(marketData),
+    },
+    {
+      provide: RealtimeStrategyEvaluationService,
+      inject: [RealtimeKernelPool],
+      useFactory: (kernelPool: RealtimeKernelPool) =>
+        new RealtimeStrategyEvaluationService(kernelPool),
+    },
+    {
       provide: CandleFinalizedJobProcessor,
       inject: [
         SignalStrategyMarketDataAdapter,
@@ -54,6 +68,7 @@ import { RuntimeObservabilityService } from '../observability/runtime-observabil
         ConfigService,
         LiveStrategyPersistenceService,
         RuntimeObservabilityService,
+        RealtimeStrategyEvaluationService,
       ],
       useFactory(
         marketData: SignalStrategyMarketDataAdapter,
@@ -61,6 +76,7 @@ import { RuntimeObservabilityService } from '../observability/runtime-observabil
         config: ConfigService,
         persistence: LiveStrategyPersistenceService,
         runtimeObservability: RuntimeObservabilityService,
+        evaluation: RealtimeStrategyEvaluationService,
       ) {
         return new CandleFinalizedJobProcessor(
           marketData,
@@ -68,7 +84,7 @@ import { RuntimeObservabilityService } from '../observability/runtime-observabil
             registry.executionPlansFor(securityId, source),
           () => new Date(),
           undefined,
-          undefined,
+          evaluation,
           config.get<number>('REALTIME_STRATEGY_JOB_TIMEOUT_MS') ?? 30_000,
           resolveRealtimeStrategyMode(
             config.get<string>('REALTIME_STRATEGY_MODE'),
