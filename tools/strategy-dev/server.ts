@@ -26,6 +26,7 @@ import {
   TRADING_LAYER_DEFAULTS,
   type HistoricalReplaySummary,
   type MacroRegimeSnapshot,
+  type PositionClosedRecord,
 } from '@app/strategy';
 import {
   StrategySimulationSession,
@@ -566,7 +567,7 @@ const sessionStreamClients = new Map<string, Set<http.ServerResponse>>();
 interface CachedBacktestResult {
   readonly signals: readonly SimulationSignal[];
   readonly navSeries: readonly number[];
-  readonly closedTrades: readonly any[];
+  readonly closedTrades: readonly PositionClosedRecord[];
   readonly performance: ReturnType<typeof computePerformanceSummary> | null;
   readonly maxUnderwaterDuration: number | undefined;
   readonly replay: HistoricalReplaySummary | undefined;
@@ -2440,18 +2441,14 @@ async function handleDevRequest(
       });
 
       // 计算更细致的交易盈亏统计（区分 Profit Factor 获利因子 与 Payoff Ratio 单笔盈亏比）
-      const winTrades = (closedTrades || []).filter(
-        (t: any) => t.realizedPnl > 0,
-      );
-      const lossTrades = (closedTrades || []).filter(
-        (t: any) => t.realizedPnl < 0,
-      );
+      const winTrades = (closedTrades || []).filter((t) => t.realizedPnl > 0);
+      const lossTrades = (closedTrades || []).filter((t) => t.realizedPnl < 0);
       const totalWinPnl = winTrades.reduce(
-        (sum: number, t: any) => sum + t.realizedPnl,
+        (sum: number, t) => sum + t.realizedPnl,
         0,
       );
       const totalLossPnl = Math.abs(
-        lossTrades.reduce((sum: number, t: any) => sum + t.realizedPnl, 0),
+        lossTrades.reduce((sum: number, t) => sum + t.realizedPnl, 0),
       );
       const avgWin = winTrades.length > 0 ? totalWinPnl / winTrades.length : 0;
       const avgLoss =
