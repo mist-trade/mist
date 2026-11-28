@@ -392,6 +392,10 @@ export class AlertChannelDeliveryService {
     };
   }
 
+  /**
+   * 线上实时投递估算记账（assumed_close 口径）：按指令参考价 instruction.referencePrice
+   *（触发 Bar close）写入 virtual_fill_events；离线回测另由 SimulatedBroker 按 Next-Bar Open 撮合。
+   */
   private async appendAssumedFill(
     instruction: TradeInstruction,
     securityId: number,

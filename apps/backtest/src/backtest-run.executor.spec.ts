@@ -1538,4 +1538,75 @@ describe('BacktestRunExecutor Wave 2B parity', () => {
       }),
     );
   });
+
+  it('advances buildAccountSnapshot.tradingDay on D+1 09:35 5m execution bar before primary daily onBar', async () => {
+    // 回归验证：D1 09:35 5m 买入（T+1 锁至 D1），D1 日线收盘发出 SELL 信号，
+    // 在 D2 09:35 5m 执行 Bar 到来时（此时 D2 日线 onBar 尚未到达），
+    // snapshot.tradingDay 必须推进到 D2，避免被 TradingEngine 误拒为 T1_FROZEN。
+    const sellRuleFlow = LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'lt', value: 10.1 },
+      'exit',
+    );
+    const buyRuleFlow = LegacyStrategyCompiler.compileRuleToDecisionFlow(
+      { field: 'k.close', operator: 'gt', value: 10.2 },
+      'entry',
+    );
+    const fixture = parityFixture({
+      period: Period.DAY,
+      rule: {
+        rootNode: { ...sellRuleFlow, onFail: buyRuleFlow },
+        requiredBarCount: 1,
+        surveillancePeriods: [5, 1440],
+      },
+    });
+    const decideSpy = jest.spyOn(TradingEngine.prototype, 'decide');
+    const submitSpy = jest.spyOn(SimulatedBroker.prototype, 'submitOrder');
+
+    // D0 (01-05): close=10.3 -> BUY signal
+    // D1 (01-06): 09:35 5m fill BUY; 15:00 close=9.9 -> SELL signal
+    // D2 (01-07): 09:35 5m -> flush SELL (tradingDay must be 2026-01-07!)
+    const d0Day = makeBar('2026-01-04T16:00:00.000Z', Period.DAY, 10.0, 10.3);
+    const d1Morning5m = makeBar(
+      '2026-01-06T01:35:00.000Z',
+      Period.FIVE_MIN,
+      10.4,
+      10.4,
+    );
+    const d1Day = makeBar('2026-01-05T16:00:00.000Z', Period.DAY, 10.4, 9.9);
+    const d2Morning5m = makeBar(
+      '2026-01-07T01:35:00.000Z',
+      Period.FIVE_MIN,
+      9.8,
+      9.8,
+    );
+    const d2Day = makeBar('2026-01-06T16:00:00.000Z', Period.DAY, 9.8, 9.7);
+
+    fixture.dependencies.marketData.readReplayPage.mockImplementation(
+      async (query: { period: number; afterTimestamp?: Date }) => {
+        if (query.afterTimestamp) {
+          return { bars: [], nextAfterTimestamp: undefined };
+        }
+        if (query.period === Period.FIVE_MIN) {
+          return {
+            bars: [d1Morning5m, d2Morning5m],
+            nextAfterTimestamp: undefined,
+          };
+        }
+        return { bars: [d0Day, d1Day, d2Day], nextAfterTimestamp: undefined };
+      },
+    );
+
+    await fixture.instance.execute(fixture.current.id);
+
+    const sellDecideCall = decideSpy.mock.calls.find(([group]) =>
+      group.signals.some((s) => s.signal.signalKind === 'exit'),
+    );
+    expect(sellDecideCall).toBeDefined();
+    expect(sellDecideCall![1].tradingDay).toBe('2026-01-07');
+
+    const sellOrderCalls = submitSpy.mock.calls.filter(
+      ([dto]) => dto.side === ORDER_SIDES.SELL,
+    );
+    expect(sellOrderCalls.length).toBeGreaterThanOrEqual(1);
+  });
 });

@@ -530,7 +530,9 @@ export class BacktestRunExecutor {
         cashLi: yuanToLi(capitalLedger.getCash()),
         positions,
         tradingDay: formatShanghaiDateString(
-          (lastSeenBar as StrategyBar | null)?.timestamp ?? new Date(0),
+          currentExecutionTime ??
+            (lastSeenBar as StrategyBar | null)?.timestamp ??
+            new Date(0),
         ),
       };
     };
@@ -676,12 +678,15 @@ export class BacktestRunExecutor {
     };
 
     let lastSeenBar: StrategyBar | null = null;
+    // 独立追踪最新执行 Bar 时间（含 5m 次级别），防止 buildAccountSnapshot().tradingDay 滞留在上一日线而误拒 D+1 09:35 卖单
+    let currentExecutionTime: Date | null = null;
     const executionPeriod =
       surveillancePeriods.length > 0
         ? Math.min(...surveillancePeriods)
         : run.period;
     const sawExecutionBarDays = new Set<string>();
     const executeOnBar = (bar: StrategyBar): void => {
+      currentExecutionTime = bar.timestamp;
       flushPendingGroup(bar);
       const fills = broker.onBar(bar);
       for (const fill of fills) {
