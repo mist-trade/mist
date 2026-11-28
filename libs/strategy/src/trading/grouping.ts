@@ -29,6 +29,24 @@ export interface SignalGroup<T> {
 }
 
 /**
+ * 单一分组键构造：组键 = `${securityId}\u0000${effectiveTime.getTime()}`。
+ * 线上扇出、离线门面与扫表恢复共享此构造，杜绝多份键逻辑漂移。
+ */
+export function groupKeyOf(signal: GroupableSignal): {
+  readonly key: string;
+  readonly effectiveTime: Date;
+} {
+  const effectiveTime = availabilityKey({
+    period: signal.period,
+    timestamp: signal.signalTime,
+  });
+  return {
+    key: `${signal.securityId}\u0000${effectiveTime.getTime()}`,
+    effectiveTime,
+  };
+}
+
+/**
  * 分组：组键 = `${securityId}\u0000${effectiveTime.getTime()}`。
  * selector 由调用方提供（扇出侧取候选信号字段，门面侧取 KernelSignal）。
  */
@@ -39,11 +57,7 @@ export function groupSignals<T>(
   const groups = new Map<string, SignalGroup<T>>();
   for (const item of signals) {
     const signal = selector(item);
-    const effectiveTime = availabilityKey({
-      period: signal.period,
-      timestamp: signal.signalTime,
-    });
-    const key = `${signal.securityId}\u0000${effectiveTime.getTime()}`;
+    const { key, effectiveTime } = groupKeyOf(signal);
     let group = groups.get(key);
     if (!group) {
       group = {

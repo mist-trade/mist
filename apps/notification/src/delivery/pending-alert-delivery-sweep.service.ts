@@ -8,7 +8,7 @@ import {
   StrategyAlertStatus,
   StrategySignal,
 } from '@app/shared-data';
-import { availabilityKey } from '@app/strategy';
+import { groupKeyOf } from '@app/strategy';
 import { formatShanghaiDateString } from '@app/timezone';
 import { toErrorMessage } from '@app/utils';
 import type { AlertDeliveryGroupDescriptor } from '@app/contracts';
@@ -109,11 +109,7 @@ export class PendingAlertDeliverySweepService {
         );
         continue;
       }
-      const effectiveTime = availabilityKey({
-        period: signal.period,
-        timestamp: signal.signalTime,
-      });
-      const key = `${signal.securityId}\u0000${effectiveTime.getTime()}`;
+      const { key, effectiveTime } = groupKeyOf(signal);
       let group = groups.get(key);
       if (!group) {
         group = {

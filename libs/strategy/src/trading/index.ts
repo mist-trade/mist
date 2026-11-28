@@ -66,7 +66,7 @@ export type {
 } from './fill-log.port';
 export { createVirtualFillAccumulator, foldVirtualFills } from './account-fold';
 export type { VirtualFillAccumulator } from './account-fold';
-export { groupSignals } from './grouping';
+export { groupSignals, groupKeyOf } from './grouping';
 export type {
   GroupableSignal,
   SignalGroup,
