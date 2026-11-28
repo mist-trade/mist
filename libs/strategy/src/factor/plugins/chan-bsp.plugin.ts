@@ -321,15 +321,10 @@ export class ChanBspFactorPlugin implements FactorPlugin {
     const pointLabel = this.formatPointName(latestEvent.type);
     const badgeText = this.formatBadgeText(latestEvent.type);
 
-    const lastBar =
-      (readContextSeries(context, context.period) ?? []).length > 0
-        ? (readContextSeries(context, context.period) ?? [])[
-            (readContextSeries(context, context.period) ?? []).length - 1
-          ]
-        : null;
+    const lastBar = series.length > 0 ? series[series.length - 1] : undefined;
     const currentBarClose =
       lastBar?.ohlc?.effective?.close ??
-      (lastBar?.rawBar as any)?.close ??
+      lastBar?.rawBar?.close ??
       latestEvent.price;
 
     return {
