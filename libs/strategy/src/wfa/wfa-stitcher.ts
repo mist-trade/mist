@@ -124,8 +124,9 @@ export function computeParameterStabilityIndex(
   const n = testSharpes.length;
   const mean = testSharpes.reduce((acc, v) => acc + v, 0) / n;
 
-  // 若平均夏普为负或零，策略整体无超额稳定性
-  if (mean <= 0 || Number.isNaN(mean)) {
+  // 若平均夏普为负、零或非有限，策略整体无超额稳定性
+  // Infinity 必须在此 fail-closed，否则方差的 Infinity - Infinity 会退化为 NaN 穿透 PSI
+  if (mean <= 0 || !Number.isFinite(mean)) {
     return 0.0;
   }
 

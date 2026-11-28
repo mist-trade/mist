@@ -239,6 +239,14 @@ describe('Walk-Forward Analysis (WFA) Pure Domain Core', () => {
 
       // Case 4: Empty folds -> 0
       expect(computeParameterStabilityIndex([])).toBe(0);
+
+      // Case 5: Non-finite mean Sharpe fails closed instead of leaking NaN into PSI
+      expect(
+        computeParameterStabilityIndex([
+          { testSharpe: Infinity },
+          { testSharpe: 1.2 },
+        ]),
+      ).toBe(0);
     });
   });
 
