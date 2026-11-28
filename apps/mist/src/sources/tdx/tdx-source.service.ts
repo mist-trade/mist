@@ -1,5 +1,4 @@
 import { Injectable, Logger, HttpException, HttpStatus } from '@nestjs/common';
-import { Decimal8, normalizeExternalDecimalText } from '@app/decimal';
 import { ConfigService } from '@nestjs/config';
 import { AxiosInstance } from 'axios';
 import { UtilsService, toErrorMessage } from '@app/utils';
@@ -28,6 +27,7 @@ import {
 } from './types';
 import { DATASOURCE_HTTP_TIMEOUT_MS } from '../constants';
 import { saveBaseK } from '../k-save.helper';
+import { normalizeTdxBarQuantity } from '../k-quantity-normalization';
 
 const TDX_BAR_FIELDS = [
   'Open',
@@ -340,20 +340,4 @@ export class TdxSource implements ITdxSourceFetcher {
 
     return payload;
   }
-}
-
-function normalizeTdxBarQuantity(
-  value: string | null,
-  fieldName: 'volume' | 'amount',
-): string | null {
-  if (value === null) return null;
-  const normalized = normalizeExternalDecimalText(value);
-  if (fieldName === 'amount') {
-    // TDX historical amount is provider-native 万元; canonical is yuan.
-    // Exact fixed-point ×10000 (Decimal8), no binary-float arithmetic.
-    return Decimal8.parseCanonical(normalized)
-      .scaleByUnit(10_000)
-      .formatCanonical();
-  }
-  return normalized;
 }

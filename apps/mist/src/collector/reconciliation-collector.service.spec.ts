@@ -232,6 +232,8 @@ describe('ReconciliationCollectorService', () => {
     });
 
     it('saves compliant DAY bars, advances checkpoint and records audit event', async () => {
+      const kSave = await import('../sources/k-save.helper');
+      const saveBaseKSpy = jest.spyOn(kSave, 'saveBaseK');
       const sec = { id: 1, code: '600000', status: 1 } as Security;
       mockSecurityRepo.findOne.mockResolvedValue(sec);
 
@@ -247,18 +249,89 @@ describe('ReconciliationCollectorService', () => {
             low: 9.8,
             close: 10.5,
             volume: 5000,
+            amount: 12345.6,
           },
         ],
       });
 
       expect(result.success).toBe(true);
       expect(result.checkpointAdvanced).toBe(true);
+      expect(saveBaseKSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        [
+          expect.objectContaining({
+            volume: '5000',
+            amount: '123456000',
+          }),
+        ],
+        sec,
+        DataSource.TDX,
+        expect.anything(),
+      );
       expect(mockCheckpointManager.updateCheckpoint).toHaveBeenCalledWith(
         1,
         '600000',
         'tdx',
         expect.any(String),
       );
+      saveBaseKSpy.mockRestore();
+    });
+
+    it('scales QMT volume from lots to canonical shares (x100) and rejects fractional lots', async () => {
+      const kSave = await import('../sources/k-save.helper');
+      const saveBaseKSpy = jest.spyOn(kSave, 'saveBaseK');
+      const sec = { id: 5, code: '000001', status: 1 } as Security;
+      mockSecurityRepo.findOne.mockResolvedValue(sec);
+
+      const result = await service.pushBars({
+        source: 'qmt',
+        symbol: '000001',
+        period: '1d',
+        bars: [
+          {
+            timestamp: 1700000000,
+            open: 3600,
+            high: 3620,
+            low: 3580,
+            close: 3606.49,
+            volume: 634626966,
+            amount: 929777242144,
+          },
+        ],
+      });
+
+      expect(result.success).toBe(true);
+      expect(saveBaseKSpy).toHaveBeenCalledWith(
+        expect.anything(),
+        [
+          expect.objectContaining({
+            volume: '63462696600',
+            amount: '929777242144',
+          }),
+        ],
+        sec,
+        DataSource.QMT,
+        expect.anything(),
+      );
+      saveBaseKSpy.mockRestore();
+
+      await expect(
+        service.pushBars({
+          source: 'qmt',
+          symbol: '000001',
+          period: '1d',
+          bars: [
+            {
+              timestamp: 1700000000,
+              open: 3600,
+              high: 3620,
+              low: 3580,
+              close: 3606.49,
+              volume: 12.5,
+            },
+          ],
+        }),
+      ).rejects.toThrow('QMT_INVALID_FRACTIONAL_VOLUME');
     });
   });
 });

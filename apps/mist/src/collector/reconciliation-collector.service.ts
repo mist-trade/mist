@@ -17,6 +17,7 @@ import {
 } from '@app/shared-data';
 import { TimezoneService } from '@app/timezone';
 import { BaseKInput, saveBaseK } from '../sources/k-save.helper';
+import { normalizePushBarQuantities } from '../sources/k-quantity-normalization';
 import { PushBarsDto } from './dto/reconciliation.dto';
 import {
   KlineVerificationValidator,
@@ -283,18 +284,23 @@ export class ReconciliationCollectorService {
       );
     }
 
-    // 4. 转换标准入库实体并执行事务入库
+    // 4. 转换标准入库实体并执行事务入库（复用 write-layer 量纲契约：QMT 手→股 ×100，TDX 万元→元 ×10000）
     const baseKInputs: BaseKInput[] = dto.bars.map((b) => {
       const rawTs = b.timestamp;
       const ms = rawTs < 1e11 ? rawTs * 1000 : rawTs;
+      const { volume, amount } = normalizePushBarQuantities(
+        sourceEnum,
+        b.volume,
+        b.amount,
+      );
       return {
         timestamp: new Date(ms),
         open: b.open,
         high: b.high,
         low: b.low,
         close: b.close,
-        volume: String(b.volume),
-        amount: b.amount != null ? String(b.amount) : null,
+        volume,
+        amount,
       };
     });
 
