@@ -96,7 +96,7 @@ describe('Decimal8 pure boundary', () => {
 
     const consumers = [
       'apps/mist/src/sources/k-save.helper.ts',
-      'apps/mist/src/sources/tdx/tdx-source.service.ts',
+      'apps/mist/src/sources/k-quantity-normalization.ts',
       'apps/mist/src/sources/qmt/qmt-source.service.ts',
       'libs/shared-data/src/transformers/canonical-decimal.transformer.ts',
       'apps/mist/src/realtime/candle/open-candle-aggregator.ts',
